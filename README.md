@@ -2,6 +2,15 @@
 
 Flutter 版本重构工程（Android 优先）。
 
+## 设计与开发指导
+
+当前项目 UI 设计与 Flutter 组件开发以相邻组件库文档为准：
+
+- 设计规范：`../flutter-components/DESIGN.md`
+- 开发指导：`../flutter-components/DOC.md`
+
+涉及 UI、页面结构、交互状态或组件选型的改动，应优先使用 `package:flutter_components/flutter_components.dart` 导出的 `Goo*` 组件，并遵循根目录 `AGENTS.md` 的项目级说明。
+
 ## 常用命令
 
 在本目录执行：
