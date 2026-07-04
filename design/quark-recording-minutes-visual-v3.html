@@ -1,0 +1,1922 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>夸克录音纪要 - 静态 Web 视觉稿 v3</title>
+    <script src="https://unpkg.com/lucide@0.468.0/dist/umd/lucide.min.js"></script>
+    <style>
+      :root {
+        --theme: #0066ff;
+        --theme-soft: #eaf2ff;
+        --theme-fill: #f4f8ff;
+        --text: #000000e5;
+        --text-2: #0000008a;
+        --text-3: #00000042;
+        --bg: #f0f1f2;
+        --page: #e7e9ec;
+        --bar: #fafafa;
+        --card: #ffffff;
+        --thin: #0000000a;
+        --regular: #00000014;
+        --medium: #0000001f;
+        --divider: #0000001f;
+        --red: #eb3b2f;
+        --red-soft: #fdebea;
+        --orange: #ff7700;
+        --orange-soft: #fff0df;
+        --yellow: #ffb200;
+        --yellow-soft: #fff4d6;
+        --green: #00bd13;
+        --green-soft: #e8f8ea;
+        --teal: #00a5a5;
+        --teal-soft: #e7f7f7;
+        --radius: 12px;
+        --panel-radius: 24px;
+        --capsule: 999px;
+        --shadow: 0 2px 4px rgba(0, 0, 0, 0.06);
+        --popup-shadow: 0 18px 38px rgba(0, 0, 0, 0.18);
+        --phone-w: 390px;
+        --phone-h: 844px;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        background: var(--page);
+        color: var(--text);
+        font-family: "OPPO Sans", "PingFang SC", "Microsoft YaHei", sans-serif;
+      }
+
+      button,
+      input,
+      textarea {
+        font: inherit;
+      }
+
+      .review-shell {
+        padding: 28px;
+      }
+
+      .review-header {
+        max-width: 1440px;
+        margin: 0 auto 24px;
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) auto;
+        gap: 20px;
+        align-items: end;
+      }
+
+      .review-header > div,
+      .system-card,
+      .board {
+        min-width: 0;
+      }
+
+      .review-header h1 {
+        margin: 0 0 8px;
+        font-size: 28px;
+        line-height: 40px;
+        font-weight: 600;
+        letter-spacing: 0;
+        overflow-wrap: anywhere;
+      }
+
+      .review-header p {
+        margin: 0;
+        max-width: 980px;
+        color: var(--text-2);
+        font-size: 14px;
+        line-height: 22px;
+      }
+
+      .header-tags,
+      .cluster-tags,
+      .chip-row,
+      .meta-row,
+      .inline-actions {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        flex-wrap: wrap;
+      }
+
+      .header-tags {
+        justify-content: flex-end;
+        max-width: 460px;
+      }
+
+      .tag,
+      .chip,
+      .header-tag,
+      .status-pill {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        border-radius: var(--capsule);
+        white-space: nowrap;
+      }
+
+      .header-tag {
+        min-height: 32px;
+        padding: 6px 12px;
+        background: var(--card);
+        border: 1px solid var(--regular);
+        color: var(--text-2);
+        font-size: 12px;
+        line-height: 16px;
+      }
+
+      .section-head {
+        max-width: 1440px;
+        margin: 28px auto 14px;
+        display: flex;
+        align-items: end;
+        justify-content: space-between;
+        gap: 12px;
+      }
+
+      .section-head h2 {
+        margin: 0;
+        font-size: 20px;
+        line-height: 28px;
+        font-weight: 600;
+        letter-spacing: 0;
+      }
+
+      .section-head p {
+        margin: 4px 0 0;
+        color: var(--text-2);
+        font-size: 13px;
+        line-height: 20px;
+      }
+
+      .boards {
+        max-width: 1440px;
+        margin: 0 auto;
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(var(--phone-w), var(--phone-w)));
+        justify-content: center;
+        gap: 28px;
+      }
+
+      .board {
+        display: grid;
+        gap: 10px;
+      }
+
+      .board-title {
+        min-height: 34px;
+        padding: 0 6px;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 10px;
+      }
+
+      .board-title h3 {
+        margin: 0;
+        font-size: 15px;
+        line-height: 22px;
+        font-weight: 600;
+      }
+
+      .board-title span {
+        color: var(--text-2);
+        font-size: 12px;
+        line-height: 16px;
+      }
+
+      .system-board {
+        max-width: 1440px;
+        margin: 0 auto;
+        display: grid;
+        grid-template-columns: minmax(0, 1.1fr) minmax(360px, 0.9fr);
+        gap: 18px;
+      }
+
+      .system-card {
+        border-radius: var(--panel-radius);
+        background: var(--card);
+        box-shadow: var(--shadow);
+        padding: 18px;
+      }
+
+      .system-card h3 {
+        margin: 0 0 8px;
+        font-size: 18px;
+        line-height: 26px;
+        font-weight: 600;
+      }
+
+      .system-card p {
+        margin: 0 0 14px;
+        color: var(--text-2);
+        font-size: 13px;
+        line-height: 20px;
+      }
+
+      .system-grid {
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: 10px;
+      }
+
+      .system-node {
+        border-radius: var(--radius);
+        background: var(--thin);
+        padding: 12px;
+      }
+
+      .system-node strong {
+        display: block;
+        margin-bottom: 8px;
+        font-size: 13px;
+        line-height: 18px;
+      }
+
+      .system-node ul {
+        margin: 0;
+        padding: 0;
+        list-style: none;
+        display: grid;
+        gap: 7px;
+      }
+
+      .system-node li {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 8px;
+        min-width: 0;
+        color: var(--text-2);
+        font-size: 12px;
+        line-height: 16px;
+      }
+
+      .stage {
+        flex: 0 0 auto;
+        min-width: 28px;
+        padding: 2px 6px;
+        border-radius: var(--capsule);
+        background: var(--regular);
+        color: var(--text-2);
+        text-align: center;
+        font-size: 10px;
+        line-height: 14px;
+        font-weight: 600;
+      }
+
+      .stage.p0 {
+        color: var(--theme);
+        background: var(--theme-soft);
+      }
+
+      .stage.p1 {
+        color: #007a7a;
+        background: var(--teal-soft);
+      }
+
+      .stage.p2 {
+        color: #8a5b00;
+        background: var(--yellow-soft);
+      }
+
+      .axis-stack {
+        display: grid;
+        gap: 10px;
+      }
+
+      .axis {
+        border-radius: var(--radius);
+        background: var(--thin);
+        padding: 12px;
+      }
+
+      .axis strong {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        margin-bottom: 8px;
+        font-size: 13px;
+        line-height: 18px;
+      }
+
+      .phone {
+        position: relative;
+        width: var(--phone-w);
+        height: var(--phone-h);
+        overflow: hidden;
+        border-radius: 34px;
+        background: var(--bg);
+        border: 10px solid #111318;
+        box-shadow: 0 18px 44px rgba(0, 0, 0, 0.24);
+      }
+
+      .phone::before {
+        content: "";
+        position: absolute;
+        z-index: 30;
+        top: 10px;
+        left: 50%;
+        width: 108px;
+        height: 22px;
+        transform: translateX(-50%);
+        border-radius: 0 0 18px 18px;
+        background: #111318;
+      }
+
+      .screen {
+        position: absolute;
+        inset: 0;
+        display: flex;
+        flex-direction: column;
+        overflow: hidden;
+        background: var(--bg);
+      }
+
+      .app-bar {
+        min-height: 96px;
+        padding: 38px 16px 10px;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        background: var(--bar);
+      }
+
+      .app-bar.compact {
+        min-height: 68px;
+        padding: 26px 14px 8px;
+      }
+
+      .app-title {
+        min-width: 0;
+        flex: 1;
+      }
+
+      .app-title h4 {
+        margin: 0;
+        font-size: 24px;
+        line-height: 34px;
+        font-weight: 600;
+        letter-spacing: 0;
+      }
+
+      .app-title.small h4 {
+        font-size: 18px;
+        line-height: 26px;
+      }
+
+      .sub {
+        margin-top: 2px;
+        color: var(--text-2);
+        font-size: 12px;
+        line-height: 16px;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+
+      .icon-btn,
+      .round-btn {
+        border: 0;
+        display: inline-grid;
+        place-items: center;
+        background: transparent;
+        color: var(--text);
+        cursor: pointer;
+        flex: 0 0 auto;
+      }
+
+      .icon-btn {
+        position: relative;
+        width: 44px;
+        height: 44px;
+        border-radius: var(--capsule);
+      }
+
+      .icon-btn.compact {
+        width: 36px;
+        height: 36px;
+      }
+
+      .icon-btn.surface {
+        background: var(--regular);
+      }
+
+      .icon-btn.primary {
+        background: var(--theme);
+        color: #fff;
+      }
+
+      .icon-btn:hover,
+      .icon-btn:focus-visible,
+      .btn:hover,
+      .btn:focus-visible,
+      .chip:hover,
+      .chip:focus-visible {
+        outline: none;
+        box-shadow: 0 0 0 3px rgba(0, 102, 255, 0.2);
+      }
+
+      .badge-dot {
+        position: absolute;
+        top: 7px;
+        right: 7px;
+        width: 9px;
+        height: 9px;
+        border-radius: var(--capsule);
+        background: var(--red);
+        border: 2px solid var(--bar);
+      }
+
+      .badge-count {
+        position: absolute;
+        top: 3px;
+        right: 1px;
+        min-width: 18px;
+        height: 18px;
+        padding: 0 5px;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        border-radius: var(--capsule);
+        background: var(--red);
+        color: #fff;
+        border: 2px solid var(--bar);
+        font-size: 10px;
+        line-height: 14px;
+        font-weight: 600;
+      }
+
+      .content {
+        flex: 1;
+        min-height: 0;
+        overflow: hidden;
+        padding: 14px 16px 76px;
+      }
+
+      .content.no-nav {
+        padding-bottom: 18px;
+      }
+
+      .content.with-player {
+        padding-bottom: 86px;
+      }
+
+      .content.scroll {
+        overflow: auto;
+      }
+
+      .bottom-nav {
+        position: absolute;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        height: 58px;
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        align-items: center;
+        background: var(--bar);
+        border-top: 1px solid var(--regular);
+      }
+
+      .nav-item {
+        display: grid;
+        justify-items: center;
+        gap: 2px;
+        color: var(--text-2);
+        font-size: 10px;
+        line-height: 14px;
+      }
+
+      .nav-item.active {
+        color: var(--theme);
+        font-weight: 600;
+      }
+
+      .card {
+        border-radius: var(--radius);
+        background: var(--card);
+        box-shadow: var(--shadow);
+        padding: 14px;
+        overflow: hidden;
+      }
+
+      .card.filled {
+        background: var(--thin);
+        box-shadow: none;
+      }
+
+      .card.soft {
+        background: var(--theme-fill);
+        box-shadow: none;
+      }
+
+      .card + .card,
+      .list + .list {
+        margin-top: 10px;
+      }
+
+      .action-hero {
+        border-radius: 22px;
+        background: var(--card);
+        box-shadow: var(--shadow);
+        padding: 16px;
+        display: grid;
+        gap: 14px;
+      }
+
+      .record-cta {
+        display: grid;
+        grid-template-columns: 62px minmax(0, 1fr) auto;
+        gap: 12px;
+        align-items: center;
+      }
+
+      .record-dot {
+        width: 62px;
+        height: 62px;
+        border-radius: var(--capsule);
+        display: grid;
+        place-items: center;
+        background: var(--theme);
+        color: #fff;
+        box-shadow: 0 8px 16px rgba(0, 102, 255, 0.22);
+      }
+
+      .record-cta strong,
+      .identity strong {
+        display: block;
+        font-size: 18px;
+        line-height: 26px;
+        font-weight: 600;
+      }
+
+      .privacy-line {
+        display: flex;
+        align-items: center;
+        gap: 7px;
+        min-width: 0;
+        color: var(--text-2);
+        font-size: 12px;
+        line-height: 18px;
+      }
+
+      .btn {
+        min-height: 36px;
+        padding: 8px 12px;
+        border: 0;
+        border-radius: var(--capsule);
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        gap: 6px;
+        color: var(--text);
+        background: var(--regular);
+        font-size: 12px;
+        line-height: 16px;
+        font-weight: 500;
+      }
+
+      .btn.primary {
+        background: var(--theme);
+        color: #fff;
+      }
+
+      .btn.ghost {
+        background: transparent;
+        color: var(--theme);
+      }
+
+      .btn.danger {
+        background: var(--red-soft);
+        color: var(--red);
+      }
+
+      .btn.disabled {
+        color: var(--text-3);
+        background: var(--thin);
+      }
+
+      .chip,
+      .tab {
+        min-height: 32px;
+        padding: 7px 12px;
+        background: var(--regular);
+        color: var(--text-2);
+        font-size: 12px;
+        line-height: 16px;
+      }
+
+      .chip.active,
+      .tab.active {
+        background: var(--theme-soft);
+        color: var(--theme);
+        font-weight: 600;
+      }
+
+      .tabs {
+        display: flex;
+        gap: 8px;
+        overflow: hidden;
+      }
+
+      .list {
+        display: grid;
+        gap: 10px;
+      }
+
+      .section-label {
+        margin: 18px 0 8px;
+        font-size: 14px;
+        line-height: 20px;
+        font-weight: 600;
+      }
+
+      .card-head {
+        display: flex;
+        align-items: flex-start;
+        justify-content: space-between;
+        gap: 10px;
+      }
+
+      .card-title {
+        min-width: 0;
+        font-size: 15px;
+        line-height: 22px;
+        font-weight: 600;
+      }
+
+      .card-title small {
+        display: block;
+        margin-top: 2px;
+        color: var(--text-2);
+        font-size: 12px;
+        line-height: 16px;
+        font-weight: 400;
+      }
+
+      .summary {
+        margin: 10px 0 0;
+        color: var(--text-2);
+        font-size: 12px;
+        line-height: 18px;
+      }
+
+      .tag {
+        min-height: 22px;
+        padding: 4px 8px;
+        color: var(--text-2);
+        background: var(--regular);
+        font-size: 10px;
+        line-height: 14px;
+        font-weight: 600;
+      }
+
+      .tag.blue {
+        color: var(--theme);
+        background: var(--theme-soft);
+      }
+
+      .tag.green {
+        color: #038f10;
+        background: var(--green-soft);
+      }
+
+      .tag.teal {
+        color: #007a7a;
+        background: var(--teal-soft);
+      }
+
+      .tag.orange {
+        color: #b95000;
+        background: var(--orange-soft);
+      }
+
+      .tag.yellow {
+        color: #8a5b00;
+        background: var(--yellow-soft);
+      }
+
+      .tag.red {
+        color: var(--red);
+        background: var(--red-soft);
+      }
+
+      .tag.disabled {
+        color: var(--text-3);
+        background: var(--thin);
+      }
+
+      .progress {
+        display: grid;
+        gap: 6px;
+        margin-top: 10px;
+      }
+
+      .progress-row {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 8px;
+        color: var(--text-2);
+        font-size: 12px;
+        line-height: 16px;
+      }
+
+      .bar {
+        height: 6px;
+        border-radius: var(--capsule);
+        background: var(--regular);
+        overflow: hidden;
+      }
+
+      .bar span {
+        display: block;
+        height: 100%;
+        width: var(--value, 50%);
+        border-radius: inherit;
+        background: var(--theme);
+      }
+
+      .bar.green span {
+        background: var(--green);
+      }
+
+      .bar.orange span {
+        background: var(--orange);
+      }
+
+      .setting-list {
+        border-radius: var(--radius);
+        overflow: hidden;
+        background: var(--card);
+      }
+
+      .setting-list.flat {
+        background: transparent;
+        border-radius: 0;
+      }
+
+      .row {
+        min-height: 54px;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 10px;
+        padding: 10px 14px;
+        border-bottom: 1px solid var(--regular);
+      }
+
+      .row:last-child {
+        border-bottom: 0;
+      }
+
+      .row-title {
+        min-width: 0;
+        font-size: 14px;
+        line-height: 20px;
+        font-weight: 500;
+      }
+
+      .row-title small {
+        display: block;
+        margin-top: 2px;
+        color: var(--text-2);
+        font-size: 12px;
+        line-height: 16px;
+        font-weight: 400;
+      }
+
+      .switch {
+        width: 38px;
+        height: 24px;
+        border-radius: var(--capsule);
+        background: var(--theme);
+        position: relative;
+        flex: 0 0 auto;
+      }
+
+      .switch.off {
+        background: var(--regular);
+      }
+
+      .switch::after {
+        content: "";
+        position: absolute;
+        top: 3px;
+        right: 3px;
+        width: 18px;
+        height: 18px;
+        border-radius: var(--capsule);
+        background: #fff;
+      }
+
+      .switch.off::after {
+        right: auto;
+        left: 3px;
+      }
+
+      .detail-tabs {
+        height: 40px;
+        display: grid;
+        grid-template-columns: repeat(5, minmax(0, 1fr));
+        align-items: center;
+        color: var(--text-2);
+        font-size: 12px;
+        line-height: 16px;
+      }
+
+      .detail-tabs span {
+        text-align: center;
+      }
+
+      .detail-tabs .active {
+        color: var(--theme);
+        font-weight: 600;
+      }
+
+      .quote {
+        margin-top: 10px;
+        padding-left: 10px;
+        border-left: 3px solid var(--theme);
+        color: var(--text-2);
+        font-size: 12px;
+        line-height: 18px;
+      }
+
+      .player {
+        position: absolute;
+        left: 10px;
+        right: 10px;
+        bottom: 10px;
+        min-height: 58px;
+        display: grid;
+        grid-template-columns: 42px minmax(0, 1fr) 42px;
+        gap: 8px;
+        align-items: center;
+        padding: 8px 12px;
+        border-radius: 22px;
+        background: rgba(255, 255, 255, 0.96);
+        box-shadow: 0 -2px 16px rgba(0, 0, 0, 0.1);
+      }
+
+      .panel {
+        position: absolute;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        min-height: 338px;
+        max-height: 690px;
+        padding: 10px 16px 18px;
+        border-radius: var(--panel-radius) var(--panel-radius) 0 0;
+        background: rgba(255, 255, 255, 0.94);
+        box-shadow: 0 -12px 28px rgba(0, 0, 0, 0.14);
+      }
+
+      .panel::before {
+        content: "";
+        display: block;
+        width: 36px;
+        height: 4px;
+        margin: 0 auto 12px;
+        border-radius: var(--capsule);
+        background: var(--medium);
+      }
+
+      .panel-head {
+        min-height: 38px;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 8px;
+      }
+
+      .panel-head h4 {
+        margin: 0;
+        font-size: 18px;
+        line-height: 26px;
+        font-weight: 600;
+      }
+
+      .dialog {
+        position: absolute;
+        left: 50%;
+        top: 50%;
+        width: 328px;
+        transform: translate(-50%, -50%);
+        border-radius: var(--panel-radius);
+        background: rgba(255, 255, 255, 0.96);
+        box-shadow: var(--popup-shadow);
+        padding: 18px 18px 14px;
+      }
+
+      .dialog h4 {
+        margin: 0 0 8px;
+        text-align: center;
+        font-size: 18px;
+        line-height: 26px;
+        font-weight: 600;
+      }
+
+      .dialog p {
+        margin: 0;
+        color: var(--text-2);
+        text-align: center;
+        font-size: 13px;
+        line-height: 20px;
+      }
+
+      .wave {
+        height: 92px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 5px;
+      }
+
+      .wave span {
+        width: 5px;
+        height: var(--h, 24px);
+        border-radius: var(--capsule);
+        background: var(--theme);
+        opacity: 0.72;
+      }
+
+      .timer {
+        text-align: center;
+        font-size: 48px;
+        line-height: 58px;
+        font-weight: 500;
+        letter-spacing: 0;
+      }
+
+      .controls {
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        gap: 18px;
+        margin-top: 18px;
+      }
+
+      .round-btn {
+        width: 54px;
+        height: 54px;
+        border-radius: var(--capsule);
+        background: var(--regular);
+      }
+
+      .round-btn.stop {
+        width: 68px;
+        height: 68px;
+        background: var(--theme);
+        color: #fff;
+      }
+
+      .avatar {
+        width: 48px;
+        height: 48px;
+        border-radius: var(--capsule);
+        display: grid;
+        place-items: center;
+        color: var(--theme);
+        background: var(--theme-soft);
+      }
+
+      .identity {
+        display: grid;
+        grid-template-columns: 48px minmax(0, 1fr) auto;
+        gap: 12px;
+        align-items: center;
+      }
+
+      .qr {
+        width: 130px;
+        height: 130px;
+        margin: 0 auto 10px;
+        border: 12px solid #fff;
+        border-radius: 16px;
+        box-shadow: var(--shadow);
+        background:
+          linear-gradient(90deg, #111 10px, transparent 10px 24px, #111 24px 36px, transparent 36px),
+          linear-gradient(#111 10px, transparent 10px 22px, #111 22px 34px, transparent 34px),
+          #fff;
+        background-size: 42px 42px;
+      }
+
+      .table {
+        display: grid;
+        gap: 8px;
+      }
+
+      .table-row {
+        display: grid;
+        grid-template-columns: 78px minmax(0, 1fr) auto;
+        gap: 8px;
+        align-items: center;
+        padding: 9px 0;
+        border-bottom: 1px solid var(--regular);
+        font-size: 12px;
+        line-height: 16px;
+      }
+
+      .table-row:last-child {
+        border-bottom: 0;
+      }
+
+      .muted {
+        color: var(--text-2);
+      }
+
+      @media (max-width: 980px) {
+        .review-shell {
+          padding: 18px 12px;
+          overflow-x: hidden;
+        }
+
+        .review-header,
+        .section-head,
+        .boards,
+        .system-board {
+          grid-template-columns: 1fr;
+          max-width: 100%;
+        }
+
+        .review-header h1 {
+          font-size: 24px;
+          line-height: 34px;
+        }
+
+        .header-tags {
+          justify-content: flex-start;
+        }
+
+        .boards {
+          grid-template-columns: minmax(0, var(--phone-w));
+        }
+
+        .system-grid {
+          grid-template-columns: 1fr;
+          min-width: 0;
+        }
+
+        .system-card,
+        .system-node {
+          max-width: 100%;
+          min-width: 0;
+          overflow: hidden;
+        }
+
+        .system-node li {
+          display: grid;
+          grid-template-columns: minmax(0, 1fr) auto;
+        }
+
+        .system-card p,
+        .system-node li {
+          overflow-wrap: anywhere;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <main class="review-shell">
+      <header class="review-header">
+        <div>
+          <h1>夸克录音纪要 · 静态 Web 视觉稿 v3</h1>
+          <p>
+            按保守版和扩展型两个 brief 重新收敛：首屏就是可操作工具，默认本地优先、不上传；P1 把 PC 离线转写、知识沉淀、会员权益和云端录音存储放进稳定承载区。
+          </p>
+        </div>
+        <div class="header-tags" aria-label="设计约束">
+          <span class="header-tag"><i data-lucide="shield-check"></i> 本地优先</span>
+          <span class="header-tag"><i data-lucide="monitor-up"></i> PC 离线</span>
+          <span class="header-tag"><i data-lucide="cloud"></i> 云端主动开启</span>
+          <span class="header-tag"><i data-lucide="layout-grid"></i> 记录 / 知识 / 我的</span>
+        </div>
+      </header>
+
+      <section class="system-board" aria-labelledby="system-title">
+        <article class="system-card">
+          <h3 id="system-title">承载结构</h3>
+          <p>v3 不把所有能力堆进首页或详情更多。首页承接单条记录生命周期，知识承接跨纪要整理，我的承接账号、权益、云空间和隐私。</p>
+          <div class="system-grid">
+            <div class="system-node">
+              <strong>记录</strong>
+              <ul>
+                <li>开始录音 <span class="stage p0">P0</span></li>
+                <li>导入音频 <span class="stage p0">P0</span></li>
+                <li>PC 离线转写 <span class="stage p1">P1</span></li>
+                <li>统一记录列表 <span class="stage p0">P0</span></li>
+              </ul>
+            </div>
+            <div class="system-node">
+              <strong>知识</strong>
+              <ul>
+                <li>主题整理 <span class="stage p1">P1</span></li>
+                <li>知识卡片 <span class="stage p1">P1</span></li>
+                <li>筛选回跳 <span class="stage p1">P1</span></li>
+                <li>在线问答 <span class="stage p2">P2</span></li>
+              </ul>
+            </div>
+            <div class="system-node">
+              <strong>我的</strong>
+              <ul>
+                <li>登录账号 <span class="stage p1">P1</span></li>
+                <li>会员权益 <span class="stage p1">P1</span></li>
+                <li>云端存储 <span class="stage p1">P1</span></li>
+                <li>隐私与数据 <span class="stage p0">P0</span></li>
+              </ul>
+            </div>
+            <div class="system-node">
+              <strong>详情</strong>
+              <ul>
+                <li>概览 / 原文 <span class="stage p0">P0</span></li>
+                <li>更多 <span class="stage p0">P0</span></li>
+                <li>时间线 / 待办 <span class="stage p1">P1</span></li>
+                <li>AI 整理 <span class="stage p1">P1</span></li>
+              </ul>
+            </div>
+            <div class="system-node">
+              <strong>处理中</strong>
+              <ul>
+                <li>本机转写 <span class="stage p0">P0</span></li>
+                <li>失败重试 <span class="stage p0">P0</span></li>
+                <li>PC 传输 <span class="stage p1">P1</span></li>
+                <li>批量操作 <span class="stage p1">P1</span></li>
+              </ul>
+            </div>
+            <div class="system-node">
+              <strong>未来弱入口</strong>
+              <ul>
+                <li>视频导入 <span class="stage p2">P2</span></li>
+                <li>网盘 / 播客 <span class="stage p2">P2</span></li>
+                <li>拍照时间线 <span class="stage p2">P2</span></li>
+                <li>硬件导入 <span class="stage p2">P2</span></li>
+              </ul>
+            </div>
+          </div>
+        </article>
+        <aside class="system-card">
+          <h3>边界标签</h3>
+          <p>所有关键卡片都拆开处理位置、存储位置、AI 能力，避免把“云端备份”误读成“云端转写”。</p>
+          <div class="axis-stack">
+            <div class="axis">
+              <strong><i data-lucide="cpu"></i>处理位置</strong>
+              <div class="cluster-tags">
+                <span class="tag blue">本机离线</span>
+                <span class="tag teal">PC 离线</span>
+                <span class="tag orange">云端在线</span>
+              </div>
+            </div>
+            <div class="axis">
+              <strong><i data-lucide="database"></i>存储位置</strong>
+              <div class="cluster-tags">
+                <span class="tag">仅本地</span>
+                <span class="tag green">云端已备份</span>
+                <span class="tag blue">本地+云端</span>
+                <span class="tag orange">备份暂停</span>
+              </div>
+            </div>
+            <div class="axis">
+              <strong><i data-lucide="sparkles"></i>AI 能力</strong>
+              <div class="cluster-tags">
+                <span class="tag">本地可用</span>
+                <span class="tag teal">PC 可用</span>
+                <span class="tag orange">在线增强</span>
+              </div>
+            </div>
+          </div>
+        </aside>
+      </section>
+
+      <section class="section-head">
+        <div>
+          <h2>主导航第一屏</h2>
+          <p>三个一级入口分别解决记录生命周期、知识沉淀、账号权益承载。</p>
+        </div>
+      </section>
+
+      <section class="boards" aria-label="主导航画板">
+        <article class="board">
+          <div class="board-title"><h3>01 记录 Tab</h3><span>P0 核心首页</span></div>
+          <div class="phone">
+            <div class="screen">
+              <header class="app-bar">
+                <div class="app-title">
+                  <h4>录音纪要</h4>
+                  <div class="sub">默认本地优先 · 不上传</div>
+                </div>
+                <button class="icon-btn" aria-label="搜索"><i data-lucide="search"></i></button>
+                <button class="icon-btn surface" aria-label="处理中"><i data-lucide="list-checks"></i><span class="badge-count">2</span></button>
+                <button class="icon-btn" aria-label="设置"><i data-lucide="settings"></i></button>
+              </header>
+              <div class="content">
+                <section class="action-hero">
+                  <div class="record-cta">
+                    <div class="record-dot"><i data-lucide="mic"></i></div>
+                    <div>
+                      <strong>开始录音</strong>
+                      <div class="privacy-line"><i data-lucide="shield-check"></i> 离线转写 · 本地保存</div>
+                    </div>
+                    <button class="icon-btn surface compact" aria-label="录音设置"><i data-lucide="settings-2"></i></button>
+                  </div>
+                  <div class="inline-actions">
+                    <button class="btn"><i data-lucide="file-audio"></i>导入音频</button>
+                    <button class="btn"><i data-lucide="monitor-up"></i>传到 PC</button>
+                    <button class="btn ghost">更多</button>
+                  </div>
+                </section>
+
+                <div class="section-label">筛选</div>
+                <div class="tabs">
+                  <span class="tab active">全部</span>
+                  <span class="tab">待转写</span>
+                  <span class="tab">处理中</span>
+                  <span class="tab">已生成</span>
+                </div>
+
+                <div class="section-label">记录</div>
+                <div class="list">
+                  <article class="card">
+                    <div class="card-head">
+                      <div class="card-title">客户访谈纪要<small>48:06 · 昨天 15:20</small></div>
+                      <span class="tag green">云端已备份</span>
+                    </div>
+                    <p class="summary">客户关注交付时间和售后响应，需要补充报价明细。</p>
+                    <div class="cluster-tags" style="margin-top:10px">
+                      <span class="tag blue">本机离线</span>
+                      <span class="tag">本地+云端</span>
+                      <span class="tag">报价</span>
+                    </div>
+                  </article>
+                  <article class="card">
+                    <div class="card-head">
+                      <div class="card-title">课堂录音：机器学习导论<small>01:12:44 · 周二 09:00</small></div>
+                      <span class="tag teal">PC 离线</span>
+                    </div>
+                    <div class="progress">
+                      <div class="progress-row"><span>PC 离线转写中 · MacBook Pro</span><strong>42%</strong></div>
+                      <div class="bar" style="--value:42%"><span></span></div>
+                    </div>
+                  </article>
+                  <article class="card">
+                    <div class="card-head">
+                      <div class="card-title">灵感录音<small>03:12 · 今天 08:40 · 仅本地</small></div>
+                      <button class="btn primary">AI 转写</button>
+                    </div>
+                  </article>
+                </div>
+              </div>
+              <nav class="bottom-nav" aria-label="主导航">
+                <div class="nav-item active"><i data-lucide="mic-2"></i><span>记录</span></div>
+                <div class="nav-item"><i data-lucide="library"></i><span>知识</span></div>
+                <div class="nav-item"><i data-lucide="circle-user-round"></i><span>我的</span></div>
+              </nav>
+            </div>
+          </div>
+        </article>
+
+        <article class="board">
+          <div class="board-title"><h3>02 知识 Tab</h3><span>P1 主题整理</span></div>
+          <div class="phone">
+            <div class="screen">
+              <header class="app-bar">
+                <div class="app-title">
+                  <h4>知识</h4>
+                  <div class="sub">主题整理 · 来源可回跳</div>
+                </div>
+                <button class="icon-btn" aria-label="搜索知识"><i data-lucide="search"></i></button>
+                <button class="icon-btn surface" aria-label="筛选"><i data-lucide="sliders-horizontal"></i></button>
+              </header>
+              <div class="content">
+                <section class="card">
+                  <div class="card-head">
+                    <div class="card-title">知识卡片筛选<small>不做“当前记录 / 全部记录”范围切换</small></div>
+                    <span class="tag blue">6 维</span>
+                  </div>
+                  <div class="chip-row" style="margin-top:10px">
+                    <span class="chip active">主题</span>
+                    <span class="chip">时间</span>
+                    <span class="chip">来源</span>
+                    <span class="chip">状态</span>
+                    <span class="chip">处理来源</span>
+                    <span class="chip">存储位置</span>
+                  </div>
+                </section>
+                <div class="section-label">主题整理</div>
+                <div class="chip-row">
+                  <span class="chip active">客户需求</span>
+                  <span class="chip">报价</span>
+                  <span class="chip">风险</span>
+                  <span class="chip">待确认</span>
+                </div>
+                <div class="section-label">知识卡片</div>
+                <div class="list">
+                  <article class="card">
+                    <div class="card-head">
+                      <div class="card-title">Q3 客户报价共识<small>来自 3 条纪要 · 8 个来源</small></div>
+                      <span class="tag blue">收藏</span>
+                    </div>
+                    <p class="summary">报价明细、审批起点和售后响应是最近访谈反复出现的主题。</p>
+                    <div class="cluster-tags" style="margin-top:10px">
+                      <span class="tag">00:12:08</span>
+                      <span class="tag green">云端已备份</span>
+                      <button class="btn ghost">查看来源</button>
+                    </div>
+                  </article>
+                  <article class="card">
+                    <div class="card-head">
+                      <div class="card-title">接口联调风险<small>来自 2 条纪要 · 4 个来源</small></div>
+                      <span class="tag orange">待复核</span>
+                    </div>
+                    <p class="summary">风险集中在排期、依赖方响应和测试环境准备。</p>
+                  </article>
+                  <article class="card filled">
+                    <div class="card-head">
+                      <div class="card-title">在线问答<small>P2 在线增强，需要联网和来源引用</small></div>
+                      <span class="tag disabled">未开启</span>
+                    </div>
+                  </article>
+                </div>
+              </div>
+              <nav class="bottom-nav" aria-label="主导航">
+                <div class="nav-item"><i data-lucide="mic-2"></i><span>记录</span></div>
+                <div class="nav-item active"><i data-lucide="library"></i><span>知识</span></div>
+                <div class="nav-item"><i data-lucide="circle-user-round"></i><span>我的</span></div>
+              </nav>
+            </div>
+          </div>
+        </article>
+
+        <article class="board">
+          <div class="board-title"><h3>03 我的 Tab</h3><span>P1 权益承载</span></div>
+          <div class="phone">
+            <div class="screen">
+              <header class="app-bar">
+                <div class="app-title">
+                  <h4>我的</h4>
+                  <div class="sub">账号 · 会员 · 隐私与数据</div>
+                </div>
+                <button class="icon-btn" aria-label="设置"><i data-lucide="settings"></i></button>
+              </header>
+              <div class="content">
+                <section class="card identity">
+                  <div class="avatar"><i data-lucide="circle-user-round"></i></div>
+                  <div>
+                    <strong>用户昵称</strong>
+                    <div class="sub">普通用户 · 本月剩余 120 分钟</div>
+                  </div>
+                  <span class="tag">登录</span>
+                </section>
+                <section class="card">
+                  <div class="card-head">
+                    <div class="card-title">会员服务<small>VIP 50GB 云空间 · 更长转写时长</small></div>
+                    <button class="btn primary">升级</button>
+                  </div>
+                  <div class="cluster-tags" style="margin-top:12px">
+                    <span class="tag">高级导出</span>
+                    <span class="tag">批量处理</span>
+                    <span class="tag orange">在线增强</span>
+                  </div>
+                </section>
+                <div class="section-label">用量与权益</div>
+                <div class="list">
+                  <section class="card">
+                    <div class="progress-row"><span>云端空间</span><strong>320MB / 免费 1GB</strong></div>
+                    <div class="bar green" style="--value:32%"><span></span></div>
+                    <p class="summary">默认关闭，开启后可备份压缩音频、文本和纪要。</p>
+                  </section>
+                  <section class="card">
+                    <div class="progress-row"><span>转写额度</span><strong>120 / 300 分钟</strong></div>
+                    <div class="bar" style="--value:40%"><span></span></div>
+                  </section>
+                  <section class="card">
+                    <div class="card-title">转写次包<small>10 次 / 30 次 / 100 次</small></div>
+                    <p class="summary">按次数扣减，不按分钟焦虑；需提示单次最长时长 / 文件体积上限。</p>
+                  </section>
+                </div>
+              </div>
+              <nav class="bottom-nav" aria-label="主导航">
+                <div class="nav-item"><i data-lucide="mic-2"></i><span>记录</span></div>
+                <div class="nav-item"><i data-lucide="library"></i><span>知识</span></div>
+                <div class="nav-item active"><i data-lucide="circle-user-round"></i><span>我的</span></div>
+              </nav>
+            </div>
+          </div>
+        </article>
+      </section>
+
+      <section class="section-head">
+        <div>
+          <h2>采集与处理任务流</h2>
+          <p>录音前设置、录音中标记、PC 离线转写和右上角处理中队列形成闭环。</p>
+        </div>
+      </section>
+
+      <section class="boards" aria-label="任务流画板">
+        <article class="board">
+          <div class="board-title"><h3>04 录音 / 导入设置</h3><span>GooPanel</span></div>
+          <div class="phone">
+            <div class="screen">
+              <header class="app-bar">
+                <div class="app-title">
+                  <h4>录音纪要</h4>
+                  <div class="sub">准备开始一次本地记录</div>
+                </div>
+                <button class="icon-btn surface"><i data-lucide="settings-2"></i></button>
+              </header>
+              <div class="content">
+                <section class="action-hero">
+                  <div class="record-cta">
+                    <div class="record-dot"><i data-lucide="mic"></i></div>
+                    <div>
+                      <strong>开始录音</strong>
+                      <div class="privacy-line"><i data-lucide="shield-check"></i> 本地优先 · 不上传</div>
+                    </div>
+                  </div>
+                </section>
+              </div>
+              <section class="panel">
+                <div class="panel-head">
+                  <h4>开始录音</h4>
+                  <button class="btn primary">开始</button>
+                </div>
+                <div class="section-label">识别设置</div>
+                <div class="setting-list">
+                  <div class="row"><div class="row-title">识别语言<small>普通话</small></div><i data-lucide="chevron-right"></i></div>
+                  <div class="row"><div class="row-title">区分人声<small>生成发言人标签</small></div><span class="switch"></span></div>
+                  <div class="row"><div class="row-title">AI 热词库<small>夸克网盘、Q3复盘</small></div><span class="tag teal">P1</span></div>
+                </div>
+                <div class="section-label">处理方式</div>
+                <div class="chip-row">
+                  <span class="chip active">本地优先</span>
+                  <span class="chip">在线增强</span>
+                </div>
+                <p class="summary">云端存储在“我的”中主动开启，这里只选择转写处理方式。</p>
+              </section>
+            </div>
+          </div>
+        </article>
+
+        <article class="board">
+          <div class="board-title"><h3>05 实时录音页</h3><span>P0 / P1</span></div>
+          <div class="phone">
+            <div class="screen">
+              <header class="app-bar compact">
+                <button class="icon-btn" aria-label="关闭"><i data-lucide="x"></i></button>
+                <div class="app-title small">
+                  <h4>正在录音</h4>
+                  <div class="sub">离线保存 · 普通话 · 不上传</div>
+                </div>
+                <button class="icon-btn" aria-label="热词库"><i data-lucide="book-marked"></i></button>
+              </header>
+              <div class="content no-nav">
+                <section class="card filled" style="text-align:center">
+                  <div class="timer">12:48</div>
+                  <div class="privacy-line" style="justify-content:center"><i data-lucide="shield"></i> 本机录音中 · 标记列表在 Panel</div>
+                </section>
+                <div class="wave" aria-label="录音波形">
+                  <span style="--h:24px"></span><span style="--h:42px"></span><span style="--h:30px"></span><span style="--h:62px"></span><span style="--h:48px"></span><span style="--h:72px"></span><span style="--h:34px"></span><span style="--h:54px"></span><span style="--h:28px"></span><span style="--h:66px"></span><span style="--h:38px"></span><span style="--h:52px"></span>
+                </div>
+                <div class="inline-actions" style="justify-content:center">
+                  <button class="btn"><i data-lucide="bookmark"></i>重点</button>
+                  <button class="btn"><i data-lucide="message-square-plus"></i>批注</button>
+                  <button class="btn"><i data-lucide="list"></i>标记 3</button>
+                </div>
+                <div class="controls">
+                  <button class="round-btn" aria-label="暂停"><i data-lucide="pause"></i></button>
+                  <button class="round-btn stop" aria-label="停止保存"><i data-lucide="square"></i></button>
+                  <button class="round-btn" aria-label="更多"><i data-lucide="ellipsis"></i></button>
+                </div>
+                <section class="card soft" style="margin-top:18px">
+                  <div class="privacy-line"><i data-lucide="info"></i> 关闭时会二次确认保存或放弃。</div>
+                </section>
+              </div>
+            </div>
+          </div>
+        </article>
+
+        <article class="board">
+          <div class="board-title"><h3>06 手机-PC 离线转写</h3><span>P1 局域网</span></div>
+          <div class="phone">
+            <div class="screen">
+              <header class="app-bar compact">
+                <button class="icon-btn" aria-label="返回"><i data-lucide="chevron-left"></i></button>
+                <div class="app-title small">
+                  <h4>传到 PC 离线转写</h4>
+                  <div class="sub">音频不经过云端</div>
+                </div>
+              </header>
+              <div class="content no-nav scroll">
+                <section class="card">
+                  <div class="card-head">
+                    <div class="card-title">安全连接<small>仅在手机和受信任 PC 间传输</small></div>
+                    <span class="tag teal">PC 离线</span>
+                  </div>
+                  <div class="chip-row" style="margin-top:12px">
+                    <span class="chip active">局域网</span>
+                    <span class="chip">蓝牙 P2</span>
+                  </div>
+                </section>
+                <div class="section-label">配对方式</div>
+                <section class="card" style="text-align:center">
+                  <div class="qr" aria-label="二维码占位"></div>
+                  <div class="card-title">扫描 PC 端二维码</div>
+                  <p class="summary">或输入一次性验证码 728 410</p>
+                </section>
+                <div class="section-label">可用设备</div>
+                <div class="setting-list">
+                  <div class="row"><div class="row-title">MacBook Pro<small>已配对 · 同一网络</small></div><span class="tag green">在线</span></div>
+                  <div class="row"><div class="row-title">Windows PC<small>待确认</small></div><i data-lucide="chevron-right"></i></div>
+                </div>
+                <div class="progress">
+                  <div class="progress-row"><span>传输中 · 支持断点续传</span><strong>42%</strong></div>
+                  <div class="bar" style="--value:42%"><span></span></div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </article>
+
+        <article class="board">
+          <div class="board-title"><h3>07 处理中队列</h3><span>右上角入口</span></div>
+          <div class="phone">
+            <div class="screen">
+              <header class="app-bar compact">
+                <button class="icon-btn" aria-label="返回"><i data-lucide="chevron-left"></i></button>
+                <div class="app-title small">
+                  <h4>处理中</h4>
+                  <div class="sub">2 个任务进行中 · 1 个失败</div>
+                </div>
+                <button class="icon-btn" aria-label="批量"><i data-lucide="check-square"></i></button>
+              </header>
+              <div class="content no-nav">
+                <div class="tabs">
+                  <span class="tab active">全部</span>
+                  <span class="tab">进行中</span>
+                  <span class="tab">失败</span>
+                  <span class="tab">完成</span>
+                </div>
+                <div class="section-label">任务</div>
+                <div class="list">
+                  <section class="card">
+                    <div class="card-head">
+                      <div class="card-title">课堂录音：机器学习导论<small>PC 离线转写 · MacBook Pro</small></div>
+                      <span class="tag teal">42%</span>
+                    </div>
+                    <div class="progress"><div class="bar" style="--value:42%"><span></span></div></div>
+                  </section>
+                  <section class="card">
+                    <div class="card-head">
+                      <div class="card-title">项目复盘会议<small>本机离线转写</small></div>
+                      <span class="tag blue">68%</span>
+                    </div>
+                    <div class="progress"><div class="bar" style="--value:68%"><span></span></div></div>
+                  </section>
+                  <section class="card">
+                    <div class="card-head">
+                      <div class="card-title">需求评审<small>噪音过大，建议重试</small></div>
+                      <span class="tag red">失败</span>
+                    </div>
+                    <div class="inline-actions" style="margin-top:12px">
+                      <button class="btn primary">重试</button>
+                      <button class="btn">复听</button>
+                      <button class="btn danger">删除</button>
+                    </div>
+                  </section>
+                </div>
+              </div>
+            </div>
+          </div>
+        </article>
+      </section>
+
+      <section class="section-head">
+        <div>
+          <h2>详情、整理与更多</h2>
+          <p>详情页只保留一个搜索入口；更多区承接导出、分享、在线增强、删除和云端状态。</p>
+        </div>
+      </section>
+
+      <section class="boards" aria-label="详情画板">
+        <article class="board">
+          <div class="board-title"><h3>08 记录详情 · 概览</h3><span>单一搜索入口</span></div>
+          <div class="phone">
+            <div class="screen">
+              <header class="app-bar compact">
+                <button class="icon-btn" aria-label="返回"><i data-lucide="chevron-left"></i></button>
+                <div class="app-title small">
+                  <h4>客户访谈纪要</h4>
+                  <div class="sub">48:06 · 本机离线 · 云端已备份</div>
+                </div>
+                <button class="icon-btn" aria-label="搜索当前记录"><i data-lucide="search"></i></button>
+              </header>
+              <div class="content with-player">
+                <div class="detail-tabs"><span class="active">概览</span><span>原文</span><span>时间线</span><span>待办</span><span>更多</span></div>
+                <section class="card">
+                  <div class="card-head">
+                    <div class="card-title">摘要<small>AI 生成，可编辑，建议复核</small></div>
+                    <span class="tag blue">有来源</span>
+                  </div>
+                  <p class="summary">本次访谈围绕上线范围、报价明细和接口联调展开。客户希望本周确认报价，下周启动内部审批。</p>
+                  <div class="quote">来源 00:03:40, 00:12:08</div>
+                </section>
+                <div class="section-label">关键结论</div>
+                <section class="card">
+                  <div class="table">
+                    <div class="table-row"><span class="muted">结论 1</span><span>本周确认报价明细</span><span class="tag">00:12</span></div>
+                    <div class="table-row"><span class="muted">结论 2</span><span>下周启动内部审批</span><span class="tag">00:18</span></div>
+                  </div>
+                </section>
+                <div class="section-label">待办</div>
+                <section class="card">
+                  <div class="card-head">
+                    <div class="card-title">补充报价明细<small>负责人待确认 · 本周五</small></div>
+                    <span class="tag orange">待确认</span>
+                  </div>
+                </section>
+              </div>
+              <div class="player">
+                <button class="icon-btn surface" aria-label="播放"><i data-lucide="play"></i></button>
+                <div><div class="bar" style="--value:36%"><span></span></div><div class="sub">17:22 / 48:06</div></div>
+                <button class="icon-btn" aria-label="播放设置"><i data-lucide="sliders-horizontal"></i></button>
+              </div>
+            </div>
+          </div>
+        </article>
+
+        <article class="board">
+          <div class="board-title"><h3>09 详情 · 原文 / 时间线</h3><span>无第二搜索框</span></div>
+          <div class="phone">
+            <div class="screen">
+              <header class="app-bar compact">
+                <button class="icon-btn" aria-label="返回"><i data-lucide="chevron-left"></i></button>
+                <div class="app-title small">
+                  <h4>客户访谈纪要</h4>
+                  <div class="sub">当前记录搜索在顶部</div>
+                </div>
+                <button class="icon-btn" aria-label="搜索"><i data-lucide="search"></i></button>
+              </header>
+              <div class="content with-player">
+                <div class="detail-tabs"><span>概览</span><span class="active">原文</span><span>时间线</span><span>待办</span><span>更多</span></div>
+                <div class="chip-row" style="margin:8px 0 12px">
+                  <span class="tag">#报价</span>
+                  <span class="tag">#上线计划</span>
+                  <span class="tag">#风险</span>
+                </div>
+                <div class="list">
+                  <section class="card">
+                    <div class="card-head">
+                      <div class="card-title">小K<small>00:01:12</small></div>
+                      <span class="tag">92%</span>
+                    </div>
+                    <p class="summary">我们先确认本周上线范围，避免把后续二期内容混进来。</p>
+                  </section>
+                  <section class="card">
+                    <div class="card-head">
+                      <div class="card-title">听记小助手<small>00:03:40</small></div>
+                      <span class="tag orange">低置信</span>
+                    </div>
+                    <p class="summary">这里提到两个待确认问题，一个是接口排期，一个是报价明细。</p>
+                  </section>
+                  <section class="card filled">
+                    <div class="card-head">
+                      <div class="card-title">时间线预览<small>章节、重点标记和批注进入 P1</small></div>
+                      <span class="tag teal">P1</span>
+                    </div>
+                    <p class="summary">00:00 开场 · 08:12 上线范围 · 24:30 风险和待办</p>
+                  </section>
+                </div>
+              </div>
+              <div class="player">
+                <button class="icon-btn surface" aria-label="暂停"><i data-lucide="pause"></i></button>
+                <div><div class="bar" style="--value:38%"><span></span></div><div class="sub">18:10 / 48:06</div></div>
+                <button class="icon-btn" aria-label="倍速">1.2x</button>
+              </div>
+            </div>
+          </div>
+        </article>
+
+        <article class="board">
+          <div class="board-title"><h3>10 AI 整理页</h3><span>P1 在线增强</span></div>
+          <div class="phone">
+            <div class="screen">
+              <header class="app-bar compact">
+                <button class="icon-btn" aria-label="返回"><i data-lucide="chevron-left"></i></button>
+                <div class="app-title small">
+                  <h4>AI 整理</h4>
+                  <div class="sub">在线增强 · 上传前确认</div>
+                </div>
+                <button class="btn ghost">重生成</button>
+              </header>
+              <div class="content no-nav scroll">
+                <div class="tabs">
+                  <span class="tab active">语篇规整</span>
+                  <span class="tab">待办</span>
+                  <span class="tab">待确认</span>
+                </div>
+                <section class="card" style="margin-top:14px">
+                  <div class="card-head">
+                    <div class="card-title">规整稿<small>AI 生成，可编辑，建议复核</small></div>
+                    <span class="tag orange">在线增强</span>
+                  </div>
+                  <p class="summary">本次访谈确认了三项内容：本周确认报价、下周启动审批、提前梳理接口联调风险。</p>
+                  <div class="quote">来源 00:03:40, 00:12:08</div>
+                  <div class="inline-actions" style="margin-top:12px">
+                    <button class="btn primary">接受保存</button>
+                    <button class="btn">局部接受</button>
+                    <button class="btn">放弃</button>
+                  </div>
+                </section>
+                <div class="section-label">差异提示</div>
+                <section class="card filled">
+                  <div class="row-title">原文<small>客户说下周可以审批</small></div>
+                  <div class="row-title" style="margin-top:8px">规整<small>客户计划下周启动内部审批</small></div>
+                </section>
+                <div class="section-label">待确认</div>
+                <div class="list">
+                  <section class="card"><div class="card-title">报价明细缺负责人<small>来源 00:12:08</small></div></section>
+                  <section class="card"><div class="card-title">接口联调排期未明确<small>来源 00:22:16</small></div></section>
+                </div>
+              </div>
+            </div>
+          </div>
+        </article>
+
+        <article class="board">
+          <div class="board-title"><h3>11 更多 / 导出 / 删除</h3><span>Panel + Dialog</span></div>
+          <div class="phone">
+            <div class="screen">
+              <header class="app-bar compact">
+                <button class="icon-btn" aria-label="返回"><i data-lucide="chevron-left"></i></button>
+                <div class="app-title small">
+                  <h4>更多</h4>
+                  <div class="sub">导出、分享、在线增强</div>
+                </div>
+              </header>
+              <div class="content no-nav">
+                <div class="setting-list">
+                  <div class="row"><div class="row-title">导出 Markdown / TXT<small>离线可用</small></div><span class="tag blue">可用</span></div>
+                  <div class="row"><div class="row-title">导出 Word / PDF<small>会员权益</small></div><span class="tag orange">会员</span></div>
+                  <div class="row"><div class="row-title">加密分享链接<small>需联网 · 可撤销</small></div><span class="tag orange">在线</span></div>
+                  <div class="row"><div class="row-title">在线 AI 整理<small>需联网并确认上传</small></div><span class="tag orange">在线增强</span></div>
+                  <div class="row"><div class="row-title">删除记录<small>可选择同时删除云端</small></div><span class="tag red">危险</span></div>
+                </div>
+              </div>
+              <section class="panel" style="min-height:330px">
+                <div class="panel-head"><h4>导出</h4><span class="tag">Panel</span></div>
+                <div class="section-label">格式</div>
+                <div class="chip-row"><span class="chip active">Markdown</span><span class="chip">TXT</span><span class="chip">Word P1</span><span class="chip">PDF P1</span></div>
+                <div class="section-label">内容</div>
+                <div class="setting-list">
+                  <div class="row"><div class="row-title">总结概要</div><span class="switch"></span></div>
+                  <div class="row"><div class="row-title">原文转写</div><span class="switch"></span></div>
+                  <div class="row"><div class="row-title">来源时间码</div><span class="switch"></span></div>
+                </div>
+                <button class="btn primary" style="width:100%;margin-top:14px">导出</button>
+              </section>
+            </div>
+          </div>
+        </article>
+      </section>
+
+      <section class="section-head">
+        <div>
+          <h2>云端、会员与关键状态</h2>
+          <p>云端录音存储是主动开启的在线增强；基础离线流程不被会员墙截断。</p>
+        </div>
+      </section>
+
+      <section class="boards" aria-label="云端权益和状态画板">
+        <article class="board">
+          <div class="board-title"><h3>12 开启云端备份</h3><span>主动确认</span></div>
+          <div class="phone">
+            <div class="screen">
+              <header class="app-bar compact">
+                <button class="icon-btn" aria-label="返回"><i data-lucide="chevron-left"></i></button>
+                <div class="app-title small">
+                  <h4>隐私与数据</h4>
+                  <div class="sub">本地优先处理已开启</div>
+                </div>
+              </header>
+              <div class="content no-nav">
+                <div class="setting-list">
+                  <div class="row"><div class="row-title">本地优先处理<small>录音和转写默认不上传</small></div><span class="switch"></span></div>
+                  <div class="row"><div class="row-title">云端录音存储<small>关闭 · 可用于换机恢复</small></div><span class="tag">关闭</span></div>
+                  <div class="row"><div class="row-title">只备份纪要文本<small>不上传音频文件</small></div><span class="switch off"></span></div>
+                </div>
+                <section class="card" style="margin-top:16px">
+                  <div class="progress-row"><span>云空间</span><strong>860MB / 1GB</strong></div>
+                  <div class="bar orange" style="--value:86%"><span></span></div>
+                  <p class="summary">超过 80% 后引导清理、扩容或升级。</p>
+                </section>
+              </div>
+              <section class="panel" style="min-height:300px">
+                <div class="panel-head"><h4>开启云端备份？</h4><span class="tag orange">需联网</span></div>
+                <p class="summary">开启后，音频将上传云端用于备份、换机恢复和多设备访问。你也可以只备份纪要文本。</p>
+                <div class="setting-list" style="margin-top:12px">
+                  <div class="row"><div class="row-title">备份压缩音频 + 文本</div><span class="tag blue">推荐</span></div>
+                  <div class="row"><div class="row-title">只备份纪要文本</div><i data-lucide="chevron-right"></i></div>
+                </div>
+                <div class="inline-actions" style="margin-top:14px;justify-content:flex-end">
+                  <button class="btn">取消</button>
+                  <button class="btn primary">确认开启</button>
+                </div>
+              </section>
+            </div>
+          </div>
+        </article>
+
+        <article class="board">
+          <div class="board-title"><h3>13 额度不足</h3><span>次包 / 会员边界</span></div>
+          <div class="phone">
+            <div class="screen">
+              <header class="app-bar">
+                <div class="app-title">
+                  <h4>录音纪要</h4>
+                  <div class="sub">基础离线转写仍可体验</div>
+                </div>
+              </header>
+              <div class="content">
+                <section class="card">
+                  <div class="card-head">
+                    <div class="card-title">长音频转写<small>01:58:20 · 超过免费额度</small></div>
+                    <span class="tag orange">额度不足</span>
+                  </div>
+                  <p class="summary">可等待下月恢复、购买按次包，或开通会员获得更长周期额度。</p>
+                </section>
+                <section class="card" style="margin-top:12px">
+                  <div class="card-title">转写次包<small>价格敏感用户优先入口</small></div>
+                  <div class="chip-row" style="margin-top:10px">
+                    <span class="chip active">10 次</span>
+                    <span class="chip">30 次</span>
+                    <span class="chip">100 次</span>
+                  </div>
+                  <p class="summary">按次数扣减，不按分钟焦虑；单次最长时长 / 最大文件体积以上线规则为准。</p>
+                </section>
+              </div>
+              <div class="dialog">
+                <h4>继续转写？</h4>
+                <p>当前文件较长，将消耗 2 次转写包。你也可以改用 PC 离线转写。</p>
+                <div class="inline-actions" style="justify-content:center;margin-top:16px">
+                  <button class="btn">取消</button>
+                  <button class="btn primary">确认</button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </article>
+
+        <article class="board">
+          <div class="board-title"><h3>14 删除确认</h3><span>Destructive Dialog</span></div>
+          <div class="phone">
+            <div class="screen">
+              <header class="app-bar compact">
+                <button class="icon-btn" aria-label="返回"><i data-lucide="chevron-left"></i></button>
+                <div class="app-title small">
+                  <h4>客户访谈纪要</h4>
+                  <div class="sub">本地+云端 · 已备份</div>
+                </div>
+              </header>
+              <div class="content no-nav">
+                <section class="card">
+                  <div class="card-title">文件信息<small>PC离线转写 · 48:06 · 52MB</small></div>
+                  <div class="cluster-tags" style="margin-top:12px">
+                    <span class="tag blue">本地+云端</span>
+                    <span class="tag green">云端已备份</span>
+                  </div>
+                </section>
+                <section class="card" style="margin-top:12px">
+                  <div class="card-head">
+                    <div class="card-title">删除记录<small>会清理音频、转写、摘要和导出缓存</small></div>
+                    <span class="tag red">危险</span>
+                  </div>
+                </section>
+              </div>
+              <div class="dialog">
+                <h4>删除这条记录？</h4>
+                <p>删除后本机音频、转写、摘要和导出缓存将被清理。可选择是否同时删除云端备份。</p>
+                <div class="setting-list" style="margin-top:14px">
+                  <div class="row"><div class="row-title">同时删除云端备份</div><span class="switch"></span></div>
+                </div>
+                <div class="inline-actions" style="justify-content:center;margin-top:16px">
+                  <button class="btn">取消</button>
+                  <button class="btn danger">删除</button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </article>
+      </section>
+    </main>
+
+    <script>
+      lucide.createIcons({ attrs: { width: 20, height: 20, "stroke-width": 2 } });
+    </script>
+  </body>
+</html>

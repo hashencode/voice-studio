@@ -2,7 +2,7 @@
 
 版本：v0.4
 整理日期：2026-06-25
-依据：`docs/QUARK_RECORDING_MINUTES_PRD.md` v0.4、`/Users/studio/Documents/GitHub/flutter-components/DESIGN.md`、`/Users/studio/Documents/GitHub/flutter-components/DOC.md`
+依据：当前产品设计沉淀、`/Users/studio/Documents/GitHub/flutter-components/DESIGN.md`、`/Users/studio/Documents/GitHub/flutter-components/DOC.md`
 
 ## 1. 文档目标
 
