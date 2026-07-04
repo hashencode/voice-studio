@@ -41,7 +41,7 @@ dependencies:
   path: ^1.9.1
   lucide_icons_flutter: ^3.1.12
   url_launcher: ^6.3.2
-  video_player: 2.10.1
+  video_player: ^2.11.1
 
 dev_dependencies:
   flutter_test:
