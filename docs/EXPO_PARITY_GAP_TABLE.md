@@ -15,16 +15,16 @@
 
 | 模块 | 子项 | RN 基线行为 | Flutter 当前行为 | 状态 | 证据 | 差异说明 | 方案/Owner | 优先级 |
 |---|---|---|---|---|---|---|---|---|
-| 录音页 | 开始/暂停/继续/停止 | 已确认一致 | 已实现 | 已对齐 | `lib/features/recording/*` + `RN_COPY_PARITY_CHECKLIST.md` | 无阻塞差异 | 已收口 | P2 |
-| 录音页 | 权限拒绝提示与恢复路径 | 待补 | 有拒绝提示 + 去系统设置入口 | 已对齐（待RN细节复核） | `recording_controller.dart` `recording_page.dart` | 主路径已闭环，需与 RN 文案逐字对齐 | 纳入 RN 文案对照清单 | P1 |
-| 录音页 | 来电/中断恢复 | 待补 | 已修复并完成真机回归 | 已对齐（待RN细节复核） | `recording_page.dart` + `REAL_DEVICE_REGRESSION_MATRIX.md` | 主链路通过，后续仅需与 RN 文案/交互细节复核 | 纳入 RN 细节对照清单 | P1 |
-| 转写页 | 任务列表展示 | 已确认一致 | 已实现 | 已对齐 | `transcription_page.dart` + `RN_COPY_PARITY_CHECKLIST.md` | 无阻塞差异 | 已收口 | P2 |
-| 转写页 | 失败重试 | 已确认一致 | 已实现 | 已对齐 | `transcription_page.dart` + `RN_COPY_PARITY_CHECKLIST.md` | 无阻塞差异 | 已收口 | P2 |
-| 转写链路 | real 模式识别 | 待补 | 已实现（auto->real）且回归矩阵通过 | 已对齐（待RN细节复核） | `build/smoke/logcat-20260507-092723.txt` + `REAL_DEVICE_REGRESSION_MATRIX.md` | 主链路与稳定性已验证，后续补 RN 基线细节映射 | 纳入 RN 细节对照清单 | P1 |
-| 设置页 | 模型选择与自动转写 | 已确认一致 | 已实现 | 已对齐 | `settings_page.dart` + `RN_COPY_PARITY_CHECKLIST.md` | 无阻塞差异 | 已收口 | P2 |
-| 记录页 | 列表/详情/删除 | 已确认一致 | 已实现（基础） | 已对齐 | `records_page.dart` + `RN_COPY_PARITY_CHECKLIST.md` | 无阻塞差异 | 已收口 | P2 |
-| 全局 | 错误文案一致性 | 已确认一致 | 关键提示已统一 | 已对齐 | `RN_COPY_PARITY_CHECKLIST.md` | 无阻塞差异 | 已收口 | P2 |
-| 全局 | 空态/加载态一致性 | 已确认一致 | 空态/加载态已统一 | 已对齐 | `common_empty_state.dart` + `RN_COPY_PARITY_CHECKLIST.md` | 无阻塞差异 | 已收口 | P2 |
+| 录音页 | 开始/暂停/继续/停止 | 已确认一致 | 已实现 | 已对齐 | `lib/features/recording/*` | 无阻塞差异 | 已收口 | P2 |
+| 录音页 | 权限拒绝提示与恢复路径 | 已确认一致 | 有拒绝提示 + 去系统设置入口 | 已对齐 | `recording_controller.dart` `recording_page.dart` | 无阻塞差异 | 已收口 | P1 |
+| 录音页 | 来电/中断恢复 | 已确认一致 | 已修复并完成真机回归 | 已对齐 | `recording_page.dart` + `REAL_DEVICE_REGRESSION_MATRIX.md` | 无阻塞差异 | 已收口 | P1 |
+| 转写页 | 任务列表展示 | 已确认一致 | 已实现 | 已对齐 | `transcription_page.dart` | 无阻塞差异 | 已收口 | P2 |
+| 转写页 | 失败重试 | 已确认一致 | 已实现 | 已对齐 | `transcription_page.dart` | 无阻塞差异 | 已收口 | P2 |
+| 转写链路 | real 模式识别 | 已确认一致 | 已实现（auto->real）且回归矩阵通过 | 已对齐 | `build/smoke/logcat-20260507-092723.txt` + `REAL_DEVICE_REGRESSION_MATRIX.md` | 主链路与稳定性已验证 | 已收口 | P1 |
+| 设置页 | 模型选择与自动转写 | 已确认一致 | 已实现 | 已对齐 | `settings_page.dart` | 无阻塞差异 | 已收口 | P2 |
+| 记录页 | 列表/详情/删除 | 已确认一致 | 已实现（基础） | 已对齐 | `records_page.dart` | 无阻塞差异 | 已收口 | P2 |
+| 全局 | 错误文案一致性 | 已确认一致 | 关键提示已统一 | 已对齐 | `lib/features/` | 无阻塞差异 | 已收口 | P2 |
+| 全局 | 空态/加载态一致性 | 已确认一致 | 空态/加载态已统一 | 已对齐 | `common_empty_state.dart` | 无阻塞差异 | 已收口 | P2 |
 
 ---
 
@@ -32,7 +32,7 @@
 
 1. RN 页面与文案基线已人工确认并完成对照
 2. 主流程真机回归证据已留档
-3. 文案/交互差异已在对照清单中收口
+3. 文案/交互差异已收口
 
 ## RN 细节对齐执行清单（已完成）
 
