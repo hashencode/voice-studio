@@ -8,17 +8,15 @@ import com.k2fsa.sherpa.onnx.OfflineRecognizer
 import com.k2fsa.sherpa.onnx.OfflineRecognizerConfig
 import com.k2fsa.sherpa.onnx.OfflineStream
 import com.k2fsa.sherpa.onnx.WaveReader
-import java.io.BufferedInputStream
 import java.io.File
-import java.io.FileOutputStream
 import java.util.concurrent.TimeUnit
-import java.util.zip.ZipInputStream
 
 internal class RealSherpaTranscriptionEngine(
     private val context: Context,
     private val transcoder: TranscodePort = NativeAudioTranscoder(),
+    private val modelAssetManager: ModelAssetManager = ModelAssetManager(context),
+    private val readinessChecker: ModelReadinessChecker = ModelReadinessChecker(modelAssetManager),
 ) : TranscriptionEngine {
-    private val flutterAssetPrefix = "flutter_assets/"
     override fun transcribe(request: TranscriptionRequest): String {
         if (request.recordingPath.isBlank()) {
             throw IllegalArgumentException("recordingPath 不能为空")
@@ -42,13 +40,11 @@ internal class RealSherpaTranscriptionEngine(
             throw IllegalStateException("转码失败: ${e.message ?: "未知错误"}", e)
         }
 
-        val modelAssetPath = modelAssetFor(request.modelId)
-        val requiredAssets = requiredAssetsForModel(modelAssetPath)
-        val missing = requiredAssets.filterNot { assetExists(it) }
-        if (missing.isNotEmpty()) {
-            throw IllegalStateException("模型资源缺失: ${missing.joinToString(",")}")
+        val readiness = readinessChecker.check(request.modelId)
+        if (!readiness.offlineReady) {
+            throw IllegalStateException(readiness.reason ?: "模型暂不可用于离线识别")
         }
-        val extractedModel = ensureModelExtracted(modelAssetPath)
+        val extractedModel = modelAssetManager.ensureParaformerExtracted(request.modelId)
         if (!extractedModel.modelFile.exists() || !extractedModel.tokensFile.exists()) {
             throw IllegalStateException("模型解压失败: onnx/tokens 文件不存在")
         }
@@ -119,27 +115,6 @@ internal class RealSherpaTranscriptionEngine(
         )
     }
 
-    private fun modelAssetFor(modelId: String): String {
-        return when (modelId) {
-            "paraformer-zh" -> "${flutterAssetPrefix}assets/sherpa/asr/paraformer-zh.zip"
-            else -> "${flutterAssetPrefix}assets/sherpa/asr/paraformer-zh.zip"
-        }
-    }
-
-    private fun requiredAssetsForModel(modelAssetPath: String): List<String> {
-        return listOf(
-            modelAssetPath,
-        )
-    }
-
-    private fun assetExists(path: String): Boolean {
-        return try {
-            context.assets.open(path).use { true }
-        } catch (_: Exception) {
-            false
-        }
-    }
-
     private fun cleanupTranscodeDir(dir: File) {
         if (!dir.exists() || !dir.isDirectory) return
         val files = dir.listFiles()?.filter { it.isFile && it.extension.equals("wav", ignoreCase = true) } ?: return
@@ -166,37 +141,5 @@ internal class RealSherpaTranscriptionEngine(
                 } catch (_: Exception) {
                 }
             }
-    }
-
-    private data class ExtractedParaformerModel(
-        val modelFile: File,
-        val tokensFile: File,
-    )
-
-    private fun ensureModelExtracted(zipAssetPath: String): ExtractedParaformerModel {
-        val modelDir = File(context.cacheDir, "sherpa_models/paraformer_zh")
-        val modelFile = File(modelDir, "model.int8.onnx")
-        val tokensFile = File(modelDir, "tokens.txt")
-        if (modelFile.exists() && tokensFile.exists() && modelFile.length() > 0L && tokensFile.length() > 0L) {
-            return ExtractedParaformerModel(modelFile, tokensFile)
-        }
-
-        if (!modelDir.exists()) modelDir.mkdirs()
-        context.assets.open(zipAssetPath).use { raw ->
-            ZipInputStream(BufferedInputStream(raw)).use { zis ->
-                var entry = zis.nextEntry
-                while (entry != null) {
-                    if (!entry.isDirectory) {
-                        val out = File(modelDir, entry.name.substringAfterLast('/'))
-                        FileOutputStream(out).use { fos ->
-                            zis.copyTo(fos)
-                        }
-                    }
-                    zis.closeEntry()
-                    entry = zis.nextEntry
-                }
-            }
-        }
-        return ExtractedParaformerModel(modelFile, tokensFile)
     }
 }

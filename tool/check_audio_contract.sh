@@ -16,9 +16,9 @@ clean_val() {
 
 extract_dart() {
   local key="$1"
-  local line
-  line="$(rg "static const .* ${key} =" "$DART_FILE")"
-  clean_val "$(echo "$line" | cut -d '=' -f2-)"
+  local value
+  value="$(perl -0ne "if (/static const [^;]* ${key}\\s*=\\s*([^;]+);/s) { print \$1 }" "$DART_FILE")"
+  clean_val "$value"
 }
 
 extract_kotlin() {
@@ -30,8 +30,14 @@ extract_kotlin() {
 
 pairs=(
   "recorderChannel:RECORDER_CHANNEL"
+  "transcriptionEventsChannel:TRANSCRIPTION_EVENTS_CHANNEL"
+  "eventTypeSegment:EVENT_TYPE_SEGMENT"
+  "eventTypeDegradation:EVENT_TYPE_DEGRADATION"
+  "eventTypeSessionStarted:EVENT_TYPE_SESSION_STARTED"
+  "eventTypeSessionStopped:EVENT_TYPE_SESSION_STOPPED"
   "recordingDirName:RECORDING_DIR_NAME"
   "recordingExtension:RECORDING_EXTENSION"
+  "realtimeRecordingExtension:REALTIME_RECORDING_EXTENSION"
   "sampleRateHz:SAMPLE_RATE_HZ"
   "bitRate:BIT_RATE"
   "channelCount:CHANNEL_COUNT"
