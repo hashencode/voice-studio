@@ -124,50 +124,48 @@ class _TranscriptionPageState extends State<TranscriptionPage> {
       body: _loading
           ? const Center(child: CircularProgressIndicator())
           : _jobs.isEmpty
-              ? const CommonEmptyState(
-                  icon: Icons.text_snippet_outlined,
-                  title: '暂无转写任务',
-                  description: '录音停止并保存后，会自动进入转写任务队列；也可在录音页关闭自动转写。',
-                )
-              : ListView.separated(
-                  padding: const EdgeInsets.all(12),
-                  itemCount: _jobs.length,
-                  separatorBuilder: (BuildContext context, int index) => const SizedBox(height: 8),
-                  itemBuilder: (BuildContext context, int index) {
-                    final job = _jobs[index];
-                    final bool canRetry = job.status == 'failed';
-                    final bool isRetrying = _retrying.contains(job.id);
+          ? const CommonEmptyState(
+              icon: Icons.text_snippet_outlined,
+              title: '暂无转写任务',
+              description: '录音停止并保存后，会自动进入转写任务队列；也可在录音页关闭自动转写。',
+            )
+          : ListView.separated(
+              padding: const EdgeInsets.all(12),
+              itemCount: _jobs.length,
+              separatorBuilder: (BuildContext context, int index) =>
+                  const SizedBox(height: 8),
+              itemBuilder: (BuildContext context, int index) {
+                final job = _jobs[index];
+                final bool canRetry = job.status == 'failed';
+                final bool isRetrying = _retrying.contains(job.id);
 
-                    return Card(
-                      child: Padding(
-                        padding: const EdgeInsets.fromLTRB(6, 4, 6, 4),
-                        child: ListTile(
-                          leading: _StatusDot(status: job.status),
-                          title: Text('任务 #${job.id}  ${_statusLabel(job.status)}'),
-                          subtitle: Text(
-                            _buildSubtitle(job),
-                            maxLines: 2,
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                          trailing: canRetry
-                              ? TextButton(
-                                  onPressed: isRetrying
-                                      ? null
-                                      : () {
-                                          _retryJob(job.id);
-                                        },
-                                  child: Text(isRetrying ? '重试中...' : '重试'),
-                                )
-                              : null,
-                        ),
+                return Card(
+                  child: Padding(
+                    padding: const EdgeInsets.fromLTRB(6, 4, 6, 4),
+                    child: ListTile(
+                      leading: _StatusDot(status: job.status),
+                      title: Text('任务 #${job.id}  ${_statusLabel(job.status)}'),
+                      subtitle: Text(
+                        _buildSubtitle(job),
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
                       ),
-                    );
-                  },
-                ),
-      bottomNavigationBar: const SafeArea(
-        top: false,
-        child: BuildInfoFooter(),
-      ),
+                      trailing: canRetry
+                          ? TextButton(
+                              onPressed: isRetrying
+                                  ? null
+                                  : () {
+                                      _retryJob(job.id);
+                                    },
+                              child: Text(isRetrying ? '重试中...' : '重试'),
+                            )
+                          : null,
+                    ),
+                  ),
+                );
+              },
+            ),
+      bottomNavigationBar: const SafeArea(top: false, child: BuildInfoFooter()),
     );
   }
 
@@ -187,9 +185,27 @@ class _TranscriptionPageState extends State<TranscriptionPage> {
   }
 
   String _buildSubtitle(TranscriptionJobEntity job) {
-    final String primary = job.resultText ?? job.errorMessage ?? job.recordingPath;
-    final String updated = DateTime.fromMillisecondsSinceEpoch(job.updatedAtMs).toString();
-    return '$primary\n更新于: $updated · 时长: ${formatDurationMs(job.durationMs)}';
+    final String primary =
+        job.resultText ?? job.errorMessage ?? job.recordingPath;
+    final String updated = DateTime.fromMillisecondsSinceEpoch(
+      job.updatedAtMs,
+    ).toString();
+    return '$primary\n${_modeLabel(job)} · 更新于: $updated · 时长: ${formatDurationMs(job.durationMs)}';
+  }
+
+  String _modeLabel(TranscriptionJobEntity job) {
+    final String mode = switch (job.recordingMode) {
+      'realtime' => '实时',
+      'standard' => '标准',
+      _ => job.recordingMode,
+    };
+    final String source = switch (job.source) {
+      'standard_offline' => '离线全文',
+      'realtime_final' => '实时分段',
+      'realtime_fallback_offline' => '实时兜底离线',
+      _ => job.source,
+    };
+    return '$mode · $source';
   }
 }
 

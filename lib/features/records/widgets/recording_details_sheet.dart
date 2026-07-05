@@ -27,15 +27,13 @@ Future<void> showRecordingDetailsSheet({
               const SizedBox(height: 12),
               Text('时长: ${formatDurationMs(durationMs)}'),
               const SizedBox(height: 8),
-              Text(
-                '创建时间: ${DateTime.fromMillisecondsSinceEpoch(createdAtMs)}',
-              ),
+              Text('创建时间: ${DateTime.fromMillisecondsSinceEpoch(createdAtMs)}'),
               const SizedBox(height: 8),
               Text('路径: $path'),
               if (latestJob != null) ...<Widget>[
                 const SizedBox(height: 12),
                 Text(
-                  '最近转写: ${_statusLabel(latestJob.status)}',
+                  '最近转写: ${_statusLabel(latestJob.status)} · ${_modeLabel(latestJob)}',
                   style: theme.textTheme.titleSmall,
                 ),
                 const SizedBox(height: 6),
@@ -55,6 +53,21 @@ Future<void> showRecordingDetailsSheet({
       );
     },
   );
+}
+
+String _modeLabel(TranscriptionJobEntity job) {
+  final String mode = switch (job.recordingMode) {
+    'realtime' => '实时',
+    'standard' => '标准',
+    _ => job.recordingMode,
+  };
+  final String source = switch (job.source) {
+    'standard_offline' => '离线全文',
+    'realtime_final' => '实时分段',
+    'realtime_fallback_offline' => '实时兜底离线',
+    _ => job.source,
+  };
+  return '$mode/$source';
 }
 
 String _statusLabel(String status) {
