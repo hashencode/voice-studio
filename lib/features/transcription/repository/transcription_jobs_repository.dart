@@ -2,13 +2,18 @@ import '../../../data/sqlite/app_database.dart';
 import '../model/transcription_job_entity.dart';
 
 class TranscriptionJobsRepository {
-  TranscriptionJobsRepository({AppDatabase? database}) : _database = database ?? AppDatabase.instance;
+  TranscriptionJobsRepository({AppDatabase? database})
+    : _database = database ?? AppDatabase.instance;
 
   final AppDatabase _database;
 
   Future<int> insertPendingJob({
     required String recordingPath,
     required int durationMs,
+    String recordingMode = 'standard',
+    String source = 'standard_offline',
+    String? failureStage,
+    double? progress,
   }) async {
     final db = await _database.database;
     final int now = DateTime.now().millisecondsSinceEpoch;
@@ -17,6 +22,10 @@ class TranscriptionJobsRepository {
       'recording_path': recordingPath,
       'duration_ms': durationMs,
       'status': 'pending',
+      'recording_mode': recordingMode,
+      'source': source,
+      'failure_stage': failureStage,
+      'progress': progress,
       'created_at_ms': now,
       'updated_at_ms': now,
       'result_text': null,
@@ -77,16 +86,34 @@ class TranscriptionJobsRepository {
     required String status,
     String? resultText,
     String? errorMessage,
+    String? recordingMode,
+    String? source,
+    String? failureStage,
+    double? progress,
   }) async {
     final db = await _database.database;
+    final Map<String, Object?> values = <String, Object?>{
+      'status': status,
+      'result_text': resultText,
+      'error_message': errorMessage,
+      'updated_at_ms': DateTime.now().millisecondsSinceEpoch,
+    };
+    if (recordingMode != null) {
+      values['recording_mode'] = recordingMode;
+    }
+    if (source != null) {
+      values['source'] = source;
+    }
+    if (failureStage != null) {
+      values['failure_stage'] = failureStage;
+    }
+    if (progress != null) {
+      values['progress'] = progress;
+    }
+
     await db.update(
       'transcription_jobs',
-      {
-        'status': status,
-        'result_text': resultText,
-        'error_message': errorMessage,
-        'updated_at_ms': DateTime.now().millisecondsSinceEpoch,
-      },
+      values,
       where: 'id = ?',
       whereArgs: <Object>[id],
     );
