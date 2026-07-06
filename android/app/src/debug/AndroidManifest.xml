@@ -4,4 +4,10 @@
          to allow setting breakpoints, to provide hot reload, etc.
     -->
     <uses-permission android:name="android.permission.INTERNET"/>
+    <application>
+        <!-- Debug-only benchmark entry. Source lives under benchmark/android. -->
+        <activity
+            android:name="com.voice2text.app.benchmark.AsrBenchmarkActivity"
+            android:exported="true" />
+    </application>
 </manifest>

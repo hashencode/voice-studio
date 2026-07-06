@@ -31,6 +31,10 @@ flutter build apk --debug
 # 转写日志判定（检查最新 smoke 日志）
 ./tool/check_transcribe_log.sh
 
+# ASR 模型 benchmark
+# 详见 benchmark/README.md；音频 fixture 已提交，模型下载到 build/asr_benchmark，不提交到 Git。
+MODEL_IDS="paraformer-zh-2025-10-07 paraformer-en-2024-03-09" PROFILE_IDS="standard_whole_warm_t2 standard_vad_silero_warm_t2 realtime_rms_warm_baseline_t2 realtime_silero_warm_default_t2" DEVICE_ID=emulator-5554 ./benchmark/run_asr_benchmark.sh
+
 # 清理真机转码临时 wav（默认保留最近 10 个）
 ./tool/clean_transcoded_audio.sh 8PXCGQZPEQJNP7U8 10
 
@@ -82,3 +86,7 @@ flutter build apk --debug
 - Real 引擎已接入真实 JNI 推理调用。
 - 自动转写链路：`m4a` 录音 -> 原生转码 `wav(16k mono)` -> Sherpa 识别（真机实测通过，已出现 `transcribe ok` 日志）。
 - 已支持转码缓存清理与识别链路日志（tag: `Voice2TextNative`）。
+
+## ASR 模型 benchmark
+
+benchmark 工具集中放在 `benchmark/` 下；固定音频 fixture 放在 `benchmark/audio/` 并提交，模型和运行缓存放在 `build/asr_benchmark/`，不提交到 Git。报告按“标准线路 benchmark / 实时线路 replay benchmark”两个 Tab 展示参数 profile 对比。根目录示例命令是 smoke；coarse/full 参数矩阵使用方式见 `benchmark/README.md`。

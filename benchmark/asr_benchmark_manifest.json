@@ -1,0 +1,61 @@
+{
+  "version": 1,
+  "defaultSegmentWindowMs": 12000,
+  "vad": {
+    "model": "vad/silero-vad.onnx",
+    "profile": "sherpa-onnx-generate-subtitles",
+    "sampleRate": 16000,
+    "threshold": 0.2,
+    "minSilenceDurationSec": 0.25,
+    "minSpeechDurationSec": 0.25,
+    "windowSize": 512,
+    "maxSpeechDurationSec": 5.0,
+    "numThreads": 1
+  },
+  "models": [
+    {
+      "id": "paraformer-zh-2025-10-07",
+      "displayName": "Paraformer zh int8 2025-10-07",
+      "pretrainedModel": "sherpa-onnx-paraformer-zh-int8-2025-10-07",
+      "family": "paraformer",
+      "languages": ["zh"],
+      "archiveUrl": "https://github.com/k2-fsa/sherpa-onnx/releases/download/asr-models/sherpa-onnx-paraformer-zh-int8-2025-10-07.tar.bz2",
+      "archiveName": "sherpa-onnx-paraformer-zh-int8-2025-10-07.tar.bz2",
+      "extractedDir": "sherpa-onnx-paraformer-zh-int8-2025-10-07",
+      "numThreads": 2,
+      "requiredFiles": {
+        "model": "model.int8.onnx",
+        "tokens": "tokens.txt"
+      }
+    },
+    {
+      "id": "paraformer-en-2024-03-09",
+      "displayName": "Paraformer en 2024-03-09",
+      "pretrainedModel": "sherpa-onnx-paraformer-en-2024-03-09",
+      "family": "paraformer",
+      "languages": ["en"],
+      "archiveUrl": "https://github.com/k2-fsa/sherpa-onnx/releases/download/asr-models/sherpa-onnx-paraformer-en-2024-03-09.tar.bz2",
+      "archiveName": "sherpa-onnx-paraformer-en-2024-03-09.tar.bz2",
+      "extractedDir": "sherpa-onnx-paraformer-en-2024-03-09",
+      "numThreads": 2,
+      "requiredFiles": {
+        "model": "model.int8.onnx",
+        "tokens": "tokens.txt"
+      }
+    }
+  ],
+  "audioCases": [
+    {
+      "id": "zh",
+      "language": "zh",
+      "wav": "audio/zh.wav",
+      "reference": "audio/zh.txt"
+    },
+    {
+      "id": "en",
+      "language": "en",
+      "wav": "audio/en.wav",
+      "reference": "audio/en.txt"
+    }
+  ]
+}

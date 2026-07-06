@@ -1,0 +1,1553 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>ASR Paraformer Parameter Benchmark</title>
+  
+    <style>
+      :root {
+        --surface: #FCFCFD;
+        --panel: #FFFFFF;
+        --ink: #1F2430;
+        --muted: #6F768A;
+        --grid: #E6E8F0;
+        --axis: #D7DBE7;
+      }
+      * { box-sizing: border-box; }
+      body { margin: 0; background: var(--surface); color: var(--ink); font-family: Inter, "Segoe UI", Arial, sans-serif; line-height: 1.45; }
+      main { width: min(1180px, calc(100vw - 32px)); margin: 28px auto 60px; }
+      h1 { margin: 0 0 8px; font-size: clamp(28px, 4vw, 42px); letter-spacing: 0; }
+      h2 { margin: 26px 0 12px; font-size: 22px; letter-spacing: 0; }
+      p { color: var(--muted); max-width: 920px; }
+      .kpis { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; margin: 20px 0 22px; }
+      .kpi { background: var(--panel); border: 1px solid var(--axis); border-radius: 8px; padding: 14px 16px; }
+      .kpi strong { display: block; font-size: 18px; margin-bottom: 4px; }
+      .kpi span { color: var(--muted); font-size: 13px; }
+      .tabs { display: flex; gap: 8px; margin: 18px 0 12px; border-bottom: 1px solid var(--axis); }
+      .tab-input { position: absolute; opacity: 0; pointer-events: none; }
+      .tab-label { border: 1px solid var(--axis); border-bottom: 0; border-radius: 8px 8px 0 0; padding: 10px 14px; background: #F4F5F7; cursor: pointer; font-weight: 650; }
+      #tab-standard:checked ~ .tabs label[for="tab-standard"],
+      #tab-realtime:checked ~ .tabs label[for="tab-realtime"] { background: var(--panel); color: var(--ink); }
+      .tab-panel { display: none; }
+      #tab-standard:checked ~ #panel-standard,
+      #tab-realtime:checked ~ #panel-realtime_replay { display: block; }
+      .grid-two { display: grid; grid-template-columns: 1fr; gap: 18px; align-items: start; }
+      .chart { background: var(--panel); border: 1px solid var(--axis); border-radius: 8px; padding: 18px; overflow: hidden; }
+      .chart-svg { width: 100%; max-width: 100%; height: auto; display: block; }
+      .chart-title { font-weight: 700; font-size: 18px; fill: var(--ink); }
+      .chart-subtitle { font-size: 12px; fill: var(--muted); }
+      .axis-label { font-size: 12px; fill: var(--ink); font-weight: 650; }
+      .axis-hint { font-size: 10px; fill: var(--muted); }
+      .value-label { font-family: "SF Mono", Menlo, Consolas, monospace; font-size: 11px; fill: var(--ink); }
+      .grid { stroke: var(--grid); stroke-width: 1; }
+      .bar { stroke-width: 1; }
+      .table-wrap { max-width: 100%; overflow-x: auto; border: 1px solid var(--axis); border-radius: 8px; background: var(--panel); }
+      .detail-table { width: 100%; min-width: 1080px; border-collapse: collapse; background: var(--panel); }
+      .detail-table th, .detail-table td { padding: 10px 12px; border-bottom: 1px solid var(--grid); text-align: left; font-size: 13px; vertical-align: top; }
+      .detail-table th { color: var(--muted); font-weight: 650; background: #F4F5F7; }
+      .detail-table td:nth-child(n+5) { font-family: "SF Mono", Menlo, Consolas, monospace; }
+      .detail-table span { color: var(--muted); font-size: 12px; }
+      .empty { background: var(--panel); border: 1px solid var(--axis); border-radius: 8px; padding: 18px; }
+      @media (max-width: 900px) { .kpis, .grid-two { grid-template-columns: 1fr; } main { width: min(100vw - 20px, 1180px); } }
+    </style>
+    
+</head>
+<body>
+<main>
+  <header>
+    <h1>Paraformer 参数 benchmark</h1>
+    <p>模型固定为 Paraformer，比较单位改为参数 profile。warm steady-state 用于主排序，cold/current 单独展示，避免把模型加载成本和参数效果混在一起。</p>
+  </header>
+
+  <section class="kpis">
+    <div class="kpi"><strong>标准中文</strong><span>Standard Silero T2 thr=0.15 sil=0.2s max=8.0s：CER 0.00%</span></div>
+    <div class="kpi"><strong>标准英文</strong><span>Standard Silero T2 thr=0.3 sil=0.5s max=5.0s：WER 7.09%</span></div>
+    <div class="kpi"><strong>实时中文</strong><span>Realtime RMS T2 frame=200 thr=650 min=320 end=500 max=12000 pre=0：CER 0.00%</span></div>
+    <div class="kpi"><strong>实时英文</strong><span>Realtime Silero T2 frame=100 thr=0.3 sil=0.5s max=5.0s：WER 7.09%</span></div>
+  </section>
+
+  <input class="tab-input" type="radio" name="route-tabs" id="tab-standard" checked />
+  <input class="tab-input" type="radio" name="route-tabs" id="tab-realtime" />
+  <nav class="tabs">
+    <label class="tab-label" for="tab-standard">标准线路 benchmark</label>
+    <label class="tab-label" for="tab-realtime">实时线路 replay benchmark</label>
+  </nav>
+
+  
+      <section class="tab-panel" id="panel-standard">
+        <h2>标准线路</h2>
+        <div class="grid-two">
+          <div class="chart"><svg class="chart-svg" viewBox="0 0 920 2742" role="img" aria-label="准确率">
+<text class="chart-title" x="0" y="18">准确率</text>
+<text class="chart-subtitle" x="0" y="42">越低越好；warm 行用于主要排序。</text>
+<line class="grid" x1="430.0" y1="62" x2="430.0" y2="2716" />
+<line class="grid" x1="550.0" y1="62" x2="550.0" y2="2716" />
+<line class="grid" x1="670.0" y1="62" x2="670.0" y2="2716" />
+<line class="grid" x1="790.0" y1="62" x2="790.0" y2="2716" />
+<text class="axis-label" x="0" y="88">Standard Silero T2 thr=0.3 sil=0.5s max=5.0s</text>
+<text class="axis-hint" x="0" y="103">英文 · warm · shared</text>
+<rect class="bar" x="310" y="75" width="307.2" height="18" fill="#A3D576" stroke="#386411" />
+<text class="value-label" x="625.2" y="90">7.09%</text>
+<text class="axis-label" x="0" y="128">Standard Silero T2 thr=0.3 sil=0.35s max=5.0s</text>
+<text class="axis-hint" x="0" y="143">英文 · warm · shared</text>
+<rect class="bar" x="310" y="115" width="313.0" height="18" fill="#A3D576" stroke="#386411" />
+<text class="value-label" x="631.0" y="130">7.22%</text>
+<text class="axis-label" x="0" y="168">Standard Silero T2 thr=0.3 sil=0.25s max=5.0s</text>
+<text class="axis-hint" x="0" y="183">英文 · warm · shared</text>
+<rect class="bar" x="310" y="155" width="318.8" height="18" fill="#A3D576" stroke="#386411" />
+<text class="value-label" x="636.8" y="170">7.35%</text>
+<text class="axis-label" x="0" y="208">Standard Silero T2 thr=0.3 sil=0.2s max=5.0s</text>
+<text class="axis-hint" x="0" y="223">英文 · warm · shared</text>
+<rect class="bar" x="310" y="195" width="318.8" height="18" fill="#A3D576" stroke="#386411" />
+<text class="value-label" x="636.8" y="210">7.35%</text>
+<text class="axis-label" x="0" y="248">Standard Silero T2 thr=0.25 sil=0.35s max=5.0s</text>
+<text class="axis-hint" x="0" y="263">英文 · warm · shared</text>
+<rect class="bar" x="310" y="235" width="330.4" height="18" fill="#A3D576" stroke="#386411" />
+<text class="value-label" x="648.4" y="250">7.62%</text>
+<text class="axis-label" x="0" y="288">Standard Silero T2 thr=0.25 sil=0.5s max=5.0s</text>
+<text class="axis-hint" x="0" y="303">英文 · warm · shared</text>
+<rect class="bar" x="310" y="275" width="330.4" height="18" fill="#A3D576" stroke="#386411" />
+<text class="value-label" x="648.4" y="290">7.62%</text>
+<text class="axis-label" x="0" y="328">Standard Silero T2 thr=0.15 sil=0.5s max=5.0s</text>
+<text class="axis-hint" x="0" y="343">英文 · warm · shared</text>
+<rect class="bar" x="310" y="315" width="330.4" height="18" fill="#A3D576" stroke="#386411" />
+<text class="value-label" x="648.4" y="330">7.62%</text>
+<text class="axis-label" x="0" y="368">Standard Silero T2 thr=0.15 sil=0.25s max=5.0s</text>
+<text class="axis-hint" x="0" y="383">英文 · warm · shared</text>
+<rect class="bar" x="310" y="355" width="330.4" height="18" fill="#A3D576" stroke="#386411" />
+<text class="value-label" x="648.4" y="370">7.62%</text>
+<text class="axis-label" x="0" y="408">Standard Silero T2 thr=0.15 sil=0.35s max=5.0s</text>
+<text class="axis-hint" x="0" y="423">英文 · warm · shared</text>
+<rect class="bar" x="310" y="395" width="330.4" height="18" fill="#A3D576" stroke="#386411" />
+<text class="value-label" x="648.4" y="410">7.62%</text>
+<text class="axis-label" x="0" y="448">Standard Silero T2 thr=0.15 sil=0.2s max=5.0s</text>
+<text class="axis-hint" x="0" y="463">英文 · warm · shared</text>
+<rect class="bar" x="310" y="435" width="330.4" height="18" fill="#A3D576" stroke="#386411" />
+<text class="value-label" x="648.4" y="450">7.62%</text>
+<text class="axis-label" x="0" y="488">Standard Silero T2 thr=0.25 sil=0.25s max=5.0s</text>
+<text class="axis-hint" x="0" y="503">英文 · warm · shared</text>
+<rect class="bar" x="310" y="475" width="336.2" height="18" fill="#A3D576" stroke="#386411" />
+<text class="value-label" x="654.2" y="490">7.75%</text>
+<text class="axis-label" x="0" y="528">Standard Silero T2 thr=0.25 sil=0.2s max=5.0s</text>
+<text class="axis-hint" x="0" y="543">英文 · warm · shared</text>
+<rect class="bar" x="310" y="515" width="336.2" height="18" fill="#A3D576" stroke="#386411" />
+<text class="value-label" x="654.2" y="530">7.75%</text>
+<text class="axis-label" x="0" y="568">Standard Silero T2 thr=0.2 sil=0.5s max=5.0s</text>
+<text class="axis-hint" x="0" y="583">英文 · warm · shared</text>
+<rect class="bar" x="310" y="555" width="342.0" height="18" fill="#A3D576" stroke="#386411" />
+<text class="value-label" x="660.0" y="570">7.89%</text>
+<text class="axis-label" x="0" y="608">Standard Silero T2 thr=0.2 sil=0.35s max=5.0s</text>
+<text class="axis-hint" x="0" y="623">英文 · warm · shared</text>
+<rect class="bar" x="310" y="595" width="342.0" height="18" fill="#A3D576" stroke="#386411" />
+<text class="value-label" x="660.0" y="610">7.89%</text>
+<text class="axis-label" x="0" y="648">Standard Silero T2 thr=0.2 sil=0.2s max=5.0s</text>
+<text class="axis-hint" x="0" y="663">英文 · warm · shared</text>
+<rect class="bar" x="310" y="635" width="347.8" height="18" fill="#A3D576" stroke="#386411" />
+<text class="value-label" x="665.8" y="650">8.02%</text>
+<text class="axis-label" x="0" y="688">Standard Silero T2 thr=0.2 sil=0.25s max=5.0s</text>
+<text class="axis-hint" x="0" y="703">英文 · warm · shared</text>
+<rect class="bar" x="310" y="675" width="347.8" height="18" fill="#A3D576" stroke="#386411" />
+<text class="value-label" x="665.8" y="690">8.02%</text>
+<text class="axis-label" x="0" y="728">Standard Silero T2 thr=0.2 sil=0.25s max=8.0s</text>
+<text class="axis-hint" x="0" y="743">英文 · warm · shared</text>
+<rect class="bar" x="310" y="715" width="371.0" height="18" fill="#A3D576" stroke="#386411" />
+<text class="value-label" x="689.0" y="730">8.56%</text>
+<text class="axis-label" x="0" y="768">Standard Silero T2 thr=0.15 sil=0.5s max=8.0s</text>
+<text class="axis-hint" x="0" y="783">英文 · warm · shared</text>
+<rect class="bar" x="310" y="755" width="376.8" height="18" fill="#A3D576" stroke="#386411" />
+<text class="value-label" x="694.8" y="770">8.69%</text>
+<text class="axis-label" x="0" y="808">Standard Silero T2 thr=0.15 sil=0.2s max=8.0s</text>
+<text class="axis-hint" x="0" y="823">英文 · warm · shared</text>
+<rect class="bar" x="310" y="795" width="376.8" height="18" fill="#A3D576" stroke="#386411" />
+<text class="value-label" x="694.8" y="810">8.69%</text>
+<text class="axis-label" x="0" y="848">Standard Silero T2 thr=0.15 sil=0.25s max=8.0s</text>
+<text class="axis-hint" x="0" y="863">英文 · warm · shared</text>
+<rect class="bar" x="310" y="835" width="382.6" height="18" fill="#A3D576" stroke="#386411" />
+<text class="value-label" x="700.6" y="850">8.82%</text>
+<text class="axis-label" x="0" y="888">Standard Silero T2 thr=0.2 sil=0.5s max=8.0s</text>
+<text class="axis-hint" x="0" y="903">英文 · warm · shared</text>
+<rect class="bar" x="310" y="875" width="382.6" height="18" fill="#A3D576" stroke="#386411" />
+<text class="value-label" x="700.6" y="890">8.82%</text>
+<text class="axis-label" x="0" y="928">Standard Silero T2 thr=0.2 sil=0.35s max=8.0s</text>
+<text class="axis-hint" x="0" y="943">英文 · warm · shared</text>
+<rect class="bar" x="310" y="915" width="382.6" height="18" fill="#A3D576" stroke="#386411" />
+<text class="value-label" x="700.6" y="930">8.82%</text>
+<text class="axis-label" x="0" y="968">Standard Silero T2 thr=0.25 sil=0.5s max=8.0s</text>
+<text class="axis-hint" x="0" y="983">英文 · warm · shared</text>
+<rect class="bar" x="310" y="955" width="382.6" height="18" fill="#A3D576" stroke="#386411" />
+<text class="value-label" x="700.6" y="970">8.82%</text>
+<text class="axis-label" x="0" y="1008">Standard Silero T2 thr=0.25 sil=0.35s max=8.0s</text>
+<text class="axis-hint" x="0" y="1023">英文 · warm · shared</text>
+<rect class="bar" x="310" y="995" width="382.6" height="18" fill="#A3D576" stroke="#386411" />
+<text class="value-label" x="700.6" y="1010">8.82%</text>
+<text class="axis-label" x="0" y="1048">Standard Silero T2 thr=0.15 sil=0.35s max=8.0s</text>
+<text class="axis-hint" x="0" y="1063">英文 · warm · shared</text>
+<rect class="bar" x="310" y="1035" width="382.6" height="18" fill="#A3D576" stroke="#386411" />
+<text class="value-label" x="700.6" y="1050">8.82%</text>
+<text class="axis-label" x="0" y="1088">Standard Silero T2 thr=0.25 sil=0.25s max=8.0s</text>
+<text class="axis-hint" x="0" y="1103">英文 · warm · shared</text>
+<rect class="bar" x="310" y="1075" width="388.4" height="18" fill="#A3D576" stroke="#386411" />
+<text class="value-label" x="706.4" y="1090">8.96%</text>
+<text class="axis-label" x="0" y="1128">Standard Silero T2 thr=0.2 sil=0.2s max=8.0s</text>
+<text class="axis-hint" x="0" y="1143">英文 · warm · shared</text>
+<rect class="bar" x="310" y="1115" width="388.4" height="18" fill="#A3D576" stroke="#386411" />
+<text class="value-label" x="706.4" y="1130">8.96%</text>
+<text class="axis-label" x="0" y="1168">Standard Silero T2 thr=0.3 sil=0.5s max=8.0s</text>
+<text class="axis-hint" x="0" y="1183">英文 · warm · shared</text>
+<rect class="bar" x="310" y="1155" width="405.8" height="18" fill="#A3D576" stroke="#386411" />
+<text class="value-label" x="723.8" y="1170">9.36%</text>
+<text class="axis-label" x="0" y="1208">Standard Silero T2 thr=0.25 sil=0.2s max=8.0s</text>
+<text class="axis-hint" x="0" y="1223">英文 · warm · shared</text>
+<rect class="bar" x="310" y="1195" width="405.8" height="18" fill="#A3D576" stroke="#386411" />
+<text class="value-label" x="723.8" y="1210">9.36%</text>
+<text class="axis-label" x="0" y="1248">Standard Silero T2 thr=0.3 sil=0.2s max=8.0s</text>
+<text class="axis-hint" x="0" y="1263">英文 · warm · shared</text>
+<rect class="bar" x="310" y="1235" width="411.6" height="18" fill="#A3D576" stroke="#386411" />
+<text class="value-label" x="729.6" y="1250">9.49%</text>
+<text class="axis-label" x="0" y="1288">Standard Silero T2 thr=0.3 sil=0.35s max=8.0s</text>
+<text class="axis-hint" x="0" y="1303">英文 · warm · shared</text>
+<rect class="bar" x="310" y="1275" width="411.6" height="18" fill="#A3D576" stroke="#386411" />
+<text class="value-label" x="729.6" y="1290">9.49%</text>
+<text class="axis-label" x="0" y="1328">Standard Silero T2 thr=0.3 sil=0.25s max=8.0s</text>
+<text class="axis-hint" x="0" y="1343">英文 · warm · shared</text>
+<rect class="bar" x="310" y="1315" width="417.4" height="18" fill="#A3D576" stroke="#386411" />
+<text class="value-label" x="735.4" y="1330">9.63%</text>
+<text class="axis-label" x="0" y="1368">Standard whole-file warm T2</text>
+<text class="axis-hint" x="0" y="1383">英文 · warm · shared</text>
+<rect class="bar" x="310" y="1355" width="417.4" height="18" fill="#A3D576" stroke="#386411" />
+<text class="value-label" x="735.4" y="1370">9.63%</text>
+<text class="axis-label" x="0" y="1408">Standard Silero T2 thr=0.15 sil=0.2s max=8.0s</text>
+<text class="axis-hint" x="0" y="1423">中文 · warm · shared</text>
+<rect class="bar" x="310" y="1395" width="1.0" height="18" fill="#A3D576" stroke="#386411" />
+<text class="value-label" x="318.0" y="1410">0.00%</text>
+<text class="axis-label" x="0" y="1448">Standard Silero T2 thr=0.15 sil=0.25s max=5.0s</text>
+<text class="axis-hint" x="0" y="1463">中文 · warm · shared</text>
+<rect class="bar" x="310" y="1435" width="1.0" height="18" fill="#A3D576" stroke="#386411" />
+<text class="value-label" x="318.0" y="1450">0.00%</text>
+<text class="axis-label" x="0" y="1488">Standard Silero T2 thr=0.15 sil=0.35s max=8.0s</text>
+<text class="axis-hint" x="0" y="1503">中文 · warm · shared</text>
+<rect class="bar" x="310" y="1475" width="1.0" height="18" fill="#A3D576" stroke="#386411" />
+<text class="value-label" x="318.0" y="1490">0.00%</text>
+<text class="axis-label" x="0" y="1528">Standard Silero T2 thr=0.15 sil=0.35s max=5.0s</text>
+<text class="axis-hint" x="0" y="1543">中文 · warm · shared</text>
+<rect class="bar" x="310" y="1515" width="1.0" height="18" fill="#A3D576" stroke="#386411" />
+<text class="value-label" x="318.0" y="1530">0.00%</text>
+<text class="axis-label" x="0" y="1568">Standard Silero T2 thr=0.15 sil=0.25s max=8.0s</text>
+<text class="axis-hint" x="0" y="1583">中文 · warm · shared</text>
+<rect class="bar" x="310" y="1555" width="1.0" height="18" fill="#A3D576" stroke="#386411" />
+<text class="value-label" x="318.0" y="1570">0.00%</text>
+<text class="axis-label" x="0" y="1608">Standard Silero T2 thr=0.15 sil=0.2s max=5.0s</text>
+<text class="axis-hint" x="0" y="1623">中文 · warm · shared</text>
+<rect class="bar" x="310" y="1595" width="1.0" height="18" fill="#A3D576" stroke="#386411" />
+<text class="value-label" x="318.0" y="1610">0.00%</text>
+<text class="axis-label" x="0" y="1648">Standard Silero T2 thr=0.15 sil=0.5s max=5.0s</text>
+<text class="axis-hint" x="0" y="1663">中文 · warm · shared</text>
+<rect class="bar" x="310" y="1635" width="1.0" height="18" fill="#A3D576" stroke="#386411" />
+<text class="value-label" x="318.0" y="1650">0.00%</text>
+<text class="axis-label" x="0" y="1688">Standard Silero T2 thr=0.15 sil=0.5s max=8.0s</text>
+<text class="axis-hint" x="0" y="1703">中文 · warm · shared</text>
+<rect class="bar" x="310" y="1675" width="1.0" height="18" fill="#A3D576" stroke="#386411" />
+<text class="value-label" x="318.0" y="1690">0.00%</text>
+<text class="axis-label" x="0" y="1728">Standard Silero T2 thr=0.2 sil=0.2s max=5.0s</text>
+<text class="axis-hint" x="0" y="1743">中文 · warm · shared</text>
+<rect class="bar" x="310" y="1715" width="8.6" height="18" fill="#A3D576" stroke="#386411" />
+<text class="value-label" x="326.6" y="1730">0.20%</text>
+<text class="axis-label" x="0" y="1768">Standard Silero T2 thr=0.2 sil=0.2s max=8.0s</text>
+<text class="axis-hint" x="0" y="1783">中文 · warm · shared</text>
+<rect class="bar" x="310" y="1755" width="8.6" height="18" fill="#A3D576" stroke="#386411" />
+<text class="value-label" x="326.6" y="1770">0.20%</text>
+<text class="axis-label" x="0" y="1808">Standard Silero T2 thr=0.2 sil=0.5s max=8.0s</text>
+<text class="axis-hint" x="0" y="1823">中文 · warm · shared</text>
+<rect class="bar" x="310" y="1795" width="8.6" height="18" fill="#A3D576" stroke="#386411" />
+<text class="value-label" x="326.6" y="1810">0.20%</text>
+<text class="axis-label" x="0" y="1848">Standard Silero T2 thr=0.2 sil=0.25s max=5.0s</text>
+<text class="axis-hint" x="0" y="1863">中文 · warm · shared</text>
+<rect class="bar" x="310" y="1835" width="8.6" height="18" fill="#A3D576" stroke="#386411" />
+<text class="value-label" x="326.6" y="1850">0.20%</text>
+<text class="axis-label" x="0" y="1888">Standard Silero T2 thr=0.2 sil=0.25s max=8.0s</text>
+<text class="axis-hint" x="0" y="1903">中文 · warm · shared</text>
+<rect class="bar" x="310" y="1875" width="8.6" height="18" fill="#A3D576" stroke="#386411" />
+<text class="value-label" x="326.6" y="1890">0.20%</text>
+<text class="axis-label" x="0" y="1928">Standard Silero T2 thr=0.2 sil=0.35s max=5.0s</text>
+<text class="axis-hint" x="0" y="1943">中文 · warm · shared</text>
+<rect class="bar" x="310" y="1915" width="8.6" height="18" fill="#A3D576" stroke="#386411" />
+<text class="value-label" x="326.6" y="1930">0.20%</text>
+<text class="axis-label" x="0" y="1968">Standard Silero T2 thr=0.2 sil=0.35s max=8.0s</text>
+<text class="axis-hint" x="0" y="1983">中文 · warm · shared</text>
+<rect class="bar" x="310" y="1955" width="8.6" height="18" fill="#A3D576" stroke="#386411" />
+<text class="value-label" x="326.6" y="1970">0.20%</text>
+<text class="axis-label" x="0" y="2008">Standard Silero T2 thr=0.2 sil=0.5s max=5.0s</text>
+<text class="axis-hint" x="0" y="2023">中文 · warm · shared</text>
+<rect class="bar" x="310" y="1995" width="8.6" height="18" fill="#A3D576" stroke="#386411" />
+<text class="value-label" x="326.6" y="2010">0.20%</text>
+<text class="axis-label" x="0" y="2048">Standard Silero T2 thr=0.25 sil=0.2s max=5.0s</text>
+<text class="axis-hint" x="0" y="2063">中文 · warm · shared</text>
+<rect class="bar" x="310" y="2035" width="21.4" height="18" fill="#A3D576" stroke="#386411" />
+<text class="value-label" x="339.4" y="2050">0.49%</text>
+<text class="axis-label" x="0" y="2088">Standard Silero T2 thr=0.25 sil=0.2s max=8.0s</text>
+<text class="axis-hint" x="0" y="2103">中文 · warm · shared</text>
+<rect class="bar" x="310" y="2075" width="21.4" height="18" fill="#A3D576" stroke="#386411" />
+<text class="value-label" x="339.4" y="2090">0.49%</text>
+<text class="axis-label" x="0" y="2128">Standard Silero T2 thr=0.25 sil=0.5s max=5.0s</text>
+<text class="axis-hint" x="0" y="2143">中文 · warm · shared</text>
+<rect class="bar" x="310" y="2115" width="21.4" height="18" fill="#A3D576" stroke="#386411" />
+<text class="value-label" x="339.4" y="2130">0.49%</text>
+<text class="axis-label" x="0" y="2168">Standard Silero T2 thr=0.25 sil=0.5s max=8.0s</text>
+<text class="axis-hint" x="0" y="2183">中文 · warm · shared</text>
+<rect class="bar" x="310" y="2155" width="21.4" height="18" fill="#A3D576" stroke="#386411" />
+<text class="value-label" x="339.4" y="2170">0.49%</text>
+<text class="axis-label" x="0" y="2208">Standard Silero T2 thr=0.25 sil=0.25s max=8.0s</text>
+<text class="axis-hint" x="0" y="2223">中文 · warm · shared</text>
+<rect class="bar" x="310" y="2195" width="21.4" height="18" fill="#A3D576" stroke="#386411" />
+<text class="value-label" x="339.4" y="2210">0.49%</text>
+<text class="axis-label" x="0" y="2248">Standard Silero T2 thr=0.25 sil=0.35s max=5.0s</text>
+<text class="axis-hint" x="0" y="2263">中文 · warm · shared</text>
+<rect class="bar" x="310" y="2235" width="21.4" height="18" fill="#A3D576" stroke="#386411" />
+<text class="value-label" x="339.4" y="2250">0.49%</text>
+<text class="axis-label" x="0" y="2288">Standard Silero T2 thr=0.25 sil=0.25s max=5.0s</text>
+<text class="axis-hint" x="0" y="2303">中文 · warm · shared</text>
+<rect class="bar" x="310" y="2275" width="21.4" height="18" fill="#A3D576" stroke="#386411" />
+<text class="value-label" x="339.4" y="2290">0.49%</text>
+<text class="axis-label" x="0" y="2328">Standard Silero T2 thr=0.25 sil=0.35s max=8.0s</text>
+<text class="axis-hint" x="0" y="2343">中文 · warm · shared</text>
+<rect class="bar" x="310" y="2315" width="21.4" height="18" fill="#A3D576" stroke="#386411" />
+<text class="value-label" x="339.4" y="2330">0.49%</text>
+<text class="axis-label" x="0" y="2368">Standard Silero T2 thr=0.3 sil=0.2s max=8.0s</text>
+<text class="axis-hint" x="0" y="2383">中文 · warm · shared</text>
+<rect class="bar" x="310" y="2355" width="25.7" height="18" fill="#A3D576" stroke="#386411" />
+<text class="value-label" x="343.7" y="2370">0.59%</text>
+<text class="axis-label" x="0" y="2408">Standard Silero T2 thr=0.3 sil=0.5s max=8.0s</text>
+<text class="axis-hint" x="0" y="2423">中文 · warm · shared</text>
+<rect class="bar" x="310" y="2395" width="25.7" height="18" fill="#A3D576" stroke="#386411" />
+<text class="value-label" x="343.7" y="2410">0.59%</text>
+<text class="axis-label" x="0" y="2448">Standard Silero T2 thr=0.3 sil=0.2s max=5.0s</text>
+<text class="axis-hint" x="0" y="2463">中文 · warm · shared</text>
+<rect class="bar" x="310" y="2435" width="25.7" height="18" fill="#A3D576" stroke="#386411" />
+<text class="value-label" x="343.7" y="2450">0.59%</text>
+<text class="axis-label" x="0" y="2488">Standard Silero T2 thr=0.3 sil=0.35s max=8.0s</text>
+<text class="axis-hint" x="0" y="2503">中文 · warm · shared</text>
+<rect class="bar" x="310" y="2475" width="25.7" height="18" fill="#A3D576" stroke="#386411" />
+<text class="value-label" x="343.7" y="2490">0.59%</text>
+<text class="axis-label" x="0" y="2528">Standard Silero T2 thr=0.3 sil=0.5s max=5.0s</text>
+<text class="axis-hint" x="0" y="2543">中文 · warm · shared</text>
+<rect class="bar" x="310" y="2515" width="25.7" height="18" fill="#A3D576" stroke="#386411" />
+<text class="value-label" x="343.7" y="2530">0.59%</text>
+<text class="axis-label" x="0" y="2568">Standard Silero T2 thr=0.3 sil=0.25s max=5.0s</text>
+<text class="axis-hint" x="0" y="2583">中文 · warm · shared</text>
+<rect class="bar" x="310" y="2555" width="25.7" height="18" fill="#A3D576" stroke="#386411" />
+<text class="value-label" x="343.7" y="2570">0.59%</text>
+<text class="axis-label" x="0" y="2608">Standard Silero T2 thr=0.3 sil=0.25s max=8.0s</text>
+<text class="axis-hint" x="0" y="2623">中文 · warm · shared</text>
+<rect class="bar" x="310" y="2595" width="25.7" height="18" fill="#A3D576" stroke="#386411" />
+<text class="value-label" x="343.7" y="2610">0.59%</text>
+<text class="axis-label" x="0" y="2648">Standard Silero T2 thr=0.3 sil=0.35s max=5.0s</text>
+<text class="axis-hint" x="0" y="2663">中文 · warm · shared</text>
+<rect class="bar" x="310" y="2635" width="25.7" height="18" fill="#A3D576" stroke="#386411" />
+<text class="value-label" x="343.7" y="2650">0.59%</text>
+<text class="axis-label" x="0" y="2688">Standard whole-file warm T2</text>
+<text class="axis-hint" x="0" y="2703">中文 · warm · shared</text>
+<rect class="bar" x="310" y="2675" width="166.8" height="18" fill="#A3D576" stroke="#386411" />
+<text class="value-label" x="484.8" y="2690">3.85%</text>
+</svg></div>
+          <div class="chart"><svg class="chart-svg" viewBox="0 0 920 2742" role="img" aria-label="Operation RTF">
+<text class="chart-title" x="0" y="18">Operation RTF</text>
+<text class="chart-subtitle" x="0" y="42">包含当前 profile 记录到的模型加载成本。</text>
+<line class="grid" x1="430.0" y1="62" x2="430.0" y2="2716" />
+<line class="grid" x1="550.0" y1="62" x2="550.0" y2="2716" />
+<line class="grid" x1="670.0" y1="62" x2="670.0" y2="2716" />
+<line class="grid" x1="790.0" y1="62" x2="790.0" y2="2716" />
+<text class="axis-label" x="0" y="88">Standard Silero T2 thr=0.3 sil=0.5s max=5.0s</text>
+<text class="axis-hint" x="0" y="103">英文 · warm · shared</text>
+<rect class="bar" x="310" y="75" width="82.2" height="18" fill="#A3D576" stroke="#386411" />
+<text class="value-label" x="400.2" y="90">0.0148</text>
+<text class="axis-label" x="0" y="128">Standard Silero T2 thr=0.3 sil=0.35s max=5.0s</text>
+<text class="axis-hint" x="0" y="143">英文 · warm · shared</text>
+<rect class="bar" x="310" y="115" width="79.6" height="18" fill="#A3D576" stroke="#386411" />
+<text class="value-label" x="397.6" y="130">0.0143</text>
+<text class="axis-label" x="0" y="168">Standard Silero T2 thr=0.3 sil=0.25s max=5.0s</text>
+<text class="axis-hint" x="0" y="183">英文 · warm · shared</text>
+<rect class="bar" x="310" y="155" width="79.4" height="18" fill="#A3D576" stroke="#386411" />
+<text class="value-label" x="397.4" y="170">0.0143</text>
+<text class="axis-label" x="0" y="208">Standard Silero T2 thr=0.3 sil=0.2s max=5.0s</text>
+<text class="axis-hint" x="0" y="223">英文 · warm · shared</text>
+<rect class="bar" x="310" y="195" width="80.9" height="18" fill="#A3D576" stroke="#386411" />
+<text class="value-label" x="398.9" y="210">0.0146</text>
+<text class="axis-label" x="0" y="248">Standard Silero T2 thr=0.25 sil=0.35s max=5.0s</text>
+<text class="axis-hint" x="0" y="263">英文 · warm · shared</text>
+<rect class="bar" x="310" y="235" width="79.9" height="18" fill="#A3D576" stroke="#386411" />
+<text class="value-label" x="397.9" y="250">0.0144</text>
+<text class="axis-label" x="0" y="288">Standard Silero T2 thr=0.25 sil=0.5s max=5.0s</text>
+<text class="axis-hint" x="0" y="303">英文 · warm · shared</text>
+<rect class="bar" x="310" y="275" width="80.2" height="18" fill="#A3D576" stroke="#386411" />
+<text class="value-label" x="398.2" y="290">0.0144</text>
+<text class="axis-label" x="0" y="328">Standard Silero T2 thr=0.15 sil=0.5s max=5.0s</text>
+<text class="axis-hint" x="0" y="343">英文 · warm · shared</text>
+<rect class="bar" x="310" y="315" width="80.4" height="18" fill="#A3D576" stroke="#386411" />
+<text class="value-label" x="398.4" y="330">0.0145</text>
+<text class="axis-label" x="0" y="368">Standard Silero T2 thr=0.15 sil=0.25s max=5.0s</text>
+<text class="axis-hint" x="0" y="383">英文 · warm · shared</text>
+<rect class="bar" x="310" y="355" width="80.4" height="18" fill="#A3D576" stroke="#386411" />
+<text class="value-label" x="398.4" y="370">0.0145</text>
+<text class="axis-label" x="0" y="408">Standard Silero T2 thr=0.15 sil=0.35s max=5.0s</text>
+<text class="axis-hint" x="0" y="423">英文 · warm · shared</text>
+<rect class="bar" x="310" y="395" width="80.5" height="18" fill="#A3D576" stroke="#386411" />
+<text class="value-label" x="398.5" y="410">0.0145</text>
+<text class="axis-label" x="0" y="448">Standard Silero T2 thr=0.15 sil=0.2s max=5.0s</text>
+<text class="axis-hint" x="0" y="463">英文 · warm · shared</text>
+<rect class="bar" x="310" y="435" width="80.9" height="18" fill="#A3D576" stroke="#386411" />
+<text class="value-label" x="398.9" y="450">0.0145</text>
+<text class="axis-label" x="0" y="488">Standard Silero T2 thr=0.25 sil=0.25s max=5.0s</text>
+<text class="axis-hint" x="0" y="503">英文 · warm · shared</text>
+<rect class="bar" x="310" y="475" width="79.6" height="18" fill="#A3D576" stroke="#386411" />
+<text class="value-label" x="397.6" y="490">0.0143</text>
+<text class="axis-label" x="0" y="528">Standard Silero T2 thr=0.25 sil=0.2s max=5.0s</text>
+<text class="axis-hint" x="0" y="543">英文 · warm · shared</text>
+<rect class="bar" x="310" y="515" width="79.7" height="18" fill="#A3D576" stroke="#386411" />
+<text class="value-label" x="397.7" y="530">0.0143</text>
+<text class="axis-label" x="0" y="568">Standard Silero T2 thr=0.2 sil=0.5s max=5.0s</text>
+<text class="axis-hint" x="0" y="583">英文 · warm · shared</text>
+<rect class="bar" x="310" y="555" width="80.1" height="18" fill="#A3D576" stroke="#386411" />
+<text class="value-label" x="398.1" y="570">0.0144</text>
+<text class="axis-label" x="0" y="608">Standard Silero T2 thr=0.2 sil=0.35s max=5.0s</text>
+<text class="axis-hint" x="0" y="623">英文 · warm · shared</text>
+<rect class="bar" x="310" y="595" width="80.2" height="18" fill="#A3D576" stroke="#386411" />
+<text class="value-label" x="398.2" y="610">0.0144</text>
+<text class="axis-label" x="0" y="648">Standard Silero T2 thr=0.2 sil=0.2s max=5.0s</text>
+<text class="axis-hint" x="0" y="663">英文 · warm · shared</text>
+<rect class="bar" x="310" y="635" width="80.1" height="18" fill="#A3D576" stroke="#386411" />
+<text class="value-label" x="398.1" y="650">0.0144</text>
+<text class="axis-label" x="0" y="688">Standard Silero T2 thr=0.2 sil=0.25s max=5.0s</text>
+<text class="axis-hint" x="0" y="703">英文 · warm · shared</text>
+<rect class="bar" x="310" y="675" width="80.3" height="18" fill="#A3D576" stroke="#386411" />
+<text class="value-label" x="398.3" y="690">0.0145</text>
+<text class="axis-label" x="0" y="728">Standard Silero T2 thr=0.2 sil=0.25s max=8.0s</text>
+<text class="axis-hint" x="0" y="743">英文 · warm · shared</text>
+<rect class="bar" x="310" y="715" width="85.6" height="18" fill="#A3D576" stroke="#386411" />
+<text class="value-label" x="403.6" y="730">0.0154</text>
+<text class="axis-label" x="0" y="768">Standard Silero T2 thr=0.15 sil=0.5s max=8.0s</text>
+<text class="axis-hint" x="0" y="783">英文 · warm · shared</text>
+<rect class="bar" x="310" y="755" width="81.3" height="18" fill="#A3D576" stroke="#386411" />
+<text class="value-label" x="399.3" y="770">0.0146</text>
+<text class="axis-label" x="0" y="808">Standard Silero T2 thr=0.15 sil=0.2s max=8.0s</text>
+<text class="axis-hint" x="0" y="823">英文 · warm · shared</text>
+<rect class="bar" x="310" y="795" width="81.5" height="18" fill="#A3D576" stroke="#386411" />
+<text class="value-label" x="399.5" y="810">0.0147</text>
+<text class="axis-label" x="0" y="848">Standard Silero T2 thr=0.15 sil=0.25s max=8.0s</text>
+<text class="axis-hint" x="0" y="863">英文 · warm · shared</text>
+<rect class="bar" x="310" y="835" width="81.5" height="18" fill="#A3D576" stroke="#386411" />
+<text class="value-label" x="399.5" y="850">0.0147</text>
+<text class="axis-label" x="0" y="888">Standard Silero T2 thr=0.2 sil=0.5s max=8.0s</text>
+<text class="axis-hint" x="0" y="903">英文 · warm · shared</text>
+<rect class="bar" x="310" y="875" width="81.5" height="18" fill="#A3D576" stroke="#386411" />
+<text class="value-label" x="399.5" y="890">0.0147</text>
+<text class="axis-label" x="0" y="928">Standard Silero T2 thr=0.2 sil=0.35s max=8.0s</text>
+<text class="axis-hint" x="0" y="943">英文 · warm · shared</text>
+<rect class="bar" x="310" y="915" width="81.5" height="18" fill="#A3D576" stroke="#386411" />
+<text class="value-label" x="399.5" y="930">0.0147</text>
+<text class="axis-label" x="0" y="968">Standard Silero T2 thr=0.25 sil=0.5s max=8.0s</text>
+<text class="axis-hint" x="0" y="983">英文 · warm · shared</text>
+<rect class="bar" x="310" y="955" width="81.7" height="18" fill="#A3D576" stroke="#386411" />
+<text class="value-label" x="399.7" y="970">0.0147</text>
+<text class="axis-label" x="0" y="1008">Standard Silero T2 thr=0.25 sil=0.35s max=8.0s</text>
+<text class="axis-hint" x="0" y="1023">英文 · warm · shared</text>
+<rect class="bar" x="310" y="995" width="81.9" height="18" fill="#A3D576" stroke="#386411" />
+<text class="value-label" x="399.9" y="1010">0.0147</text>
+<text class="axis-label" x="0" y="1048">Standard Silero T2 thr=0.15 sil=0.35s max=8.0s</text>
+<text class="axis-hint" x="0" y="1063">英文 · warm · shared</text>
+<rect class="bar" x="310" y="1035" width="82.9" height="18" fill="#A3D576" stroke="#386411" />
+<text class="value-label" x="400.9" y="1050">0.0149</text>
+<text class="axis-label" x="0" y="1088">Standard Silero T2 thr=0.25 sil=0.25s max=8.0s</text>
+<text class="axis-hint" x="0" y="1103">英文 · warm · shared</text>
+<rect class="bar" x="310" y="1075" width="81.4" height="18" fill="#A3D576" stroke="#386411" />
+<text class="value-label" x="399.4" y="1090">0.0146</text>
+<text class="axis-label" x="0" y="1128">Standard Silero T2 thr=0.2 sil=0.2s max=8.0s</text>
+<text class="axis-hint" x="0" y="1143">英文 · warm · shared</text>
+<rect class="bar" x="310" y="1115" width="82.0" height="18" fill="#A3D576" stroke="#386411" />
+<text class="value-label" x="400.0" y="1130">0.0148</text>
+<text class="axis-label" x="0" y="1168">Standard Silero T2 thr=0.3 sil=0.5s max=8.0s</text>
+<text class="axis-hint" x="0" y="1183">英文 · warm · shared</text>
+<rect class="bar" x="310" y="1155" width="81.0" height="18" fill="#A3D576" stroke="#386411" />
+<text class="value-label" x="399.0" y="1170">0.0146</text>
+<text class="axis-label" x="0" y="1208">Standard Silero T2 thr=0.25 sil=0.2s max=8.0s</text>
+<text class="axis-hint" x="0" y="1223">英文 · warm · shared</text>
+<rect class="bar" x="310" y="1195" width="82.8" height="18" fill="#A3D576" stroke="#386411" />
+<text class="value-label" x="400.8" y="1210">0.0149</text>
+<text class="axis-label" x="0" y="1248">Standard Silero T2 thr=0.3 sil=0.2s max=8.0s</text>
+<text class="axis-hint" x="0" y="1263">英文 · warm · shared</text>
+<rect class="bar" x="310" y="1235" width="80.9" height="18" fill="#A3D576" stroke="#386411" />
+<text class="value-label" x="398.9" y="1250">0.0146</text>
+<text class="axis-label" x="0" y="1288">Standard Silero T2 thr=0.3 sil=0.35s max=8.0s</text>
+<text class="axis-hint" x="0" y="1303">英文 · warm · shared</text>
+<rect class="bar" x="310" y="1275" width="81.0" height="18" fill="#A3D576" stroke="#386411" />
+<text class="value-label" x="399.0" y="1290">0.0146</text>
+<text class="axis-label" x="0" y="1328">Standard Silero T2 thr=0.3 sil=0.25s max=8.0s</text>
+<text class="axis-hint" x="0" y="1343">英文 · warm · shared</text>
+<rect class="bar" x="310" y="1315" width="81.2" height="18" fill="#A3D576" stroke="#386411" />
+<text class="value-label" x="399.2" y="1330">0.0146</text>
+<text class="axis-label" x="0" y="1368">Standard whole-file warm T2</text>
+<text class="axis-hint" x="0" y="1383">英文 · warm · shared</text>
+<rect class="bar" x="310" y="1355" width="417.4" height="18" fill="#A3D576" stroke="#386411" />
+<text class="value-label" x="735.4" y="1370">0.0751</text>
+<text class="axis-label" x="0" y="1408">Standard Silero T2 thr=0.15 sil=0.2s max=8.0s</text>
+<text class="axis-hint" x="0" y="1423">中文 · warm · shared</text>
+<rect class="bar" x="310" y="1395" width="70.5" height="18" fill="#A3D576" stroke="#386411" />
+<text class="value-label" x="388.5" y="1410">0.0127</text>
+<text class="axis-label" x="0" y="1448">Standard Silero T2 thr=0.15 sil=0.25s max=5.0s</text>
+<text class="axis-hint" x="0" y="1463">中文 · warm · shared</text>
+<rect class="bar" x="310" y="1435" width="71.0" height="18" fill="#A3D576" stroke="#386411" />
+<text class="value-label" x="389.0" y="1450">0.0128</text>
+<text class="axis-label" x="0" y="1488">Standard Silero T2 thr=0.15 sil=0.35s max=8.0s</text>
+<text class="axis-hint" x="0" y="1503">中文 · warm · shared</text>
+<rect class="bar" x="310" y="1475" width="71.2" height="18" fill="#A3D576" stroke="#386411" />
+<text class="value-label" x="389.2" y="1490">0.0128</text>
+<text class="axis-label" x="0" y="1528">Standard Silero T2 thr=0.15 sil=0.35s max=5.0s</text>
+<text class="axis-hint" x="0" y="1543">中文 · warm · shared</text>
+<rect class="bar" x="310" y="1515" width="71.4" height="18" fill="#A3D576" stroke="#386411" />
+<text class="value-label" x="389.4" y="1530">0.0128</text>
+<text class="axis-label" x="0" y="1568">Standard Silero T2 thr=0.15 sil=0.25s max=8.0s</text>
+<text class="axis-hint" x="0" y="1583">中文 · warm · shared</text>
+<rect class="bar" x="310" y="1555" width="71.5" height="18" fill="#A3D576" stroke="#386411" />
+<text class="value-label" x="389.5" y="1570">0.0129</text>
+<text class="axis-label" x="0" y="1608">Standard Silero T2 thr=0.15 sil=0.2s max=5.0s</text>
+<text class="axis-hint" x="0" y="1623">中文 · warm · shared</text>
+<rect class="bar" x="310" y="1595" width="71.7" height="18" fill="#A3D576" stroke="#386411" />
+<text class="value-label" x="389.7" y="1610">0.0129</text>
+<text class="axis-label" x="0" y="1648">Standard Silero T2 thr=0.15 sil=0.5s max=5.0s</text>
+<text class="axis-hint" x="0" y="1663">中文 · warm · shared</text>
+<rect class="bar" x="310" y="1635" width="71.7" height="18" fill="#A3D576" stroke="#386411" />
+<text class="value-label" x="389.7" y="1650">0.0129</text>
+<text class="axis-label" x="0" y="1688">Standard Silero T2 thr=0.15 sil=0.5s max=8.0s</text>
+<text class="axis-hint" x="0" y="1703">中文 · warm · shared</text>
+<rect class="bar" x="310" y="1675" width="73.8" height="18" fill="#A3D576" stroke="#386411" />
+<text class="value-label" x="391.8" y="1690">0.0133</text>
+<text class="axis-label" x="0" y="1728">Standard Silero T2 thr=0.2 sil=0.2s max=5.0s</text>
+<text class="axis-hint" x="0" y="1743">中文 · warm · shared</text>
+<rect class="bar" x="310" y="1715" width="69.8" height="18" fill="#A3D576" stroke="#386411" />
+<text class="value-label" x="387.8" y="1730">0.0126</text>
+<text class="axis-label" x="0" y="1768">Standard Silero T2 thr=0.2 sil=0.2s max=8.0s</text>
+<text class="axis-hint" x="0" y="1783">中文 · warm · shared</text>
+<rect class="bar" x="310" y="1755" width="70.0" height="18" fill="#A3D576" stroke="#386411" />
+<text class="value-label" x="388.0" y="1770">0.0126</text>
+<text class="axis-label" x="0" y="1808">Standard Silero T2 thr=0.2 sil=0.5s max=8.0s</text>
+<text class="axis-hint" x="0" y="1823">中文 · warm · shared</text>
+<rect class="bar" x="310" y="1795" width="70.3" height="18" fill="#A3D576" stroke="#386411" />
+<text class="value-label" x="388.3" y="1810">0.0126</text>
+<text class="axis-label" x="0" y="1848">Standard Silero T2 thr=0.2 sil=0.25s max=5.0s</text>
+<text class="axis-hint" x="0" y="1863">中文 · warm · shared</text>
+<rect class="bar" x="310" y="1835" width="70.8" height="18" fill="#A3D576" stroke="#386411" />
+<text class="value-label" x="388.8" y="1850">0.0127</text>
+<text class="axis-label" x="0" y="1888">Standard Silero T2 thr=0.2 sil=0.25s max=8.0s</text>
+<text class="axis-hint" x="0" y="1903">中文 · warm · shared</text>
+<rect class="bar" x="310" y="1875" width="71.1" height="18" fill="#A3D576" stroke="#386411" />
+<text class="value-label" x="389.1" y="1890">0.0128</text>
+<text class="axis-label" x="0" y="1928">Standard Silero T2 thr=0.2 sil=0.35s max=5.0s</text>
+<text class="axis-hint" x="0" y="1943">中文 · warm · shared</text>
+<rect class="bar" x="310" y="1915" width="71.2" height="18" fill="#A3D576" stroke="#386411" />
+<text class="value-label" x="389.2" y="1930">0.0128</text>
+<text class="axis-label" x="0" y="1968">Standard Silero T2 thr=0.2 sil=0.35s max=8.0s</text>
+<text class="axis-hint" x="0" y="1983">中文 · warm · shared</text>
+<rect class="bar" x="310" y="1955" width="71.7" height="18" fill="#A3D576" stroke="#386411" />
+<text class="value-label" x="389.7" y="1970">0.0129</text>
+<text class="axis-label" x="0" y="2008">Standard Silero T2 thr=0.2 sil=0.5s max=5.0s</text>
+<text class="axis-hint" x="0" y="2023">中文 · warm · shared</text>
+<rect class="bar" x="310" y="1995" width="72.0" height="18" fill="#A3D576" stroke="#386411" />
+<text class="value-label" x="390.0" y="2010">0.0130</text>
+<text class="axis-label" x="0" y="2048">Standard Silero T2 thr=0.25 sil=0.2s max=5.0s</text>
+<text class="axis-hint" x="0" y="2063">中文 · warm · shared</text>
+<rect class="bar" x="310" y="2035" width="69.9" height="18" fill="#A3D576" stroke="#386411" />
+<text class="value-label" x="387.9" y="2050">0.0126</text>
+<text class="axis-label" x="0" y="2088">Standard Silero T2 thr=0.25 sil=0.2s max=8.0s</text>
+<text class="axis-hint" x="0" y="2103">中文 · warm · shared</text>
+<rect class="bar" x="310" y="2075" width="70.1" height="18" fill="#A3D576" stroke="#386411" />
+<text class="value-label" x="388.1" y="2090">0.0126</text>
+<text class="axis-label" x="0" y="2128">Standard Silero T2 thr=0.25 sil=0.5s max=5.0s</text>
+<text class="axis-hint" x="0" y="2143">中文 · warm · shared</text>
+<rect class="bar" x="310" y="2115" width="70.1" height="18" fill="#A3D576" stroke="#386411" />
+<text class="value-label" x="388.1" y="2130">0.0126</text>
+<text class="axis-label" x="0" y="2168">Standard Silero T2 thr=0.25 sil=0.5s max=8.0s</text>
+<text class="axis-hint" x="0" y="2183">中文 · warm · shared</text>
+<rect class="bar" x="310" y="2155" width="70.2" height="18" fill="#A3D576" stroke="#386411" />
+<text class="value-label" x="388.2" y="2170">0.0126</text>
+<text class="axis-label" x="0" y="2208">Standard Silero T2 thr=0.25 sil=0.25s max=8.0s</text>
+<text class="axis-hint" x="0" y="2223">中文 · warm · shared</text>
+<rect class="bar" x="310" y="2195" width="70.4" height="18" fill="#A3D576" stroke="#386411" />
+<text class="value-label" x="388.4" y="2210">0.0127</text>
+<text class="axis-label" x="0" y="2248">Standard Silero T2 thr=0.25 sil=0.35s max=5.0s</text>
+<text class="axis-hint" x="0" y="2263">中文 · warm · shared</text>
+<rect class="bar" x="310" y="2235" width="70.6" height="18" fill="#A3D576" stroke="#386411" />
+<text class="value-label" x="388.6" y="2250">0.0127</text>
+<text class="axis-label" x="0" y="2288">Standard Silero T2 thr=0.25 sil=0.25s max=5.0s</text>
+<text class="axis-hint" x="0" y="2303">中文 · warm · shared</text>
+<rect class="bar" x="310" y="2275" width="70.6" height="18" fill="#A3D576" stroke="#386411" />
+<text class="value-label" x="388.6" y="2290">0.0127</text>
+<text class="axis-label" x="0" y="2328">Standard Silero T2 thr=0.25 sil=0.35s max=8.0s</text>
+<text class="axis-hint" x="0" y="2343">中文 · warm · shared</text>
+<rect class="bar" x="310" y="2315" width="70.6" height="18" fill="#A3D576" stroke="#386411" />
+<text class="value-label" x="388.6" y="2330">0.0127</text>
+<text class="axis-label" x="0" y="2368">Standard Silero T2 thr=0.3 sil=0.2s max=8.0s</text>
+<text class="axis-hint" x="0" y="2383">中文 · warm · shared</text>
+<rect class="bar" x="310" y="2355" width="69.9" height="18" fill="#A3D576" stroke="#386411" />
+<text class="value-label" x="387.9" y="2370">0.0126</text>
+<text class="axis-label" x="0" y="2408">Standard Silero T2 thr=0.3 sil=0.5s max=8.0s</text>
+<text class="axis-hint" x="0" y="2423">中文 · warm · shared</text>
+<rect class="bar" x="310" y="2395" width="69.9" height="18" fill="#A3D576" stroke="#386411" />
+<text class="value-label" x="387.9" y="2410">0.0126</text>
+<text class="axis-label" x="0" y="2448">Standard Silero T2 thr=0.3 sil=0.2s max=5.0s</text>
+<text class="axis-hint" x="0" y="2463">中文 · warm · shared</text>
+<rect class="bar" x="310" y="2435" width="70.0" height="18" fill="#A3D576" stroke="#386411" />
+<text class="value-label" x="388.0" y="2450">0.0126</text>
+<text class="axis-label" x="0" y="2488">Standard Silero T2 thr=0.3 sil=0.35s max=8.0s</text>
+<text class="axis-hint" x="0" y="2503">中文 · warm · shared</text>
+<rect class="bar" x="310" y="2475" width="70.2" height="18" fill="#A3D576" stroke="#386411" />
+<text class="value-label" x="388.2" y="2490">0.0126</text>
+<text class="axis-label" x="0" y="2528">Standard Silero T2 thr=0.3 sil=0.5s max=5.0s</text>
+<text class="axis-hint" x="0" y="2543">中文 · warm · shared</text>
+<rect class="bar" x="310" y="2515" width="70.2" height="18" fill="#A3D576" stroke="#386411" />
+<text class="value-label" x="388.2" y="2530">0.0126</text>
+<text class="axis-label" x="0" y="2568">Standard Silero T2 thr=0.3 sil=0.25s max=5.0s</text>
+<text class="axis-hint" x="0" y="2583">中文 · warm · shared</text>
+<rect class="bar" x="310" y="2555" width="70.4" height="18" fill="#A3D576" stroke="#386411" />
+<text class="value-label" x="388.4" y="2570">0.0127</text>
+<text class="axis-label" x="0" y="2608">Standard Silero T2 thr=0.3 sil=0.25s max=8.0s</text>
+<text class="axis-hint" x="0" y="2623">中文 · warm · shared</text>
+<rect class="bar" x="310" y="2595" width="71.1" height="18" fill="#A3D576" stroke="#386411" />
+<text class="value-label" x="389.1" y="2610">0.0128</text>
+<text class="axis-label" x="0" y="2648">Standard Silero T2 thr=0.3 sil=0.35s max=5.0s</text>
+<text class="axis-hint" x="0" y="2663">中文 · warm · shared</text>
+<rect class="bar" x="310" y="2635" width="71.7" height="18" fill="#A3D576" stroke="#386411" />
+<text class="value-label" x="389.7" y="2650">0.0129</text>
+<text class="axis-label" x="0" y="2688">Standard whole-file warm T2</text>
+<text class="axis-hint" x="0" y="2703">中文 · warm · shared</text>
+<rect class="bar" x="310" y="2675" width="395.2" height="18" fill="#A3D576" stroke="#386411" />
+<text class="value-label" x="713.2" y="2690">0.0711</text>
+</svg></div>
+        </div>
+        <h2>Profile 明细</h2>
+        <div class="table-wrap"><table class="detail-table"><thead><tr><th>Profile</th><th>语言</th><th>类别</th><th>加载策略</th><th>错误率</th><th>Decode RTF</th><th>Operation RTF</th><th>解码</th><th>加载</th><th>分段/非空</th><th>p95段解码</th><th>Native heap</th></tr></thead><tbody><tr><td><strong>Standard Silero T2 thr=0.3 sil=0.5s max=5.0s</strong><br><span>vad_segmented_offline, threads 2</span></td><td>英文</td><td>warm</td><td>shared</td><td>WER 7.09%</td><td>0.0148</td><td>0.0148</td><td>4.503s</td><td>0.000s</td><td>48/48</td><td>109ms</td><td>283.5MiB</td></tr><tr><td><strong>Standard Silero T2 thr=0.3 sil=0.35s max=5.0s</strong><br><span>vad_segmented_offline, threads 2</span></td><td>英文</td><td>warm</td><td>shared</td><td>WER 7.22%</td><td>0.0143</td><td>0.0143</td><td>4.359s</td><td>0.000s</td><td>49/49</td><td>106ms</td><td>283.5MiB</td></tr><tr><td><strong>Standard Silero T2 thr=0.3 sil=0.25s max=5.0s</strong><br><span>vad_segmented_offline, threads 2</span></td><td>英文</td><td>warm</td><td>shared</td><td>WER 7.35%</td><td>0.0143</td><td>0.0143</td><td>4.349s</td><td>0.000s</td><td>50/50</td><td>106ms</td><td>283.6MiB</td></tr><tr><td><strong>Standard Silero T2 thr=0.3 sil=0.2s max=5.0s</strong><br><span>vad_segmented_offline, threads 2</span></td><td>英文</td><td>warm</td><td>shared</td><td>WER 7.35%</td><td>0.0146</td><td>0.0146</td><td>4.435s</td><td>0.000s</td><td>50/50</td><td>109ms</td><td>283.6MiB</td></tr><tr><td><strong>Standard Silero T2 thr=0.25 sil=0.35s max=5.0s</strong><br><span>vad_segmented_offline, threads 2</span></td><td>英文</td><td>warm</td><td>shared</td><td>WER 7.62%</td><td>0.0144</td><td>0.0144</td><td>4.376s</td><td>0.000s</td><td>48/48</td><td>105ms</td><td>283.5MiB</td></tr><tr><td><strong>Standard Silero T2 thr=0.25 sil=0.5s max=5.0s</strong><br><span>vad_segmented_offline, threads 2</span></td><td>英文</td><td>warm</td><td>shared</td><td>WER 7.62%</td><td>0.0144</td><td>0.0144</td><td>4.392s</td><td>0.000s</td><td>47/47</td><td>105ms</td><td>283.6MiB</td></tr><tr><td><strong>Standard Silero T2 thr=0.15 sil=0.5s max=5.0s</strong><br><span>vad_segmented_offline, threads 2</span></td><td>英文</td><td>warm</td><td>shared</td><td>WER 7.62%</td><td>0.0145</td><td>0.0145</td><td>4.404s</td><td>0.000s</td><td>47/47</td><td>105ms</td><td>283.4MiB</td></tr><tr><td><strong>Standard Silero T2 thr=0.15 sil=0.25s max=5.0s</strong><br><span>vad_segmented_offline, threads 2</span></td><td>英文</td><td>warm</td><td>shared</td><td>WER 7.62%</td><td>0.0145</td><td>0.0145</td><td>4.407s</td><td>0.000s</td><td>47/47</td><td>105ms</td><td>283.5MiB</td></tr><tr><td><strong>Standard Silero T2 thr=0.15 sil=0.35s max=5.0s</strong><br><span>vad_segmented_offline, threads 2</span></td><td>英文</td><td>warm</td><td>shared</td><td>WER 7.62%</td><td>0.0145</td><td>0.0145</td><td>4.412s</td><td>0.000s</td><td>47/47</td><td>106ms</td><td>283.5MiB</td></tr><tr><td><strong>Standard Silero T2 thr=0.15 sil=0.2s max=5.0s</strong><br><span>vad_segmented_offline, threads 2</span></td><td>英文</td><td>warm</td><td>shared</td><td>WER 7.62%</td><td>0.0145</td><td>0.0145</td><td>4.430s</td><td>0.000s</td><td>47/47</td><td>105ms</td><td>283.4MiB</td></tr><tr><td><strong>Standard Silero T2 thr=0.25 sil=0.25s max=5.0s</strong><br><span>vad_segmented_offline, threads 2</span></td><td>英文</td><td>warm</td><td>shared</td><td>WER 7.75%</td><td>0.0143</td><td>0.0143</td><td>4.360s</td><td>0.000s</td><td>49/49</td><td>105ms</td><td>283.6MiB</td></tr><tr><td><strong>Standard Silero T2 thr=0.25 sil=0.2s max=5.0s</strong><br><span>vad_segmented_offline, threads 2</span></td><td>英文</td><td>warm</td><td>shared</td><td>WER 7.75%</td><td>0.0143</td><td>0.0143</td><td>4.366s</td><td>0.000s</td><td>49/49</td><td>105ms</td><td>283.5MiB</td></tr><tr><td><strong>Standard Silero T2 thr=0.2 sil=0.5s max=5.0s</strong><br><span>vad_segmented_offline, threads 2</span></td><td>英文</td><td>warm</td><td>shared</td><td>WER 7.89%</td><td>0.0144</td><td>0.0144</td><td>4.386s</td><td>0.000s</td><td>47/47</td><td>105ms</td><td>283.5MiB</td></tr><tr><td><strong>Standard Silero T2 thr=0.2 sil=0.35s max=5.0s</strong><br><span>vad_segmented_offline, threads 2</span></td><td>英文</td><td>warm</td><td>shared</td><td>WER 7.89%</td><td>0.0144</td><td>0.0144</td><td>4.396s</td><td>0.000s</td><td>47/47</td><td>105ms</td><td>283.4MiB</td></tr><tr><td><strong>Standard Silero T2 thr=0.2 sil=0.2s max=5.0s</strong><br><span>vad_segmented_offline, threads 2</span></td><td>英文</td><td>warm</td><td>shared</td><td>WER 8.02%</td><td>0.0144</td><td>0.0144</td><td>4.391s</td><td>0.000s</td><td>48/48</td><td>105ms</td><td>283.6MiB</td></tr><tr><td><strong>Standard Silero T2 thr=0.2 sil=0.25s max=5.0s</strong><br><span>vad_segmented_offline, threads 2</span></td><td>英文</td><td>warm</td><td>shared</td><td>WER 8.02%</td><td>0.0145</td><td>0.0145</td><td>4.402s</td><td>0.000s</td><td>48/48</td><td>106ms</td><td>283.6MiB</td></tr><tr><td><strong>Standard Silero T2 thr=0.2 sil=0.25s max=8.0s</strong><br><span>vad_segmented_offline, threads 2</span></td><td>英文</td><td>warm</td><td>shared</td><td>WER 8.56%</td><td>0.0154</td><td>0.0154</td><td>4.691s</td><td>0.000s</td><td>35/35</td><td>149ms</td><td>291.4MiB</td></tr><tr><td><strong>Standard Silero T2 thr=0.15 sil=0.5s max=8.0s</strong><br><span>vad_segmented_offline, threads 2</span></td><td>英文</td><td>warm</td><td>shared</td><td>WER 8.69%</td><td>0.0146</td><td>0.0146</td><td>4.456s</td><td>0.000s</td><td>34/34</td><td>142ms</td><td>291.2MiB</td></tr><tr><td><strong>Standard Silero T2 thr=0.15 sil=0.2s max=8.0s</strong><br><span>vad_segmented_offline, threads 2</span></td><td>英文</td><td>warm</td><td>shared</td><td>WER 8.69%</td><td>0.0147</td><td>0.0147</td><td>4.463s</td><td>0.000s</td><td>34/34</td><td>142ms</td><td>291.2MiB</td></tr><tr><td><strong>Standard Silero T2 thr=0.15 sil=0.25s max=8.0s</strong><br><span>vad_segmented_offline, threads 2</span></td><td>英文</td><td>warm</td><td>shared</td><td>WER 8.82%</td><td>0.0147</td><td>0.0147</td><td>4.463s</td><td>0.000s</td><td>34/34</td><td>142ms</td><td>291.2MiB</td></tr><tr><td><strong>Standard Silero T2 thr=0.2 sil=0.5s max=8.0s</strong><br><span>vad_segmented_offline, threads 2</span></td><td>英文</td><td>warm</td><td>shared</td><td>WER 8.82%</td><td>0.0147</td><td>0.0147</td><td>4.464s</td><td>0.000s</td><td>34/34</td><td>142ms</td><td>291.2MiB</td></tr><tr><td><strong>Standard Silero T2 thr=0.2 sil=0.35s max=8.0s</strong><br><span>vad_segmented_offline, threads 2</span></td><td>英文</td><td>warm</td><td>shared</td><td>WER 8.82%</td><td>0.0147</td><td>0.0147</td><td>4.467s</td><td>0.000s</td><td>34/34</td><td>142ms</td><td>291.2MiB</td></tr><tr><td><strong>Standard Silero T2 thr=0.25 sil=0.5s max=8.0s</strong><br><span>vad_segmented_offline, threads 2</span></td><td>英文</td><td>warm</td><td>shared</td><td>WER 8.82%</td><td>0.0147</td><td>0.0147</td><td>4.477s</td><td>0.000s</td><td>34/34</td><td>142ms</td><td>291.2MiB</td></tr><tr><td><strong>Standard Silero T2 thr=0.25 sil=0.35s max=8.0s</strong><br><span>vad_segmented_offline, threads 2</span></td><td>英文</td><td>warm</td><td>shared</td><td>WER 8.82%</td><td>0.0147</td><td>0.0147</td><td>4.485s</td><td>0.000s</td><td>35/35</td><td>142ms</td><td>291.2MiB</td></tr><tr><td><strong>Standard Silero T2 thr=0.15 sil=0.35s max=8.0s</strong><br><span>vad_segmented_offline, threads 2</span></td><td>英文</td><td>warm</td><td>shared</td><td>WER 8.82%</td><td>0.0149</td><td>0.0149</td><td>4.541s</td><td>0.000s</td><td>34/34</td><td>142ms</td><td>291.2MiB</td></tr><tr><td><strong>Standard Silero T2 thr=0.25 sil=0.25s max=8.0s</strong><br><span>vad_segmented_offline, threads 2</span></td><td>英文</td><td>warm</td><td>shared</td><td>WER 8.96%</td><td>0.0146</td><td>0.0146</td><td>4.459s</td><td>0.000s</td><td>37/37</td><td>142ms</td><td>291.4MiB</td></tr><tr><td><strong>Standard Silero T2 thr=0.2 sil=0.2s max=8.0s</strong><br><span>vad_segmented_offline, threads 2</span></td><td>英文</td><td>warm</td><td>shared</td><td>WER 8.96%</td><td>0.0148</td><td>0.0148</td><td>4.494s</td><td>0.000s</td><td>35/35</td><td>142ms</td><td>291.4MiB</td></tr><tr><td><strong>Standard Silero T2 thr=0.3 sil=0.5s max=8.0s</strong><br><span>vad_segmented_offline, threads 2</span></td><td>英文</td><td>warm</td><td>shared</td><td>WER 9.36%</td><td>0.0146</td><td>0.0146</td><td>4.436s</td><td>0.000s</td><td>35/35</td><td>142ms</td><td>291.5MiB</td></tr><tr><td><strong>Standard Silero T2 thr=0.25 sil=0.2s max=8.0s</strong><br><span>vad_segmented_offline, threads 2</span></td><td>英文</td><td>warm</td><td>shared</td><td>WER 9.36%</td><td>0.0149</td><td>0.0149</td><td>4.539s</td><td>0.000s</td><td>37/37</td><td>142ms</td><td>291.4MiB</td></tr><tr><td><strong>Standard Silero T2 thr=0.3 sil=0.2s max=8.0s</strong><br><span>vad_segmented_offline, threads 2</span></td><td>英文</td><td>warm</td><td>shared</td><td>WER 9.49%</td><td>0.0146</td><td>0.0146</td><td>4.435s</td><td>0.000s</td><td>38/38</td><td>142ms</td><td>291.6MiB</td></tr><tr><td><strong>Standard Silero T2 thr=0.3 sil=0.35s max=8.0s</strong><br><span>vad_segmented_offline, threads 2</span></td><td>英文</td><td>warm</td><td>shared</td><td>WER 9.49%</td><td>0.0146</td><td>0.0146</td><td>4.439s</td><td>0.000s</td><td>37/37</td><td>142ms</td><td>291.5MiB</td></tr><tr><td><strong>Standard Silero T2 thr=0.3 sil=0.25s max=8.0s</strong><br><span>vad_segmented_offline, threads 2</span></td><td>英文</td><td>warm</td><td>shared</td><td>WER 9.63%</td><td>0.0146</td><td>0.0146</td><td>4.450s</td><td>0.000s</td><td>38/38</td><td>142ms</td><td>291.5MiB</td></tr><tr><td><strong>Standard whole-file warm T2</strong><br><span>offline, threads 2</span></td><td>英文</td><td>warm</td><td>shared</td><td>WER 9.63%</td><td>0.0751</td><td>0.0751</td><td>22.868s</td><td>0.000s</td><td>1/1</td><td>0ms</td><td>1466.7MiB</td></tr><tr><td><strong>Standard Silero T2 thr=0.15 sil=0.2s max=8.0s</strong><br><span>vad_segmented_offline, threads 2</span></td><td>中文</td><td>warm</td><td>shared</td><td>CER 0.00%</td><td>0.0127</td><td>0.0127</td><td>3.815s</td><td>0.000s</td><td>78/78</td><td>51ms</td><td>287.3MiB</td></tr><tr><td><strong>Standard Silero T2 thr=0.15 sil=0.25s max=5.0s</strong><br><span>vad_segmented_offline, threads 2</span></td><td>中文</td><td>warm</td><td>shared</td><td>CER 0.00%</td><td>0.0128</td><td>0.0128</td><td>3.841s</td><td>0.000s</td><td>78/78</td><td>53ms</td><td>287.3MiB</td></tr><tr><td><strong>Standard Silero T2 thr=0.15 sil=0.35s max=8.0s</strong><br><span>vad_segmented_offline, threads 2</span></td><td>中文</td><td>warm</td><td>shared</td><td>CER 0.00%</td><td>0.0128</td><td>0.0128</td><td>3.850s</td><td>0.000s</td><td>78/78</td><td>53ms</td><td>287.4MiB</td></tr><tr><td><strong>Standard Silero T2 thr=0.15 sil=0.35s max=5.0s</strong><br><span>vad_segmented_offline, threads 2</span></td><td>中文</td><td>warm</td><td>shared</td><td>CER 0.00%</td><td>0.0128</td><td>0.0128</td><td>3.859s</td><td>0.000s</td><td>78/78</td><td>54ms</td><td>287.4MiB</td></tr><tr><td><strong>Standard Silero T2 thr=0.15 sil=0.25s max=8.0s</strong><br><span>vad_segmented_offline, threads 2</span></td><td>中文</td><td>warm</td><td>shared</td><td>CER 0.00%</td><td>0.0129</td><td>0.0129</td><td>3.869s</td><td>0.000s</td><td>78/78</td><td>53ms</td><td>287.3MiB</td></tr><tr><td><strong>Standard Silero T2 thr=0.15 sil=0.2s max=5.0s</strong><br><span>vad_segmented_offline, threads 2</span></td><td>中文</td><td>warm</td><td>shared</td><td>CER 0.00%</td><td>0.0129</td><td>0.0129</td><td>3.877s</td><td>0.000s</td><td>78/78</td><td>53ms</td><td>287.4MiB</td></tr><tr><td><strong>Standard Silero T2 thr=0.15 sil=0.5s max=5.0s</strong><br><span>vad_segmented_offline, threads 2</span></td><td>中文</td><td>warm</td><td>shared</td><td>CER 0.00%</td><td>0.0129</td><td>0.0129</td><td>3.878s</td><td>0.000s</td><td>78/78</td><td>54ms</td><td>287.5MiB</td></tr><tr><td><strong>Standard Silero T2 thr=0.15 sil=0.5s max=8.0s</strong><br><span>vad_segmented_offline, threads 2</span></td><td>中文</td><td>warm</td><td>shared</td><td>CER 0.00%</td><td>0.0133</td><td>0.0133</td><td>3.990s</td><td>0.000s</td><td>77/77</td><td>55ms</td><td>287.4MiB</td></tr><tr><td><strong>Standard Silero T2 thr=0.2 sil=0.2s max=5.0s</strong><br><span>vad_segmented_offline, threads 2</span></td><td>中文</td><td>warm</td><td>shared</td><td>CER 0.20%</td><td>0.0126</td><td>0.0126</td><td>3.777s</td><td>0.000s</td><td>78/78</td><td>51ms</td><td>287.2MiB</td></tr><tr><td><strong>Standard Silero T2 thr=0.2 sil=0.2s max=8.0s</strong><br><span>vad_segmented_offline, threads 2</span></td><td>中文</td><td>warm</td><td>shared</td><td>CER 0.20%</td><td>0.0126</td><td>0.0126</td><td>3.787s</td><td>0.000s</td><td>78/78</td><td>51ms</td><td>287.2MiB</td></tr><tr><td><strong>Standard Silero T2 thr=0.2 sil=0.5s max=8.0s</strong><br><span>vad_segmented_offline, threads 2</span></td><td>中文</td><td>warm</td><td>shared</td><td>CER 0.20%</td><td>0.0126</td><td>0.0126</td><td>3.802s</td><td>0.000s</td><td>78/78</td><td>52ms</td><td>287.4MiB</td></tr><tr><td><strong>Standard Silero T2 thr=0.2 sil=0.25s max=5.0s</strong><br><span>vad_segmented_offline, threads 2</span></td><td>中文</td><td>warm</td><td>shared</td><td>CER 0.20%</td><td>0.0127</td><td>0.0127</td><td>3.827s</td><td>0.000s</td><td>78/78</td><td>53ms</td><td>287.2MiB</td></tr><tr><td><strong>Standard Silero T2 thr=0.2 sil=0.25s max=8.0s</strong><br><span>vad_segmented_offline, threads 2</span></td><td>中文</td><td>warm</td><td>shared</td><td>CER 0.20%</td><td>0.0128</td><td>0.0128</td><td>3.847s</td><td>0.000s</td><td>78/78</td><td>53ms</td><td>287.2MiB</td></tr><tr><td><strong>Standard Silero T2 thr=0.2 sil=0.35s max=5.0s</strong><br><span>vad_segmented_offline, threads 2</span></td><td>中文</td><td>warm</td><td>shared</td><td>CER 0.20%</td><td>0.0128</td><td>0.0128</td><td>3.848s</td><td>0.000s</td><td>78/78</td><td>53ms</td><td>287.2MiB</td></tr><tr><td><strong>Standard Silero T2 thr=0.2 sil=0.35s max=8.0s</strong><br><span>vad_segmented_offline, threads 2</span></td><td>中文</td><td>warm</td><td>shared</td><td>CER 0.20%</td><td>0.0129</td><td>0.0129</td><td>3.878s</td><td>0.000s</td><td>78/78</td><td>54ms</td><td>287.2MiB</td></tr><tr><td><strong>Standard Silero T2 thr=0.2 sil=0.5s max=5.0s</strong><br><span>vad_segmented_offline, threads 2</span></td><td>中文</td><td>warm</td><td>shared</td><td>CER 0.20%</td><td>0.0130</td><td>0.0130</td><td>3.894s</td><td>0.000s</td><td>78/78</td><td>54ms</td><td>287.4MiB</td></tr><tr><td><strong>Standard Silero T2 thr=0.25 sil=0.2s max=5.0s</strong><br><span>vad_segmented_offline, threads 2</span></td><td>中文</td><td>warm</td><td>shared</td><td>CER 0.49%</td><td>0.0126</td><td>0.0126</td><td>3.781s</td><td>0.000s</td><td>78/78</td><td>52ms</td><td>287.2MiB</td></tr><tr><td><strong>Standard Silero T2 thr=0.25 sil=0.2s max=8.0s</strong><br><span>vad_segmented_offline, threads 2</span></td><td>中文</td><td>warm</td><td>shared</td><td>CER 0.49%</td><td>0.0126</td><td>0.0126</td><td>3.789s</td><td>0.000s</td><td>78/78</td><td>52ms</td><td>287.2MiB</td></tr><tr><td><strong>Standard Silero T2 thr=0.25 sil=0.5s max=5.0s</strong><br><span>vad_segmented_offline, threads 2</span></td><td>中文</td><td>warm</td><td>shared</td><td>CER 0.49%</td><td>0.0126</td><td>0.0126</td><td>3.792s</td><td>0.000s</td><td>78/78</td><td>53ms</td><td>287.3MiB</td></tr><tr><td><strong>Standard Silero T2 thr=0.25 sil=0.5s max=8.0s</strong><br><span>vad_segmented_offline, threads 2</span></td><td>中文</td><td>warm</td><td>shared</td><td>CER 0.49%</td><td>0.0126</td><td>0.0126</td><td>3.796s</td><td>0.000s</td><td>78/78</td><td>52ms</td><td>287.3MiB</td></tr><tr><td><strong>Standard Silero T2 thr=0.25 sil=0.25s max=8.0s</strong><br><span>vad_segmented_offline, threads 2</span></td><td>中文</td><td>warm</td><td>shared</td><td>CER 0.49%</td><td>0.0127</td><td>0.0127</td><td>3.807s</td><td>0.000s</td><td>78/78</td><td>52ms</td><td>287.2MiB</td></tr><tr><td><strong>Standard Silero T2 thr=0.25 sil=0.35s max=5.0s</strong><br><span>vad_segmented_offline, threads 2</span></td><td>中文</td><td>warm</td><td>shared</td><td>CER 0.49%</td><td>0.0127</td><td>0.0127</td><td>3.816s</td><td>0.000s</td><td>78/78</td><td>53ms</td><td>287.2MiB</td></tr><tr><td><strong>Standard Silero T2 thr=0.25 sil=0.25s max=5.0s</strong><br><span>vad_segmented_offline, threads 2</span></td><td>中文</td><td>warm</td><td>shared</td><td>CER 0.49%</td><td>0.0127</td><td>0.0127</td><td>3.819s</td><td>0.000s</td><td>78/78</td><td>53ms</td><td>287.2MiB</td></tr><tr><td><strong>Standard Silero T2 thr=0.25 sil=0.35s max=8.0s</strong><br><span>vad_segmented_offline, threads 2</span></td><td>中文</td><td>warm</td><td>shared</td><td>CER 0.49%</td><td>0.0127</td><td>0.0127</td><td>3.819s</td><td>0.000s</td><td>78/78</td><td>53ms</td><td>287.2MiB</td></tr><tr><td><strong>Standard Silero T2 thr=0.3 sil=0.2s max=8.0s</strong><br><span>vad_segmented_offline, threads 2</span></td><td>中文</td><td>warm</td><td>shared</td><td>CER 0.59%</td><td>0.0126</td><td>0.0126</td><td>3.778s</td><td>0.000s</td><td>78/78</td><td>51ms</td><td>287.2MiB</td></tr><tr><td><strong>Standard Silero T2 thr=0.3 sil=0.5s max=8.0s</strong><br><span>vad_segmented_offline, threads 2</span></td><td>中文</td><td>warm</td><td>shared</td><td>CER 0.59%</td><td>0.0126</td><td>0.0126</td><td>3.781s</td><td>0.000s</td><td>78/78</td><td>52ms</td><td>287.3MiB</td></tr><tr><td><strong>Standard Silero T2 thr=0.3 sil=0.2s max=5.0s</strong><br><span>vad_segmented_offline, threads 2</span></td><td>中文</td><td>warm</td><td>shared</td><td>CER 0.59%</td><td>0.0126</td><td>0.0126</td><td>3.786s</td><td>0.000s</td><td>78/78</td><td>52ms</td><td>287.2MiB</td></tr><tr><td><strong>Standard Silero T2 thr=0.3 sil=0.35s max=8.0s</strong><br><span>vad_segmented_offline, threads 2</span></td><td>中文</td><td>warm</td><td>shared</td><td>CER 0.59%</td><td>0.0126</td><td>0.0126</td><td>3.795s</td><td>0.000s</td><td>78/78</td><td>53ms</td><td>287.2MiB</td></tr><tr><td><strong>Standard Silero T2 thr=0.3 sil=0.5s max=5.0s</strong><br><span>vad_segmented_offline, threads 2</span></td><td>中文</td><td>warm</td><td>shared</td><td>CER 0.59%</td><td>0.0126</td><td>0.0126</td><td>3.796s</td><td>0.000s</td><td>78/78</td><td>53ms</td><td>287.3MiB</td></tr><tr><td><strong>Standard Silero T2 thr=0.3 sil=0.25s max=5.0s</strong><br><span>vad_segmented_offline, threads 2</span></td><td>中文</td><td>warm</td><td>shared</td><td>CER 0.59%</td><td>0.0127</td><td>0.0127</td><td>3.809s</td><td>0.000s</td><td>78/78</td><td>53ms</td><td>287.2MiB</td></tr><tr><td><strong>Standard Silero T2 thr=0.3 sil=0.25s max=8.0s</strong><br><span>vad_segmented_offline, threads 2</span></td><td>中文</td><td>warm</td><td>shared</td><td>CER 0.59%</td><td>0.0128</td><td>0.0128</td><td>3.843s</td><td>0.000s</td><td>78/78</td><td>53ms</td><td>287.2MiB</td></tr><tr><td><strong>Standard Silero T2 thr=0.3 sil=0.35s max=5.0s</strong><br><span>vad_segmented_offline, threads 2</span></td><td>中文</td><td>warm</td><td>shared</td><td>CER 0.59%</td><td>0.0129</td><td>0.0129</td><td>3.878s</td><td>0.000s</td><td>78/78</td><td>54ms</td><td>287.2MiB</td></tr><tr><td><strong>Standard whole-file warm T2</strong><br><span>offline, threads 2</span></td><td>中文</td><td>warm</td><td>shared</td><td>CER 3.85%</td><td>0.0711</td><td>0.0711</td><td>21.369s</td><td>0.000s</td><td>1/1</td><td>0ms</td><td>1475.3MiB</td></tr></tbody></table></div>
+      </section>
+    
+  
+      <section class="tab-panel" id="panel-realtime_replay">
+        <h2>实时 replay</h2>
+        <div class="grid-two">
+          <div class="chart"><svg class="chart-svg" viewBox="0 0 920 4582" role="img" aria-label="准确率">
+<text class="chart-title" x="0" y="18">准确率</text>
+<text class="chart-subtitle" x="0" y="42">越低越好；warm 行用于主要排序。</text>
+<line class="grid" x1="430.0" y1="62" x2="430.0" y2="4556" />
+<line class="grid" x1="550.0" y1="62" x2="550.0" y2="4556" />
+<line class="grid" x1="670.0" y1="62" x2="670.0" y2="4556" />
+<line class="grid" x1="790.0" y1="62" x2="790.0" y2="4556" />
+<text class="axis-label" x="0" y="88">Realtime Silero T2 frame=100 thr=0.3 sil=0.5s max=5.0s</text>
+<text class="axis-hint" x="0" y="103">英文 · warm · shared</text>
+<rect class="bar" x="310" y="75" width="283.6" height="18" fill="#A3D576" stroke="#386411" />
+<text class="value-label" x="601.6" y="90">7.09%</text>
+<text class="axis-label" x="0" y="128">Realtime Silero T2 frame=100 thr=0.3 sil=0.35s max=5.0s</text>
+<text class="axis-hint" x="0" y="143">英文 · warm · shared</text>
+<rect class="bar" x="310" y="115" width="289.0" height="18" fill="#A3D576" stroke="#386411" />
+<text class="value-label" x="607.0" y="130">7.22%</text>
+<text class="axis-label" x="0" y="168">Realtime Silero T2 frame=100 thr=0.3 sil=0.2s max=5.0s</text>
+<text class="axis-hint" x="0" y="183">英文 · warm · shared</text>
+<rect class="bar" x="310" y="155" width="294.3" height="18" fill="#A3D576" stroke="#386411" />
+<text class="value-label" x="612.3" y="170">7.35%</text>
+<text class="axis-label" x="0" y="208">Realtime Silero T2 frame=100 thr=0.3 sil=0.25s max=5.0s</text>
+<text class="axis-hint" x="0" y="223">英文 · warm · shared</text>
+<rect class="bar" x="310" y="195" width="294.3" height="18" fill="#A3D576" stroke="#386411" />
+<text class="value-label" x="612.3" y="210">7.35%</text>
+<text class="axis-label" x="0" y="248">Realtime Silero T2 frame=100 thr=0.25 sil=0.35s max=5.0s</text>
+<text class="axis-hint" x="0" y="263">英文 · warm · shared</text>
+<rect class="bar" x="310" y="235" width="305.0" height="18" fill="#A3D576" stroke="#386411" />
+<text class="value-label" x="623.0" y="250">7.62%</text>
+<text class="axis-label" x="0" y="288">Realtime Silero T2 frame=100 thr=0.15 sil=0.2s max=5.0s</text>
+<text class="axis-hint" x="0" y="303">英文 · warm · shared</text>
+<rect class="bar" x="310" y="275" width="305.0" height="18" fill="#A3D576" stroke="#386411" />
+<text class="value-label" x="623.0" y="290">7.62%</text>
+<text class="axis-label" x="0" y="328">Realtime Silero T2 frame=100 thr=0.15 sil=0.25s max=5.0s</text>
+<text class="axis-hint" x="0" y="343">英文 · warm · shared</text>
+<rect class="bar" x="310" y="315" width="305.0" height="18" fill="#A3D576" stroke="#386411" />
+<text class="value-label" x="623.0" y="330">7.62%</text>
+<text class="axis-label" x="0" y="368">Realtime Silero T2 frame=100 thr=0.15 sil=0.35s max=5.0s</text>
+<text class="axis-hint" x="0" y="383">英文 · warm · shared</text>
+<rect class="bar" x="310" y="355" width="305.0" height="18" fill="#A3D576" stroke="#386411" />
+<text class="value-label" x="623.0" y="370">7.62%</text>
+<text class="axis-label" x="0" y="408">Realtime Silero T2 frame=100 thr=0.15 sil=0.5s max=5.0s</text>
+<text class="axis-hint" x="0" y="423">英文 · warm · shared</text>
+<rect class="bar" x="310" y="395" width="305.0" height="18" fill="#A3D576" stroke="#386411" />
+<text class="value-label" x="623.0" y="410">7.62%</text>
+<text class="axis-label" x="0" y="448">Realtime Silero T2 frame=100 thr=0.25 sil=0.5s max=5.0s</text>
+<text class="axis-hint" x="0" y="463">英文 · warm · shared</text>
+<rect class="bar" x="310" y="435" width="305.0" height="18" fill="#A3D576" stroke="#386411" />
+<text class="value-label" x="623.0" y="450">7.62%</text>
+<text class="axis-label" x="0" y="488">Realtime RMS T2 frame=200 thr=650 min=320 end=1000 max=12000 pre=0</text>
+<text class="axis-hint" x="0" y="503">英文 · warm · shared</text>
+<rect class="bar" x="310" y="475" width="310.4" height="18" fill="#A3D576" stroke="#386411" />
+<text class="value-label" x="628.4" y="490">7.75%</text>
+<text class="axis-label" x="0" y="528">Realtime Silero T2 frame=100 thr=0.25 sil=0.25s max=5.0s</text>
+<text class="axis-hint" x="0" y="543">英文 · warm · shared</text>
+<rect class="bar" x="310" y="515" width="310.4" height="18" fill="#A3D576" stroke="#386411" />
+<text class="value-label" x="628.4" y="530">7.75%</text>
+<text class="axis-label" x="0" y="568">Realtime Silero T2 frame=100 thr=0.25 sil=0.2s max=5.0s</text>
+<text class="axis-hint" x="0" y="583">英文 · warm · shared</text>
+<rect class="bar" x="310" y="555" width="310.4" height="18" fill="#A3D576" stroke="#386411" />
+<text class="value-label" x="628.4" y="570">7.75%</text>
+<text class="axis-label" x="0" y="608">Realtime RMS T2 frame=200 thr=520 min=320 end=1000 max=12000 pre=0</text>
+<text class="axis-hint" x="0" y="623">英文 · warm · shared</text>
+<rect class="bar" x="310" y="595" width="315.7" height="18" fill="#A3D576" stroke="#386411" />
+<text class="value-label" x="633.7" y="610">7.89%</text>
+<text class="axis-label" x="0" y="648">Realtime RMS T2 frame=200 thr=420 min=320 end=1000 max=12000 pre=0</text>
+<text class="axis-hint" x="0" y="663">英文 · warm · shared</text>
+<rect class="bar" x="310" y="635" width="315.7" height="18" fill="#A3D576" stroke="#386411" />
+<text class="value-label" x="633.7" y="650">7.89%</text>
+<text class="axis-label" x="0" y="688">Realtime Silero T2 frame=100 thr=0.2 sil=0.5s max=5.0s</text>
+<text class="axis-hint" x="0" y="703">英文 · warm · shared</text>
+<rect class="bar" x="310" y="675" width="315.7" height="18" fill="#A3D576" stroke="#386411" />
+<text class="value-label" x="633.7" y="690">7.89%</text>
+<text class="axis-label" x="0" y="728">Realtime Silero T2 frame=100 thr=0.2 sil=0.35s max=5.0s</text>
+<text class="axis-hint" x="0" y="743">英文 · warm · shared</text>
+<rect class="bar" x="310" y="715" width="315.7" height="18" fill="#A3D576" stroke="#386411" />
+<text class="value-label" x="633.7" y="730">7.89%</text>
+<text class="axis-label" x="0" y="768">Realtime Silero T2 frame=100 thr=0.2 sil=0.2s max=5.0s</text>
+<text class="axis-hint" x="0" y="783">英文 · warm · shared</text>
+<rect class="bar" x="310" y="755" width="321.1" height="18" fill="#A3D576" stroke="#386411" />
+<text class="value-label" x="639.1" y="770">8.02%</text>
+<text class="axis-label" x="0" y="808">Realtime Silero T2 frame=100 thr=0.2 sil=0.25s max=5.0s</text>
+<text class="axis-hint" x="0" y="823">英文 · warm · shared</text>
+<rect class="bar" x="310" y="795" width="321.1" height="18" fill="#A3D576" stroke="#386411" />
+<text class="value-label" x="639.1" y="810">8.02%</text>
+<text class="axis-label" x="0" y="848">Realtime RMS T2 frame=200 thr=520 min=320 end=500 max=8000 pre=0</text>
+<text class="axis-hint" x="0" y="863">英文 · warm · shared</text>
+<rect class="bar" x="310" y="835" width="337.1" height="18" fill="#A3D576" stroke="#386411" />
+<text class="value-label" x="655.1" y="850">8.42%</text>
+<text class="axis-label" x="0" y="888">Realtime Silero T2 frame=100 thr=0.2 sil=0.25s max=8.0s</text>
+<text class="axis-hint" x="0" y="903">英文 · warm · shared</text>
+<rect class="bar" x="310" y="875" width="342.5" height="18" fill="#A3D576" stroke="#386411" />
+<text class="value-label" x="660.5" y="890">8.56%</text>
+<text class="axis-label" x="0" y="928">Realtime RMS T2 frame=200 thr=420 min=320 end=500 max=12000 pre=0</text>
+<text class="axis-hint" x="0" y="943">英文 · warm · shared</text>
+<rect class="bar" x="310" y="915" width="347.8" height="18" fill="#A3D576" stroke="#386411" />
+<text class="value-label" x="665.8" y="930">8.69%</text>
+<text class="axis-label" x="0" y="968">Realtime RMS T2 frame=200 thr=520 min=320 end=500 max=12000 pre=0</text>
+<text class="axis-hint" x="0" y="983">英文 · warm · shared</text>
+<rect class="bar" x="310" y="955" width="347.8" height="18" fill="#A3D576" stroke="#386411" />
+<text class="value-label" x="665.8" y="970">8.69%</text>
+<text class="axis-label" x="0" y="1008">Realtime RMS T2 frame=200 thr=420 min=320 end=500 max=8000 pre=0</text>
+<text class="axis-hint" x="0" y="1023">英文 · warm · shared</text>
+<rect class="bar" x="310" y="995" width="347.8" height="18" fill="#A3D576" stroke="#386411" />
+<text class="value-label" x="665.8" y="1010">8.69%</text>
+<text class="axis-label" x="0" y="1048">Realtime Silero T2 frame=100 thr=0.15 sil=0.5s max=8.0s</text>
+<text class="axis-hint" x="0" y="1063">英文 · warm · shared</text>
+<rect class="bar" x="310" y="1035" width="347.8" height="18" fill="#A3D576" stroke="#386411" />
+<text class="value-label" x="665.8" y="1050">8.69%</text>
+<text class="axis-label" x="0" y="1088">Realtime Silero T2 frame=100 thr=0.15 sil=0.2s max=8.0s</text>
+<text class="axis-hint" x="0" y="1103">英文 · warm · shared</text>
+<rect class="bar" x="310" y="1075" width="347.8" height="18" fill="#A3D576" stroke="#386411" />
+<text class="value-label" x="665.8" y="1090">8.69%</text>
+<text class="axis-label" x="0" y="1128">Realtime RMS T2 frame=200 thr=420 min=320 end=1000 max=8000 pre=0</text>
+<text class="axis-hint" x="0" y="1143">英文 · warm · shared</text>
+<rect class="bar" x="310" y="1115" width="353.2" height="18" fill="#A3D576" stroke="#386411" />
+<text class="value-label" x="671.2" y="1130">8.82%</text>
+<text class="axis-label" x="0" y="1168">Realtime RMS T2 frame=200 thr=650 min=320 end=500 max=8000 pre=0</text>
+<text class="axis-hint" x="0" y="1183">英文 · warm · shared</text>
+<rect class="bar" x="310" y="1155" width="353.2" height="18" fill="#A3D576" stroke="#386411" />
+<text class="value-label" x="671.2" y="1170">8.82%</text>
+<text class="axis-label" x="0" y="1208">Realtime Silero T2 frame=100 thr=0.25 sil=0.5s max=8.0s</text>
+<text class="axis-hint" x="0" y="1223">英文 · warm · shared</text>
+<rect class="bar" x="310" y="1195" width="353.2" height="18" fill="#A3D576" stroke="#386411" />
+<text class="value-label" x="671.2" y="1210">8.82%</text>
+<text class="axis-label" x="0" y="1248">Realtime Silero T2 frame=100 thr=0.15 sil=0.35s max=8.0s</text>
+<text class="axis-hint" x="0" y="1263">英文 · warm · shared</text>
+<rect class="bar" x="310" y="1235" width="353.2" height="18" fill="#A3D576" stroke="#386411" />
+<text class="value-label" x="671.2" y="1250">8.82%</text>
+<text class="axis-label" x="0" y="1288">Realtime Silero T2 frame=100 thr=0.2 sil=0.5s max=8.0s</text>
+<text class="axis-hint" x="0" y="1303">英文 · warm · shared</text>
+<rect class="bar" x="310" y="1275" width="353.2" height="18" fill="#A3D576" stroke="#386411" />
+<text class="value-label" x="671.2" y="1290">8.82%</text>
+<text class="axis-label" x="0" y="1328">Realtime Silero T2 frame=100 thr=0.2 sil=0.35s max=8.0s</text>
+<text class="axis-hint" x="0" y="1343">英文 · warm · shared</text>
+<rect class="bar" x="310" y="1315" width="353.2" height="18" fill="#A3D576" stroke="#386411" />
+<text class="value-label" x="671.2" y="1330">8.82%</text>
+<text class="axis-label" x="0" y="1368">Realtime Silero T2 frame=100 thr=0.25 sil=0.35s max=8.0s</text>
+<text class="axis-hint" x="0" y="1383">英文 · warm · shared</text>
+<rect class="bar" x="310" y="1355" width="353.2" height="18" fill="#A3D576" stroke="#386411" />
+<text class="value-label" x="671.2" y="1370">8.82%</text>
+<text class="axis-label" x="0" y="1408">Realtime Silero T2 frame=100 thr=0.15 sil=0.25s max=8.0s</text>
+<text class="axis-hint" x="0" y="1423">英文 · warm · shared</text>
+<rect class="bar" x="310" y="1395" width="353.2" height="18" fill="#A3D576" stroke="#386411" />
+<text class="value-label" x="671.2" y="1410">8.82%</text>
+<text class="axis-label" x="0" y="1448">Realtime RMS T2 frame=200 thr=520 min=320 end=1000 max=8000 pre=0</text>
+<text class="axis-hint" x="0" y="1463">英文 · warm · shared</text>
+<rect class="bar" x="310" y="1435" width="358.5" height="18" fill="#A3D576" stroke="#386411" />
+<text class="value-label" x="676.5" y="1450">8.96%</text>
+<text class="axis-label" x="0" y="1488">Realtime RMS T2 frame=200 thr=420 min=320 end=720 max=12000 pre=0</text>
+<text class="axis-hint" x="0" y="1503">英文 · warm · shared</text>
+<rect class="bar" x="310" y="1475" width="358.5" height="18" fill="#A3D576" stroke="#386411" />
+<text class="value-label" x="676.5" y="1490">8.96%</text>
+<text class="axis-label" x="0" y="1528">Realtime RMS T2 frame=200 thr=800 min=320 end=1000 max=12000 pre=0</text>
+<text class="axis-hint" x="0" y="1543">英文 · warm · shared</text>
+<rect class="bar" x="310" y="1515" width="358.5" height="18" fill="#A3D576" stroke="#386411" />
+<text class="value-label" x="676.5" y="1530">8.96%</text>
+<text class="axis-label" x="0" y="1568">Realtime Silero T2 frame=100 thr=0.25 sil=0.25s max=8.0s</text>
+<text class="axis-hint" x="0" y="1583">英文 · warm · shared</text>
+<rect class="bar" x="310" y="1555" width="358.5" height="18" fill="#A3D576" stroke="#386411" />
+<text class="value-label" x="676.5" y="1570">8.96%</text>
+<text class="axis-label" x="0" y="1608">Realtime Silero T2 frame=100 thr=0.2 sil=0.2s max=8.0s</text>
+<text class="axis-hint" x="0" y="1623">英文 · warm · shared</text>
+<rect class="bar" x="310" y="1595" width="358.5" height="18" fill="#A3D576" stroke="#386411" />
+<text class="value-label" x="676.5" y="1610">8.96%</text>
+<text class="axis-label" x="0" y="1648">Realtime RMS T2 frame=200 thr=520 min=320 end=720 max=12000 pre=0</text>
+<text class="axis-hint" x="0" y="1663">英文 · warm · shared</text>
+<rect class="bar" x="310" y="1635" width="363.9" height="18" fill="#A3D576" stroke="#386411" />
+<text class="value-label" x="681.9" y="1650">9.09%</text>
+<text class="axis-label" x="0" y="1688">Realtime RMS T2 frame=200 thr=800 min=320 end=500 max=8000 pre=0</text>
+<text class="axis-hint" x="0" y="1703">英文 · warm · shared</text>
+<rect class="bar" x="310" y="1675" width="374.6" height="18" fill="#A3D576" stroke="#386411" />
+<text class="value-label" x="692.6" y="1690">9.36%</text>
+<text class="axis-label" x="0" y="1728">Realtime Silero T2 frame=100 thr=0.3 sil=0.5s max=8.0s</text>
+<text class="axis-hint" x="0" y="1743">英文 · warm · shared</text>
+<rect class="bar" x="310" y="1715" width="374.6" height="18" fill="#A3D576" stroke="#386411" />
+<text class="value-label" x="692.6" y="1730">9.36%</text>
+<text class="axis-label" x="0" y="1768">Realtime Silero T2 frame=100 thr=0.25 sil=0.2s max=8.0s</text>
+<text class="axis-hint" x="0" y="1783">英文 · warm · shared</text>
+<rect class="bar" x="310" y="1755" width="374.6" height="18" fill="#A3D576" stroke="#386411" />
+<text class="value-label" x="692.6" y="1770">9.36%</text>
+<text class="axis-label" x="0" y="1808">Realtime Silero T2 frame=100 thr=0.3 sil=0.2s max=8.0s</text>
+<text class="axis-hint" x="0" y="1823">英文 · warm · shared</text>
+<rect class="bar" x="310" y="1795" width="379.9" height="18" fill="#A3D576" stroke="#386411" />
+<text class="value-label" x="697.9" y="1810">9.49%</text>
+<text class="axis-label" x="0" y="1848">Realtime Silero T2 frame=100 thr=0.3 sil=0.35s max=8.0s</text>
+<text class="axis-hint" x="0" y="1863">英文 · warm · shared</text>
+<rect class="bar" x="310" y="1835" width="379.9" height="18" fill="#A3D576" stroke="#386411" />
+<text class="value-label" x="697.9" y="1850">9.49%</text>
+<text class="axis-label" x="0" y="1888">Realtime RMS T2 frame=200 thr=650 min=320 end=1000 max=8000 pre=0</text>
+<text class="axis-hint" x="0" y="1903">英文 · warm · shared</text>
+<rect class="bar" x="310" y="1875" width="385.3" height="18" fill="#A3D576" stroke="#386411" />
+<text class="value-label" x="703.3" y="1890">9.63%</text>
+<text class="axis-label" x="0" y="1928">Realtime Silero T2 frame=100 thr=0.3 sil=0.25s max=8.0s</text>
+<text class="axis-hint" x="0" y="1943">英文 · warm · shared</text>
+<rect class="bar" x="310" y="1915" width="385.3" height="18" fill="#A3D576" stroke="#386411" />
+<text class="value-label" x="703.3" y="1930">9.63%</text>
+<text class="axis-label" x="0" y="1968">Realtime RMS T2 frame=200 thr=650 min=320 end=500 max=12000 pre=0</text>
+<text class="axis-hint" x="0" y="1983">英文 · warm · shared</text>
+<rect class="bar" x="310" y="1955" width="390.6" height="18" fill="#A3D576" stroke="#386411" />
+<text class="value-label" x="708.6" y="1970">9.76%</text>
+<text class="axis-label" x="0" y="2008">Realtime RMS T2 frame=200 thr=800 min=320 end=720 max=12000 pre=0</text>
+<text class="axis-hint" x="0" y="2023">英文 · warm · shared</text>
+<rect class="bar" x="310" y="1995" width="390.6" height="18" fill="#A3D576" stroke="#386411" />
+<text class="value-label" x="708.6" y="2010">9.76%</text>
+<text class="axis-label" x="0" y="2048">Realtime RMS T2 frame=200 thr=520 min=320 end=720 max=8000 pre=0</text>
+<text class="axis-hint" x="0" y="2063">英文 · warm · shared</text>
+<rect class="bar" x="310" y="2035" width="396.0" height="18" fill="#A3D576" stroke="#386411" />
+<text class="value-label" x="714.0" y="2050">9.89%</text>
+<text class="axis-label" x="0" y="2088">Realtime RMS T2 frame=200 thr=420 min=320 end=720 max=8000 pre=0</text>
+<text class="axis-hint" x="0" y="2103">英文 · warm · shared</text>
+<rect class="bar" x="310" y="2075" width="401.3" height="18" fill="#A3D576" stroke="#386411" />
+<text class="value-label" x="719.3" y="2090">10.03%</text>
+<text class="axis-label" x="0" y="2128">Realtime RMS T2 frame=200 thr=650 min=320 end=720 max=12000 pre=0</text>
+<text class="axis-hint" x="0" y="2143">英文 · warm · shared</text>
+<rect class="bar" x="310" y="2115" width="401.3" height="18" fill="#A3D576" stroke="#386411" />
+<text class="value-label" x="719.3" y="2130">10.03%</text>
+<text class="axis-label" x="0" y="2168">Realtime RMS T2 frame=200 thr=800 min=320 end=500 max=12000 pre=0</text>
+<text class="axis-hint" x="0" y="2183">英文 · warm · shared</text>
+<rect class="bar" x="310" y="2155" width="406.7" height="18" fill="#A3D576" stroke="#386411" />
+<text class="value-label" x="724.7" y="2170">10.16%</text>
+<text class="axis-label" x="0" y="2208">Realtime RMS T2 frame=200 thr=800 min=320 end=720 max=8000 pre=0</text>
+<text class="axis-hint" x="0" y="2223">英文 · warm · shared</text>
+<rect class="bar" x="310" y="2195" width="406.7" height="18" fill="#A3D576" stroke="#386411" />
+<text class="value-label" x="724.7" y="2210">10.16%</text>
+<text class="axis-label" x="0" y="2248">Realtime RMS T2 frame=200 thr=800 min=320 end=1000 max=8000 pre=0</text>
+<text class="axis-hint" x="0" y="2263">英文 · warm · shared</text>
+<rect class="bar" x="310" y="2235" width="412.0" height="18" fill="#A3D576" stroke="#386411" />
+<text class="value-label" x="730.0" y="2250">10.29%</text>
+<text class="axis-label" x="0" y="2288">Realtime RMS T2 frame=200 thr=650 min=320 end=720 max=8000 pre=0</text>
+<text class="axis-hint" x="0" y="2303">英文 · warm · shared</text>
+<rect class="bar" x="310" y="2275" width="417.4" height="18" fill="#A3D576" stroke="#386411" />
+<text class="value-label" x="735.4" y="2290">10.43%</text>
+<text class="axis-label" x="0" y="2328">Realtime RMS T2 frame=200 thr=650 min=320 end=500 max=12000 pre=0</text>
+<text class="axis-hint" x="0" y="2343">中文 · warm · shared</text>
+<rect class="bar" x="310" y="2315" width="1.0" height="18" fill="#A3D576" stroke="#386411" />
+<text class="value-label" x="318.0" y="2330">0.00%</text>
+<text class="axis-label" x="0" y="2368">Realtime RMS T2 frame=200 thr=650 min=320 end=500 max=8000 pre=0</text>
+<text class="axis-hint" x="0" y="2383">中文 · warm · shared</text>
+<rect class="bar" x="310" y="2355" width="1.0" height="18" fill="#A3D576" stroke="#386411" />
+<text class="value-label" x="318.0" y="2370">0.00%</text>
+<text class="axis-label" x="0" y="2408">Realtime RMS T2 frame=200 thr=420 min=320 end=500 max=12000 pre=0</text>
+<text class="axis-hint" x="0" y="2423">中文 · warm · shared</text>
+<rect class="bar" x="310" y="2395" width="1.0" height="18" fill="#A3D576" stroke="#386411" />
+<text class="value-label" x="318.0" y="2410">0.00%</text>
+<text class="axis-label" x="0" y="2448">Realtime RMS T2 frame=200 thr=520 min=320 end=500 max=8000 pre=0</text>
+<text class="axis-hint" x="0" y="2463">中文 · warm · shared</text>
+<rect class="bar" x="310" y="2435" width="1.0" height="18" fill="#A3D576" stroke="#386411" />
+<text class="value-label" x="318.0" y="2450">0.00%</text>
+<text class="axis-label" x="0" y="2488">Realtime RMS T2 frame=200 thr=520 min=320 end=500 max=12000 pre=0</text>
+<text class="axis-hint" x="0" y="2503">中文 · warm · shared</text>
+<rect class="bar" x="310" y="2475" width="1.0" height="18" fill="#A3D576" stroke="#386411" />
+<text class="value-label" x="318.0" y="2490">0.00%</text>
+<text class="axis-label" x="0" y="2528">Realtime RMS T2 frame=200 thr=420 min=320 end=500 max=8000 pre=0</text>
+<text class="axis-hint" x="0" y="2543">中文 · warm · shared</text>
+<rect class="bar" x="310" y="2515" width="1.0" height="18" fill="#A3D576" stroke="#386411" />
+<text class="value-label" x="318.0" y="2530">0.00%</text>
+<text class="axis-label" x="0" y="2568">Realtime RMS T2 frame=200 thr=520 min=320 end=1000 max=12000 pre=0</text>
+<text class="axis-hint" x="0" y="2583">中文 · warm · shared</text>
+<rect class="bar" x="310" y="2555" width="1.0" height="18" fill="#A3D576" stroke="#386411" />
+<text class="value-label" x="318.0" y="2570">0.00%</text>
+<text class="axis-label" x="0" y="2608">Realtime RMS T2 frame=200 thr=650 min=320 end=720 max=8000 pre=0</text>
+<text class="axis-hint" x="0" y="2623">中文 · warm · shared</text>
+<rect class="bar" x="310" y="2595" width="1.0" height="18" fill="#A3D576" stroke="#386411" />
+<text class="value-label" x="318.0" y="2610">0.00%</text>
+<text class="axis-label" x="0" y="2648">Realtime RMS T2 frame=200 thr=650 min=320 end=720 max=12000 pre=0</text>
+<text class="axis-hint" x="0" y="2663">中文 · warm · shared</text>
+<rect class="bar" x="310" y="2635" width="1.0" height="18" fill="#A3D576" stroke="#386411" />
+<text class="value-label" x="318.0" y="2650">0.00%</text>
+<text class="axis-label" x="0" y="2688">Realtime RMS T2 frame=200 thr=520 min=320 end=720 max=8000 pre=0</text>
+<text class="axis-hint" x="0" y="2703">中文 · warm · shared</text>
+<rect class="bar" x="310" y="2675" width="1.0" height="18" fill="#A3D576" stroke="#386411" />
+<text class="value-label" x="318.0" y="2690">0.00%</text>
+<text class="axis-label" x="0" y="2728">Realtime RMS T2 frame=200 thr=520 min=320 end=720 max=12000 pre=0</text>
+<text class="axis-hint" x="0" y="2743">中文 · warm · shared</text>
+<rect class="bar" x="310" y="2715" width="1.0" height="18" fill="#A3D576" stroke="#386411" />
+<text class="value-label" x="318.0" y="2730">0.00%</text>
+<text class="axis-label" x="0" y="2768">Realtime RMS T2 frame=200 thr=420 min=320 end=720 max=8000 pre=0</text>
+<text class="axis-hint" x="0" y="2783">中文 · warm · shared</text>
+<rect class="bar" x="310" y="2755" width="1.0" height="18" fill="#A3D576" stroke="#386411" />
+<text class="value-label" x="318.0" y="2770">0.00%</text>
+<text class="axis-label" x="0" y="2808">Realtime RMS T2 frame=200 thr=420 min=320 end=1000 max=8000 pre=0</text>
+<text class="axis-hint" x="0" y="2823">中文 · warm · shared</text>
+<rect class="bar" x="310" y="2795" width="1.0" height="18" fill="#A3D576" stroke="#386411" />
+<text class="value-label" x="318.0" y="2810">0.00%</text>
+<text class="axis-label" x="0" y="2848">Realtime RMS T2 frame=200 thr=520 min=320 end=1000 max=8000 pre=0</text>
+<text class="axis-hint" x="0" y="2863">中文 · warm · shared</text>
+<rect class="bar" x="310" y="2835" width="1.0" height="18" fill="#A3D576" stroke="#386411" />
+<text class="value-label" x="318.0" y="2850">0.00%</text>
+<text class="axis-label" x="0" y="2888">Realtime RMS T2 frame=200 thr=420 min=320 end=720 max=12000 pre=0</text>
+<text class="axis-hint" x="0" y="2903">中文 · warm · shared</text>
+<rect class="bar" x="310" y="2875" width="1.0" height="18" fill="#A3D576" stroke="#386411" />
+<text class="value-label" x="318.0" y="2890">0.00%</text>
+<text class="axis-label" x="0" y="2928">Realtime Silero T2 frame=100 thr=0.15 sil=0.2s max=8.0s</text>
+<text class="axis-hint" x="0" y="2943">中文 · warm · shared</text>
+<rect class="bar" x="310" y="2915" width="1.0" height="18" fill="#A3D576" stroke="#386411" />
+<text class="value-label" x="318.0" y="2930">0.00%</text>
+<text class="axis-label" x="0" y="2968">Realtime Silero T2 frame=100 thr=0.15 sil=0.35s max=8.0s</text>
+<text class="axis-hint" x="0" y="2983">中文 · warm · shared</text>
+<rect class="bar" x="310" y="2955" width="1.0" height="18" fill="#A3D576" stroke="#386411" />
+<text class="value-label" x="318.0" y="2970">0.00%</text>
+<text class="axis-label" x="0" y="3008">Realtime Silero T2 frame=100 thr=0.15 sil=0.35s max=5.0s</text>
+<text class="axis-hint" x="0" y="3023">中文 · warm · shared</text>
+<rect class="bar" x="310" y="2995" width="1.0" height="18" fill="#A3D576" stroke="#386411" />
+<text class="value-label" x="318.0" y="3010">0.00%</text>
+<text class="axis-label" x="0" y="3048">Realtime Silero T2 frame=100 thr=0.15 sil=0.25s max=8.0s</text>
+<text class="axis-hint" x="0" y="3063">中文 · warm · shared</text>
+<rect class="bar" x="310" y="3035" width="1.0" height="18" fill="#A3D576" stroke="#386411" />
+<text class="value-label" x="318.0" y="3050">0.00%</text>
+<text class="axis-label" x="0" y="3088">Realtime Silero T2 frame=100 thr=0.15 sil=0.25s max=5.0s</text>
+<text class="axis-hint" x="0" y="3103">中文 · warm · shared</text>
+<rect class="bar" x="310" y="3075" width="1.0" height="18" fill="#A3D576" stroke="#386411" />
+<text class="value-label" x="318.0" y="3090">0.00%</text>
+<text class="axis-label" x="0" y="3128">Realtime Silero T2 frame=100 thr=0.15 sil=0.5s max=5.0s</text>
+<text class="axis-hint" x="0" y="3143">中文 · warm · shared</text>
+<rect class="bar" x="310" y="3115" width="1.0" height="18" fill="#A3D576" stroke="#386411" />
+<text class="value-label" x="318.0" y="3130">0.00%</text>
+<text class="axis-label" x="0" y="3168">Realtime Silero T2 frame=100 thr=0.15 sil=0.2s max=5.0s</text>
+<text class="axis-hint" x="0" y="3183">中文 · warm · shared</text>
+<rect class="bar" x="310" y="3155" width="1.0" height="18" fill="#A3D576" stroke="#386411" />
+<text class="value-label" x="318.0" y="3170">0.00%</text>
+<text class="axis-label" x="0" y="3208">Realtime Silero T2 frame=100 thr=0.15 sil=0.5s max=8.0s</text>
+<text class="axis-hint" x="0" y="3223">中文 · warm · shared</text>
+<rect class="bar" x="310" y="3195" width="1.0" height="18" fill="#A3D576" stroke="#386411" />
+<text class="value-label" x="318.0" y="3210">0.00%</text>
+<text class="axis-label" x="0" y="3248">Realtime RMS T2 frame=200 thr=650 min=320 end=1000 max=8000 pre=0</text>
+<text class="axis-hint" x="0" y="3263">中文 · warm · shared</text>
+<rect class="bar" x="310" y="3235" width="7.9" height="18" fill="#A3D576" stroke="#386411" />
+<text class="value-label" x="325.9" y="3250">0.20%</text>
+<text class="axis-label" x="0" y="3288">Realtime Silero T2 frame=100 thr=0.2 sil=0.2s max=5.0s</text>
+<text class="axis-hint" x="0" y="3303">中文 · warm · shared</text>
+<rect class="bar" x="310" y="3275" width="7.9" height="18" fill="#A3D576" stroke="#386411" />
+<text class="value-label" x="325.9" y="3290">0.20%</text>
+<text class="axis-label" x="0" y="3328">Realtime Silero T2 frame=100 thr=0.2 sil=0.2s max=8.0s</text>
+<text class="axis-hint" x="0" y="3343">中文 · warm · shared</text>
+<rect class="bar" x="310" y="3315" width="7.9" height="18" fill="#A3D576" stroke="#386411" />
+<text class="value-label" x="325.9" y="3330">0.20%</text>
+<text class="axis-label" x="0" y="3368">Realtime RMS T2 frame=200 thr=650 min=320 end=1000 max=12000 pre=0</text>
+<text class="axis-hint" x="0" y="3383">中文 · warm · shared</text>
+<rect class="bar" x="310" y="3355" width="7.9" height="18" fill="#A3D576" stroke="#386411" />
+<text class="value-label" x="325.9" y="3370">0.20%</text>
+<text class="axis-label" x="0" y="3408">Realtime Silero T2 frame=100 thr=0.2 sil=0.5s max=8.0s</text>
+<text class="axis-hint" x="0" y="3423">中文 · warm · shared</text>
+<rect class="bar" x="310" y="3395" width="7.9" height="18" fill="#A3D576" stroke="#386411" />
+<text class="value-label" x="325.9" y="3410">0.20%</text>
+<text class="axis-label" x="0" y="3448">Realtime Silero T2 frame=100 thr=0.2 sil=0.25s max=5.0s</text>
+<text class="axis-hint" x="0" y="3463">中文 · warm · shared</text>
+<rect class="bar" x="310" y="3435" width="7.9" height="18" fill="#A3D576" stroke="#386411" />
+<text class="value-label" x="325.9" y="3450">0.20%</text>
+<text class="axis-label" x="0" y="3488">Realtime Silero T2 frame=100 thr=0.2 sil=0.35s max=8.0s</text>
+<text class="axis-hint" x="0" y="3503">中文 · warm · shared</text>
+<rect class="bar" x="310" y="3475" width="7.9" height="18" fill="#A3D576" stroke="#386411" />
+<text class="value-label" x="325.9" y="3490">0.20%</text>
+<text class="axis-label" x="0" y="3528">Realtime Silero T2 frame=100 thr=0.2 sil=0.35s max=5.0s</text>
+<text class="axis-hint" x="0" y="3543">中文 · warm · shared</text>
+<rect class="bar" x="310" y="3515" width="7.9" height="18" fill="#A3D576" stroke="#386411" />
+<text class="value-label" x="325.9" y="3530">0.20%</text>
+<text class="axis-label" x="0" y="3568">Realtime Silero T2 frame=100 thr=0.2 sil=0.25s max=8.0s</text>
+<text class="axis-hint" x="0" y="3583">中文 · warm · shared</text>
+<rect class="bar" x="310" y="3555" width="7.9" height="18" fill="#A3D576" stroke="#386411" />
+<text class="value-label" x="325.9" y="3570">0.20%</text>
+<text class="axis-label" x="0" y="3608">Realtime Silero T2 frame=100 thr=0.2 sil=0.5s max=5.0s</text>
+<text class="axis-hint" x="0" y="3623">中文 · warm · shared</text>
+<rect class="bar" x="310" y="3595" width="7.9" height="18" fill="#A3D576" stroke="#386411" />
+<text class="value-label" x="325.9" y="3610">0.20%</text>
+<text class="axis-label" x="0" y="3648">Realtime Silero T2 frame=100 thr=0.25 sil=0.2s max=5.0s</text>
+<text class="axis-hint" x="0" y="3663">中文 · warm · shared</text>
+<rect class="bar" x="310" y="3635" width="19.7" height="18" fill="#A3D576" stroke="#386411" />
+<text class="value-label" x="337.7" y="3650">0.49%</text>
+<text class="axis-label" x="0" y="3688">Realtime Silero T2 frame=100 thr=0.25 sil=0.2s max=8.0s</text>
+<text class="axis-hint" x="0" y="3703">中文 · warm · shared</text>
+<rect class="bar" x="310" y="3675" width="19.7" height="18" fill="#A3D576" stroke="#386411" />
+<text class="value-label" x="337.7" y="3690">0.49%</text>
+<text class="axis-label" x="0" y="3728">Realtime Silero T2 frame=100 thr=0.25 sil=0.5s max=8.0s</text>
+<text class="axis-hint" x="0" y="3743">中文 · warm · shared</text>
+<rect class="bar" x="310" y="3715" width="19.7" height="18" fill="#A3D576" stroke="#386411" />
+<text class="value-label" x="337.7" y="3730">0.49%</text>
+<text class="axis-label" x="0" y="3768">Realtime Silero T2 frame=100 thr=0.25 sil=0.5s max=5.0s</text>
+<text class="axis-hint" x="0" y="3783">中文 · warm · shared</text>
+<rect class="bar" x="310" y="3755" width="19.7" height="18" fill="#A3D576" stroke="#386411" />
+<text class="value-label" x="337.7" y="3770">0.49%</text>
+<text class="axis-label" x="0" y="3808">Realtime Silero T2 frame=100 thr=0.25 sil=0.35s max=5.0s</text>
+<text class="axis-hint" x="0" y="3823">中文 · warm · shared</text>
+<rect class="bar" x="310" y="3795" width="19.7" height="18" fill="#A3D576" stroke="#386411" />
+<text class="value-label" x="337.7" y="3810">0.49%</text>
+<text class="axis-label" x="0" y="3848">Realtime Silero T2 frame=100 thr=0.25 sil=0.25s max=8.0s</text>
+<text class="axis-hint" x="0" y="3863">中文 · warm · shared</text>
+<rect class="bar" x="310" y="3835" width="19.7" height="18" fill="#A3D576" stroke="#386411" />
+<text class="value-label" x="337.7" y="3850">0.49%</text>
+<text class="axis-label" x="0" y="3888">Realtime Silero T2 frame=100 thr=0.25 sil=0.25s max=5.0s</text>
+<text class="axis-hint" x="0" y="3903">中文 · warm · shared</text>
+<rect class="bar" x="310" y="3875" width="19.7" height="18" fill="#A3D576" stroke="#386411" />
+<text class="value-label" x="337.7" y="3890">0.49%</text>
+<text class="axis-label" x="0" y="3928">Realtime Silero T2 frame=100 thr=0.25 sil=0.35s max=8.0s</text>
+<text class="axis-hint" x="0" y="3943">中文 · warm · shared</text>
+<rect class="bar" x="310" y="3915" width="19.7" height="18" fill="#A3D576" stroke="#386411" />
+<text class="value-label" x="337.7" y="3930">0.49%</text>
+<text class="axis-label" x="0" y="3968">Realtime Silero T2 frame=100 thr=0.3 sil=0.5s max=8.0s</text>
+<text class="axis-hint" x="0" y="3983">中文 · warm · shared</text>
+<rect class="bar" x="310" y="3955" width="23.7" height="18" fill="#A3D576" stroke="#386411" />
+<text class="value-label" x="341.7" y="3970">0.59%</text>
+<text class="axis-label" x="0" y="4008">Realtime Silero T2 frame=100 thr=0.3 sil=0.5s max=5.0s</text>
+<text class="axis-hint" x="0" y="4023">中文 · warm · shared</text>
+<rect class="bar" x="310" y="3995" width="23.7" height="18" fill="#A3D576" stroke="#386411" />
+<text class="value-label" x="341.7" y="4010">0.59%</text>
+<text class="axis-label" x="0" y="4048">Realtime Silero T2 frame=100 thr=0.3 sil=0.2s max=5.0s</text>
+<text class="axis-hint" x="0" y="4063">中文 · warm · shared</text>
+<rect class="bar" x="310" y="4035" width="23.7" height="18" fill="#A3D576" stroke="#386411" />
+<text class="value-label" x="341.7" y="4050">0.59%</text>
+<text class="axis-label" x="0" y="4088">Realtime Silero T2 frame=100 thr=0.3 sil=0.2s max=8.0s</text>
+<text class="axis-hint" x="0" y="4103">中文 · warm · shared</text>
+<rect class="bar" x="310" y="4075" width="23.7" height="18" fill="#A3D576" stroke="#386411" />
+<text class="value-label" x="341.7" y="4090">0.59%</text>
+<text class="axis-label" x="0" y="4128">Realtime Silero T2 frame=100 thr=0.3 sil=0.35s max=8.0s</text>
+<text class="axis-hint" x="0" y="4143">中文 · warm · shared</text>
+<rect class="bar" x="310" y="4115" width="23.7" height="18" fill="#A3D576" stroke="#386411" />
+<text class="value-label" x="341.7" y="4130">0.59%</text>
+<text class="axis-label" x="0" y="4168">Realtime Silero T2 frame=100 thr=0.3 sil=0.25s max=8.0s</text>
+<text class="axis-hint" x="0" y="4183">中文 · warm · shared</text>
+<rect class="bar" x="310" y="4155" width="23.7" height="18" fill="#A3D576" stroke="#386411" />
+<text class="value-label" x="341.7" y="4170">0.59%</text>
+<text class="axis-label" x="0" y="4208">Realtime Silero T2 frame=100 thr=0.3 sil=0.25s max=5.0s</text>
+<text class="axis-hint" x="0" y="4223">中文 · warm · shared</text>
+<rect class="bar" x="310" y="4195" width="23.7" height="18" fill="#A3D576" stroke="#386411" />
+<text class="value-label" x="341.7" y="4210">0.59%</text>
+<text class="axis-label" x="0" y="4248">Realtime Silero T2 frame=100 thr=0.3 sil=0.35s max=5.0s</text>
+<text class="axis-hint" x="0" y="4263">中文 · warm · shared</text>
+<rect class="bar" x="310" y="4235" width="23.7" height="18" fill="#A3D576" stroke="#386411" />
+<text class="value-label" x="341.7" y="4250">0.59%</text>
+<text class="axis-label" x="0" y="4288">Realtime RMS T2 frame=200 thr=800 min=320 end=720 max=8000 pre=0</text>
+<text class="axis-hint" x="0" y="4303">中文 · warm · shared</text>
+<rect class="bar" x="310" y="4275" width="35.5" height="18" fill="#A3D576" stroke="#386411" />
+<text class="value-label" x="353.5" y="4290">0.89%</text>
+<text class="axis-label" x="0" y="4328">Realtime RMS T2 frame=200 thr=800 min=320 end=720 max=12000 pre=0</text>
+<text class="axis-hint" x="0" y="4343">中文 · warm · shared</text>
+<rect class="bar" x="310" y="4315" width="35.5" height="18" fill="#A3D576" stroke="#386411" />
+<text class="value-label" x="353.5" y="4330">0.89%</text>
+<text class="axis-label" x="0" y="4368">Realtime RMS T2 frame=200 thr=800 min=320 end=1000 max=12000 pre=0</text>
+<text class="axis-hint" x="0" y="4383">中文 · warm · shared</text>
+<rect class="bar" x="310" y="4355" width="39.5" height="18" fill="#A3D576" stroke="#386411" />
+<text class="value-label" x="357.5" y="4370">0.99%</text>
+<text class="axis-label" x="0" y="4408">Realtime RMS T2 frame=200 thr=800 min=320 end=1000 max=8000 pre=0</text>
+<text class="axis-hint" x="0" y="4423">中文 · warm · shared</text>
+<rect class="bar" x="310" y="4395" width="39.5" height="18" fill="#A3D576" stroke="#386411" />
+<text class="value-label" x="357.5" y="4410">0.99%</text>
+<text class="axis-label" x="0" y="4448">Realtime RMS T2 frame=200 thr=800 min=320 end=500 max=8000 pre=0</text>
+<text class="axis-hint" x="0" y="4463">中文 · warm · shared</text>
+<rect class="bar" x="310" y="4435" width="51.3" height="18" fill="#A3D576" stroke="#386411" />
+<text class="value-label" x="369.3" y="4450">1.28%</text>
+<text class="axis-label" x="0" y="4488">Realtime RMS T2 frame=200 thr=800 min=320 end=500 max=12000 pre=0</text>
+<text class="axis-hint" x="0" y="4503">中文 · warm · shared</text>
+<rect class="bar" x="310" y="4475" width="51.3" height="18" fill="#A3D576" stroke="#386411" />
+<text class="value-label" x="369.3" y="4490">1.28%</text>
+<text class="axis-label" x="0" y="4528">Realtime RMS T2 frame=200 thr=420 min=320 end=1000 max=12000 pre=0</text>
+<text class="axis-hint" x="0" y="4543">中文 · warm · shared</text>
+<rect class="bar" x="310" y="4515" width="98.7" height="18" fill="#A3D576" stroke="#386411" />
+<text class="value-label" x="416.7" y="4530">2.47%</text>
+</svg></div>
+          <div class="chart"><svg class="chart-svg" viewBox="0 0 920 4582" role="img" aria-label="Operation RTF">
+<text class="chart-title" x="0" y="18">Operation RTF</text>
+<text class="chart-subtitle" x="0" y="42">包含当前 profile 记录到的模型加载成本。</text>
+<line class="grid" x1="430.0" y1="62" x2="430.0" y2="4556" />
+<line class="grid" x1="550.0" y1="62" x2="550.0" y2="4556" />
+<line class="grid" x1="670.0" y1="62" x2="670.0" y2="4556" />
+<line class="grid" x1="790.0" y1="62" x2="790.0" y2="4556" />
+<text class="axis-label" x="0" y="88">Realtime Silero T2 frame=100 thr=0.3 sil=0.5s max=5.0s</text>
+<text class="axis-hint" x="0" y="103">英文 · warm · shared</text>
+<rect class="bar" x="310" y="75" width="386.9" height="18" fill="#A3D576" stroke="#386411" />
+<text class="value-label" x="704.9" y="90">0.0143</text>
+<text class="axis-label" x="0" y="128">Realtime Silero T2 frame=100 thr=0.3 sil=0.35s max=5.0s</text>
+<text class="axis-hint" x="0" y="143">英文 · warm · shared</text>
+<rect class="bar" x="310" y="115" width="389.6" height="18" fill="#A3D576" stroke="#386411" />
+<text class="value-label" x="707.6" y="130">0.0144</text>
+<text class="axis-label" x="0" y="168">Realtime Silero T2 frame=100 thr=0.3 sil=0.2s max=5.0s</text>
+<text class="axis-hint" x="0" y="183">英文 · warm · shared</text>
+<rect class="bar" x="310" y="155" width="386.5" height="18" fill="#A3D576" stroke="#386411" />
+<text class="value-label" x="704.5" y="170">0.0143</text>
+<text class="axis-label" x="0" y="208">Realtime Silero T2 frame=100 thr=0.3 sil=0.25s max=5.0s</text>
+<text class="axis-hint" x="0" y="223">英文 · warm · shared</text>
+<rect class="bar" x="310" y="195" width="388.2" height="18" fill="#A3D576" stroke="#386411" />
+<text class="value-label" x="706.2" y="210">0.0143</text>
+<text class="axis-label" x="0" y="248">Realtime Silero T2 frame=100 thr=0.25 sil=0.35s max=5.0s</text>
+<text class="axis-hint" x="0" y="263">英文 · warm · shared</text>
+<rect class="bar" x="310" y="235" width="389.2" height="18" fill="#A3D576" stroke="#386411" />
+<text class="value-label" x="707.2" y="250">0.0144</text>
+<text class="axis-label" x="0" y="288">Realtime Silero T2 frame=100 thr=0.15 sil=0.2s max=5.0s</text>
+<text class="axis-hint" x="0" y="303">英文 · warm · shared</text>
+<rect class="bar" x="310" y="275" width="390.9" height="18" fill="#A3D576" stroke="#386411" />
+<text class="value-label" x="708.9" y="290">0.0145</text>
+<text class="axis-label" x="0" y="328">Realtime Silero T2 frame=100 thr=0.15 sil=0.25s max=5.0s</text>
+<text class="axis-hint" x="0" y="343">英文 · warm · shared</text>
+<rect class="bar" x="310" y="315" width="391.0" height="18" fill="#A3D576" stroke="#386411" />
+<text class="value-label" x="709.0" y="330">0.0145</text>
+<text class="axis-label" x="0" y="368">Realtime Silero T2 frame=100 thr=0.15 sil=0.35s max=5.0s</text>
+<text class="axis-hint" x="0" y="383">英文 · warm · shared</text>
+<rect class="bar" x="310" y="355" width="391.0" height="18" fill="#A3D576" stroke="#386411" />
+<text class="value-label" x="709.0" y="370">0.0145</text>
+<text class="axis-label" x="0" y="408">Realtime Silero T2 frame=100 thr=0.15 sil=0.5s max=5.0s</text>
+<text class="axis-hint" x="0" y="423">英文 · warm · shared</text>
+<rect class="bar" x="310" y="395" width="391.5" height="18" fill="#A3D576" stroke="#386411" />
+<text class="value-label" x="709.5" y="410">0.0145</text>
+<text class="axis-label" x="0" y="448">Realtime Silero T2 frame=100 thr=0.25 sil=0.5s max=5.0s</text>
+<text class="axis-hint" x="0" y="463">英文 · warm · shared</text>
+<rect class="bar" x="310" y="435" width="396.2" height="18" fill="#A3D576" stroke="#386411" />
+<text class="value-label" x="714.2" y="450">0.0146</text>
+<text class="axis-label" x="0" y="488">Realtime RMS T2 frame=200 thr=650 min=320 end=1000 max=12000 pre=0</text>
+<text class="axis-hint" x="0" y="503">英文 · warm · shared</text>
+<rect class="bar" x="310" y="475" width="339.8" height="18" fill="#A3D576" stroke="#386411" />
+<text class="value-label" x="657.8" y="490">0.0126</text>
+<text class="axis-label" x="0" y="528">Realtime Silero T2 frame=100 thr=0.25 sil=0.25s max=5.0s</text>
+<text class="axis-hint" x="0" y="543">英文 · warm · shared</text>
+<rect class="bar" x="310" y="515" width="387.6" height="18" fill="#A3D576" stroke="#386411" />
+<text class="value-label" x="705.6" y="530">0.0143</text>
+<text class="axis-label" x="0" y="568">Realtime Silero T2 frame=100 thr=0.25 sil=0.2s max=5.0s</text>
+<text class="axis-hint" x="0" y="583">英文 · warm · shared</text>
+<rect class="bar" x="310" y="555" width="394.9" height="18" fill="#A3D576" stroke="#386411" />
+<text class="value-label" x="712.9" y="570">0.0146</text>
+<text class="axis-label" x="0" y="608">Realtime RMS T2 frame=200 thr=520 min=320 end=1000 max=12000 pre=0</text>
+<text class="axis-hint" x="0" y="623">英文 · warm · shared</text>
+<rect class="bar" x="310" y="595" width="338.5" height="18" fill="#A3D576" stroke="#386411" />
+<text class="value-label" x="656.5" y="610">0.0125</text>
+<text class="axis-label" x="0" y="648">Realtime RMS T2 frame=200 thr=420 min=320 end=1000 max=12000 pre=0</text>
+<text class="axis-hint" x="0" y="663">英文 · warm · shared</text>
+<rect class="bar" x="310" y="635" width="350.7" height="18" fill="#A3D576" stroke="#386411" />
+<text class="value-label" x="668.7" y="650">0.0130</text>
+<text class="axis-label" x="0" y="688">Realtime Silero T2 frame=100 thr=0.2 sil=0.5s max=5.0s</text>
+<text class="axis-hint" x="0" y="703">英文 · warm · shared</text>
+<rect class="bar" x="310" y="675" width="390.0" height="18" fill="#A3D576" stroke="#386411" />
+<text class="value-label" x="708.0" y="690">0.0144</text>
+<text class="axis-label" x="0" y="728">Realtime Silero T2 frame=100 thr=0.2 sil=0.35s max=5.0s</text>
+<text class="axis-hint" x="0" y="743">英文 · warm · shared</text>
+<rect class="bar" x="310" y="715" width="390.8" height="18" fill="#A3D576" stroke="#386411" />
+<text class="value-label" x="708.8" y="730">0.0144</text>
+<text class="axis-label" x="0" y="768">Realtime Silero T2 frame=100 thr=0.2 sil=0.2s max=5.0s</text>
+<text class="axis-hint" x="0" y="783">英文 · warm · shared</text>
+<rect class="bar" x="310" y="755" width="389.5" height="18" fill="#A3D576" stroke="#386411" />
+<text class="value-label" x="707.5" y="770">0.0144</text>
+<text class="axis-label" x="0" y="808">Realtime Silero T2 frame=100 thr=0.2 sil=0.25s max=5.0s</text>
+<text class="axis-hint" x="0" y="823">英文 · warm · shared</text>
+<rect class="bar" x="310" y="795" width="390.0" height="18" fill="#A3D576" stroke="#386411" />
+<text class="value-label" x="708.0" y="810">0.0144</text>
+<text class="axis-label" x="0" y="848">Realtime RMS T2 frame=200 thr=520 min=320 end=500 max=8000 pre=0</text>
+<text class="axis-hint" x="0" y="863">英文 · warm · shared</text>
+<rect class="bar" x="310" y="835" width="327.4" height="18" fill="#A3D576" stroke="#386411" />
+<text class="value-label" x="645.4" y="850">0.0121</text>
+<text class="axis-label" x="0" y="888">Realtime Silero T2 frame=100 thr=0.2 sil=0.25s max=8.0s</text>
+<text class="axis-hint" x="0" y="903">英文 · warm · shared</text>
+<rect class="bar" x="310" y="875" width="399.2" height="18" fill="#A3D576" stroke="#386411" />
+<text class="value-label" x="717.2" y="890">0.0148</text>
+<text class="axis-label" x="0" y="928">Realtime RMS T2 frame=200 thr=420 min=320 end=500 max=12000 pre=0</text>
+<text class="axis-hint" x="0" y="943">英文 · warm · shared</text>
+<rect class="bar" x="310" y="915" width="328.3" height="18" fill="#A3D576" stroke="#386411" />
+<text class="value-label" x="646.3" y="930">0.0121</text>
+<text class="axis-label" x="0" y="968">Realtime RMS T2 frame=200 thr=520 min=320 end=500 max=12000 pre=0</text>
+<text class="axis-hint" x="0" y="983">英文 · warm · shared</text>
+<rect class="bar" x="310" y="955" width="328.6" height="18" fill="#A3D576" stroke="#386411" />
+<text class="value-label" x="646.6" y="970">0.0121</text>
+<text class="axis-label" x="0" y="1008">Realtime RMS T2 frame=200 thr=420 min=320 end=500 max=8000 pre=0</text>
+<text class="axis-hint" x="0" y="1023">英文 · warm · shared</text>
+<rect class="bar" x="310" y="995" width="328.7" height="18" fill="#A3D576" stroke="#386411" />
+<text class="value-label" x="646.7" y="1010">0.0122</text>
+<text class="axis-label" x="0" y="1048">Realtime Silero T2 frame=100 thr=0.15 sil=0.5s max=8.0s</text>
+<text class="axis-hint" x="0" y="1063">英文 · warm · shared</text>
+<rect class="bar" x="310" y="1035" width="397.1" height="18" fill="#A3D576" stroke="#386411" />
+<text class="value-label" x="715.1" y="1050">0.0147</text>
+<text class="axis-label" x="0" y="1088">Realtime Silero T2 frame=100 thr=0.15 sil=0.2s max=8.0s</text>
+<text class="axis-hint" x="0" y="1103">英文 · warm · shared</text>
+<rect class="bar" x="310" y="1075" width="397.1" height="18" fill="#A3D576" stroke="#386411" />
+<text class="value-label" x="715.1" y="1090">0.0147</text>
+<text class="axis-label" x="0" y="1128">Realtime RMS T2 frame=200 thr=420 min=320 end=1000 max=8000 pre=0</text>
+<text class="axis-hint" x="0" y="1143">英文 · warm · shared</text>
+<rect class="bar" x="310" y="1115" width="333.6" height="18" fill="#A3D576" stroke="#386411" />
+<text class="value-label" x="651.6" y="1130">0.0123</text>
+<text class="axis-label" x="0" y="1168">Realtime RMS T2 frame=200 thr=650 min=320 end=500 max=8000 pre=0</text>
+<text class="axis-hint" x="0" y="1183">英文 · warm · shared</text>
+<rect class="bar" x="310" y="1155" width="335.7" height="18" fill="#A3D576" stroke="#386411" />
+<text class="value-label" x="653.7" y="1170">0.0124</text>
+<text class="axis-label" x="0" y="1208">Realtime Silero T2 frame=100 thr=0.25 sil=0.5s max=8.0s</text>
+<text class="axis-hint" x="0" y="1223">英文 · warm · shared</text>
+<rect class="bar" x="310" y="1195" width="396.3" height="18" fill="#A3D576" stroke="#386411" />
+<text class="value-label" x="714.3" y="1210">0.0146</text>
+<text class="axis-label" x="0" y="1248">Realtime Silero T2 frame=100 thr=0.15 sil=0.35s max=8.0s</text>
+<text class="axis-hint" x="0" y="1263">英文 · warm · shared</text>
+<rect class="bar" x="310" y="1235" width="397.1" height="18" fill="#A3D576" stroke="#386411" />
+<text class="value-label" x="715.1" y="1250">0.0147</text>
+<text class="axis-label" x="0" y="1288">Realtime Silero T2 frame=100 thr=0.2 sil=0.5s max=8.0s</text>
+<text class="axis-hint" x="0" y="1303">英文 · warm · shared</text>
+<rect class="bar" x="310" y="1275" width="397.1" height="18" fill="#A3D576" stroke="#386411" />
+<text class="value-label" x="715.1" y="1290">0.0147</text>
+<text class="axis-label" x="0" y="1328">Realtime Silero T2 frame=100 thr=0.2 sil=0.35s max=8.0s</text>
+<text class="axis-hint" x="0" y="1343">英文 · warm · shared</text>
+<rect class="bar" x="310" y="1315" width="397.2" height="18" fill="#A3D576" stroke="#386411" />
+<text class="value-label" x="715.2" y="1330">0.0147</text>
+<text class="axis-label" x="0" y="1368">Realtime Silero T2 frame=100 thr=0.25 sil=0.35s max=8.0s</text>
+<text class="axis-hint" x="0" y="1383">英文 · warm · shared</text>
+<rect class="bar" x="310" y="1355" width="398.4" height="18" fill="#A3D576" stroke="#386411" />
+<text class="value-label" x="716.4" y="1370">0.0147</text>
+<text class="axis-label" x="0" y="1408">Realtime Silero T2 frame=100 thr=0.15 sil=0.25s max=8.0s</text>
+<text class="axis-hint" x="0" y="1423">英文 · warm · shared</text>
+<rect class="bar" x="310" y="1395" width="417.4" height="18" fill="#A3D576" stroke="#386411" />
+<text class="value-label" x="735.4" y="1410">0.0154</text>
+<text class="axis-label" x="0" y="1448">Realtime RMS T2 frame=200 thr=520 min=320 end=1000 max=8000 pre=0</text>
+<text class="axis-hint" x="0" y="1463">英文 · warm · shared</text>
+<rect class="bar" x="310" y="1435" width="332.0" height="18" fill="#A3D576" stroke="#386411" />
+<text class="value-label" x="650.0" y="1450">0.0123</text>
+<text class="axis-label" x="0" y="1488">Realtime RMS T2 frame=200 thr=420 min=320 end=720 max=12000 pre=0</text>
+<text class="axis-hint" x="0" y="1503">英文 · warm · shared</text>
+<rect class="bar" x="310" y="1475" width="334.7" height="18" fill="#A3D576" stroke="#386411" />
+<text class="value-label" x="652.7" y="1490">0.0124</text>
+<text class="axis-label" x="0" y="1528">Realtime RMS T2 frame=200 thr=800 min=320 end=1000 max=12000 pre=0</text>
+<text class="axis-hint" x="0" y="1543">英文 · warm · shared</text>
+<rect class="bar" x="310" y="1515" width="337.6" height="18" fill="#A3D576" stroke="#386411" />
+<text class="value-label" x="655.6" y="1530">0.0125</text>
+<text class="axis-label" x="0" y="1568">Realtime Silero T2 frame=100 thr=0.25 sil=0.25s max=8.0s</text>
+<text class="axis-hint" x="0" y="1583">英文 · warm · shared</text>
+<rect class="bar" x="310" y="1555" width="396.7" height="18" fill="#A3D576" stroke="#386411" />
+<text class="value-label" x="714.7" y="1570">0.0147</text>
+<text class="axis-label" x="0" y="1608">Realtime Silero T2 frame=100 thr=0.2 sil=0.2s max=8.0s</text>
+<text class="axis-hint" x="0" y="1623">英文 · warm · shared</text>
+<rect class="bar" x="310" y="1595" width="400.8" height="18" fill="#A3D576" stroke="#386411" />
+<text class="value-label" x="718.8" y="1610">0.0148</text>
+<text class="axis-label" x="0" y="1648">Realtime RMS T2 frame=200 thr=520 min=320 end=720 max=12000 pre=0</text>
+<text class="axis-hint" x="0" y="1663">英文 · warm · shared</text>
+<rect class="bar" x="310" y="1635" width="333.4" height="18" fill="#A3D576" stroke="#386411" />
+<text class="value-label" x="651.4" y="1650">0.0123</text>
+<text class="axis-label" x="0" y="1688">Realtime RMS T2 frame=200 thr=800 min=320 end=500 max=8000 pre=0</text>
+<text class="axis-hint" x="0" y="1703">英文 · warm · shared</text>
+<rect class="bar" x="310" y="1675" width="322.7" height="18" fill="#A3D576" stroke="#386411" />
+<text class="value-label" x="640.7" y="1690">0.0119</text>
+<text class="axis-label" x="0" y="1728">Realtime Silero T2 frame=100 thr=0.3 sil=0.5s max=8.0s</text>
+<text class="axis-hint" x="0" y="1743">英文 · warm · shared</text>
+<rect class="bar" x="310" y="1715" width="394.2" height="18" fill="#A3D576" stroke="#386411" />
+<text class="value-label" x="712.2" y="1730">0.0146</text>
+<text class="axis-label" x="0" y="1768">Realtime Silero T2 frame=100 thr=0.25 sil=0.2s max=8.0s</text>
+<text class="axis-hint" x="0" y="1783">英文 · warm · shared</text>
+<rect class="bar" x="310" y="1755" width="397.9" height="18" fill="#A3D576" stroke="#386411" />
+<text class="value-label" x="715.9" y="1770">0.0147</text>
+<text class="axis-label" x="0" y="1808">Realtime Silero T2 frame=100 thr=0.3 sil=0.2s max=8.0s</text>
+<text class="axis-hint" x="0" y="1823">英文 · warm · shared</text>
+<rect class="bar" x="310" y="1795" width="395.8" height="18" fill="#A3D576" stroke="#386411" />
+<text class="value-label" x="713.8" y="1810">0.0146</text>
+<text class="axis-label" x="0" y="1848">Realtime Silero T2 frame=100 thr=0.3 sil=0.35s max=8.0s</text>
+<text class="axis-hint" x="0" y="1863">英文 · warm · shared</text>
+<rect class="bar" x="310" y="1835" width="405.9" height="18" fill="#A3D576" stroke="#386411" />
+<text class="value-label" x="723.9" y="1850">0.0150</text>
+<text class="axis-label" x="0" y="1888">Realtime RMS T2 frame=200 thr=650 min=320 end=1000 max=8000 pre=0</text>
+<text class="axis-hint" x="0" y="1903">英文 · warm · shared</text>
+<rect class="bar" x="310" y="1875" width="338.2" height="18" fill="#A3D576" stroke="#386411" />
+<text class="value-label" x="656.2" y="1890">0.0125</text>
+<text class="axis-label" x="0" y="1928">Realtime Silero T2 frame=100 thr=0.3 sil=0.25s max=8.0s</text>
+<text class="axis-hint" x="0" y="1943">英文 · warm · shared</text>
+<rect class="bar" x="310" y="1915" width="395.5" height="18" fill="#A3D576" stroke="#386411" />
+<text class="value-label" x="713.5" y="1930">0.0146</text>
+<text class="axis-label" x="0" y="1968">Realtime RMS T2 frame=200 thr=650 min=320 end=500 max=12000 pre=0</text>
+<text class="axis-hint" x="0" y="1983">英文 · warm · shared</text>
+<rect class="bar" x="310" y="1955" width="327.3" height="18" fill="#A3D576" stroke="#386411" />
+<text class="value-label" x="645.3" y="1970">0.0121</text>
+<text class="axis-label" x="0" y="2008">Realtime RMS T2 frame=200 thr=800 min=320 end=720 max=12000 pre=0</text>
+<text class="axis-hint" x="0" y="2023">英文 · warm · shared</text>
+<rect class="bar" x="310" y="1995" width="332.5" height="18" fill="#A3D576" stroke="#386411" />
+<text class="value-label" x="650.5" y="2010">0.0123</text>
+<text class="axis-label" x="0" y="2048">Realtime RMS T2 frame=200 thr=520 min=320 end=720 max=8000 pre=0</text>
+<text class="axis-hint" x="0" y="2063">英文 · warm · shared</text>
+<rect class="bar" x="310" y="2035" width="330.5" height="18" fill="#A3D576" stroke="#386411" />
+<text class="value-label" x="648.5" y="2050">0.0122</text>
+<text class="axis-label" x="0" y="2088">Realtime RMS T2 frame=200 thr=420 min=320 end=720 max=8000 pre=0</text>
+<text class="axis-hint" x="0" y="2103">英文 · warm · shared</text>
+<rect class="bar" x="310" y="2075" width="330.7" height="18" fill="#A3D576" stroke="#386411" />
+<text class="value-label" x="648.7" y="2090">0.0122</text>
+<text class="axis-label" x="0" y="2128">Realtime RMS T2 frame=200 thr=650 min=320 end=720 max=12000 pre=0</text>
+<text class="axis-hint" x="0" y="2143">英文 · warm · shared</text>
+<rect class="bar" x="310" y="2115" width="332.9" height="18" fill="#A3D576" stroke="#386411" />
+<text class="value-label" x="650.9" y="2130">0.0123</text>
+<text class="axis-label" x="0" y="2168">Realtime RMS T2 frame=200 thr=800 min=320 end=500 max=12000 pre=0</text>
+<text class="axis-hint" x="0" y="2183">英文 · warm · shared</text>
+<rect class="bar" x="310" y="2155" width="324.7" height="18" fill="#A3D576" stroke="#386411" />
+<text class="value-label" x="642.7" y="2170">0.0120</text>
+<text class="axis-label" x="0" y="2208">Realtime RMS T2 frame=200 thr=800 min=320 end=720 max=8000 pre=0</text>
+<text class="axis-hint" x="0" y="2223">英文 · warm · shared</text>
+<rect class="bar" x="310" y="2195" width="335.5" height="18" fill="#A3D576" stroke="#386411" />
+<text class="value-label" x="653.5" y="2210">0.0124</text>
+<text class="axis-label" x="0" y="2248">Realtime RMS T2 frame=200 thr=800 min=320 end=1000 max=8000 pre=0</text>
+<text class="axis-hint" x="0" y="2263">英文 · warm · shared</text>
+<rect class="bar" x="310" y="2235" width="334.6" height="18" fill="#A3D576" stroke="#386411" />
+<text class="value-label" x="652.6" y="2250">0.0124</text>
+<text class="axis-label" x="0" y="2288">Realtime RMS T2 frame=200 thr=650 min=320 end=720 max=8000 pre=0</text>
+<text class="axis-hint" x="0" y="2303">英文 · warm · shared</text>
+<rect class="bar" x="310" y="2275" width="329.4" height="18" fill="#A3D576" stroke="#386411" />
+<text class="value-label" x="647.4" y="2290">0.0122</text>
+<text class="axis-label" x="0" y="2328">Realtime RMS T2 frame=200 thr=650 min=320 end=500 max=12000 pre=0</text>
+<text class="axis-hint" x="0" y="2343">中文 · warm · shared</text>
+<rect class="bar" x="310" y="2315" width="314.2" height="18" fill="#A3D576" stroke="#386411" />
+<text class="value-label" x="632.2" y="2330">0.0116</text>
+<text class="axis-label" x="0" y="2368">Realtime RMS T2 frame=200 thr=650 min=320 end=500 max=8000 pre=0</text>
+<text class="axis-hint" x="0" y="2383">中文 · warm · shared</text>
+<rect class="bar" x="310" y="2355" width="315.9" height="18" fill="#A3D576" stroke="#386411" />
+<text class="value-label" x="633.9" y="2370">0.0117</text>
+<text class="axis-label" x="0" y="2408">Realtime RMS T2 frame=200 thr=420 min=320 end=500 max=12000 pre=0</text>
+<text class="axis-hint" x="0" y="2423">中文 · warm · shared</text>
+<rect class="bar" x="310" y="2395" width="318.0" height="18" fill="#A3D576" stroke="#386411" />
+<text class="value-label" x="636.0" y="2410">0.0118</text>
+<text class="axis-label" x="0" y="2448">Realtime RMS T2 frame=200 thr=520 min=320 end=500 max=8000 pre=0</text>
+<text class="axis-hint" x="0" y="2463">中文 · warm · shared</text>
+<rect class="bar" x="310" y="2435" width="318.5" height="18" fill="#A3D576" stroke="#386411" />
+<text class="value-label" x="636.5" y="2450">0.0118</text>
+<text class="axis-label" x="0" y="2488">Realtime RMS T2 frame=200 thr=520 min=320 end=500 max=12000 pre=0</text>
+<text class="axis-hint" x="0" y="2503">中文 · warm · shared</text>
+<rect class="bar" x="310" y="2475" width="321.9" height="18" fill="#A3D576" stroke="#386411" />
+<text class="value-label" x="639.9" y="2490">0.0119</text>
+<text class="axis-label" x="0" y="2528">Realtime RMS T2 frame=200 thr=420 min=320 end=500 max=8000 pre=0</text>
+<text class="axis-hint" x="0" y="2543">中文 · warm · shared</text>
+<rect class="bar" x="310" y="2515" width="324.3" height="18" fill="#A3D576" stroke="#386411" />
+<text class="value-label" x="642.3" y="2530">0.0120</text>
+<text class="axis-label" x="0" y="2568">Realtime RMS T2 frame=200 thr=520 min=320 end=1000 max=12000 pre=0</text>
+<text class="axis-hint" x="0" y="2583">中文 · warm · shared</text>
+<rect class="bar" x="310" y="2555" width="326.0" height="18" fill="#A3D576" stroke="#386411" />
+<text class="value-label" x="644.0" y="2570">0.0121</text>
+<text class="axis-label" x="0" y="2608">Realtime RMS T2 frame=200 thr=650 min=320 end=720 max=8000 pre=0</text>
+<text class="axis-hint" x="0" y="2623">中文 · warm · shared</text>
+<rect class="bar" x="310" y="2595" width="327.1" height="18" fill="#A3D576" stroke="#386411" />
+<text class="value-label" x="645.1" y="2610">0.0121</text>
+<text class="axis-label" x="0" y="2648">Realtime RMS T2 frame=200 thr=650 min=320 end=720 max=12000 pre=0</text>
+<text class="axis-hint" x="0" y="2663">中文 · warm · shared</text>
+<rect class="bar" x="310" y="2635" width="328.0" height="18" fill="#A3D576" stroke="#386411" />
+<text class="value-label" x="646.0" y="2650">0.0121</text>
+<text class="axis-label" x="0" y="2688">Realtime RMS T2 frame=200 thr=520 min=320 end=720 max=8000 pre=0</text>
+<text class="axis-hint" x="0" y="2703">中文 · warm · shared</text>
+<rect class="bar" x="310" y="2675" width="333.4" height="18" fill="#A3D576" stroke="#386411" />
+<text class="value-label" x="651.4" y="2690">0.0123</text>
+<text class="axis-label" x="0" y="2728">Realtime RMS T2 frame=200 thr=520 min=320 end=720 max=12000 pre=0</text>
+<text class="axis-hint" x="0" y="2743">中文 · warm · shared</text>
+<rect class="bar" x="310" y="2715" width="333.5" height="18" fill="#A3D576" stroke="#386411" />
+<text class="value-label" x="651.5" y="2730">0.0123</text>
+<text class="axis-label" x="0" y="2768">Realtime RMS T2 frame=200 thr=420 min=320 end=720 max=8000 pre=0</text>
+<text class="axis-hint" x="0" y="2783">中文 · warm · shared</text>
+<rect class="bar" x="310" y="2755" width="333.8" height="18" fill="#A3D576" stroke="#386411" />
+<text class="value-label" x="651.8" y="2770">0.0123</text>
+<text class="axis-label" x="0" y="2808">Realtime RMS T2 frame=200 thr=420 min=320 end=1000 max=8000 pre=0</text>
+<text class="axis-hint" x="0" y="2823">中文 · warm · shared</text>
+<rect class="bar" x="310" y="2795" width="334.3" height="18" fill="#A3D576" stroke="#386411" />
+<text class="value-label" x="652.3" y="2810">0.0124</text>
+<text class="axis-label" x="0" y="2848">Realtime RMS T2 frame=200 thr=520 min=320 end=1000 max=8000 pre=0</text>
+<text class="axis-hint" x="0" y="2863">中文 · warm · shared</text>
+<rect class="bar" x="310" y="2835" width="335.5" height="18" fill="#A3D576" stroke="#386411" />
+<text class="value-label" x="653.5" y="2850">0.0124</text>
+<text class="axis-label" x="0" y="2888">Realtime RMS T2 frame=200 thr=420 min=320 end=720 max=12000 pre=0</text>
+<text class="axis-hint" x="0" y="2903">中文 · warm · shared</text>
+<rect class="bar" x="310" y="2875" width="336.7" height="18" fill="#A3D576" stroke="#386411" />
+<text class="value-label" x="654.7" y="2890">0.0124</text>
+<text class="axis-label" x="0" y="2928">Realtime Silero T2 frame=100 thr=0.15 sil=0.2s max=8.0s</text>
+<text class="axis-hint" x="0" y="2943">中文 · warm · shared</text>
+<rect class="bar" x="310" y="2915" width="343.0" height="18" fill="#A3D576" stroke="#386411" />
+<text class="value-label" x="661.0" y="2930">0.0127</text>
+<text class="axis-label" x="0" y="2968">Realtime Silero T2 frame=100 thr=0.15 sil=0.35s max=8.0s</text>
+<text class="axis-hint" x="0" y="2983">中文 · warm · shared</text>
+<rect class="bar" x="310" y="2955" width="344.7" height="18" fill="#A3D576" stroke="#386411" />
+<text class="value-label" x="662.7" y="2970">0.0127</text>
+<text class="axis-label" x="0" y="3008">Realtime Silero T2 frame=100 thr=0.15 sil=0.35s max=5.0s</text>
+<text class="axis-hint" x="0" y="3023">中文 · warm · shared</text>
+<rect class="bar" x="310" y="2995" width="344.9" height="18" fill="#A3D576" stroke="#386411" />
+<text class="value-label" x="662.9" y="3010">0.0127</text>
+<text class="axis-label" x="0" y="3048">Realtime Silero T2 frame=100 thr=0.15 sil=0.25s max=8.0s</text>
+<text class="axis-hint" x="0" y="3063">中文 · warm · shared</text>
+<rect class="bar" x="310" y="3035" width="345.0" height="18" fill="#A3D576" stroke="#386411" />
+<text class="value-label" x="663.0" y="3050">0.0128</text>
+<text class="axis-label" x="0" y="3088">Realtime Silero T2 frame=100 thr=0.15 sil=0.25s max=5.0s</text>
+<text class="axis-hint" x="0" y="3103">中文 · warm · shared</text>
+<rect class="bar" x="310" y="3075" width="345.0" height="18" fill="#A3D576" stroke="#386411" />
+<text class="value-label" x="663.0" y="3090">0.0128</text>
+<text class="axis-label" x="0" y="3128">Realtime Silero T2 frame=100 thr=0.15 sil=0.5s max=5.0s</text>
+<text class="axis-hint" x="0" y="3143">中文 · warm · shared</text>
+<rect class="bar" x="310" y="3115" width="345.0" height="18" fill="#A3D576" stroke="#386411" />
+<text class="value-label" x="663.0" y="3130">0.0128</text>
+<text class="axis-label" x="0" y="3168">Realtime Silero T2 frame=100 thr=0.15 sil=0.2s max=5.0s</text>
+<text class="axis-hint" x="0" y="3183">中文 · warm · shared</text>
+<rect class="bar" x="310" y="3155" width="350.6" height="18" fill="#A3D576" stroke="#386411" />
+<text class="value-label" x="668.6" y="3170">0.0130</text>
+<text class="axis-label" x="0" y="3208">Realtime Silero T2 frame=100 thr=0.15 sil=0.5s max=8.0s</text>
+<text class="axis-hint" x="0" y="3223">中文 · warm · shared</text>
+<rect class="bar" x="310" y="3195" width="358.5" height="18" fill="#A3D576" stroke="#386411" />
+<text class="value-label" x="676.5" y="3210">0.0133</text>
+<text class="axis-label" x="0" y="3248">Realtime RMS T2 frame=200 thr=650 min=320 end=1000 max=8000 pre=0</text>
+<text class="axis-hint" x="0" y="3263">中文 · warm · shared</text>
+<rect class="bar" x="310" y="3235" width="330.8" height="18" fill="#A3D576" stroke="#386411" />
+<text class="value-label" x="648.8" y="3250">0.0122</text>
+<text class="axis-label" x="0" y="3288">Realtime Silero T2 frame=100 thr=0.2 sil=0.2s max=5.0s</text>
+<text class="axis-hint" x="0" y="3303">中文 · warm · shared</text>
+<rect class="bar" x="310" y="3275" width="339.3" height="18" fill="#A3D576" stroke="#386411" />
+<text class="value-label" x="657.3" y="3290">0.0125</text>
+<text class="axis-label" x="0" y="3328">Realtime Silero T2 frame=100 thr=0.2 sil=0.2s max=8.0s</text>
+<text class="axis-hint" x="0" y="3343">中文 · warm · shared</text>
+<rect class="bar" x="310" y="3315" width="340.6" height="18" fill="#A3D576" stroke="#386411" />
+<text class="value-label" x="658.6" y="3330">0.0126</text>
+<text class="axis-label" x="0" y="3368">Realtime RMS T2 frame=200 thr=650 min=320 end=1000 max=12000 pre=0</text>
+<text class="axis-hint" x="0" y="3383">中文 · warm · shared</text>
+<rect class="bar" x="310" y="3355" width="341.3" height="18" fill="#A3D576" stroke="#386411" />
+<text class="value-label" x="659.3" y="3370">0.0126</text>
+<text class="axis-label" x="0" y="3408">Realtime Silero T2 frame=100 thr=0.2 sil=0.5s max=8.0s</text>
+<text class="axis-hint" x="0" y="3423">中文 · warm · shared</text>
+<rect class="bar" x="310" y="3395" width="342.9" height="18" fill="#A3D576" stroke="#386411" />
+<text class="value-label" x="660.9" y="3410">0.0127</text>
+<text class="axis-label" x="0" y="3448">Realtime Silero T2 frame=100 thr=0.2 sil=0.25s max=5.0s</text>
+<text class="axis-hint" x="0" y="3463">中文 · warm · shared</text>
+<rect class="bar" x="310" y="3435" width="343.1" height="18" fill="#A3D576" stroke="#386411" />
+<text class="value-label" x="661.1" y="3450">0.0127</text>
+<text class="axis-label" x="0" y="3488">Realtime Silero T2 frame=100 thr=0.2 sil=0.35s max=8.0s</text>
+<text class="axis-hint" x="0" y="3503">中文 · warm · shared</text>
+<rect class="bar" x="310" y="3475" width="344.0" height="18" fill="#A3D576" stroke="#386411" />
+<text class="value-label" x="662.0" y="3490">0.0127</text>
+<text class="axis-label" x="0" y="3528">Realtime Silero T2 frame=100 thr=0.2 sil=0.35s max=5.0s</text>
+<text class="axis-hint" x="0" y="3543">中文 · warm · shared</text>
+<rect class="bar" x="310" y="3515" width="344.5" height="18" fill="#A3D576" stroke="#386411" />
+<text class="value-label" x="662.5" y="3530">0.0127</text>
+<text class="axis-label" x="0" y="3568">Realtime Silero T2 frame=100 thr=0.2 sil=0.25s max=8.0s</text>
+<text class="axis-hint" x="0" y="3583">中文 · warm · shared</text>
+<rect class="bar" x="310" y="3555" width="345.0" height="18" fill="#A3D576" stroke="#386411" />
+<text class="value-label" x="663.0" y="3570">0.0128</text>
+<text class="axis-label" x="0" y="3608">Realtime Silero T2 frame=100 thr=0.2 sil=0.5s max=5.0s</text>
+<text class="axis-hint" x="0" y="3623">中文 · warm · shared</text>
+<rect class="bar" x="310" y="3595" width="349.2" height="18" fill="#A3D576" stroke="#386411" />
+<text class="value-label" x="667.2" y="3610">0.0129</text>
+<text class="axis-label" x="0" y="3648">Realtime Silero T2 frame=100 thr=0.25 sil=0.2s max=5.0s</text>
+<text class="axis-hint" x="0" y="3663">中文 · warm · shared</text>
+<rect class="bar" x="310" y="3635" width="339.1" height="18" fill="#A3D576" stroke="#386411" />
+<text class="value-label" x="657.1" y="3650">0.0125</text>
+<text class="axis-label" x="0" y="3688">Realtime Silero T2 frame=100 thr=0.25 sil=0.2s max=8.0s</text>
+<text class="axis-hint" x="0" y="3703">中文 · warm · shared</text>
+<rect class="bar" x="310" y="3675" width="339.1" height="18" fill="#A3D576" stroke="#386411" />
+<text class="value-label" x="657.1" y="3690">0.0125</text>
+<text class="axis-label" x="0" y="3728">Realtime Silero T2 frame=100 thr=0.25 sil=0.5s max=8.0s</text>
+<text class="axis-hint" x="0" y="3743">中文 · warm · shared</text>
+<rect class="bar" x="310" y="3715" width="340.5" height="18" fill="#A3D576" stroke="#386411" />
+<text class="value-label" x="658.5" y="3730">0.0126</text>
+<text class="axis-label" x="0" y="3768">Realtime Silero T2 frame=100 thr=0.25 sil=0.5s max=5.0s</text>
+<text class="axis-hint" x="0" y="3783">中文 · warm · shared</text>
+<rect class="bar" x="310" y="3755" width="341.1" height="18" fill="#A3D576" stroke="#386411" />
+<text class="value-label" x="659.1" y="3770">0.0126</text>
+<text class="axis-label" x="0" y="3808">Realtime Silero T2 frame=100 thr=0.25 sil=0.35s max=5.0s</text>
+<text class="axis-hint" x="0" y="3823">中文 · warm · shared</text>
+<rect class="bar" x="310" y="3795" width="341.4" height="18" fill="#A3D576" stroke="#386411" />
+<text class="value-label" x="659.4" y="3810">0.0126</text>
+<text class="axis-label" x="0" y="3848">Realtime Silero T2 frame=100 thr=0.25 sil=0.25s max=8.0s</text>
+<text class="axis-hint" x="0" y="3863">中文 · warm · shared</text>
+<rect class="bar" x="310" y="3835" width="341.9" height="18" fill="#A3D576" stroke="#386411" />
+<text class="value-label" x="659.9" y="3850">0.0126</text>
+<text class="axis-label" x="0" y="3888">Realtime Silero T2 frame=100 thr=0.25 sil=0.25s max=5.0s</text>
+<text class="axis-hint" x="0" y="3903">中文 · warm · shared</text>
+<rect class="bar" x="310" y="3875" width="342.4" height="18" fill="#A3D576" stroke="#386411" />
+<text class="value-label" x="660.4" y="3890">0.0127</text>
+<text class="axis-label" x="0" y="3928">Realtime Silero T2 frame=100 thr=0.25 sil=0.35s max=8.0s</text>
+<text class="axis-hint" x="0" y="3943">中文 · warm · shared</text>
+<rect class="bar" x="310" y="3915" width="351.0" height="18" fill="#A3D576" stroke="#386411" />
+<text class="value-label" x="669.0" y="3930">0.0130</text>
+<text class="axis-label" x="0" y="3968">Realtime Silero T2 frame=100 thr=0.3 sil=0.5s max=8.0s</text>
+<text class="axis-hint" x="0" y="3983">中文 · warm · shared</text>
+<rect class="bar" x="310" y="3955" width="339.6" height="18" fill="#A3D576" stroke="#386411" />
+<text class="value-label" x="657.6" y="3970">0.0126</text>
+<text class="axis-label" x="0" y="4008">Realtime Silero T2 frame=100 thr=0.3 sil=0.5s max=5.0s</text>
+<text class="axis-hint" x="0" y="4023">中文 · warm · shared</text>
+<rect class="bar" x="310" y="3995" width="339.8" height="18" fill="#A3D576" stroke="#386411" />
+<text class="value-label" x="657.8" y="4010">0.0126</text>
+<text class="axis-label" x="0" y="4048">Realtime Silero T2 frame=100 thr=0.3 sil=0.2s max=5.0s</text>
+<text class="axis-hint" x="0" y="4063">中文 · warm · shared</text>
+<rect class="bar" x="310" y="4035" width="340.1" height="18" fill="#A3D576" stroke="#386411" />
+<text class="value-label" x="658.1" y="4050">0.0126</text>
+<text class="axis-label" x="0" y="4088">Realtime Silero T2 frame=100 thr=0.3 sil=0.2s max=8.0s</text>
+<text class="axis-hint" x="0" y="4103">中文 · warm · shared</text>
+<rect class="bar" x="310" y="4075" width="340.7" height="18" fill="#A3D576" stroke="#386411" />
+<text class="value-label" x="658.7" y="4090">0.0126</text>
+<text class="axis-label" x="0" y="4128">Realtime Silero T2 frame=100 thr=0.3 sil=0.35s max=8.0s</text>
+<text class="axis-hint" x="0" y="4143">中文 · warm · shared</text>
+<rect class="bar" x="310" y="4115" width="341.1" height="18" fill="#A3D576" stroke="#386411" />
+<text class="value-label" x="659.1" y="4130">0.0126</text>
+<text class="axis-label" x="0" y="4168">Realtime Silero T2 frame=100 thr=0.3 sil=0.25s max=8.0s</text>
+<text class="axis-hint" x="0" y="4183">中文 · warm · shared</text>
+<rect class="bar" x="310" y="4155" width="342.3" height="18" fill="#A3D576" stroke="#386411" />
+<text class="value-label" x="660.3" y="4170">0.0127</text>
+<text class="axis-label" x="0" y="4208">Realtime Silero T2 frame=100 thr=0.3 sil=0.25s max=5.0s</text>
+<text class="axis-hint" x="0" y="4223">中文 · warm · shared</text>
+<rect class="bar" x="310" y="4195" width="343.0" height="18" fill="#A3D576" stroke="#386411" />
+<text class="value-label" x="661.0" y="4210">0.0127</text>
+<text class="axis-label" x="0" y="4248">Realtime Silero T2 frame=100 thr=0.3 sil=0.35s max=5.0s</text>
+<text class="axis-hint" x="0" y="4263">中文 · warm · shared</text>
+<rect class="bar" x="310" y="4235" width="356.2" height="18" fill="#A3D576" stroke="#386411" />
+<text class="value-label" x="674.2" y="4250">0.0132</text>
+<text class="axis-label" x="0" y="4288">Realtime RMS T2 frame=200 thr=800 min=320 end=720 max=8000 pre=0</text>
+<text class="axis-hint" x="0" y="4303">中文 · warm · shared</text>
+<rect class="bar" x="310" y="4275" width="316.4" height="18" fill="#A3D576" stroke="#386411" />
+<text class="value-label" x="634.4" y="4290">0.0117</text>
+<text class="axis-label" x="0" y="4328">Realtime RMS T2 frame=200 thr=800 min=320 end=720 max=12000 pre=0</text>
+<text class="axis-hint" x="0" y="4343">中文 · warm · shared</text>
+<rect class="bar" x="310" y="4315" width="317.9" height="18" fill="#A3D576" stroke="#386411" />
+<text class="value-label" x="635.9" y="4330">0.0118</text>
+<text class="axis-label" x="0" y="4368">Realtime RMS T2 frame=200 thr=800 min=320 end=1000 max=12000 pre=0</text>
+<text class="axis-hint" x="0" y="4383">中文 · warm · shared</text>
+<rect class="bar" x="310" y="4355" width="321.7" height="18" fill="#A3D576" stroke="#386411" />
+<text class="value-label" x="639.7" y="4370">0.0119</text>
+<text class="axis-label" x="0" y="4408">Realtime RMS T2 frame=200 thr=800 min=320 end=1000 max=8000 pre=0</text>
+<text class="axis-hint" x="0" y="4423">中文 · warm · shared</text>
+<rect class="bar" x="310" y="4395" width="322.4" height="18" fill="#A3D576" stroke="#386411" />
+<text class="value-label" x="640.4" y="4410">0.0119</text>
+<text class="axis-label" x="0" y="4448">Realtime RMS T2 frame=200 thr=800 min=320 end=500 max=8000 pre=0</text>
+<text class="axis-hint" x="0" y="4463">中文 · warm · shared</text>
+<rect class="bar" x="310" y="4435" width="302.5" height="18" fill="#A3D576" stroke="#386411" />
+<text class="value-label" x="620.5" y="4450">0.0112</text>
+<text class="axis-label" x="0" y="4488">Realtime RMS T2 frame=200 thr=800 min=320 end=500 max=12000 pre=0</text>
+<text class="axis-hint" x="0" y="4503">中文 · warm · shared</text>
+<rect class="bar" x="310" y="4475" width="302.7" height="18" fill="#A3D576" stroke="#386411" />
+<text class="value-label" x="620.7" y="4490">0.0112</text>
+<text class="axis-label" x="0" y="4528">Realtime RMS T2 frame=200 thr=420 min=320 end=1000 max=12000 pre=0</text>
+<text class="axis-hint" x="0" y="4543">中文 · warm · shared</text>
+<rect class="bar" x="310" y="4515" width="332.0" height="18" fill="#A3D576" stroke="#386411" />
+<text class="value-label" x="650.0" y="4530">0.0123</text>
+</svg></div>
+        </div>
+        <h2>Profile 明细</h2>
+        <div class="table-wrap"><table class="detail-table"><thead><tr><th>Profile</th><th>语言</th><th>类别</th><th>加载策略</th><th>错误率</th><th>Decode RTF</th><th>Operation RTF</th><th>解码</th><th>加载</th><th>分段/非空</th><th>p95段解码</th><th>Native heap</th></tr></thead><tbody><tr><td><strong>Realtime Silero T2 frame=100 thr=0.3 sil=0.5s max=5.0s</strong><br><span>Silero threshold 0.3, silence 0.5s, max 5s</span></td><td>英文</td><td>warm</td><td>shared</td><td>WER 7.09%</td><td>0.0143</td><td>0.0143</td><td>4.357s</td><td>0.000s</td><td>48/48</td><td>106ms</td><td>283.5MiB</td></tr><tr><td><strong>Realtime Silero T2 frame=100 thr=0.3 sil=0.35s max=5.0s</strong><br><span>Silero threshold 0.3, silence 0.35s, max 5s</span></td><td>英文</td><td>warm</td><td>shared</td><td>WER 7.22%</td><td>0.0144</td><td>0.0144</td><td>4.387s</td><td>0.000s</td><td>49/49</td><td>109ms</td><td>283.5MiB</td></tr><tr><td><strong>Realtime Silero T2 frame=100 thr=0.3 sil=0.2s max=5.0s</strong><br><span>Silero threshold 0.3, silence 0.2s, max 5s</span></td><td>英文</td><td>warm</td><td>shared</td><td>WER 7.35%</td><td>0.0143</td><td>0.0143</td><td>4.352s</td><td>0.000s</td><td>50/50</td><td>107ms</td><td>283.6MiB</td></tr><tr><td><strong>Realtime Silero T2 frame=100 thr=0.3 sil=0.25s max=5.0s</strong><br><span>Silero threshold 0.3, silence 0.25s, max 5s</span></td><td>英文</td><td>warm</td><td>shared</td><td>WER 7.35%</td><td>0.0143</td><td>0.0143</td><td>4.371s</td><td>0.000s</td><td>50/50</td><td>106ms</td><td>283.6MiB</td></tr><tr><td><strong>Realtime Silero T2 frame=100 thr=0.25 sil=0.35s max=5.0s</strong><br><span>Silero threshold 0.25, silence 0.35s, max 5s</span></td><td>英文</td><td>warm</td><td>shared</td><td>WER 7.62%</td><td>0.0144</td><td>0.0144</td><td>4.382s</td><td>0.000s</td><td>48/48</td><td>105ms</td><td>283.5MiB</td></tr><tr><td><strong>Realtime Silero T2 frame=100 thr=0.15 sil=0.2s max=5.0s</strong><br><span>Silero threshold 0.15, silence 0.2s, max 5s</span></td><td>英文</td><td>warm</td><td>shared</td><td>WER 7.62%</td><td>0.0145</td><td>0.0145</td><td>4.402s</td><td>0.000s</td><td>47/47</td><td>105ms</td><td>283.4MiB</td></tr><tr><td><strong>Realtime Silero T2 frame=100 thr=0.15 sil=0.25s max=5.0s</strong><br><span>Silero threshold 0.15, silence 0.25s, max 5s</span></td><td>英文</td><td>warm</td><td>shared</td><td>WER 7.62%</td><td>0.0145</td><td>0.0145</td><td>4.403s</td><td>0.000s</td><td>47/47</td><td>105ms</td><td>283.4MiB</td></tr><tr><td><strong>Realtime Silero T2 frame=100 thr=0.15 sil=0.35s max=5.0s</strong><br><span>Silero threshold 0.15, silence 0.35s, max 5s</span></td><td>英文</td><td>warm</td><td>shared</td><td>WER 7.62%</td><td>0.0145</td><td>0.0145</td><td>4.403s</td><td>0.000s</td><td>47/47</td><td>105ms</td><td>283.4MiB</td></tr><tr><td><strong>Realtime Silero T2 frame=100 thr=0.15 sil=0.5s max=5.0s</strong><br><span>Silero threshold 0.15, silence 0.5s, max 5s</span></td><td>英文</td><td>warm</td><td>shared</td><td>WER 7.62%</td><td>0.0145</td><td>0.0145</td><td>4.408s</td><td>0.000s</td><td>47/47</td><td>106ms</td><td>283.3MiB</td></tr><tr><td><strong>Realtime Silero T2 frame=100 thr=0.25 sil=0.5s max=5.0s</strong><br><span>Silero threshold 0.25, silence 0.5s, max 5s</span></td><td>英文</td><td>warm</td><td>shared</td><td>WER 7.62%</td><td>0.0146</td><td>0.0146</td><td>4.461s</td><td>0.000s</td><td>47/47</td><td>106ms</td><td>283.6MiB</td></tr><tr><td><strong>Realtime RMS T2 frame=200 thr=650 min=320 end=1000 max=12000 pre=0</strong><br><span>RMS threshold 650, end 1000ms, max 12000ms, pre-roll 0ms</span></td><td>英文</td><td>warm</td><td>shared</td><td>WER 7.75%</td><td>0.0126</td><td>0.0126</td><td>3.826s</td><td>0.000s</td><td>38/38</td><td>153ms</td><td>291.3MiB</td></tr><tr><td><strong>Realtime Silero T2 frame=100 thr=0.25 sil=0.25s max=5.0s</strong><br><span>Silero threshold 0.25, silence 0.25s, max 5s</span></td><td>英文</td><td>warm</td><td>shared</td><td>WER 7.75%</td><td>0.0143</td><td>0.0143</td><td>4.365s</td><td>0.000s</td><td>49/49</td><td>105ms</td><td>283.6MiB</td></tr><tr><td><strong>Realtime Silero T2 frame=100 thr=0.25 sil=0.2s max=5.0s</strong><br><span>Silero threshold 0.25, silence 0.2s, max 5s</span></td><td>英文</td><td>warm</td><td>shared</td><td>WER 7.75%</td><td>0.0146</td><td>0.0146</td><td>4.447s</td><td>0.000s</td><td>49/49</td><td>106ms</td><td>283.5MiB</td></tr><tr><td><strong>Realtime RMS T2 frame=200 thr=520 min=320 end=1000 max=12000 pre=0</strong><br><span>RMS threshold 520, end 1000ms, max 12000ms, pre-roll 0ms</span></td><td>英文</td><td>warm</td><td>shared</td><td>WER 7.89%</td><td>0.0125</td><td>0.0125</td><td>3.812s</td><td>0.000s</td><td>35/35</td><td>152ms</td><td>291.4MiB</td></tr><tr><td><strong>Realtime RMS T2 frame=200 thr=420 min=320 end=1000 max=12000 pre=0</strong><br><span>RMS threshold 420, end 1000ms, max 12000ms, pre-roll 0ms</span></td><td>英文</td><td>warm</td><td>shared</td><td>WER 7.89%</td><td>0.0130</td><td>0.0130</td><td>3.949s</td><td>0.000s</td><td>35/35</td><td>154ms</td><td>291.3MiB</td></tr><tr><td><strong>Realtime Silero T2 frame=100 thr=0.2 sil=0.5s max=5.0s</strong><br><span>Silero threshold 0.2, silence 0.5s, max 5s</span></td><td>英文</td><td>warm</td><td>shared</td><td>WER 7.89%</td><td>0.0144</td><td>0.0144</td><td>4.392s</td><td>0.000s</td><td>47/47</td><td>105ms</td><td>283.5MiB</td></tr><tr><td><strong>Realtime Silero T2 frame=100 thr=0.2 sil=0.35s max=5.0s</strong><br><span>Silero threshold 0.2, silence 0.35s, max 5s</span></td><td>英文</td><td>warm</td><td>shared</td><td>WER 7.89%</td><td>0.0144</td><td>0.0144</td><td>4.401s</td><td>0.000s</td><td>47/47</td><td>105ms</td><td>283.4MiB</td></tr><tr><td><strong>Realtime Silero T2 frame=100 thr=0.2 sil=0.2s max=5.0s</strong><br><span>Silero threshold 0.2, silence 0.2s, max 5s</span></td><td>英文</td><td>warm</td><td>shared</td><td>WER 8.02%</td><td>0.0144</td><td>0.0144</td><td>4.386s</td><td>0.000s</td><td>48/48</td><td>105ms</td><td>283.6MiB</td></tr><tr><td><strong>Realtime Silero T2 frame=100 thr=0.2 sil=0.25s max=5.0s</strong><br><span>Silero threshold 0.2, silence 0.25s, max 5s</span></td><td>英文</td><td>warm</td><td>shared</td><td>WER 8.02%</td><td>0.0144</td><td>0.0144</td><td>4.391s</td><td>0.000s</td><td>48/48</td><td>105ms</td><td>283.6MiB</td></tr><tr><td><strong>Realtime RMS T2 frame=200 thr=520 min=320 end=500 max=8000 pre=0</strong><br><span>RMS threshold 520, end 500ms, max 8000ms, pre-roll 0ms</span></td><td>英文</td><td>warm</td><td>shared</td><td>WER 8.42%</td><td>0.0121</td><td>0.0121</td><td>3.687s</td><td>0.000s</td><td>66/66</td><td>99ms</td><td>283.3MiB</td></tr><tr><td><strong>Realtime Silero T2 frame=100 thr=0.2 sil=0.25s max=8.0s</strong><br><span>Silero threshold 0.2, silence 0.25s, max 8s</span></td><td>英文</td><td>warm</td><td>shared</td><td>WER 8.56%</td><td>0.0148</td><td>0.0148</td><td>4.495s</td><td>0.000s</td><td>35/35</td><td>142ms</td><td>291.4MiB</td></tr><tr><td><strong>Realtime RMS T2 frame=200 thr=420 min=320 end=500 max=12000 pre=0</strong><br><span>RMS threshold 420, end 500ms, max 12000ms, pre-roll 0ms</span></td><td>英文</td><td>warm</td><td>shared</td><td>WER 8.69%</td><td>0.0121</td><td>0.0121</td><td>3.697s</td><td>0.000s</td><td>60/60</td><td>122ms</td><td>283.6MiB</td></tr><tr><td><strong>Realtime RMS T2 frame=200 thr=520 min=320 end=500 max=12000 pre=0</strong><br><span>RMS threshold 520, end 500ms, max 12000ms, pre-roll 0ms</span></td><td>英文</td><td>warm</td><td>shared</td><td>WER 8.69%</td><td>0.0121</td><td>0.0121</td><td>3.700s</td><td>0.000s</td><td>61/61</td><td>122ms</td><td>283.6MiB</td></tr><tr><td><strong>Realtime RMS T2 frame=200 thr=420 min=320 end=500 max=8000 pre=0</strong><br><span>RMS threshold 420, end 500ms, max 8000ms, pre-roll 0ms</span></td><td>英文</td><td>warm</td><td>shared</td><td>WER 8.69%</td><td>0.0122</td><td>0.0122</td><td>3.701s</td><td>0.000s</td><td>65/65</td><td>100ms</td><td>283.3MiB</td></tr><tr><td><strong>Realtime Silero T2 frame=100 thr=0.15 sil=0.5s max=8.0s</strong><br><span>Silero threshold 0.15, silence 0.5s, max 8s</span></td><td>英文</td><td>warm</td><td>shared</td><td>WER 8.69%</td><td>0.0147</td><td>0.0147</td><td>4.471s</td><td>0.000s</td><td>34/34</td><td>142ms</td><td>291.1MiB</td></tr><tr><td><strong>Realtime Silero T2 frame=100 thr=0.15 sil=0.2s max=8.0s</strong><br><span>Silero threshold 0.15, silence 0.2s, max 8s</span></td><td>英文</td><td>warm</td><td>shared</td><td>WER 8.69%</td><td>0.0147</td><td>0.0147</td><td>4.472s</td><td>0.000s</td><td>34/34</td><td>142ms</td><td>291.2MiB</td></tr><tr><td><strong>Realtime RMS T2 frame=200 thr=420 min=320 end=1000 max=8000 pre=0</strong><br><span>RMS threshold 420, end 1000ms, max 8000ms, pre-roll 0ms</span></td><td>英文</td><td>warm</td><td>shared</td><td>WER 8.82%</td><td>0.0123</td><td>0.0123</td><td>3.757s</td><td>0.000s</td><td>47/47</td><td>100ms</td><td>282.8MiB</td></tr><tr><td><strong>Realtime RMS T2 frame=200 thr=650 min=320 end=500 max=8000 pre=0</strong><br><span>RMS threshold 650, end 500ms, max 8000ms, pre-roll 0ms</span></td><td>英文</td><td>warm</td><td>shared</td><td>WER 8.82%</td><td>0.0124</td><td>0.0124</td><td>3.780s</td><td>0.000s</td><td>67/67</td><td>99ms</td><td>283.4MiB</td></tr><tr><td><strong>Realtime Silero T2 frame=100 thr=0.25 sil=0.5s max=8.0s</strong><br><span>Silero threshold 0.25, silence 0.5s, max 8s</span></td><td>英文</td><td>warm</td><td>shared</td><td>WER 8.82%</td><td>0.0146</td><td>0.0146</td><td>4.462s</td><td>0.000s</td><td>34/34</td><td>142ms</td><td>291.2MiB</td></tr><tr><td><strong>Realtime Silero T2 frame=100 thr=0.15 sil=0.35s max=8.0s</strong><br><span>Silero threshold 0.15, silence 0.35s, max 8s</span></td><td>英文</td><td>warm</td><td>shared</td><td>WER 8.82%</td><td>0.0147</td><td>0.0147</td><td>4.472s</td><td>0.000s</td><td>34/34</td><td>142ms</td><td>291.2MiB</td></tr><tr><td><strong>Realtime Silero T2 frame=100 thr=0.2 sil=0.5s max=8.0s</strong><br><span>Silero threshold 0.2, silence 0.5s, max 8s</span></td><td>英文</td><td>warm</td><td>shared</td><td>WER 8.82%</td><td>0.0147</td><td>0.0147</td><td>4.472s</td><td>0.000s</td><td>34/34</td><td>142ms</td><td>291.2MiB</td></tr><tr><td><strong>Realtime Silero T2 frame=100 thr=0.2 sil=0.35s max=8.0s</strong><br><span>Silero threshold 0.2, silence 0.35s, max 8s</span></td><td>英文</td><td>warm</td><td>shared</td><td>WER 8.82%</td><td>0.0147</td><td>0.0147</td><td>4.473s</td><td>0.000s</td><td>34/34</td><td>142ms</td><td>291.2MiB</td></tr><tr><td><strong>Realtime Silero T2 frame=100 thr=0.25 sil=0.35s max=8.0s</strong><br><span>Silero threshold 0.25, silence 0.35s, max 8s</span></td><td>英文</td><td>warm</td><td>shared</td><td>WER 8.82%</td><td>0.0147</td><td>0.0147</td><td>4.486s</td><td>0.000s</td><td>35/35</td><td>142ms</td><td>291.2MiB</td></tr><tr><td><strong>Realtime Silero T2 frame=100 thr=0.15 sil=0.25s max=8.0s</strong><br><span>Silero threshold 0.15, silence 0.25s, max 8s</span></td><td>英文</td><td>warm</td><td>shared</td><td>WER 8.82%</td><td>0.0154</td><td>0.0154</td><td>4.700s</td><td>0.000s</td><td>34/34</td><td>144ms</td><td>291.2MiB</td></tr><tr><td><strong>Realtime RMS T2 frame=200 thr=520 min=320 end=1000 max=8000 pre=0</strong><br><span>RMS threshold 520, end 1000ms, max 8000ms, pre-roll 0ms</span></td><td>英文</td><td>warm</td><td>shared</td><td>WER 8.96%</td><td>0.0123</td><td>0.0123</td><td>3.738s</td><td>0.000s</td><td>48/48</td><td>100ms</td><td>282.7MiB</td></tr><tr><td><strong>Realtime RMS T2 frame=200 thr=420 min=320 end=720 max=12000 pre=0</strong><br><span>RMS threshold 420, end 720ms, max 12000ms, pre-roll 0ms</span></td><td>英文</td><td>warm</td><td>shared</td><td>WER 8.96%</td><td>0.0124</td><td>0.0124</td><td>3.769s</td><td>0.000s</td><td>47/47</td><td>151ms</td><td>291.8MiB</td></tr><tr><td><strong>Realtime RMS T2 frame=200 thr=800 min=320 end=1000 max=12000 pre=0</strong><br><span>RMS threshold 800, end 1000ms, max 12000ms, pre-roll 0ms</span></td><td>英文</td><td>warm</td><td>shared</td><td>WER 8.96%</td><td>0.0125</td><td>0.0125</td><td>3.802s</td><td>0.000s</td><td>40/40</td><td>152ms</td><td>291.4MiB</td></tr><tr><td><strong>Realtime Silero T2 frame=100 thr=0.25 sil=0.25s max=8.0s</strong><br><span>Silero threshold 0.25, silence 0.25s, max 8s</span></td><td>英文</td><td>warm</td><td>shared</td><td>WER 8.96%</td><td>0.0147</td><td>0.0147</td><td>4.467s</td><td>0.000s</td><td>37/37</td><td>142ms</td><td>291.4MiB</td></tr><tr><td><strong>Realtime Silero T2 frame=100 thr=0.2 sil=0.2s max=8.0s</strong><br><span>Silero threshold 0.2, silence 0.2s, max 8s</span></td><td>英文</td><td>warm</td><td>shared</td><td>WER 8.96%</td><td>0.0148</td><td>0.0148</td><td>4.513s</td><td>0.000s</td><td>35/35</td><td>143ms</td><td>291.4MiB</td></tr><tr><td><strong>Realtime RMS T2 frame=200 thr=520 min=320 end=720 max=12000 pre=0</strong><br><span>RMS threshold 520, end 720ms, max 12000ms, pre-roll 0ms</span></td><td>英文</td><td>warm</td><td>shared</td><td>WER 9.09%</td><td>0.0123</td><td>0.0123</td><td>3.754s</td><td>0.000s</td><td>47/47</td><td>151ms</td><td>291.8MiB</td></tr><tr><td><strong>Realtime RMS T2 frame=200 thr=800 min=320 end=500 max=8000 pre=0</strong><br><span>RMS threshold 800, end 500ms, max 8000ms, pre-roll 0ms</span></td><td>英文</td><td>warm</td><td>shared</td><td>WER 9.36%</td><td>0.0119</td><td>0.0119</td><td>3.634s</td><td>0.000s</td><td>67/67</td><td>99ms</td><td>283.4MiB</td></tr><tr><td><strong>Realtime Silero T2 frame=100 thr=0.3 sil=0.5s max=8.0s</strong><br><span>Silero threshold 0.3, silence 0.5s, max 8s</span></td><td>英文</td><td>warm</td><td>shared</td><td>WER 9.36%</td><td>0.0146</td><td>0.0146</td><td>4.439s</td><td>0.000s</td><td>35/35</td><td>142ms</td><td>291.5MiB</td></tr><tr><td><strong>Realtime Silero T2 frame=100 thr=0.25 sil=0.2s max=8.0s</strong><br><span>Silero threshold 0.25, silence 0.2s, max 8s</span></td><td>英文</td><td>warm</td><td>shared</td><td>WER 9.36%</td><td>0.0147</td><td>0.0147</td><td>4.481s</td><td>0.000s</td><td>37/37</td><td>142ms</td><td>291.4MiB</td></tr><tr><td><strong>Realtime Silero T2 frame=100 thr=0.3 sil=0.2s max=8.0s</strong><br><span>Silero threshold 0.3, silence 0.2s, max 8s</span></td><td>英文</td><td>warm</td><td>shared</td><td>WER 9.49%</td><td>0.0146</td><td>0.0146</td><td>4.457s</td><td>0.000s</td><td>38/38</td><td>143ms</td><td>291.6MiB</td></tr><tr><td><strong>Realtime Silero T2 frame=100 thr=0.3 sil=0.35s max=8.0s</strong><br><span>Silero threshold 0.3, silence 0.35s, max 8s</span></td><td>英文</td><td>warm</td><td>shared</td><td>WER 9.49%</td><td>0.0150</td><td>0.0150</td><td>4.571s</td><td>0.000s</td><td>37/37</td><td>142ms</td><td>291.5MiB</td></tr><tr><td><strong>Realtime RMS T2 frame=200 thr=650 min=320 end=1000 max=8000 pre=0</strong><br><span>RMS threshold 650, end 1000ms, max 8000ms, pre-roll 0ms</span></td><td>英文</td><td>warm</td><td>shared</td><td>WER 9.63%</td><td>0.0125</td><td>0.0125</td><td>3.808s</td><td>0.000s</td><td>50/50</td><td>101ms</td><td>282.9MiB</td></tr><tr><td><strong>Realtime Silero T2 frame=100 thr=0.3 sil=0.25s max=8.0s</strong><br><span>Silero threshold 0.3, silence 0.25s, max 8s</span></td><td>英文</td><td>warm</td><td>shared</td><td>WER 9.63%</td><td>0.0146</td><td>0.0146</td><td>4.454s</td><td>0.000s</td><td>38/38</td><td>143ms</td><td>291.5MiB</td></tr><tr><td><strong>Realtime RMS T2 frame=200 thr=650 min=320 end=500 max=12000 pre=0</strong><br><span>RMS threshold 650, end 500ms, max 12000ms, pre-roll 0ms</span></td><td>英文</td><td>warm</td><td>shared</td><td>WER 9.76%</td><td>0.0121</td><td>0.0121</td><td>3.686s</td><td>0.000s</td><td>63/63</td><td>122ms</td><td>283.7MiB</td></tr><tr><td><strong>Realtime RMS T2 frame=200 thr=800 min=320 end=720 max=12000 pre=0</strong><br><span>RMS threshold 800, end 720ms, max 12000ms, pre-roll 0ms</span></td><td>英文</td><td>warm</td><td>shared</td><td>WER 9.76%</td><td>0.0123</td><td>0.0123</td><td>3.744s</td><td>0.000s</td><td>50/50</td><td>151ms</td><td>291.6MiB</td></tr><tr><td><strong>Realtime RMS T2 frame=200 thr=520 min=320 end=720 max=8000 pre=0</strong><br><span>RMS threshold 520, end 720ms, max 8000ms, pre-roll 0ms</span></td><td>英文</td><td>warm</td><td>shared</td><td>WER 9.89%</td><td>0.0122</td><td>0.0122</td><td>3.722s</td><td>0.000s</td><td>55/55</td><td>100ms</td><td>283.2MiB</td></tr><tr><td><strong>Realtime RMS T2 frame=200 thr=420 min=320 end=720 max=8000 pre=0</strong><br><span>RMS threshold 420, end 720ms, max 8000ms, pre-roll 0ms</span></td><td>英文</td><td>warm</td><td>shared</td><td>WER 10.03%</td><td>0.0122</td><td>0.0122</td><td>3.724s</td><td>0.000s</td><td>55/55</td><td>100ms</td><td>283.2MiB</td></tr><tr><td><strong>Realtime RMS T2 frame=200 thr=650 min=320 end=720 max=12000 pre=0</strong><br><span>RMS threshold 650, end 720ms, max 12000ms, pre-roll 0ms</span></td><td>英文</td><td>warm</td><td>shared</td><td>WER 10.03%</td><td>0.0123</td><td>0.0123</td><td>3.749s</td><td>0.000s</td><td>47/47</td><td>151ms</td><td>291.9MiB</td></tr><tr><td><strong>Realtime RMS T2 frame=200 thr=800 min=320 end=500 max=12000 pre=0</strong><br><span>RMS threshold 800, end 500ms, max 12000ms, pre-roll 0ms</span></td><td>英文</td><td>warm</td><td>shared</td><td>WER 10.16%</td><td>0.0120</td><td>0.0120</td><td>3.656s</td><td>0.000s</td><td>63/63</td><td>116ms</td><td>283.6MiB</td></tr><tr><td><strong>Realtime RMS T2 frame=200 thr=800 min=320 end=720 max=8000 pre=0</strong><br><span>RMS threshold 800, end 720ms, max 8000ms, pre-roll 0ms</span></td><td>英文</td><td>warm</td><td>shared</td><td>WER 10.16%</td><td>0.0124</td><td>0.0124</td><td>3.778s</td><td>0.000s</td><td>58/58</td><td>100ms</td><td>283.0MiB</td></tr><tr><td><strong>Realtime RMS T2 frame=200 thr=800 min=320 end=1000 max=8000 pre=0</strong><br><span>RMS threshold 800, end 1000ms, max 8000ms, pre-roll 0ms</span></td><td>英文</td><td>warm</td><td>shared</td><td>WER 10.29%</td><td>0.0124</td><td>0.0124</td><td>3.768s</td><td>0.000s</td><td>53/53</td><td>100ms</td><td>282.9MiB</td></tr><tr><td><strong>Realtime RMS T2 frame=200 thr=650 min=320 end=720 max=8000 pre=0</strong><br><span>RMS threshold 650, end 720ms, max 8000ms, pre-roll 0ms</span></td><td>英文</td><td>warm</td><td>shared</td><td>WER 10.43%</td><td>0.0122</td><td>0.0122</td><td>3.709s</td><td>0.000s</td><td>55/55</td><td>100ms</td><td>283.2MiB</td></tr><tr><td><strong>Realtime RMS T2 frame=200 thr=650 min=320 end=500 max=12000 pre=0</strong><br><span>RMS threshold 650, end 500ms, max 12000ms, pre-roll 0ms</span></td><td>中文</td><td>warm</td><td>shared</td><td>CER 0.00%</td><td>0.0116</td><td>0.0116</td><td>3.492s</td><td>0.000s</td><td>78/78</td><td>56ms</td><td>287.0MiB</td></tr><tr><td><strong>Realtime RMS T2 frame=200 thr=650 min=320 end=500 max=8000 pre=0</strong><br><span>RMS threshold 650, end 500ms, max 8000ms, pre-roll 0ms</span></td><td>中文</td><td>warm</td><td>shared</td><td>CER 0.00%</td><td>0.0117</td><td>0.0117</td><td>3.511s</td><td>0.000s</td><td>78/78</td><td>57ms</td><td>287.0MiB</td></tr><tr><td><strong>Realtime RMS T2 frame=200 thr=420 min=320 end=500 max=12000 pre=0</strong><br><span>RMS threshold 420, end 500ms, max 12000ms, pre-roll 0ms</span></td><td>中文</td><td>warm</td><td>shared</td><td>CER 0.00%</td><td>0.0118</td><td>0.0118</td><td>3.534s</td><td>0.000s</td><td>78/78</td><td>56ms</td><td>287.0MiB</td></tr><tr><td><strong>Realtime RMS T2 frame=200 thr=520 min=320 end=500 max=8000 pre=0</strong><br><span>RMS threshold 520, end 500ms, max 8000ms, pre-roll 0ms</span></td><td>中文</td><td>warm</td><td>shared</td><td>CER 0.00%</td><td>0.0118</td><td>0.0118</td><td>3.540s</td><td>0.000s</td><td>78/78</td><td>57ms</td><td>287.0MiB</td></tr><tr><td><strong>Realtime RMS T2 frame=200 thr=520 min=320 end=500 max=12000 pre=0</strong><br><span>RMS threshold 520, end 500ms, max 12000ms, pre-roll 0ms</span></td><td>中文</td><td>warm</td><td>shared</td><td>CER 0.00%</td><td>0.0119</td><td>0.0119</td><td>3.578s</td><td>0.000s</td><td>78/78</td><td>58ms</td><td>287.0MiB</td></tr><tr><td><strong>Realtime RMS T2 frame=200 thr=420 min=320 end=500 max=8000 pre=0</strong><br><span>RMS threshold 420, end 500ms, max 8000ms, pre-roll 0ms</span></td><td>中文</td><td>warm</td><td>shared</td><td>CER 0.00%</td><td>0.0120</td><td>0.0120</td><td>3.604s</td><td>0.000s</td><td>78/78</td><td>58ms</td><td>287.0MiB</td></tr><tr><td><strong>Realtime RMS T2 frame=200 thr=520 min=320 end=1000 max=12000 pre=0</strong><br><span>RMS threshold 520, end 1000ms, max 12000ms, pre-roll 0ms</span></td><td>中文</td><td>warm</td><td>shared</td><td>CER 0.00%</td><td>0.0121</td><td>0.0121</td><td>3.623s</td><td>0.000s</td><td>27/27</td><td>141ms</td><td>291.2MiB</td></tr><tr><td><strong>Realtime RMS T2 frame=200 thr=650 min=320 end=720 max=8000 pre=0</strong><br><span>RMS threshold 650, end 720ms, max 8000ms, pre-roll 0ms</span></td><td>中文</td><td>warm</td><td>shared</td><td>CER 0.00%</td><td>0.0121</td><td>0.0121</td><td>3.636s</td><td>0.000s</td><td>78/78</td><td>60ms</td><td>287.1MiB</td></tr><tr><td><strong>Realtime RMS T2 frame=200 thr=650 min=320 end=720 max=12000 pre=0</strong><br><span>RMS threshold 650, end 720ms, max 12000ms, pre-roll 0ms</span></td><td>中文</td><td>warm</td><td>shared</td><td>CER 0.00%</td><td>0.0121</td><td>0.0121</td><td>3.646s</td><td>0.000s</td><td>78/78</td><td>60ms</td><td>287.1MiB</td></tr><tr><td><strong>Realtime RMS T2 frame=200 thr=520 min=320 end=720 max=8000 pre=0</strong><br><span>RMS threshold 520, end 720ms, max 8000ms, pre-roll 0ms</span></td><td>中文</td><td>warm</td><td>shared</td><td>CER 0.00%</td><td>0.0123</td><td>0.0123</td><td>3.705s</td><td>0.000s</td><td>76/76</td><td>62ms</td><td>287.2MiB</td></tr><tr><td><strong>Realtime RMS T2 frame=200 thr=520 min=320 end=720 max=12000 pre=0</strong><br><span>RMS threshold 520, end 720ms, max 12000ms, pre-roll 0ms</span></td><td>中文</td><td>warm</td><td>shared</td><td>CER 0.00%</td><td>0.0123</td><td>0.0123</td><td>3.707s</td><td>0.000s</td><td>76/76</td><td>61ms</td><td>287.2MiB</td></tr><tr><td><strong>Realtime RMS T2 frame=200 thr=420 min=320 end=720 max=8000 pre=0</strong><br><span>RMS threshold 420, end 720ms, max 8000ms, pre-roll 0ms</span></td><td>中文</td><td>warm</td><td>shared</td><td>CER 0.00%</td><td>0.0123</td><td>0.0123</td><td>3.710s</td><td>0.000s</td><td>71/71</td><td>81ms</td><td>291.3MiB</td></tr><tr><td><strong>Realtime RMS T2 frame=200 thr=420 min=320 end=1000 max=8000 pre=0</strong><br><span>RMS threshold 420, end 1000ms, max 8000ms, pre-roll 0ms</span></td><td>中文</td><td>warm</td><td>shared</td><td>CER 0.00%</td><td>0.0124</td><td>0.0124</td><td>3.716s</td><td>0.000s</td><td>48/48</td><td>100ms</td><td>291.2MiB</td></tr><tr><td><strong>Realtime RMS T2 frame=200 thr=520 min=320 end=1000 max=8000 pre=0</strong><br><span>RMS threshold 520, end 1000ms, max 8000ms, pre-roll 0ms</span></td><td>中文</td><td>warm</td><td>shared</td><td>CER 0.00%</td><td>0.0124</td><td>0.0124</td><td>3.729s</td><td>0.000s</td><td>52/52</td><td>100ms</td><td>291.2MiB</td></tr><tr><td><strong>Realtime RMS T2 frame=200 thr=420 min=320 end=720 max=12000 pre=0</strong><br><span>RMS threshold 420, end 720ms, max 12000ms, pre-roll 0ms</span></td><td>中文</td><td>warm</td><td>shared</td><td>CER 0.00%</td><td>0.0124</td><td>0.0124</td><td>3.742s</td><td>0.000s</td><td>71/71</td><td>82ms</td><td>291.3MiB</td></tr><tr><td><strong>Realtime Silero T2 frame=100 thr=0.15 sil=0.2s max=8.0s</strong><br><span>Silero threshold 0.15, silence 0.2s, max 8s</span></td><td>中文</td><td>warm</td><td>shared</td><td>CER 0.00%</td><td>0.0127</td><td>0.0127</td><td>3.812s</td><td>0.000s</td><td>78/78</td><td>51ms</td><td>287.4MiB</td></tr><tr><td><strong>Realtime Silero T2 frame=100 thr=0.15 sil=0.35s max=8.0s</strong><br><span>Silero threshold 0.15, silence 0.35s, max 8s</span></td><td>中文</td><td>warm</td><td>shared</td><td>CER 0.00%</td><td>0.0127</td><td>0.0127</td><td>3.831s</td><td>0.000s</td><td>78/78</td><td>53ms</td><td>287.4MiB</td></tr><tr><td><strong>Realtime Silero T2 frame=100 thr=0.15 sil=0.35s max=5.0s</strong><br><span>Silero threshold 0.15, silence 0.35s, max 5s</span></td><td>中文</td><td>warm</td><td>shared</td><td>CER 0.00%</td><td>0.0127</td><td>0.0127</td><td>3.833s</td><td>0.000s</td><td>78/78</td><td>52ms</td><td>287.4MiB</td></tr><tr><td><strong>Realtime Silero T2 frame=100 thr=0.15 sil=0.25s max=8.0s</strong><br><span>Silero threshold 0.15, silence 0.25s, max 8s</span></td><td>中文</td><td>warm</td><td>shared</td><td>CER 0.00%</td><td>0.0128</td><td>0.0128</td><td>3.834s</td><td>0.000s</td><td>78/78</td><td>52ms</td><td>287.4MiB</td></tr><tr><td><strong>Realtime Silero T2 frame=100 thr=0.15 sil=0.25s max=5.0s</strong><br><span>Silero threshold 0.15, silence 0.25s, max 5s</span></td><td>中文</td><td>warm</td><td>shared</td><td>CER 0.00%</td><td>0.0128</td><td>0.0128</td><td>3.835s</td><td>0.000s</td><td>78/78</td><td>52ms</td><td>287.4MiB</td></tr><tr><td><strong>Realtime Silero T2 frame=100 thr=0.15 sil=0.5s max=5.0s</strong><br><span>Silero threshold 0.15, silence 0.5s, max 5s</span></td><td>中文</td><td>warm</td><td>shared</td><td>CER 0.00%</td><td>0.0128</td><td>0.0128</td><td>3.835s</td><td>0.000s</td><td>78/78</td><td>52ms</td><td>287.5MiB</td></tr><tr><td><strong>Realtime Silero T2 frame=100 thr=0.15 sil=0.2s max=5.0s</strong><br><span>Silero threshold 0.15, silence 0.2s, max 5s</span></td><td>中文</td><td>warm</td><td>shared</td><td>CER 0.00%</td><td>0.0130</td><td>0.0130</td><td>3.897s</td><td>0.000s</td><td>78/78</td><td>53ms</td><td>287.4MiB</td></tr><tr><td><strong>Realtime Silero T2 frame=100 thr=0.15 sil=0.5s max=8.0s</strong><br><span>Silero threshold 0.15, silence 0.5s, max 8s</span></td><td>中文</td><td>warm</td><td>shared</td><td>CER 0.00%</td><td>0.0133</td><td>0.0133</td><td>3.985s</td><td>0.000s</td><td>77/77</td><td>58ms</td><td>287.4MiB</td></tr><tr><td><strong>Realtime RMS T2 frame=200 thr=650 min=320 end=1000 max=8000 pre=0</strong><br><span>RMS threshold 650, end 1000ms, max 8000ms, pre-roll 0ms</span></td><td>中文</td><td>warm</td><td>shared</td><td>CER 0.20%</td><td>0.0122</td><td>0.0122</td><td>3.677s</td><td>0.000s</td><td>52/52</td><td>98ms</td><td>291.2MiB</td></tr><tr><td><strong>Realtime Silero T2 frame=100 thr=0.2 sil=0.2s max=5.0s</strong><br><span>Silero threshold 0.2, silence 0.2s, max 5s</span></td><td>中文</td><td>warm</td><td>shared</td><td>CER 0.20%</td><td>0.0125</td><td>0.0125</td><td>3.771s</td><td>0.000s</td><td>78/78</td><td>51ms</td><td>287.2MiB</td></tr><tr><td><strong>Realtime Silero T2 frame=100 thr=0.2 sil=0.2s max=8.0s</strong><br><span>Silero threshold 0.2, silence 0.2s, max 8s</span></td><td>中文</td><td>warm</td><td>shared</td><td>CER 0.20%</td><td>0.0126</td><td>0.0126</td><td>3.786s</td><td>0.000s</td><td>78/78</td><td>51ms</td><td>287.2MiB</td></tr><tr><td><strong>Realtime RMS T2 frame=200 thr=650 min=320 end=1000 max=12000 pre=0</strong><br><span>RMS threshold 650, end 1000ms, max 12000ms, pre-roll 0ms</span></td><td>中文</td><td>warm</td><td>shared</td><td>CER 0.20%</td><td>0.0126</td><td>0.0126</td><td>3.793s</td><td>0.000s</td><td>34/34</td><td>156ms</td><td>291.4MiB</td></tr><tr><td><strong>Realtime Silero T2 frame=100 thr=0.2 sil=0.5s max=8.0s</strong><br><span>Silero threshold 0.2, silence 0.5s, max 8s</span></td><td>中文</td><td>warm</td><td>shared</td><td>CER 0.20%</td><td>0.0127</td><td>0.0127</td><td>3.811s</td><td>0.000s</td><td>78/78</td><td>53ms</td><td>287.4MiB</td></tr><tr><td><strong>Realtime Silero T2 frame=100 thr=0.2 sil=0.25s max=5.0s</strong><br><span>Silero threshold 0.2, silence 0.25s, max 5s</span></td><td>中文</td><td>warm</td><td>shared</td><td>CER 0.20%</td><td>0.0127</td><td>0.0127</td><td>3.813s</td><td>0.000s</td><td>78/78</td><td>52ms</td><td>287.2MiB</td></tr><tr><td><strong>Realtime Silero T2 frame=100 thr=0.2 sil=0.35s max=8.0s</strong><br><span>Silero threshold 0.2, silence 0.35s, max 8s</span></td><td>中文</td><td>warm</td><td>shared</td><td>CER 0.20%</td><td>0.0127</td><td>0.0127</td><td>3.823s</td><td>0.000s</td><td>78/78</td><td>53ms</td><td>287.2MiB</td></tr><tr><td><strong>Realtime Silero T2 frame=100 thr=0.2 sil=0.35s max=5.0s</strong><br><span>Silero threshold 0.2, silence 0.35s, max 5s</span></td><td>中文</td><td>warm</td><td>shared</td><td>CER 0.20%</td><td>0.0127</td><td>0.0127</td><td>3.829s</td><td>0.000s</td><td>78/78</td><td>53ms</td><td>287.2MiB</td></tr><tr><td><strong>Realtime Silero T2 frame=100 thr=0.2 sil=0.25s max=8.0s</strong><br><span>Silero threshold 0.2, silence 0.25s, max 8s</span></td><td>中文</td><td>warm</td><td>shared</td><td>CER 0.20%</td><td>0.0128</td><td>0.0128</td><td>3.834s</td><td>0.000s</td><td>78/78</td><td>52ms</td><td>287.2MiB</td></tr><tr><td><strong>Realtime Silero T2 frame=100 thr=0.2 sil=0.5s max=5.0s</strong><br><span>Silero threshold 0.2, silence 0.5s, max 5s</span></td><td>中文</td><td>warm</td><td>shared</td><td>CER 0.20%</td><td>0.0129</td><td>0.0129</td><td>3.881s</td><td>0.000s</td><td>78/78</td><td>52ms</td><td>287.4MiB</td></tr><tr><td><strong>Realtime Silero T2 frame=100 thr=0.25 sil=0.2s max=5.0s</strong><br><span>Silero threshold 0.25, silence 0.2s, max 5s</span></td><td>中文</td><td>warm</td><td>shared</td><td>CER 0.49%</td><td>0.0125</td><td>0.0125</td><td>3.769s</td><td>0.000s</td><td>78/78</td><td>51ms</td><td>287.2MiB</td></tr><tr><td><strong>Realtime Silero T2 frame=100 thr=0.25 sil=0.2s max=8.0s</strong><br><span>Silero threshold 0.25, silence 0.2s, max 8s</span></td><td>中文</td><td>warm</td><td>shared</td><td>CER 0.49%</td><td>0.0125</td><td>0.0125</td><td>3.769s</td><td>0.000s</td><td>78/78</td><td>51ms</td><td>287.2MiB</td></tr><tr><td><strong>Realtime Silero T2 frame=100 thr=0.25 sil=0.5s max=8.0s</strong><br><span>Silero threshold 0.25, silence 0.5s, max 8s</span></td><td>中文</td><td>warm</td><td>shared</td><td>CER 0.49%</td><td>0.0126</td><td>0.0126</td><td>3.784s</td><td>0.000s</td><td>78/78</td><td>53ms</td><td>287.3MiB</td></tr><tr><td><strong>Realtime Silero T2 frame=100 thr=0.25 sil=0.5s max=5.0s</strong><br><span>Silero threshold 0.25, silence 0.5s, max 5s</span></td><td>中文</td><td>warm</td><td>shared</td><td>CER 0.49%</td><td>0.0126</td><td>0.0126</td><td>3.791s</td><td>0.000s</td><td>78/78</td><td>53ms</td><td>287.3MiB</td></tr><tr><td><strong>Realtime Silero T2 frame=100 thr=0.25 sil=0.35s max=5.0s</strong><br><span>Silero threshold 0.25, silence 0.35s, max 5s</span></td><td>中文</td><td>warm</td><td>shared</td><td>CER 0.49%</td><td>0.0126</td><td>0.0126</td><td>3.795s</td><td>0.000s</td><td>78/78</td><td>53ms</td><td>287.2MiB</td></tr><tr><td><strong>Realtime Silero T2 frame=100 thr=0.25 sil=0.25s max=8.0s</strong><br><span>Silero threshold 0.25, silence 0.25s, max 8s</span></td><td>中文</td><td>warm</td><td>shared</td><td>CER 0.49%</td><td>0.0126</td><td>0.0126</td><td>3.800s</td><td>0.000s</td><td>78/78</td><td>52ms</td><td>287.2MiB</td></tr><tr><td><strong>Realtime Silero T2 frame=100 thr=0.25 sil=0.25s max=5.0s</strong><br><span>Silero threshold 0.25, silence 0.25s, max 5s</span></td><td>中文</td><td>warm</td><td>shared</td><td>CER 0.49%</td><td>0.0127</td><td>0.0127</td><td>3.806s</td><td>0.000s</td><td>78/78</td><td>53ms</td><td>287.2MiB</td></tr><tr><td><strong>Realtime Silero T2 frame=100 thr=0.25 sil=0.35s max=8.0s</strong><br><span>Silero threshold 0.25, silence 0.35s, max 8s</span></td><td>中文</td><td>warm</td><td>shared</td><td>CER 0.49%</td><td>0.0130</td><td>0.0130</td><td>3.901s</td><td>0.000s</td><td>78/78</td><td>53ms</td><td>287.2MiB</td></tr><tr><td><strong>Realtime Silero T2 frame=100 thr=0.3 sil=0.5s max=8.0s</strong><br><span>Silero threshold 0.3, silence 0.5s, max 8s</span></td><td>中文</td><td>warm</td><td>shared</td><td>CER 0.59%</td><td>0.0126</td><td>0.0126</td><td>3.774s</td><td>0.000s</td><td>78/78</td><td>52ms</td><td>287.3MiB</td></tr><tr><td><strong>Realtime Silero T2 frame=100 thr=0.3 sil=0.5s max=5.0s</strong><br><span>Silero threshold 0.3, silence 0.5s, max 5s</span></td><td>中文</td><td>warm</td><td>shared</td><td>CER 0.59%</td><td>0.0126</td><td>0.0126</td><td>3.777s</td><td>0.000s</td><td>78/78</td><td>53ms</td><td>287.3MiB</td></tr><tr><td><strong>Realtime Silero T2 frame=100 thr=0.3 sil=0.2s max=5.0s</strong><br><span>Silero threshold 0.3, silence 0.2s, max 5s</span></td><td>中文</td><td>warm</td><td>shared</td><td>CER 0.59%</td><td>0.0126</td><td>0.0126</td><td>3.780s</td><td>0.000s</td><td>78/78</td><td>51ms</td><td>287.2MiB</td></tr><tr><td><strong>Realtime Silero T2 frame=100 thr=0.3 sil=0.2s max=8.0s</strong><br><span>Silero threshold 0.3, silence 0.2s, max 8s</span></td><td>中文</td><td>warm</td><td>shared</td><td>CER 0.59%</td><td>0.0126</td><td>0.0126</td><td>3.787s</td><td>0.000s</td><td>78/78</td><td>51ms</td><td>287.2MiB</td></tr><tr><td><strong>Realtime Silero T2 frame=100 thr=0.3 sil=0.35s max=8.0s</strong><br><span>Silero threshold 0.3, silence 0.35s, max 8s</span></td><td>中文</td><td>warm</td><td>shared</td><td>CER 0.59%</td><td>0.0126</td><td>0.0126</td><td>3.791s</td><td>0.000s</td><td>78/78</td><td>53ms</td><td>287.2MiB</td></tr><tr><td><strong>Realtime Silero T2 frame=100 thr=0.3 sil=0.25s max=8.0s</strong><br><span>Silero threshold 0.3, silence 0.25s, max 8s</span></td><td>中文</td><td>warm</td><td>shared</td><td>CER 0.59%</td><td>0.0127</td><td>0.0127</td><td>3.805s</td><td>0.000s</td><td>78/78</td><td>53ms</td><td>287.2MiB</td></tr><tr><td><strong>Realtime Silero T2 frame=100 thr=0.3 sil=0.25s max=5.0s</strong><br><span>Silero threshold 0.3, silence 0.25s, max 5s</span></td><td>中文</td><td>warm</td><td>shared</td><td>CER 0.59%</td><td>0.0127</td><td>0.0127</td><td>3.812s</td><td>0.000s</td><td>78/78</td><td>53ms</td><td>287.2MiB</td></tr><tr><td><strong>Realtime Silero T2 frame=100 thr=0.3 sil=0.35s max=5.0s</strong><br><span>Silero threshold 0.3, silence 0.35s, max 5s</span></td><td>中文</td><td>warm</td><td>shared</td><td>CER 0.59%</td><td>0.0132</td><td>0.0132</td><td>3.959s</td><td>0.000s</td><td>78/78</td><td>59ms</td><td>287.2MiB</td></tr><tr><td><strong>Realtime RMS T2 frame=200 thr=800 min=320 end=720 max=8000 pre=0</strong><br><span>RMS threshold 800, end 720ms, max 8000ms, pre-roll 0ms</span></td><td>中文</td><td>warm</td><td>shared</td><td>CER 0.89%</td><td>0.0117</td><td>0.0117</td><td>3.517s</td><td>0.000s</td><td>78/78</td><td>60ms</td><td>291.4MiB</td></tr><tr><td><strong>Realtime RMS T2 frame=200 thr=800 min=320 end=720 max=12000 pre=0</strong><br><span>RMS threshold 800, end 720ms, max 12000ms, pre-roll 0ms</span></td><td>中文</td><td>warm</td><td>shared</td><td>CER 0.89%</td><td>0.0118</td><td>0.0118</td><td>3.533s</td><td>0.000s</td><td>78/78</td><td>60ms</td><td>291.4MiB</td></tr><tr><td><strong>Realtime RMS T2 frame=200 thr=800 min=320 end=1000 max=12000 pre=0</strong><br><span>RMS threshold 800, end 1000ms, max 12000ms, pre-roll 0ms</span></td><td>中文</td><td>warm</td><td>shared</td><td>CER 0.99%</td><td>0.0119</td><td>0.0119</td><td>3.575s</td><td>0.000s</td><td>46/46</td><td>133ms</td><td>291.6MiB</td></tr><tr><td><strong>Realtime RMS T2 frame=200 thr=800 min=320 end=1000 max=8000 pre=0</strong><br><span>RMS threshold 800, end 1000ms, max 8000ms, pre-roll 0ms</span></td><td>中文</td><td>warm</td><td>shared</td><td>CER 0.99%</td><td>0.0119</td><td>0.0119</td><td>3.583s</td><td>0.000s</td><td>53/53</td><td>98ms</td><td>291.4MiB</td></tr><tr><td><strong>Realtime RMS T2 frame=200 thr=800 min=320 end=500 max=8000 pre=0</strong><br><span>RMS threshold 800, end 500ms, max 8000ms, pre-roll 0ms</span></td><td>中文</td><td>warm</td><td>shared</td><td>CER 1.28%</td><td>0.0112</td><td>0.0112</td><td>3.362s</td><td>0.000s</td><td>78/78</td><td>56ms</td><td>291.4MiB</td></tr><tr><td><strong>Realtime RMS T2 frame=200 thr=800 min=320 end=500 max=12000 pre=0</strong><br><span>RMS threshold 800, end 500ms, max 12000ms, pre-roll 0ms</span></td><td>中文</td><td>warm</td><td>shared</td><td>CER 1.28%</td><td>0.0112</td><td>0.0112</td><td>3.364s</td><td>0.000s</td><td>78/78</td><td>56ms</td><td>291.4MiB</td></tr><tr><td><strong>Realtime RMS T2 frame=200 thr=420 min=320 end=1000 max=12000 pre=0</strong><br><span>RMS threshold 420, end 1000ms, max 12000ms, pre-roll 0ms</span></td><td>中文</td><td>warm</td><td>shared</td><td>CER 2.47%</td><td>0.0123</td><td>0.0123</td><td>3.690s</td><td>0.000s</td><td>27/27</td><td>151ms</td><td>291.3MiB</td></tr></tbody></table></div>
+      </section>
+    
+</main>
+</body>
+</html>

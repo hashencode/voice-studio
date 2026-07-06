@@ -67,6 +67,12 @@ android {
                 }
         }
     }
+
+    sourceSets {
+        getByName("debug") {
+            java.srcDir("../../benchmark/android/src/debug/kotlin")
+        }
+    }
 }
 
 
