@@ -21,6 +21,7 @@ Model download URLs live in `benchmark/asr_benchmark_manifest.json` under each m
 - `run_asr_benchmark.sh`: builds the debug APK, installs assets, runs the benchmark Activity, and pulls JSON results.
 - `generate_asr_profile_matrix.py`: generates larger Paraformer tuning matrices under `build/asr_benchmark/profile_matrices`.
 - `generate_asr_benchmark_visual_report.py`: regenerates summary JSON and the HTML report from local result JSON.
+- `asr_benchmark_test_plan.md`: complete smoke/coarse/full matrix definition and reproduction commands.
 
 ## Quick Start
 
@@ -90,6 +91,10 @@ Generate repeatable matrices:
   --output build/asr_benchmark/profile_matrices/paraformer-full-grid.json \
   --batch-size 100
 ```
+
+The complete layer definitions and batch guidance are in `benchmark/asr_benchmark_test_plan.md`.
+
+Physical-device validation is not skipped by default. Use the physical serial from `adb devices` as `DEVICE_ID`; skip it only when the run explicitly documents that no real device is connected or that the run is emulator-only.
 
 Current presets:
 

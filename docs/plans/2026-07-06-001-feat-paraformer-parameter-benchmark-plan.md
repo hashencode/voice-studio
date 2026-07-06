@@ -22,13 +22,14 @@ The model choice has converged to Paraformer for both Chinese and English. The r
 - R3. Add standard route and realtime replay result categories for the report.
 - R4. Preserve separate metrics for warm steady-state, cold-start, and current-business-route behavior.
 - R5. Keep benchmark code and committed fixtures under `benchmark/`; keep downloaded models and raw run artifacts out of Git.
-- R6. Skip physical-device execution for this iteration.
+- R6. Keep emulator and physical-device execution paths available; physical-device validation is expected unless the run explicitly documents that no real device is connected or that the run is emulator-only.
+- R7. Define smoke, coarse, and full matrix layers so future agents do not confuse default smoke with exhaustive testing.
 
 ## Scope Boundaries
 
-- Do not run true-device validation in this iteration.
+- Do not silently skip true-device validation; if no real device is connected, record the run as emulator-only and keep the same commands usable with a physical `DEVICE_ID`.
 - Do not change production app behavior outside debug-only benchmark support.
-- Do not implement a full large exhaustive matrix run in code review; provide a small committed profile set and make larger matrices configurable.
+- Do not commit large generated matrix/result artifacts; provide a small committed smoke profile set and make coarse/full matrices reproducible through a generator.
 - Do not add new model families back into the default matrix.
 
 ## Context & Research
@@ -56,18 +57,21 @@ The model choice has converged to Paraformer for both Chinese and English. The r
 - Treat warm steady-state as the primary ranking view, because it isolates parameter behavior from model load noise.
 - Keep current-business-route style rows explicit instead of pretending they are the same as warm rows; the current realtime route may reload the recognizer per segment.
 - Generate an HTML report with two tabs, one for standard route and one for realtime replay, with the same underlying JSON summary available for future dashboards.
+- Generate larger coarse/full profile matrices from code instead of committing thousands of expanded profile rows.
 
 ## Open Questions
 
 ### Resolved During Planning
 
-- Should true-device validation run now? No. The user said true device is not currently connected and should be skipped.
+- Should true-device validation be part of the plan? Yes. It can be skipped only for a specific run when no physical device is connected or the operator explicitly says emulator-only.
 - Should the report remain model comparison focused? No. Paraformer is fixed; profiles are the comparison unit.
 
-### Deferred to Implementation
+### Resolved During Implementation
 
-- Exact profile count for the default committed matrix: choose a small smoke matrix that proves the machinery without making every run too long.
-- Exact score weights: start with transparent metric display and simple accuracy/latency sorting; refine weights after real profile runs exist.
+- Default committed matrix is smoke only: 4 profiles, 8 zh/en result rows.
+- Coarse matrix is the practical emulator sweep: 89 profiles, 178 zh/en rows.
+- Full matrix is generated but should be run in batches: 4969 profiles, 9938 zh/en rows.
+- Exact score weights start with transparent sorting: error rate first, then operation RTF, then memory/segment behavior.
 
 ## High-Level Technical Design
 
@@ -205,7 +209,7 @@ flowchart LR
 - Test expectation: none -- documentation-only behavior.
 
 **Verification:**
-- Docs clearly state that true-device复核 is skipped for now.
+- Docs clearly state that physical-device复核 is part of the benchmark flow and can be skipped only when a run explicitly documents the reason.
 
 - [x] **Unit 5: Validation**
 
@@ -222,7 +226,7 @@ flowchart LR
 
 **Approach:**
 - Run JSON validation, shell syntax checks, Python compile/report generation, debug APK build, and normal project checks.
-- Do not require physical-device validation.
+- Treat physical-device benchmark execution as a separate device-dependent validation step. If no real device is connected, record that limitation instead of presenting the run as complete physical validation.
 
 **Test scenarios:**
 - Happy path: static validations pass.
@@ -231,6 +235,43 @@ flowchart LR
 **Verification:**
 - `flutter build apk --debug` passes.
 - `./tool/dev_check.sh` passes.
+
+- [x] **Unit 6: Matrix Generator and Coarse Sweep**
+
+**Goal:** Make the larger tuning matrix explicit and reproducible, then run the practical coarse matrix on the emulator.
+
+**Requirements:** R2, R3, R4, R5, R7
+
+**Dependencies:** Units 1-5
+
+**Files:**
+- Create: `benchmark/generate_asr_profile_matrix.py`
+- Create: `benchmark/asr_benchmark_test_plan.md`
+- Modify: `benchmark/README.md`
+- Modify: `benchmark/asr_benchmark_results_2026-07-05.md`
+- Modify: `benchmark/generate_asr_benchmark_visual_report.py`
+
+**Approach:**
+- Keep `benchmark/asr_benchmark_profiles.json` as the committed smoke matrix.
+- Generate `coarse` and `full` profile matrices under `build/asr_benchmark/profile_matrices/`.
+- Do not commit generated matrix JSON or raw result JSON.
+- Add report `--result-file` support so a report can target one matrix run instead of mixing historical smoke/coarse results.
+- Run the coarse matrix on emulator: 89 profiles x zh/en = 178 rows.
+
+**Patterns to follow:**
+- Existing profile schema in `benchmark/asr_benchmark_profiles.json`
+- Existing report generation flow in `benchmark/generate_asr_benchmark_visual_report.py`
+
+**Test scenarios:**
+- Happy path: `--preset coarse` generates 89 unique profile IDs.
+- Happy path: `--preset full` generates 4969 unique profile IDs and batch files.
+- Integration: coarse matrix benchmark produces 178 rows and zero failures.
+- Report path: `--result-file` generates a summary from only the selected result file.
+
+**Verification:**
+- Coarse emulator run completed: `build/asr_benchmark/results/asr-benchmark-1783274555128.json`.
+- Summary contains 178 rows from only that result file.
+- Visual report regenerates from the selected coarse result file.
 
 ## System-Wide Impact
 
@@ -246,8 +287,9 @@ flowchart LR
 | Risk | Mitigation |
 |------|------------|
 | Large parameter matrices take too long on emulator | Commit a small smoke profile set and support override files for larger matrices. |
+| Default smoke run is mistaken for exhaustive tuning | Document smoke/coarse/full layers and provide `benchmark/asr_benchmark_test_plan.md`. |
 | Warm ranking hides cold-start pain | Keep cold/current rows separate and visible in report. |
-| Replay does not perfectly match microphone behavior | Label it as replay; defer true-device validation. |
+| Replay does not perfectly match microphone behavior | Label it as replay and rerun winning profiles on physical devices before production decisions. |
 | Old result JSON confuses new report | Keep backward compatibility but rank only profile-aware rows when available. |
 | Repeated fixture phrases bias accuracy | Document the risk and support additional committed fixtures later. |
 
@@ -255,7 +297,7 @@ flowchart LR
 
 - `benchmark/README.md` should be the main operator guide.
 - `benchmark/asr_benchmark_results_2026-07-05.md` should explain the current baseline and transition from model comparison to parameter tuning.
-- True-device复核 remains deferred until a device is connected.
+- True-device复核 is expected when a device is connected; emulator-only runs must say so explicitly.
 
 ## Sources & References
 

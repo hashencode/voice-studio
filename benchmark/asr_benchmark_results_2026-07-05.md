@@ -83,7 +83,7 @@ Cold/current profiles available for targeted runs:
 Known bias controls:
 - Do not compare warm, cold, and current rows as if they measure the same thing.
 - Rotate or randomize profile order for large exhaustive sweeps to reduce thermal and cache-order bias.
-- Treat simulator timing and memory as screening evidence; true-device复核 remains deferred.
+- Treat simulator timing and memory as screening evidence; physical-device复核 is required before production decisions unless a run explicitly states emulator-only.
 - Watch segment count, empty segments, p95 segment decode time, total recognizer load time, queue/drop behavior, and operation RTF together.
 - Keep warm-up policy, filesystem cache state, Android background load, emulator CPU allocation, audio sample rate, normalization, and transcript cleanup fixed across comparable runs.
 - The current committed fixtures are stable but limited; add more fixture diversity before treating a profile as globally optimal.
