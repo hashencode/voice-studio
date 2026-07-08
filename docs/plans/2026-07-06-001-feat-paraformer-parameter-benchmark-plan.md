@@ -105,7 +105,7 @@ flowchart LR
 - Modify: `benchmark/install_asr_benchmark_assets.sh`
 
 **Approach:**
-- Add a small default profile set covering baseline standard warm/current/cold rows and realtime replay RMS/Silero-style profile examples.
+- Add a small default profile set covering baseline standard warm/current/cold rows and realtime replay RMS-style profile examples.
 - Copy the profile file into benchmark staging alongside `manifest.json`.
 - Allow override with `BENCHMARK_PROFILES_FILE` for future large matrices.
 
@@ -138,7 +138,7 @@ flowchart LR
 **Approach:**
 - Parse `profiles.json` into route/profile records.
 - Add standard route modes for whole-file warm/current/cold and VAD segmented warm.
-- Add realtime replay modes that feed wav samples as synthetic PCM frames, segment by RMS or Silero VAD semantics, and decode resulting segments.
+- Add realtime replay modes that feed wav samples as synthetic PCM frames, segment by RMS VAD semantics, and decode resulting segments.
 - Record `route`, `profileId`, `profileName`, `runClass`, `loadStrategy`, profile parameters, warm-up status, segment stats, decode timing, and memory snapshots.
 - Keep current-business-route style rows separate from warm rows so recognizer reload behavior is visible.
 
@@ -298,6 +298,7 @@ flowchart LR
 - `benchmark/README.md` should be the main operator guide.
 - `benchmark/asr_benchmark_results_2026-07-05.md` should explain the current baseline and transition from model comparison to parameter tuning.
 - True-device复核 is expected when a device is connected; emulator-only runs must say so explicitly.
+- Follow-up standard: `docs/plans/2026-07-07-001-feat-asr-benchmark-decision-sweeps-plan.md` supersedes the default execution order with validation audio, focused micro-sweeps, and measured complete-audio length thresholds. Coarse and full matrices remain optional deep-search layers, not the default path.
 
 ## Sources & References
 

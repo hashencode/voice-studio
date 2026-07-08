@@ -39,3 +39,22 @@ REBUILD_FROM_SOURCES=1 ./benchmark/prepare_asr_benchmark_audio.sh
 ```
 
 That path downloads the public source audio into `build/asr_benchmark/source_audio/` and writes regenerated files under `build/asr_benchmark/audio/`. It does not update committed fixtures automatically.
+
+## Generated Validation Audio
+
+Validation and length audio is generated into `build/asr_benchmark/validation_audio/`:
+
+```bash
+./benchmark/prepare_asr_validation_audio.py --mode all
+```
+
+Generated manifests are written under `build/asr_benchmark/diagnostics/`:
+
+- `asr-official-en-manifest.json`: official English `0.wav` and `1.wav` extracted from the Paraformer English archive.
+- `asr-validation-manifest.json`: committed long zh/en fixtures copied into the generated audio root, one AISHELL Chinese validation case, and two official English validation cases.
+- `asr-length-decision-manifest.json`: generated zh/en complete-audio cases targeting 15s, 30s, 60s, 120s, 300s, and 600s.
+
+All generated validation WAV files are normalized to mono 16kHz PCM.
+Only ordinary 16kHz audio with reference text is part of the current benchmark standard.
+
+Chinese official model `test_wavs` are not used for CER scoring because the current archive does not include reference transcripts.
