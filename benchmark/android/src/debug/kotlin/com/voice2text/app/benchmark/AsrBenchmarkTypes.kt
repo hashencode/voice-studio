@@ -46,17 +46,12 @@ internal data class AsrBenchmarkProfile(
     val route: String,
     val runClass: String,
     val mode: String?,
-    val vadType: String?,
     val loadStrategy: String,
     val numThreads: Int?,
     val warmupIterations: Int,
-    val frameMs: Int,
-    val speechThreshold: Double,
-    val minSpeechMs: Int,
-    val endSilenceMs: Int,
     val maxSegmentMs: Int,
-    val preRollMs: Int,
-    val maxQueuedSegments: Int,
+    val liveFrameMs: Int,
+    val liveRealtimePace: Boolean,
     val modelIds: Set<String>?,
     val languages: Set<String>?,
     val vadOverrides: AsrBenchmarkVadOverrides?,
@@ -79,4 +74,17 @@ internal data class AsrDecodeOutcome(
 internal data class AsrMemorySnapshot(
     val javaHeapUsedBytes: Long,
     val nativeHeapAllocatedBytes: Long,
+)
+
+internal data class AsrBenchmarkProgress(
+    val startedAtMs: Long,
+    val updatedAtMs: Long,
+    val totalPairs: Int,
+    val completedPairs: Int,
+    val resultCount: Int,
+    val failureCount: Int,
+    val currentStage: String,
+    val currentModelId: String?,
+    val currentProfileId: String?,
+    val currentAudioCaseId: String?,
 )

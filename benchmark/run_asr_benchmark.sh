@@ -3,11 +3,49 @@ set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$ROOT"
-DEVICE_ID="${DEVICE_ID:-${1:-emulator-5554}}"
 APP_ID="${APP_ID:-com.voice2text.app}"
 SEGMENT_WINDOW_MS="${SEGMENT_WINDOW_MS:-12000}"
 RESULT_DIR="$ROOT/build/asr_benchmark/results"
 LOG_DIR="$ROOT/build/asr_benchmark/logs"
+
+detect_device_id() {
+  local requested="${1:-}"
+
+  if [[ -n "${DEVICE_ID:-}" ]]; then
+    echo "$DEVICE_ID"
+    return
+  fi
+
+  if [[ -n "$requested" ]]; then
+    echo "$requested"
+    return
+  fi
+
+  if ! command -v adb >/dev/null 2>&1; then
+    echo "adb is not available on PATH." >&2
+    exit 1
+  fi
+
+  local devices
+  devices="$(adb devices | awk 'NR > 1 && $2 == "device" { print $1 }')"
+  local count
+  count="$(printf '%s\n' "$devices" | sed '/^$/d' | wc -l | tr -d ' ')"
+
+  if [[ "$count" == "1" ]]; then
+    printf '%s\n' "$devices" | sed '/^$/d'
+    return
+  fi
+
+  if [[ "$count" == "0" ]]; then
+    echo "No online Android device found. Start an emulator or connect a device, then retry." >&2
+  else
+    echo "Multiple online Android devices found. Set DEVICE_ID or pass a device serial:" >&2
+    printf '%s\n' "$devices" | sed '/^$/d;s/^/  /' >&2
+  fi
+  exit 1
+}
+
+DEVICE_ID="$(detect_device_id "${1:-}")"
 
 mkdir -p "$RESULT_DIR" "$LOG_DIR"
 
@@ -31,6 +69,7 @@ echo "[4/6] Installing benchmark assets"
 
 echo "[5/6] Running native benchmark activity"
 log_file="$LOG_DIR/asr-benchmark-$(date +%Y%m%d-%H%M%S).log"
+adb -s "$DEVICE_ID" shell am force-stop "$APP_ID" >/dev/null || true
 adb -s "$DEVICE_ID" shell "run-as '$APP_ID' rm -f files/asr_benchmark/status.json" >/dev/null
 adb -s "$DEVICE_ID" shell am start \
   -n "$APP_ID/com.voice2text.app.benchmark.AsrBenchmarkActivity" \
@@ -38,11 +77,36 @@ adb -s "$DEVICE_ID" shell am start \
 
 deadline=$((SECONDS + ${ASR_BENCHMARK_TIMEOUT_SECONDS:-1800}))
 remote_result=""
+last_progress_line=""
 while [[ "$SECONDS" -lt "$deadline" ]]; do
   status_json="$(adb -s "$DEVICE_ID" exec-out run-as "$APP_ID" cat files/asr_benchmark/status.json 2>/dev/null | tr -d '\r' || true)"
   if [[ -n "$status_json" ]]; then
     echo "$status_json" > "$LOG_DIR/latest-status.json"
     status="$(python3 -c 'import json,sys; print(json.load(sys.stdin).get("status",""))' <<<"$status_json" 2>/dev/null || true)"
+    progress_line="$(python3 -c 'import json,sys
+s=json.load(sys.stdin)
+parts=[]
+completed=s.get("completedPairs")
+total=s.get("totalPairs")
+stage=s.get("currentStage")
+model=s.get("currentModelId")
+profile=s.get("currentProfileId")
+audio=s.get("currentAudioCaseId")
+if completed is not None and total is not None:
+    parts.append(f"{completed}/{total}")
+if stage:
+    parts.append(str(stage))
+if model:
+    parts.append(str(model))
+if profile:
+    parts.append(str(profile))
+if audio:
+    parts.append(str(audio))
+print(" | ".join(parts))' <<<"$status_json" 2>/dev/null || true)"
+    if [[ -n "$progress_line" && "$progress_line" != "$last_progress_line" ]]; then
+      echo "Progress: $progress_line"
+      last_progress_line="$progress_line"
+    fi
     if [[ "$status" == "done" ]]; then
       remote_result="$(python3 -c 'import json,sys; print(json.load(sys.stdin).get("reportPath",""))' <<<"$status_json")"
       break

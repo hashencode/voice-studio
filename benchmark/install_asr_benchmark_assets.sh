@@ -3,7 +3,6 @@ set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$ROOT"
-DEVICE_ID="${1:-emulator-5554}"
 APP_ID="${2:-com.voice2text.app}"
 LOCAL_ROOT="$ROOT/build/asr_benchmark"
 STAGING="$LOCAL_ROOT/staging"
@@ -11,6 +10,45 @@ REMOTE_TMP="/data/local/tmp/voice2text-asr-benchmark"
 MANIFEST_FILE="${BENCHMARK_MANIFEST_FILE:-$ROOT/benchmark/asr_benchmark_manifest.json}"
 PROFILES_FILE="${BENCHMARK_PROFILES_FILE:-$ROOT/benchmark/asr_benchmark_profiles.json}"
 AUDIO_ROOT="${BENCHMARK_AUDIO_ROOT:-$ROOT/benchmark}"
+
+detect_device_id() {
+  local requested="${1:-}"
+
+  if [[ -n "$requested" ]]; then
+    echo "$requested"
+    return
+  fi
+
+  if [[ -n "${DEVICE_ID:-}" ]]; then
+    echo "$DEVICE_ID"
+    return
+  fi
+
+  if ! command -v adb >/dev/null 2>&1; then
+    echo "adb is not available on PATH." >&2
+    exit 1
+  fi
+
+  local devices
+  devices="$(adb devices | awk 'NR > 1 && $2 == "device" { print $1 }')"
+  local count
+  count="$(printf '%s\n' "$devices" | sed '/^$/d' | wc -l | tr -d ' ')"
+
+  if [[ "$count" == "1" ]]; then
+    printf '%s\n' "$devices" | sed '/^$/d'
+    return
+  fi
+
+  if [[ "$count" == "0" ]]; then
+    echo "No online Android device found. Start an emulator or connect a device, then retry." >&2
+  else
+    echo "Multiple online Android devices found. Set DEVICE_ID or pass a device serial:" >&2
+    printf '%s\n' "$devices" | sed '/^$/d;s/^/  /' >&2
+  fi
+  exit 1
+}
+
+DEVICE_ID="$(detect_device_id "${1:-}")"
 
 require_file() {
   local path="$1"
@@ -132,6 +170,7 @@ cp "$ROOT/assets/sherpa/onnx/silero-vad.onnx" "$STAGING/vad/silero-vad.onnx"
 
 adb -s "$DEVICE_ID" shell "rm -rf '$REMOTE_TMP'"
 adb -s "$DEVICE_ID" push "$STAGING" "$REMOTE_TMP" >/dev/null
+adb -s "$DEVICE_ID" shell am force-stop "$APP_ID" >/dev/null || true
 adb -s "$DEVICE_ID" shell "run-as '$APP_ID' sh -c 'rm -rf files/asr_benchmark && mkdir -p files/asr_benchmark'"
 adb -s "$DEVICE_ID" shell "run-as '$APP_ID' sh -c 'cp -R $REMOTE_TMP/. files/asr_benchmark/'"
 adb -s "$DEVICE_ID" shell "rm -rf '$REMOTE_TMP'"

@@ -19,23 +19,57 @@ class AsrBenchmarkActivity : Activity() {
         val segmentWindowMs = intent.getIntExtra("segmentWindowMs", 12000)
         val statusFile = File(filesDir, "asr_benchmark/status.json")
         statusFile.parentFile?.mkdirs()
-        writeStatus(
-            statusFile,
-            JSONObject()
+        val startedAtMs = System.currentTimeMillis()
+        fun runningStatus(progress: AsrBenchmarkProgress? = null): JSONObject {
+            val status = JSONObject()
                 .put("status", "running")
-                .put("startedAtMs", System.currentTimeMillis())
-                .put("segmentWindowMs", segmentWindowMs),
-        )
+                .put("startedAtMs", startedAtMs)
+                .put("updatedAtMs", System.currentTimeMillis())
+                .put("segmentWindowMs", segmentWindowMs)
+            if (progress != null) {
+                status
+                    .put("progressStartedAtMs", progress.startedAtMs)
+                    .put("progressUpdatedAtMs", progress.updatedAtMs)
+                    .put("totalPairs", progress.totalPairs)
+                    .put("completedPairs", progress.completedPairs)
+                    .put(
+                        "progressPercent",
+                        if (progress.totalPairs > 0) progress.completedPairs.toDouble() / progress.totalPairs else JSONObject.NULL,
+                    )
+                    .put("resultCount", progress.resultCount)
+                    .put("failureCount", progress.failureCount)
+                    .put("currentStage", progress.currentStage)
+                    .put("currentModelId", progress.currentModelId ?: JSONObject.NULL)
+                    .put("currentProfileId", progress.currentProfileId ?: JSONObject.NULL)
+                    .put("currentAudioCaseId", progress.currentAudioCaseId ?: JSONObject.NULL)
+            }
+            return status
+        }
+        writeStatus(statusFile, runningStatus())
 
         Thread {
             try {
-                val result = AsrBenchmarkRunner(this).run(segmentWindowMs)
+                val result = AsrBenchmarkRunner(this) { progress ->
+                    writeStatus(statusFile, runningStatus(progress))
+                    runOnUiThread {
+                        statusView.text = buildString {
+                            append("ASR benchmark running\n")
+                            append("${progress.completedPairs}/${progress.totalPairs} pairs\n")
+                            append(progress.currentStage)
+                            progress.currentProfileId?.let { append("\n").append(it) }
+                            progress.currentAudioCaseId?.let { append("\n").append(it) }
+                        }
+                    }
+                }.run(segmentWindowMs)
                 val status = JSONObject()
                     .put("status", "done")
+                    .put("startedAtMs", startedAtMs)
                     .put("finishedAtMs", System.currentTimeMillis())
                     .put("reportPath", result["reportPath"])
                     .put("resultCount", result["resultCount"])
                     .put("failureCount", result["failureCount"])
+                    .put("totalPairs", result["totalPairs"])
+                    .put("completedPairs", result["completedPairs"])
                     .put("modelsConfigured", result["modelsConfigured"])
                     .put("audioCasesConfigured", result["audioCasesConfigured"])
                 writeStatus(statusFile, status)
@@ -48,6 +82,7 @@ class AsrBenchmarkActivity : Activity() {
                     statusFile,
                     JSONObject()
                         .put("status", "failed")
+                        .put("startedAtMs", startedAtMs)
                         .put("finishedAtMs", System.currentTimeMillis())
                         .put("message", e.message ?: "ASR benchmark failed"),
                 )

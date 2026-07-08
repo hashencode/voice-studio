@@ -15,18 +15,18 @@ import com.k2fsa.sherpa.onnx.VadModelConfig
 import com.k2fsa.sherpa.onnx.WaveReader
 import java.io.File
 import java.util.Locale
-import kotlin.math.max
 import kotlin.math.min
 import kotlin.math.roundToInt
-import kotlin.math.sqrt
 import org.json.JSONArray
 import org.json.JSONObject
 
 internal class AsrBenchmarkRunner(
     private val context: Context,
+    private val progressListener: ((AsrBenchmarkProgress) -> Unit)? = null,
 ) {
     fun run(segmentWindowMs: Int): Map<String, Any> {
         require(segmentWindowMs > 0) { "segmentWindowMs must be positive" }
+        val startedAtMs = System.currentTimeMillis()
 
         val paths = AsrBenchmarkPaths(File(context.filesDir, "asr_benchmark"))
         if (!paths.manifestFile.exists()) {
@@ -41,8 +41,38 @@ internal class AsrBenchmarkRunner(
         val profiles = parseProfiles(paths, manifest, segmentWindowMs)
         val results = JSONArray()
         val failures = JSONArray()
+        val totalPairs = models.sumOf { model ->
+            profiles.sumOf { profile ->
+                if (profileAppliesToModel(profile, model)) matchingAudioCases(model, profile, audioCases).size else 0
+            }
+        }
+        var completedPairs = 0
 
-        if (profiles.any { it.mode == MODE_VAD_SEGMENTED_OFFLINE || it.vadType == VAD_TYPE_SILERO }) {
+        fun reportProgress(
+            stage: String,
+            model: AsrBenchmarkModel? = null,
+            profile: AsrBenchmarkProfile? = null,
+            audioCase: AsrBenchmarkAudioCase? = null,
+        ) {
+            progressListener?.invoke(
+                AsrBenchmarkProgress(
+                    startedAtMs = startedAtMs,
+                    updatedAtMs = System.currentTimeMillis(),
+                    totalPairs = totalPairs,
+                    completedPairs = completedPairs.coerceAtMost(totalPairs),
+                    resultCount = results.length(),
+                    failureCount = failures.length(),
+                    currentStage = stage,
+                    currentModelId = model?.id,
+                    currentProfileId = profile?.id,
+                    currentAudioCaseId = audioCase?.id,
+                ),
+            )
+        }
+
+        reportProgress("initialized")
+
+        if (profiles.any { it.mode == MODE_VAD_SEGMENTED_OFFLINE }) {
             if (vadConfig == null) {
                 throw IllegalStateException("VAD benchmark profiles require a vad config in manifest.json")
             }
@@ -57,28 +87,37 @@ internal class AsrBenchmarkRunner(
             val modelSizeBytes = directorySize(modelDir)
             val validationError = validateModelFiles(model, modelDir)
             if (validationError != null) {
+                val skippedPairs = profiles
+                    .filter { profileAppliesToModel(it, model) }
+                    .sumOf { matchingAudioCases(model, it, audioCases).size }
                 failures.put(failureJson(model.id, null, "model_validation", validationError))
+                completedPairs += skippedPairs
+                reportProgress("model_validation_failed", model)
                 continue
             }
 
             for (profile in profiles) {
                 if (!profileAppliesToModel(profile, model)) continue
+                val matchingAudioCases = matchingAudioCases(model, profile, audioCases)
+                if (matchingAudioCases.isEmpty()) continue
+                reportProgress("profile_start", model, profile)
 
                 var sharedLoaded: LoadedRecognizer? = null
                 if (profile.loadStrategy == LOAD_STRATEGY_SHARED) {
                     sharedLoaded = try {
+                        reportProgress("recognizer_load", model, profile)
                         loadRecognizer(model, modelDir, profile.numThreads ?: model.numThreads)
                     } catch (e: Exception) {
                         failures.put(failureJson(model.id, null, "recognizer_load:${profile.id}", e.message ?: "unknown error"))
+                        completedPairs += matchingAudioCases.size
+                        reportProgress("recognizer_load_failed", model, profile)
                         continue
                     }
                 }
 
                 try {
-                    for (audioCase in audioCases) {
-                        if (!model.languages.contains(audioCase.language)) continue
-                        if (!profileAppliesToAudio(profile, audioCase)) continue
-
+                    for (audioCase in matchingAudioCases) {
+                        reportProgress("pair_start", model, profile, audioCase)
                         try {
                             results.put(
                                 runProfileAudioCase(
@@ -92,8 +131,12 @@ internal class AsrBenchmarkRunner(
                                     baseVadConfig = vadConfig,
                                 ),
                             )
+                            completedPairs += 1
+                            reportProgress("pair_done", model, profile, audioCase)
                         } catch (e: Exception) {
                             failures.put(failureJson(model.id, audioCase.id, "profile:${profile.id}", e.message ?: "unknown error"))
+                            completedPairs += 1
+                            reportProgress("pair_failed", model, profile, audioCase)
                         }
                     }
                 } finally {
@@ -108,6 +151,8 @@ internal class AsrBenchmarkRunner(
         if (results.length() == 0 && failures.length() == 0) {
             throw IllegalStateException("No benchmark pairs were runnable")
         }
+
+        reportProgress("finalizing")
 
         val report = JSONObject()
             .put("schemaVersion", 2)
@@ -141,6 +186,8 @@ internal class AsrBenchmarkRunner(
             "reportPath" to reportFile.absolutePath,
             "resultCount" to results.length(),
             "failureCount" to failures.length(),
+            "totalPairs" to totalPairs,
+            "completedPairs" to completedPairs.coerceAtMost(totalPairs),
             "profilesConfigured" to profiles.size,
             "modelsConfigured" to models.size,
             "audioCasesConfigured" to audioCases.size,
@@ -197,17 +244,12 @@ internal class AsrBenchmarkRunner(
                     route = ROUTE_STANDARD,
                     runClass = RUN_CLASS_WARM,
                     mode = mode,
-                    vadType = null,
                     loadStrategy = LOAD_STRATEGY_SHARED,
                     numThreads = null,
                     warmupIterations = 0,
-                    frameMs = 100,
-                    speechThreshold = 520.0,
-                    minSpeechMs = 320,
-                    endSilenceMs = 720,
                     maxSegmentMs = segmentWindowMs,
-                    preRollMs = 0,
-                    maxQueuedSegments = 2,
+                    liveFrameMs = LIVE_FRAME_MS_DEFAULT,
+                    liveRealtimePace = false,
                     modelIds = null,
                     languages = null,
                     vadOverrides = null,
@@ -227,17 +269,12 @@ internal class AsrBenchmarkRunner(
                 route = item.getString("route"),
                 runClass = item.optString("runClass", RUN_CLASS_WARM),
                 mode = item.optNullableString("mode"),
-                vadType = item.optNullableString("vadType"),
                 loadStrategy = item.optString("loadStrategy", LOAD_STRATEGY_SHARED),
                 numThreads = if (item.has("numThreads")) item.optInt("numThreads").coerceAtLeast(1) else null,
                 warmupIterations = item.optInt("warmupIterations", 0).coerceAtLeast(0),
-                frameMs = item.optInt("frameMs", 100).coerceAtLeast(10),
-                speechThreshold = item.optDouble("speechThreshold", 520.0),
-                minSpeechMs = item.optInt("minSpeechMs", 320).coerceAtLeast(0),
-                endSilenceMs = item.optInt("endSilenceMs", 720).coerceAtLeast(0),
                 maxSegmentMs = item.optInt("maxSegmentMs", segmentWindowMs).coerceAtLeast(1),
-                preRollMs = item.optInt("preRollMs", 0).coerceAtLeast(0),
-                maxQueuedSegments = item.optInt("maxQueuedSegments", 2).coerceAtLeast(1),
+                liveFrameMs = item.optInt("liveFrameMs", LIVE_FRAME_MS_DEFAULT).coerceAtLeast(10),
+                liveRealtimePace = item.optBoolean("liveRealtimePace", false),
                 modelIds = item.optJSONArray("modelIds")?.toStringSet(),
                 languages = item.optJSONArray("languages")?.toStringSet(),
                 vadOverrides = vad?.let {
@@ -256,7 +293,7 @@ internal class AsrBenchmarkRunner(
     private fun parseModes(manifest: JSONObject): List<String> {
         val configured = manifest.optJSONArray("modes") ?: return listOf(MODE_OFFLINE, MODE_SEGMENTED_OFFLINE)
         val modes = (0 until configured.length()).map { configured.getString(it) }
-        val allowed = setOf(MODE_OFFLINE, MODE_SEGMENTED_OFFLINE, MODE_VAD_SEGMENTED_OFFLINE)
+        val allowed = setOf(MODE_OFFLINE, MODE_SEGMENTED_OFFLINE, MODE_VAD_SEGMENTED_OFFLINE, MODE_LIVE_VAD_REPLAY)
         val unknown = modes.filterNot { allowed.contains(it) }
         require(unknown.isEmpty()) { "unsupported benchmark modes: ${unknown.joinToString()}" }
         return modes.distinct()
@@ -267,8 +304,8 @@ internal class AsrBenchmarkRunner(
         return AsrBenchmarkVadConfig(
             model = vad.getString("model"),
             sampleRate = vad.optInt("sampleRate", 16000),
-            threshold = vad.optDouble("threshold", 0.2).toFloat(),
-            minSilenceDurationSec = vad.optDouble("minSilenceDurationSec", 0.25).toFloat(),
+            threshold = vad.optDouble("threshold", 0.15).toFloat(),
+            minSilenceDurationSec = vad.optDouble("minSilenceDurationSec", 0.20).toFloat(),
             minSpeechDurationSec = vad.optDouble("minSpeechDurationSec", 0.25).toFloat(),
             windowSize = vad.optInt("windowSize", 512),
             maxSpeechDurationSec = vad.optDouble("maxSpeechDurationSec", 5.0).toFloat(),
@@ -282,6 +319,16 @@ internal class AsrBenchmarkRunner(
 
     private fun profileAppliesToAudio(profile: AsrBenchmarkProfile, audioCase: AsrBenchmarkAudioCase): Boolean {
         return profile.languages?.contains(audioCase.language) ?: true
+    }
+
+    private fun matchingAudioCases(
+        model: AsrBenchmarkModel,
+        profile: AsrBenchmarkProfile,
+        audioCases: List<AsrBenchmarkAudioCase>,
+    ): List<AsrBenchmarkAudioCase> {
+        return audioCases.filter { audioCase ->
+            model.languages.contains(audioCase.language) && profileAppliesToAudio(profile, audioCase)
+        }
     }
 
     private fun profileVadConfig(base: AsrBenchmarkVadConfig?, profile: AsrBenchmarkProfile): AsrBenchmarkVadConfig {
@@ -412,7 +459,7 @@ internal class AsrBenchmarkRunner(
             val memoryBefore = memorySnapshot()
             val result = when (profile.route) {
                 ROUTE_STANDARD -> runStandardProfile(profile, wave.samples, wave.sampleRate, root, baseVadConfig, ::decodeOne)
-                ROUTE_REALTIME_REPLAY -> runRealtimeReplayProfile(profile, wave.samples, wave.sampleRate, root, baseVadConfig, ::decodeOne)
+                ROUTE_LIVE_VAD -> runLiveVadProfile(profile, wave.samples, wave.sampleRate, root, baseVadConfig, ::decodeOne)
                 else -> throw IllegalArgumentException("Unsupported benchmark route: ${profile.route}")
             }
             val memoryAfter = memorySnapshot()
@@ -496,7 +543,7 @@ internal class AsrBenchmarkRunner(
         }
     }
 
-    private fun runRealtimeReplayProfile(
+    private fun runLiveVadProfile(
         profile: AsrBenchmarkProfile,
         samples: FloatArray,
         sampleRate: Int,
@@ -504,19 +551,17 @@ internal class AsrBenchmarkRunner(
         baseVadConfig: AsrBenchmarkVadConfig?,
         decodeOne: (FloatArray, Int) -> AsrDecodeOutcome,
     ): JSONObject {
-        return when (profile.vadType ?: VAD_TYPE_RMS) {
-            VAD_TYPE_RMS -> decodeRealtimeRmsReplay(samples, sampleRate, profile, decodeOne)
-            VAD_TYPE_SILERO -> decodeVadSegmented(
+        return when (val mode = profile.mode ?: MODE_LIVE_VAD_REPLAY) {
+            MODE_LIVE_VAD_REPLAY -> decodeLiveVadReplay(
                 samples = samples,
                 sampleRate = sampleRate,
                 vadConfig = profileVadConfig(baseVadConfig, profile),
                 benchmarkRoot = root,
+                liveFrameMs = profile.liveFrameMs,
+                realtimePace = profile.liveRealtimePace,
                 decodeOne = decodeOne,
-            )
-                .put("mode", MODE_REALTIME_REPLAY)
-                .put("vadType", VAD_TYPE_SILERO)
-                .put("frameMs", profile.frameMs)
-            else -> throw IllegalArgumentException("Unsupported realtime replay VAD type: ${profile.vadType}")
+            ).put("mode", mode)
+            else -> throw IllegalArgumentException("Unsupported live_vad mode: $mode")
         }
     }
 
@@ -695,112 +740,164 @@ internal class AsrBenchmarkRunner(
             .put("segments", segments)
     }
 
-    private fun decodeRealtimeRmsReplay(
+    private fun decodeLiveVadReplay(
         samples: FloatArray,
         sampleRate: Int,
-        profile: AsrBenchmarkProfile,
+        vadConfig: AsrBenchmarkVadConfig,
+        benchmarkRoot: File,
+        liveFrameMs: Int,
+        realtimePace: Boolean,
         decodeOne: (FloatArray, Int) -> AsrDecodeOutcome,
     ): JSONObject {
-        val frameSamples = ((sampleRate * profile.frameMs) / 1000.0).roundToInt().coerceAtLeast(1)
-        val preRollSamples = ((sampleRate * profile.preRollMs) / 1000.0).roundToInt().coerceAtLeast(0)
+        val vadModelFile = File(benchmarkRoot, vadConfig.model)
+        val nativeConfig = VadModelConfig(
+            sileroVadModelConfig = SileroVadModelConfig(
+                model = vadModelFile.absolutePath,
+                threshold = vadConfig.threshold,
+                minSilenceDuration = vadConfig.minSilenceDurationSec,
+                minSpeechDuration = vadConfig.minSpeechDurationSec,
+                windowSize = vadConfig.windowSize,
+                maxSpeechDuration = vadConfig.maxSpeechDurationSec,
+            ),
+            sampleRate = vadConfig.sampleRate,
+            numThreads = vadConfig.numThreads,
+            provider = "cpu",
+            debug = false,
+        )
+        val vad = Vad(null as android.content.res.AssetManager?, nativeConfig)
         val startedWall = SystemClock.elapsedRealtimeNanos()
         val startedCpu = Debug.threadCpuTimeNanos()
         val segments = JSONArray()
         val texts = mutableListOf<String>()
-        var inSpeech = false
-        var segmentStart = 0
-        var lastSpeechEnd = 0
-        var trailingSilenceMs = 0
-        var speechSampleCount = 0L
+        val boundaryLatencies = mutableListOf<Long>()
+        val paceLagValues = mutableListOf<Long>()
         var index = 0
+        var speechSampleCount = 0L
+        var totalPaceSleepMs = 0L
+        var firstSegmentEndMs: Long? = null
+        var firstSegmentEmitAudioMs: Long? = null
+        var firstSegmentBoundaryLatencyMs: Long? = null
+        var firstSegmentResultWallMs: Long? = null
+        var finalSegmentEndMs = 0L
+        var finalSegmentEmitAudioMs = 0L
+        var finalSegmentBoundaryLatencyMs = 0L
+        var finalSegmentResultWallMs = 0L
 
-        fun finishSegment(endSample: Int) {
-            val safeEnd = endSample.coerceIn(segmentStart, samples.size)
-            if (safeEnd <= segmentStart) return
-            val segmentSamples = samples.copyOfRange(segmentStart, safeEnd)
-            val outcome = decodeOne(segmentSamples, sampleRate)
-            if (outcome.text.isNotBlank()) texts.add(outcome.text)
-            speechSampleCount += segmentSamples.size.toLong()
-            segments.put(
-                JSONObject()
-                    .put("index", index)
-                    .put("startMs", ((segmentStart.toDouble() / sampleRate) * 1000.0).roundToInt())
-                    .put("endMs", ((safeEnd.toDouble() / sampleRate) * 1000.0).roundToInt())
-                    .put("sampleCount", segmentSamples.size)
-                    .put("decodeWallMs", outcome.wallMs)
-                    .put("decodeCpuMs", outcome.cpuMs)
-                    .put("emptyResult", outcome.text.isBlank())
-                    .put("text", outcome.text),
-            )
-            index += 1
-        }
-
-        fun resetSegmenter() {
-            inSpeech = false
-            segmentStart = 0
-            lastSpeechEnd = 0
-            trailingSilenceMs = 0
-        }
-
-        var start = 0
-        while (start < samples.size) {
-            val end = min(start + frameSamples, samples.size)
-            val frameDurationMs = (((end - start).toDouble() / sampleRate) * 1000.0).roundToInt().coerceAtLeast(1)
-            val speech = rmsPcm16(samples, start, end) >= profile.speechThreshold
-
-            if (!inSpeech && speech) {
-                inSpeech = true
-                segmentStart = max(0, start - preRollSamples)
-                lastSpeechEnd = end
-                trailingSilenceMs = 0
-            } else if (inSpeech && speech) {
-                lastSpeechEnd = end
-                trailingSilenceMs = 0
-            } else if (inSpeech) {
-                trailingSilenceMs += frameDurationMs
+        try {
+            fun audioMs(sampleCount: Int): Long {
+                return ((sampleCount.toDouble() / sampleRate) * 1000.0).roundToInt().toLong()
             }
 
-            if (inSpeech) {
-                val segmentDurationMs = (((end - segmentStart).toDouble() / sampleRate) * 1000.0).roundToInt()
-                val speechDurationMs = (((lastSpeechEnd - segmentStart).toDouble() / sampleRate) * 1000.0).roundToInt()
-                if (
-                    segmentDurationMs >= profile.maxSegmentMs ||
-                    (trailingSilenceMs >= profile.endSilenceMs && speechDurationMs >= profile.minSpeechMs)
-                ) {
-                    finishSegment(end)
-                    resetSegmenter()
-                } else if (trailingSilenceMs >= profile.endSilenceMs && speechDurationMs < profile.minSpeechMs) {
-                    resetSegmenter()
+            fun paceToAudio(acceptedSamples: Int) {
+                if (!realtimePace) return
+                val targetMs = audioMs(acceptedSamples)
+                val currentMs = elapsedMsSince(startedWall)
+                val sleepMs = (targetMs - currentMs).coerceAtLeast(0L)
+                if (sleepMs > 0L) {
+                    SystemClock.sleep(sleepMs)
+                    totalPaceSleepMs += sleepMs
+                }
+                paceLagValues.add((elapsedMsSince(startedWall) - targetMs).coerceAtLeast(0L))
+            }
+
+            fun drainDetectedSegments(acceptedSamples: Int) {
+                val emitAudioMs = audioMs(acceptedSamples)
+                while (!vad.empty()) {
+                    val speech = vad.front()
+                    val segmentSamples = speech.samples
+                    val startSample = speech.start
+                    val endSample = startSample + segmentSamples.size
+                    val startMs = audioMs(startSample)
+                    val endMs = audioMs(endSample)
+                    val boundaryLatencyMs = (emitAudioMs - endMs).coerceAtLeast(0L)
+                    val outcome = decodeOne(segmentSamples, sampleRate)
+                    val resultWallMs = elapsedMsSince(startedWall)
+                    if (outcome.text.isNotBlank()) texts.add(outcome.text)
+                    speechSampleCount += segmentSamples.size.toLong()
+                    boundaryLatencies.add(boundaryLatencyMs)
+
+                    if (firstSegmentEndMs == null) {
+                        firstSegmentEndMs = endMs
+                        firstSegmentEmitAudioMs = emitAudioMs
+                        firstSegmentBoundaryLatencyMs = boundaryLatencyMs
+                        firstSegmentResultWallMs = resultWallMs
+                    }
+                    finalSegmentEndMs = endMs
+                    finalSegmentEmitAudioMs = emitAudioMs
+                    finalSegmentBoundaryLatencyMs = boundaryLatencyMs
+                    finalSegmentResultWallMs = resultWallMs
+
+                    segments.put(
+                        JSONObject()
+                            .put("index", index)
+                            .put("startMs", startMs)
+                            .put("endMs", endMs)
+                            .put("emitAudioMs", emitAudioMs)
+                            .put("boundaryLatencyMs", boundaryLatencyMs)
+                            .put("resultWallMs", resultWallMs)
+                            .put("sampleCount", segmentSamples.size)
+                            .put("decodeWallMs", outcome.wallMs)
+                            .put("decodeCpuMs", outcome.cpuMs)
+                            .put("emptyResult", outcome.text.isBlank())
+                            .put("text", outcome.text),
+                    )
+                    vad.pop()
+                    index += 1
                 }
             }
-            start = end
-        }
 
-        if (inSpeech) {
-            finishSegment(samples.size)
-            resetSegmenter()
+            val liveFrameSamples = ((sampleRate * liveFrameMs) / 1000.0).roundToInt()
+                .coerceAtLeast(vadConfig.windowSize)
+            var start = 0
+            while (start < samples.size) {
+                val end = min(start + liveFrameSamples, samples.size)
+                vad.acceptWaveform(samples.copyOfRange(start, end))
+                drainDetectedSegments(end)
+                paceToAudio(end)
+                start = end
+            }
+            vad.flush()
+            drainDetectedSegments(samples.size)
+        } finally {
+            try {
+                vad.release()
+            } catch (_: Exception) {
+            }
         }
 
         if (index == 0) {
-            throw IllegalStateException("RMS replay detected no speech segments")
+            throw IllegalStateException("live_vad detected no speech segments")
         }
+        val decodeWallMs = elapsedMsSince(startedWall)
 
         return JSONObject()
-            .put("mode", MODE_REALTIME_REPLAY)
-            .put("vadType", VAD_TYPE_RMS)
-            .put("frameMs", profile.frameMs)
-            .put("speechThreshold", profile.speechThreshold)
-            .put("minSpeechMs", profile.minSpeechMs)
-            .put("endSilenceMs", profile.endSilenceMs)
-            .put("maxSegmentMs", profile.maxSegmentMs)
-            .put("preRollMs", profile.preRollMs)
-            .put("maxQueuedSegments", profile.maxQueuedSegments)
-            .put("droppedSegmentCount", 0)
             .put("text", texts.joinToString(" ").trim())
-            .put("decodeWallMs", elapsedMsSince(startedWall))
+            .put("decodeWallMs", decodeWallMs)
             .put("decodeCpuMs", elapsedThreadCpuMsSince(startedCpu))
             .put("segmentCount", index)
+            .put("vadModel", vadModelFile.name)
+            .put("vadSampleRate", vadConfig.sampleRate)
+            .put("vadThreshold", vadConfig.threshold.toDouble())
+            .put("vadMinSilenceDurationSec", vadConfig.minSilenceDurationSec.toDouble())
+            .put("vadMinSpeechDurationSec", vadConfig.minSpeechDurationSec.toDouble())
+            .put("vadMaxSpeechDurationSec", vadConfig.maxSpeechDurationSec.toDouble())
             .put("vadSpeechDurationSec", speechSampleCount.toDouble() / sampleRate.toDouble())
+            .put("liveFrameMs", liveFrameMs)
+            .put("liveRealtimePace", realtimePace)
+            .put("livePaceSleepMs", totalPaceSleepMs)
+            .put("liveProcessingWallMs", (decodeWallMs - totalPaceSleepMs).coerceAtLeast(0L))
+            .put("p50PaceLagMs", percentile(paceLagValues, 0.50))
+            .put("p95PaceLagMs", percentile(paceLagValues, 0.95))
+            .put("firstSegmentEndMs", firstSegmentEndMs ?: JSONObject.NULL)
+            .put("firstSegmentEmitAudioMs", firstSegmentEmitAudioMs ?: JSONObject.NULL)
+            .put("firstSegmentBoundaryLatencyMs", firstSegmentBoundaryLatencyMs ?: JSONObject.NULL)
+            .put("firstSegmentResultWallMs", firstSegmentResultWallMs ?: JSONObject.NULL)
+            .put("finalSegmentEndMs", finalSegmentEndMs)
+            .put("finalSegmentEmitAudioMs", finalSegmentEmitAudioMs)
+            .put("finalSegmentBoundaryLatencyMs", finalSegmentBoundaryLatencyMs)
+            .put("finalSegmentResultWallMs", finalSegmentResultWallMs)
+            .put("p50BoundaryLatencyMs", percentile(boundaryLatencies, 0.50))
+            .put("p95BoundaryLatencyMs", percentile(boundaryLatencies, 0.95))
             .put("segments", segments)
     }
 
@@ -906,18 +1003,6 @@ internal class AsrBenchmarkRunner(
         return previous[hypothesis.size]
     }
 
-    private fun rmsPcm16(samples: FloatArray, start: Int, end: Int): Double {
-        if (end <= start) return 0.0
-        var sum = 0.0
-        var count = 0
-        for (i in start until end) {
-            val value = (samples[i].coerceIn(-1.0f, 1.0f) * 32767.0).toDouble()
-            sum += value * value
-            count += 1
-        }
-        return if (count == 0) 0.0 else sqrt(sum / count)
-    }
-
     private fun percentile(values: List<Long>, percentile: Double): Long {
         if (values.isEmpty()) return 0L
         val sorted = values.sorted()
@@ -976,16 +1061,15 @@ internal class AsrBenchmarkRunner(
 
     private companion object {
         const val ROUTE_STANDARD = "standard"
-        const val ROUTE_REALTIME_REPLAY = "realtime_replay"
+        const val ROUTE_LIVE_VAD = "live_vad"
         const val RUN_CLASS_WARM = "warm"
         const val LOAD_STRATEGY_SHARED = "shared"
         const val LOAD_STRATEGY_PER_CASE = "per_case"
         const val LOAD_STRATEGY_PER_SEGMENT = "per_segment"
+        const val LIVE_FRAME_MS_DEFAULT = 100
         const val MODE_OFFLINE = "offline"
         const val MODE_SEGMENTED_OFFLINE = "segmented_offline"
         const val MODE_VAD_SEGMENTED_OFFLINE = "vad_segmented_offline"
-        const val MODE_REALTIME_REPLAY = "realtime_replay"
-        const val VAD_TYPE_RMS = "rms"
-        const val VAD_TYPE_SILERO = "silero"
+        const val MODE_LIVE_VAD_REPLAY = "live_vad_replay"
     }
 }

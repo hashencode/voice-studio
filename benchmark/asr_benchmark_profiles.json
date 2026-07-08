@@ -1,94 +1,56 @@
 {
   "version": 1,
   "defaultProfileIds": [
-    "standard_whole_warm_t2",
     "standard_vad_silero_warm_t2",
-    "realtime_rms_warm_baseline_t2",
-    "realtime_silero_warm_default_t2"
+    "live_vad_silero_paced_t2_f100"
   ],
   "profiles": [
     {
-      "id": "standard_whole_warm_t2",
-      "name": "Standard whole-file warm T2",
-      "route": "standard",
-      "runClass": "warm",
-      "mode": "offline",
-      "loadStrategy": "shared",
-      "numThreads": 2,
-      "warmupIterations": 1
-    },
-    {
-      "id": "standard_whole_cold_t2",
-      "name": "Standard whole-file cold T2",
-      "route": "standard",
-      "runClass": "cold",
-      "mode": "offline",
-      "loadStrategy": "per_case",
-      "numThreads": 2,
-      "warmupIterations": 0
-    },
-    {
       "id": "standard_vad_silero_warm_t2",
-      "name": "Standard Silero VAD warm T2",
+      "name": "Standard Silero VAD warm T4",
       "route": "standard",
       "runClass": "warm",
       "mode": "vad_segmented_offline",
       "loadStrategy": "shared",
-      "numThreads": 2,
+      "numThreads": 4,
       "warmupIterations": 1,
       "vad": {
-        "threshold": 0.2,
+        "threshold": 0.15,
+        "minSilenceDurationSec": 0.20,
+        "minSpeechDurationSec": 0.25,
+        "maxSpeechDurationSec": 5.0
+      }
+    },
+    {
+      "id": "live_vad_silero_replay_t2_f100",
+      "name": "Live Silero VAD replay T4 frame=100ms",
+      "route": "live_vad",
+      "runClass": "warm",
+      "mode": "live_vad_replay",
+      "loadStrategy": "shared",
+      "numThreads": 4,
+      "warmupIterations": 1,
+      "liveFrameMs": 100,
+      "vad": {
+        "threshold": 0.15,
         "minSilenceDurationSec": 0.25,
         "minSpeechDurationSec": 0.25,
         "maxSpeechDurationSec": 5.0
       }
     },
     {
-      "id": "realtime_rms_warm_baseline_t2",
-      "name": "Realtime replay RMS warm baseline T2",
-      "route": "realtime_replay",
+      "id": "live_vad_silero_paced_t2_f100",
+      "name": "Live Silero VAD paced replay T4 frame=100ms",
+      "route": "live_vad",
       "runClass": "warm",
-      "vadType": "rms",
+      "mode": "live_vad_replay",
       "loadStrategy": "shared",
-      "numThreads": 2,
+      "numThreads": 4,
       "warmupIterations": 1,
-      "frameMs": 200,
-      "speechThreshold": 520.0,
-      "minSpeechMs": 320,
-      "endSilenceMs": 720,
-      "maxSegmentMs": 12000,
-      "preRollMs": 0,
-      "maxQueuedSegments": 2
-    },
-    {
-      "id": "realtime_rms_current_baseline_t2",
-      "name": "Realtime replay RMS current-like baseline T2",
-      "route": "realtime_replay",
-      "runClass": "current",
-      "vadType": "rms",
-      "loadStrategy": "per_segment",
-      "numThreads": 2,
-      "warmupIterations": 0,
-      "frameMs": 200,
-      "speechThreshold": 520.0,
-      "minSpeechMs": 320,
-      "endSilenceMs": 720,
-      "maxSegmentMs": 12000,
-      "preRollMs": 0,
-      "maxQueuedSegments": 2
-    },
-    {
-      "id": "realtime_silero_warm_default_t2",
-      "name": "Realtime replay Silero warm default T2",
-      "route": "realtime_replay",
-      "runClass": "warm",
-      "vadType": "silero",
-      "loadStrategy": "shared",
-      "numThreads": 2,
-      "warmupIterations": 1,
-      "frameMs": 100,
+      "liveFrameMs": 100,
+      "liveRealtimePace": true,
       "vad": {
-        "threshold": 0.2,
+        "threshold": 0.15,
         "minSilenceDurationSec": 0.25,
         "minSpeechDurationSec": 0.25,
         "maxSpeechDurationSec": 5.0

@@ -3,8 +3,8 @@
 
 from __future__ import annotations
 
-import html
 import argparse
+import html
 import json
 from dataclasses import dataclass
 from pathlib import Path
@@ -27,18 +27,11 @@ TOKENS = {
     "green_dark": "#386411",
     "blue": "#A3BEFA",
     "blue_dark": "#2E4780",
-    "orange": "#F0986E",
-    "orange_dark": "#804126",
 }
 
 MODEL_LABELS = {
     "paraformer-zh-2025-10-07": "Paraformer zh int8",
     "paraformer-en-2024-03-09": "Paraformer en",
-}
-
-ROUTE_LABELS = {
-    "standard": "标准线路",
-    "realtime_replay": "实时 replay",
 }
 
 RUN_CLASS_LABELS = {
@@ -126,20 +119,13 @@ def route_for_legacy(mode: str) -> str:
 
 def profile_description(row: ResultRow) -> str:
     profile = row.profile
-    if row.route == "realtime_replay":
-        vad_type = str(profile.get("vadType", row.mode))
-        if vad_type == "rms":
-            return (
-                f"RMS threshold {profile.get('speechThreshold', 'n/a')}, "
-                f"end {profile.get('endSilenceMs', 'n/a')}ms, "
-                f"max {profile.get('maxSegmentMs', 'n/a')}ms, "
-                f"pre-roll {profile.get('preRollMs', 0)}ms"
-            )
-        vad = profile.get("vad") if isinstance(profile.get("vad"), dict) else {}
+    vad = profile.get("vad") if isinstance(profile.get("vad"), dict) else {}
+    if vad:
         return (
             f"Silero threshold {vad.get('threshold', 'n/a')}, "
             f"silence {vad.get('minSilenceDurationSec', 'n/a')}s, "
-            f"max {vad.get('maxSpeechDurationSec', 'n/a')}s"
+            f"max {vad.get('maxSpeechDurationSec', 'n/a')}s, "
+            f"threads {profile.get('numThreads', 'n/a')}"
         )
     return f"{row.mode}, threads {profile.get('numThreads', 'n/a')}"
 
@@ -157,7 +143,6 @@ def load_rows(
     for path in sorted(paths):
         data = json.loads(path.read_text())
         schema_version = int(data.get("schemaVersion", 1))
-        window_ms = int(data.get("segmentWindowMs", 12000))
         for item in data.get("results", []):
             if item["modelId"] not in active_model_ids:
                 continue
@@ -166,6 +151,9 @@ def load_rows(
 
             mode = item.get("mode", "")
             route = item.get("route", route_for_legacy(mode))
+            if route != "standard":
+                continue
+
             profile_id = item.get("profileId") or f"legacy-{mode}-{item['modelId']}-{item['audioCaseId']}"
             profile_name = item.get("profileName") or mode
             profile = item.get("profile") if isinstance(item.get("profile"), dict) else {"mode": mode, "numThreads": item.get("profileNumThreads", "legacy")}
@@ -214,15 +202,15 @@ def load_rows(
 
     if not rows:
         source = ", ".join(str(path) for path in paths) if paths else str(RESULT_DIR)
-        raise SystemExit(f"No benchmark JSON results found for: {source}")
+        raise SystemExit(f"No standard benchmark JSON results found for: {source}")
     profile_rows = [row for row in rows if row.schema_version >= 2 or not row.profile_id.startswith("legacy-")]
     return profile_rows or rows
 
 
 def latest_by_profile(rows: list[ResultRow]) -> list[ResultRow]:
-    selected: dict[tuple[str, str, str, str], ResultRow] = {}
+    selected: dict[tuple[str, str, str], ResultRow] = {}
     for row in rows:
-        key = (row.route, row.profile_id, row.model_id, row.language)
+        key = (row.profile_id, row.model_id, row.language)
         current = selected.get(key)
         if current is None or report_sequence(row.report_file) > report_sequence(current.report_file):
             selected[key] = row
@@ -234,14 +222,14 @@ def sorted_rows(rows: list[ResultRow]) -> list[ResultRow]:
     return sorted(rows, key=lambda row: (class_order.get(row.run_class, 9), row.language, row.error_rate, row.operation_rtf))
 
 
-def best_text(rows: list[ResultRow], route: str, language: str) -> str:
-    scoped = [row for row in rows if row.route == route and row.language == language and row.run_class == "warm"]
+def best_text(rows: list[ResultRow], language: str) -> str:
+    scoped = [row for row in rows if row.language == language and row.run_class == "warm"]
     if not scoped:
-        scoped = [row for row in rows if row.route == route and row.language == language]
+        scoped = [row for row in rows if row.language == language]
     if not scoped:
         return "n/a"
     row = min(scoped, key=lambda item: (item.error_rate, item.operation_rtf))
-    return f"{row.profile_name}：{row.metric.upper()} {pct(row.error_rate)}"
+    return f"{row.profile_name}: {row.metric.upper()} {pct(row.error_rate)}"
 
 
 def bar_chart(rows: list[ResultRow], title: str, subtitle: str, value_attr: str, value_label) -> str:
@@ -267,8 +255,8 @@ def bar_chart(rows: list[ResultRow], title: str, subtitle: str, value_attr: str,
         y = top + index * row_h
         raw = float(getattr(row, value_attr))
         bar_w = plot_width * raw / max_v if max_v else 0
-        fill = TOKENS["green"] if row.run_class == "warm" else TOKENS["blue"] if row.run_class == "current" else TOKENS["orange"]
-        stroke = TOKENS["green_dark"] if row.run_class == "warm" else TOKENS["blue_dark"] if row.run_class == "current" else TOKENS["orange_dark"]
+        fill = TOKENS["green"] if row.run_class == "warm" else TOKENS["blue"]
+        stroke = TOKENS["green_dark"] if row.run_class == "warm" else TOKENS["blue_dark"]
         lines.extend(
             [
                 f'<text class="axis-label" x="0" y="{y + 16}">{esc(row.profile_name)}</text>',
@@ -283,7 +271,7 @@ def bar_chart(rows: list[ResultRow], title: str, subtitle: str, value_attr: str,
 
 def profile_table(rows: list[ResultRow]) -> str:
     if not rows:
-        return '<p class="empty">还没有这个线路的结果。运行对应 profile 后重新生成报告即可。</p>'
+        return '<p class="empty">还没有结果。运行 profile 后重新生成报告即可。</p>'
     body = []
     for row in sorted_rows(rows):
         body.append(
@@ -309,31 +297,14 @@ def profile_table(rows: list[ResultRow]) -> str:
     )
 
 
-def tab_panel(route: str, rows: list[ResultRow]) -> str:
-    route_rows = [row for row in rows if row.route == route]
-    warm_rows = [row for row in route_rows if row.run_class == "warm"] or route_rows
-    return f"""
-      <section class="tab-panel" id="panel-{esc(route)}">
-        <h2>{esc(ROUTE_LABELS.get(route, route))}</h2>
-        <div class="grid-two">
-          <div class="chart">{bar_chart(sorted_rows(warm_rows), "准确率", "越低越好；warm 行用于主要排序。", "error_rate", pct) if route_rows else '<p class="empty">暂无结果</p>'}</div>
-          <div class="chart">{bar_chart(sorted_rows(warm_rows), "Operation RTF", "包含当前 profile 记录到的模型加载成本。", "operation_rtf", lambda value: f"{value:.4f}") if route_rows else '<p class="empty">暂无结果</p>'}</div>
-        </div>
-        <h2>Profile 明细</h2>
-        {profile_table(route_rows)}
-      </section>
-    """
-
-
 def write_summary(rows: list[ResultRow], sources: list[Path] | None) -> None:
     payload = {
         "generatedFrom": [str(path.relative_to(ROOT) if path.is_relative_to(ROOT) else path) for path in sources]
         if sources
         else str(RESULT_DIR.relative_to(ROOT)),
-        "comparisonUnit": "parameter_profile",
+        "comparisonUnit": "standard_vad_parameter_profile",
         "routes": {
-            "standard": [row.to_json() for row in sorted_rows([item for item in rows if item.route == "standard"])],
-            "realtime_replay": [row.to_json() for row in sorted_rows([item for item in rows if item.route == "realtime_replay"])],
+            "standard": [row.to_json() for row in sorted_rows(rows)],
         },
         "allResults": [row.to_json() for row in rows],
     }
@@ -341,6 +312,7 @@ def write_summary(rows: list[ResultRow], sources: list[Path] | None) -> None:
 
 
 def render_report(rows: list[ResultRow]) -> str:
+    warm_rows = [row for row in rows if row.run_class == "warm"] or rows
     style = f"""
     <style>
       :root {{
@@ -357,18 +329,10 @@ def render_report(rows: list[ResultRow]) -> str:
       h1 {{ margin: 0 0 8px; font-size: clamp(28px, 4vw, 42px); letter-spacing: 0; }}
       h2 {{ margin: 26px 0 12px; font-size: 22px; letter-spacing: 0; }}
       p {{ color: var(--muted); max-width: 920px; }}
-      .kpis {{ display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; margin: 20px 0 22px; }}
+      .kpis {{ display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; margin: 20px 0 22px; }}
       .kpi {{ background: var(--panel); border: 1px solid var(--axis); border-radius: 8px; padding: 14px 16px; }}
       .kpi strong {{ display: block; font-size: 18px; margin-bottom: 4px; }}
       .kpi span {{ color: var(--muted); font-size: 13px; }}
-      .tabs {{ display: flex; gap: 8px; margin: 18px 0 12px; border-bottom: 1px solid var(--axis); }}
-      .tab-input {{ position: absolute; opacity: 0; pointer-events: none; }}
-      .tab-label {{ border: 1px solid var(--axis); border-bottom: 0; border-radius: 8px 8px 0 0; padding: 10px 14px; background: #F4F5F7; cursor: pointer; font-weight: 650; }}
-      #tab-standard:checked ~ .tabs label[for="tab-standard"],
-      #tab-realtime:checked ~ .tabs label[for="tab-realtime"] {{ background: var(--panel); color: var(--ink); }}
-      .tab-panel {{ display: none; }}
-      #tab-standard:checked ~ #panel-standard,
-      #tab-realtime:checked ~ #panel-realtime_replay {{ display: block; }}
       .grid-two {{ display: grid; grid-template-columns: 1fr; gap: 18px; align-items: start; }}
       .chart {{ background: var(--panel); border: 1px solid var(--axis); border-radius: 8px; padding: 18px; overflow: hidden; }}
       .chart-svg {{ width: 100%; max-width: 100%; height: auto; display: block; }}
@@ -385,7 +349,6 @@ def render_report(rows: list[ResultRow]) -> str:
       .detail-table th {{ color: var(--muted); font-weight: 650; background: #F4F5F7; }}
       .detail-table td:nth-child(n+5) {{ font-family: "SF Mono", Menlo, Consolas, monospace; }}
       .detail-table span {{ color: var(--muted); font-size: 12px; }}
-      .empty {{ background: var(--panel); border: 1px solid var(--axis); border-radius: 8px; padding: 18px; }}
       @media (max-width: 900px) {{ .kpis, .grid-two {{ grid-template-columns: 1fr; }} main {{ width: min(100vw - 20px, 1180px); }} }}
     </style>
     """
@@ -394,32 +357,28 @@ def render_report(rows: list[ResultRow]) -> str:
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>ASR Paraformer Parameter Benchmark</title>
+  <title>ASR Paraformer Standard VAD Benchmark</title>
   {style}
 </head>
 <body>
 <main>
   <header>
-    <h1>Paraformer 参数 benchmark</h1>
-    <p>模型固定为 Paraformer，比较单位改为参数 profile。warm steady-state 用于主排序，cold/current 单独展示，避免把模型加载成本和参数效果混在一起。</p>
+    <h1>Paraformer 标准 VAD benchmark</h1>
+    <p>模型固定为 Paraformer，比较单位为标准 VAD 参数 profile。生产路线只保留 Silero VAD 切片后离线识别；历史实时 replay 不再参与新报告。</p>
   </header>
 
   <section class="kpis">
-    <div class="kpi"><strong>标准中文</strong><span>{esc(best_text(rows, "standard", "zh"))}</span></div>
-    <div class="kpi"><strong>标准英文</strong><span>{esc(best_text(rows, "standard", "en"))}</span></div>
-    <div class="kpi"><strong>实时中文</strong><span>{esc(best_text(rows, "realtime_replay", "zh"))}</span></div>
-    <div class="kpi"><strong>实时英文</strong><span>{esc(best_text(rows, "realtime_replay", "en"))}</span></div>
+    <div class="kpi"><strong>中文最佳</strong><span>{esc(best_text(rows, "zh"))}</span></div>
+    <div class="kpi"><strong>英文最佳</strong><span>{esc(best_text(rows, "en"))}</span></div>
   </section>
 
-  <input class="tab-input" type="radio" name="route-tabs" id="tab-standard" checked />
-  <input class="tab-input" type="radio" name="route-tabs" id="tab-realtime" />
-  <nav class="tabs">
-    <label class="tab-label" for="tab-standard">标准线路 benchmark</label>
-    <label class="tab-label" for="tab-realtime">实时线路 replay benchmark</label>
-  </nav>
+  <section class="grid-two">
+    <div class="chart">{bar_chart(sorted_rows(warm_rows), "准确率", "越低越好；warm 行用于主要排序。", "error_rate", pct)}</div>
+    <div class="chart">{bar_chart(sorted_rows(warm_rows), "Operation RTF", "包含当前 profile 记录到的模型加载成本。", "operation_rtf", lambda value: f"{value:.4f}")}</div>
+  </section>
 
-  {tab_panel("standard", rows)}
-  {tab_panel("realtime_replay", rows)}
+  <h2>Profile 明细</h2>
+  {profile_table(rows)}
 </main>
 </body>
 </html>
