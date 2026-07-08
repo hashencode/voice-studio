@@ -71,4 +71,23 @@ class ModelAssetManager(
         }
         return ExtractedParaformerModel(modelFile, tokensFile)
     }
+
+    fun ensureVadExtracted(): File {
+        val vadFile = File(context.cacheDir, "sherpa_models/silero-vad.onnx")
+        if (vadFile.exists() && vadFile.length() > 0L) {
+            return vadFile
+        }
+
+        vadFile.parentFile?.mkdirs()
+        context.assets.open(VAD_ASSET_PATH).use { raw ->
+            FileOutputStream(vadFile).use { out ->
+                raw.copyTo(out)
+            }
+        }
+        return vadFile
+    }
+
+    companion object {
+        const val VAD_ASSET_PATH = "flutter_assets/assets/sherpa/onnx/silero-vad.onnx"
+    }
 }

@@ -17,6 +17,5 @@ void main() {
 
     expect(model, isNotNull);
     expect(model!.selectable, isFalse);
-    expect(model.canTranscribeRealtime, isFalse);
   });
 }

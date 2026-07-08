@@ -3,7 +3,6 @@ package com.voice2text.app.transcription
 data class ModelReadiness(
     val modelId: String,
     val offlineReady: Boolean,
-    val realtimeReady: Boolean,
     val vadReady: Boolean,
     val punctuationReady: Boolean,
     val denoiseReady: Boolean,
@@ -21,7 +20,7 @@ class ModelReadinessChecker(
         val vadReady = !descriptor.vadRequired || assetManager.assetExists(VAD_ASSET_PATH)
 
         val reason = when {
-            !descriptor.offlineReady && !descriptor.realtimeReady -> "模型暂未开放"
+            !descriptor.offlineReady -> "模型暂未开放"
             !hasAssets -> "模型资源缺失: ${missing.joinToString(",")}"
             descriptor.vadRequired && !vadReady -> "VAD 资源缺失"
             else -> null
@@ -30,7 +29,6 @@ class ModelReadinessChecker(
         return ModelReadiness(
             modelId = descriptor.id,
             offlineReady = descriptor.offlineReady && hasAssets,
-            realtimeReady = descriptor.realtimeReady && hasAssets && vadReady,
             vadReady = vadReady,
             punctuationReady = descriptor.punctuationReady,
             denoiseReady = descriptor.denoiseReady,
@@ -39,6 +37,6 @@ class ModelReadinessChecker(
     }
 
     companion object {
-        private const val VAD_ASSET_PATH = "flutter_assets/assets/sherpa/onnx/silero-vad.onnx"
+        private const val VAD_ASSET_PATH = ModelAssetManager.VAD_ASSET_PATH
     }
 }
