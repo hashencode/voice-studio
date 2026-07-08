@@ -22,9 +22,6 @@ class AppSettingsRepository {
     final row = rows.first;
     return AppSettings(
       modelId: row['model_id'] as String,
-      recordingMode: RecordingMode.fromStorage(
-        row['recording_mode'] as String?,
-      ),
       autoTranscribe: (row['auto_transcribe'] as int) == 1,
       isDarkMode: (row['is_dark_mode'] as int? ?? 0) == 1,
     );
@@ -35,7 +32,7 @@ class AppSettingsRepository {
     await db.insert('app_settings', {
       'id': 1,
       'model_id': settings.modelId,
-      'recording_mode': settings.recordingMode.storageValue,
+      'recording_mode': 'standard',
       'auto_transcribe': settings.autoTranscribe ? 1 : 0,
       'is_dark_mode': settings.isDarkMode ? 1 : 0,
     }, conflictAlgorithm: ConflictAlgorithm.replace);

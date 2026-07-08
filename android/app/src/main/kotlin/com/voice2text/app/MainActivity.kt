@@ -1,32 +1,24 @@
 package com.voice2text.app
 
-import android.os.Handler
-import android.os.Looper
 import android.util.Log
 import com.voice2text.app.build.BuildInfoProvider
 import com.voice2text.app.contracts.AudioContract
 import com.voice2text.app.recording.RecordingSessionException
-import com.voice2text.app.recording.RealtimeRecordingSession
 import com.voice2text.app.recording.StandardRecordingSession
-import com.voice2text.app.realtime.RealtimeTranscriptionEvent
 import com.voice2text.app.transcription.TranscriptionRequest
 import com.voice2text.app.transcription.TranscriptionEngineRouter
 import io.flutter.embedding.android.FlutterActivity
 import io.flutter.embedding.engine.FlutterEngine
-import io.flutter.plugin.common.EventChannel
 import io.flutter.plugin.common.MethodCall
 import io.flutter.plugin.common.MethodChannel
 
 class MainActivity : FlutterActivity() {
     private val tag = "Voice2TextNative"
     private val channelName = AudioContract.RECORDER_CHANNEL
-    private val mainHandler = Handler(Looper.getMainLooper())
 
     private val standardSession by lazy { StandardRecordingSession(this) }
-    private val realtimeSession by lazy { RealtimeRecordingSession(this, ::emitRealtimeEvent) }
     private val buildInfoProvider by lazy { BuildInfoProvider(this) }
     private val transcriptionRouter by lazy { TranscriptionEngineRouter(this) }
-    private var realtimeEventSink: EventChannel.EventSink? = null
 
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
@@ -38,36 +30,11 @@ class MainActivity : FlutterActivity() {
                     "pause" -> handlePause(result)
                     "resume" -> handleResume(result)
                     "stop" -> handleStop(result)
-                    "startRealtime" -> handleRealtimeStart(result)
-                    "pauseRealtime" -> handleRealtimePause(result)
-                    "resumeRealtime" -> handleRealtimeResume(result)
-                    "stopRealtime" -> handleRealtimeStop(result)
                     "getBuildInfo" -> handleGetBuildInfo(result)
                     "transcribe" -> handleTranscribe(call, result)
                     else -> result.notImplemented()
                 }
             }
-
-        EventChannel(
-            flutterEngine.dartExecutor.binaryMessenger,
-            AudioContract.TRANSCRIPTION_EVENTS_CHANNEL,
-        ).setStreamHandler(
-            object : EventChannel.StreamHandler {
-                override fun onListen(arguments: Any?, events: EventChannel.EventSink?) {
-                    realtimeEventSink = events
-                }
-
-                override fun onCancel(arguments: Any?) {
-                    realtimeEventSink = null
-                }
-            },
-        )
-    }
-
-    private fun emitRealtimeEvent(event: RealtimeTranscriptionEvent) {
-        mainHandler.post {
-            realtimeEventSink?.success(event.toPayload())
-        }
     }
 
     private fun handleStart(result: MethodChannel.Result) {
@@ -105,46 +72,6 @@ class MainActivity : FlutterActivity() {
                 "durationMs" to recording.durationMs,
             )
 
-            result.success(payload)
-        } catch (e: RecordingSessionException) {
-            result.error(e.code, e.message, null)
-        }
-    }
-
-    private fun handleRealtimeStart(result: MethodChannel.Result) {
-        try {
-            realtimeSession.start()
-            result.success(null)
-        } catch (e: RecordingSessionException) {
-            result.error(e.code, e.message, null)
-        }
-    }
-
-    private fun handleRealtimePause(result: MethodChannel.Result) {
-        try {
-            realtimeSession.pause()
-            result.success(null)
-        } catch (e: RecordingSessionException) {
-            result.error(e.code, e.message, null)
-        }
-    }
-
-    private fun handleRealtimeResume(result: MethodChannel.Result) {
-        try {
-            realtimeSession.resume()
-            result.success(null)
-        } catch (e: RecordingSessionException) {
-            result.error(e.code, e.message, null)
-        }
-    }
-
-    private fun handleRealtimeStop(result: MethodChannel.Result) {
-        try {
-            val recording = realtimeSession.stop()
-            val payload = hashMapOf<String, Any>(
-                "path" to recording.path,
-                "durationMs" to recording.durationMs,
-            )
             result.success(payload)
         } catch (e: RecordingSessionException) {
             result.error(e.code, e.message, null)

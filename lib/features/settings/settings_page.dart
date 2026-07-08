@@ -2,10 +2,10 @@ import 'package:flutter/material.dart';
 import 'package:flutter_components/flutter_components.dart';
 
 import '../../app/theme/theme_mode_controller.dart';
-import 'model/app_settings.dart';
 import 'model/transcription_model_descriptor.dart';
 import 'repository/app_settings_repository.dart';
 import '../shared/widgets/build_info_footer.dart';
+import 'model/app_settings.dart';
 
 class SettingsPage extends StatefulWidget {
   const SettingsPage({super.key});
@@ -19,7 +19,6 @@ class _SettingsPageState extends State<SettingsPage> {
 
   bool _loading = true;
   String _modelId = 'paraformer-zh';
-  RecordingMode _recordingMode = RecordingMode.standard;
   bool _autoTranscribe = true;
   bool _isDarkMode = false;
 
@@ -39,7 +38,6 @@ class _SettingsPageState extends State<SettingsPage> {
       _modelId = selectedModel.selectable
           ? selectedModel.id
           : TranscriptionModelDescriptor.defaultModel().id;
-      _recordingMode = settings.recordingMode;
       _autoTranscribe = settings.autoTranscribe;
       _isDarkMode = settings.isDarkMode;
       _loading = false;
@@ -54,7 +52,6 @@ class _SettingsPageState extends State<SettingsPage> {
     await _repository.save(
       AppSettings(
         modelId: _modelId,
-        recordingMode: _recordingMode,
         autoTranscribe: _autoTranscribe,
         isDarkMode: _isDarkMode,
       ),
@@ -82,27 +79,6 @@ class _SettingsPageState extends State<SettingsPage> {
       body: ListView(
         padding: const EdgeInsets.all(16),
         children: <Widget>[
-          const GooText('录音模式', variant: GooTextVariant.subtitle),
-          const SizedBox(height: 8),
-          GooSegmentedButton<RecordingMode>(
-            value: _recordingMode,
-            onValueChange: (RecordingMode value) {
-              setState(() {
-                _recordingMode = value;
-              });
-            },
-            items: RecordingMode.values
-                .map(
-                  (RecordingMode mode) => GooSegmentedButtonItem<RecordingMode>(
-                    value: mode,
-                    label: mode.label,
-                  ),
-                )
-                .toList(),
-          ),
-          const SizedBox(height: 8),
-          GooText(_recordingMode.description, variant: GooTextVariant.caption),
-          const SizedBox(height: 16),
           const GooText('识别模型', variant: GooTextVariant.subtitle),
           const SizedBox(height: 8),
           GooList(
@@ -156,7 +132,6 @@ class _SettingsPageState extends State<SettingsPage> {
     final bool selected = descriptor.id == _modelId;
     final String capabilities = <String>[
       if (descriptor.offlineReady) '离线可用',
-      if (descriptor.canTranscribeRealtime) '分段实时可用',
       if (!descriptor.punctuationReady) '标点未开放',
       if (!descriptor.denoiseReady) '降噪未开放',
     ].join(' · ');

@@ -2,28 +2,18 @@ import 'dart:io' show Platform;
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
-import 'package:flutter_components/flutter_components.dart';
 import 'package:permission_handler/permission_handler.dart';
 
 import '../records/repository/recordings_repository.dart';
-import '../settings/model/app_settings.dart';
 import '../settings/repository/app_settings_repository.dart';
 import '../transcription/repository/transcription_jobs_repository.dart';
-import '../transcription/repository/transcript_segments_repository.dart';
-import '../transcription/service/android_realtime_transcription_events.dart';
 import '../transcription/service/android_transcription_service.dart';
-import '../transcription/service/fake_realtime_transcription_events.dart';
 import '../transcription/service/fake_transcription_service.dart';
-import '../transcription/service/realtime_transcription_events_port.dart';
 import '../transcription/service/transcription_port.dart';
 import 'controller/recording_controller.dart';
-import 'engine/android_realtime_recorder_engine.dart';
 import 'engine/android_recorder_engine.dart';
 import 'engine/fake_recorder_engine.dart';
-import 'engine/fake_realtime_recorder_engine.dart';
-import 'engine/realtime_recorder_port.dart';
 import 'engine/recorder_port.dart';
-import 'model/live_transcript_state.dart';
 import 'model/recording_phase.dart';
 import 'services/microphone_permission_service.dart';
 
@@ -56,12 +46,9 @@ class _RecordingPageState extends State<RecordingPage>
     _controller = RecordingController(
       permissionService: MicrophonePermissionService(),
       recorder: _buildRecorder(),
-      realtimeRecorder: _buildRealtimeRecorder(),
       recordingsRepository: RecordingsRepository(),
       transcriptionJobsRepository: TranscriptionJobsRepository(),
-      transcriptSegmentsRepository: TranscriptSegmentsRepository(),
       transcriptionService: _buildTranscriptionService(),
-      realtimeEvents: _buildRealtimeEvents(),
       appSettingsRepository: AppSettingsRepository(),
     );
     _controller.addListener(_onControllerChanged);
@@ -80,20 +67,6 @@ class _RecordingPageState extends State<RecordingPage>
       return AndroidRecorderEngine();
     }
     return FakeRecorderEngine();
-  }
-
-  RealtimeRecorderPort _buildRealtimeRecorder() {
-    if (Platform.isAndroid) {
-      return AndroidRealtimeRecorderEngine();
-    }
-    return FakeRealtimeRecorderEngine();
-  }
-
-  RealtimeTranscriptionEventsPort _buildRealtimeEvents() {
-    if (Platform.isAndroid) {
-      return AndroidRealtimeTranscriptionEvents();
-    }
-    return FakeRealtimeTranscriptionEvents();
   }
 
   @override
@@ -500,13 +473,6 @@ class _RecordingPageState extends State<RecordingPage>
                         label: const Text('去系统设置开启权限'),
                       ),
                     ],
-                    if (_controller.isRealtimeSession) ...<Widget>[
-                      const SizedBox(height: 12),
-                      _RealtimeTranscriptPanel(
-                        state: _controller.liveTranscriptState,
-                        statusMessage: _controller.realtimeStatusMessage,
-                      ),
-                    ],
                     const SizedBox(height: 14),
                     Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -585,15 +551,13 @@ class _RecordingPageState extends State<RecordingPage>
     final String dd = now.day.toString().padLeft(2, '0');
     final String hh = now.hour.toString().padLeft(2, '0');
     final String min = now.minute.toString().padLeft(2, '0');
-    return '$mm-$dd $hh:$min · ${_phaseLabel(_controller.phase)} · ${_modeLabel(_controller.activeRecordingMode)}';
+    return '$mm-$dd $hh:$min · ${_phaseLabel(_controller.phase)}';
   }
 
   String get _bottomHint {
     if (_controller.phase == RecordingPhase.recording ||
         _controller.phase == RecordingPhase.paused) {
-      return _controller.isRealtimeSession
-          ? '实时转写中 $_elapsedPreciseText'
-          : '录音中 $_elapsedPreciseText';
+      return '录音中 $_elapsedPreciseText';
     }
     if (_controller.phase == RecordingPhase.stopping) {
       return '正在停止录音...';
@@ -619,84 +583,6 @@ class _RecordingPageState extends State<RecordingPage>
       case RecordingPhase.error:
         return '异常';
     }
-  }
-
-  String _modeLabel(RecordingMode mode) {
-    switch (mode) {
-      case RecordingMode.standard:
-        return '标准';
-      case RecordingMode.realtime:
-        return '实时';
-      case RecordingMode.auto:
-        return '自动';
-    }
-  }
-}
-
-class _RealtimeTranscriptPanel extends StatelessWidget {
-  const _RealtimeTranscriptPanel({
-    required this.state,
-    required this.statusMessage,
-  });
-
-  final LiveTranscriptState state;
-  final String? statusMessage;
-
-  @override
-  Widget build(BuildContext context) {
-    final String text = state.mergedText.trim();
-    final String displayText = text.isEmpty ? '等待语音...' : text;
-    final bool degraded =
-        statusMessage?.trim().isNotEmpty == true || state.hasDegradation;
-    final String? status = statusMessage ?? state.degradationReason;
-
-    return Container(
-      width: double.infinity,
-      constraints: const BoxConstraints(maxHeight: 120),
-      padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: const Color(0xFFE5E7EB)),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        mainAxisSize: MainAxisSize.min,
-        children: <Widget>[
-          Row(
-            children: <Widget>[
-              Icon(
-                degraded ? Icons.info_outline : Icons.graphic_eq_rounded,
-                size: 16,
-                color: degraded
-                    ? const Color(0xFFF59E0B)
-                    : const Color(0xFF1E6BFF),
-              ),
-              const SizedBox(width: 6),
-              const GooText('实时转写', variant: GooTextVariant.caption),
-            ],
-          ),
-          const SizedBox(height: 8),
-          Flexible(
-            child: SingleChildScrollView(
-              child: Text(
-                degraded && status != null
-                    ? '$status\n$displayText'
-                    : displayText,
-                style: TextStyle(
-                  color: degraded
-                      ? const Color(0xFF92400E)
-                      : const Color(0xFF111827),
-                  fontSize: 14,
-                  height: 1.35,
-                  fontWeight: FontWeight.w500,
-                ),
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
   }
 }
 

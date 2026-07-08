@@ -8,8 +8,8 @@ void main() {
     await tester.pumpWidget(const Voice2TextApp());
     await tester.pumpAndSettle();
 
-    expect(find.text('音频'), findsAtLeastNWidgets(2));
-    expect(find.text('实时'), findsOneWidget);
+    expect(find.text('音频'), findsOneWidget);
+    expect(find.text('实时'), findsNothing);
     expect(find.text('全部音频'), findsOneWidget);
     expect(find.byIcon(LucideIcons.search300), findsWidgets);
     expect(find.byIcon(LucideIcons.mic300), findsOneWidget);

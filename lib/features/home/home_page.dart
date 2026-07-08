@@ -1,13 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:flutter_components/flutter_components.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 import 'package:path/path.dart' as p;
 
 import '../../app/theme/theme_mode_controller.dart';
 import 'model/folder_entity.dart';
 import 'repository/folders_repository.dart';
-import '../recording/realtime_transcript_page.dart';
 import '../records/model/recording_entity.dart';
 import '../records/repository/recordings_repository.dart';
 import '../records/widgets/recording_details_sheet.dart';
@@ -19,8 +17,6 @@ import 'home_tokens.dart';
 const String _allTab = 'all';
 const String _meetingTab = 'meeting';
 const String _recentlyDeletedTab = 'recentlyDeleted';
-const String _homeRootRecordsTab = 'records';
-const String _homeRootRealtimeTab = 'realtime';
 
 enum _HomeViewMode { loading, empty, normal, selection }
 
@@ -156,7 +152,6 @@ class _HomePageState extends State<HomePage> {
   bool _loading = true;
   String? _loadError;
   String _activeTab = _allTab;
-  String _rootTab = _homeRootRecordsTab;
   Set<int> _selectedIds = <int>{};
 
   List<_HomeTabSpec> get _tabs => <_HomeTabSpec>[
@@ -845,8 +840,8 @@ class _HomePageState extends State<HomePage> {
                       : '会从当前首页样式预览中移除 ${items.length} 个占位项。')
                 : isRecentlyDeleted
                 ? (items.length == 1
-                      ? '删除后无法恢复，会同时清理关联转写任务和实时片段。'
-                      : '删除后无法恢复，会同时清理 ${items.length} 条录音的关联转写任务和实时片段。')
+                      ? '删除后无法恢复，会同时清理关联转写数据。'
+                      : '删除后无法恢复，会同时清理 ${items.length} 条录音的关联转写数据。')
                 : (items.length == 1
                       ? '会将该录音移入最近删除。'
                       : '会将 ${items.length} 条录音移入最近删除。'),
@@ -959,13 +954,6 @@ class _HomePageState extends State<HomePage> {
 
   @override
   Widget build(BuildContext context) {
-    if (_rootTab == _homeRootRealtimeTab) {
-      return Scaffold(
-        body: const RealtimeTranscriptPage(),
-        bottomNavigationBar: _buildBottomNavigation(),
-      );
-    }
-
     final HomePagePalette palette = HomePagePalette.of(context);
     final AppThemeModeController? themeController = AppThemeModeScope.maybeOf(
       context,
@@ -1075,35 +1063,7 @@ class _HomePageState extends State<HomePage> {
           ),
         ),
       ),
-      bottomNavigationBar: _isSelectionMode ? null : _buildBottomNavigation(),
-    );
-  }
-
-  Widget _buildBottomNavigation() {
-    return GooBottomNavigation<String>(
-      value: _rootTab,
-      onValueChange: (String value) {
-        if (_rootTab == value) return;
-        setState(() {
-          _rootTab = value;
-          _selectedIds = <int>{};
-        });
-        if (value == _homeRootRecordsTab) {
-          _load();
-        }
-      },
-      items: const <GooBottomNavigationItem<String>>[
-        GooBottomNavigationItem<String>(
-          value: _homeRootRecordsTab,
-          label: '音频',
-          iconName: 'file-audio',
-        ),
-        GooBottomNavigationItem<String>(
-          value: _homeRootRealtimeTab,
-          label: '实时',
-          iconName: 'captions',
-        ),
-      ],
+      bottomNavigationBar: null,
     );
   }
 }
