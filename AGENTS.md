@@ -20,3 +20,13 @@ Run the normal project checks after relevant changes:
 ```bash
 ./tool/dev_check.sh
 ```
+
+## UI device watcher
+
+After generating or changing code in this `voice2text-flutter` project, run this best-effort watcher check before finishing:
+
+```bash
+./tool/ensure_ui_watcher.sh
+```
+
+The script starts `tool/watch_ui_device.sh` only when a physical Android device is connected and the watcher is not already running. If no physical device is connected, or the watcher is already running, it exits without changing anything.

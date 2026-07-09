@@ -25,6 +25,12 @@ Flutter 版本重构工程（Android 优先）。
 # 单独构建
 flutter build apk --debug
 
+# UI 真机开发：启动后监听文件，安静 60 秒后自动 hot reload / rebuild
+./tool/watch_ui_device.sh 8PXCGQZPEQJNP7U8
+
+# UI watcher 幂等检查：有真机且 watcher 未运行时后台启动，否则跳过
+./tool/ensure_ui_watcher.sh
+
 # Android 冒烟（安装+启动+抓日志）
 ./tool/run_android_smoke.sh
 
