@@ -5,6 +5,8 @@ set -euo pipefail
 DEVICE_ID="${1:-emulator-5554}"
 APP_ID="${2:-com.voice2text.app}"
 CAPTURE_SECONDS="${3:-60}"
+FLAVOR="${4:-full}"
+APK_PATH="build/app/outputs/flutter-apk/app-${FLAVOR}-debug.apk"
 LOG_DIR="build/smoke"
 LOG_FILE="$LOG_DIR/logcat-$(date +%Y%m%d-%H%M%S).txt"
 
@@ -14,12 +16,12 @@ echo "[1/5] Checking device: $DEVICE_ID"
 adb -s "$DEVICE_ID" get-state >/dev/null
 
 echo "[2/5] Building debug APK"
-flutter build apk --debug >/dev/null
+flutter build apk --debug --flavor "$FLAVOR" >/dev/null
 
 echo "[3/5] Installing APK"
-adb -s "$DEVICE_ID" install -r build/app/outputs/flutter-apk/app-debug.apk >/dev/null
+adb -s "$DEVICE_ID" install -r "$APK_PATH" >/dev/null
 
-echo "[4/5] Launching app: $APP_ID"
+echo "[4/5] Launching app: $APP_ID (flavor=$FLAVOR)"
 adb -s "$DEVICE_ID" shell monkey -p "$APP_ID" -c android.intent.category.LAUNCHER 1 >/dev/null
 
 echo "[5/5] Capturing logs (${CAPTURE_SECONDS}s) -> $LOG_FILE"

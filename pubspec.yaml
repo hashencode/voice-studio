@@ -65,19 +65,35 @@ dependency_overrides:
 # The following section is specific to Flutter packages.
 flutter:
 
+  default-flavor: ui
+
   # The following line ensures that the Material Icons font is
   # included with your application, so that you can use the icons in
   # the material Icons class.
   uses-material-design: true
 
   assets:
-    - assets/sherpa/asr/paraformer-zh.zip
-    - assets/sherpa/asr/paraformer-zh.json
-    - assets/sherpa/onnx/punctuation.onnx
-    - assets/sherpa/onnx/silero-vad.onnx
-    - assets/sherpa/onnx/speech-enhancement.onnx
-    - assets/sherpa/onnx/ten-vad.onnx
-    - assets/sherpa/wav/test.wav
+    - path: assets/sherpa/asr/paraformer-zh.zip
+      flavors:
+        - full
+    - path: assets/sherpa/asr/paraformer-zh.json
+      flavors:
+        - full
+    - path: assets/sherpa/onnx/punctuation.onnx
+      flavors:
+        - full
+    - path: assets/sherpa/onnx/silero-vad.onnx
+      flavors:
+        - full
+    - path: assets/sherpa/onnx/speech-enhancement.onnx
+      flavors:
+        - full
+    - path: assets/sherpa/onnx/ten-vad.onnx
+      flavors:
+        - full
+    - path: assets/sherpa/wav/test.wav
+      flavors:
+        - full
 
   # To add assets to your application, add an assets section, like this:
   # assets:
