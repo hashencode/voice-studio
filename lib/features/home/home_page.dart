@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter_components/flutter_components.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 import 'package:path/path.dart' as p;
 
@@ -20,36 +21,29 @@ const String _recentlyDeletedTab = 'recentlyDeleted';
 
 enum _HomeViewMode { loading, empty, normal, selection }
 
-class _HomeActionSheetOption {
-  const _HomeActionSheetOption({
-    required this.id,
-    required this.label,
-    required this.icon,
-    this.enabled = true,
-    this.destructive = false,
+class HomePage extends StatefulWidget {
+  const HomePage({
+    super.key,
+    this.recordingsRepository,
+    this.foldersRepository,
+    this.transcriptionJobsRepository,
+    this.transcriptSegmentsRepository,
   });
 
-  final String id;
-  final String label;
-  final IconData icon;
-  final bool enabled;
-  final bool destructive;
-}
-
-class HomePage extends StatefulWidget {
-  const HomePage({super.key});
+  final RecordingsRepository? recordingsRepository;
+  final FoldersRepository? foldersRepository;
+  final TranscriptionJobsRepository? transcriptionJobsRepository;
+  final TranscriptSegmentsRepository? transcriptSegmentsRepository;
 
   @override
   State<HomePage> createState() => _HomePageState();
 }
 
 class _HomePageState extends State<HomePage> {
-  final RecordingsRepository _repository = RecordingsRepository();
-  final FoldersRepository _foldersRepository = FoldersRepository();
-  final TranscriptionJobsRepository _transcriptionJobsRepository =
-      TranscriptionJobsRepository();
-  final TranscriptSegmentsRepository _transcriptSegmentsRepository =
-      TranscriptSegmentsRepository();
+  late final RecordingsRepository _repository;
+  late final FoldersRepository _foldersRepository;
+  late final TranscriptionJobsRepository _transcriptionJobsRepository;
+  late final TranscriptSegmentsRepository _transcriptSegmentsRepository;
   static final List<_RecordingPreview> _visualPlaceholderItems =
       <_RecordingPreview>[
         _RecordingPreview(
@@ -148,11 +142,11 @@ class _HomePageState extends State<HomePage> {
 
   List<_RecordingPreview> _items = const <_RecordingPreview>[];
   List<FolderEntity> _folders = const <FolderEntity>[];
+  late final GooSelectionController<int> _selectionController;
   late final List<_RecordingPreview> _placeholderItems;
   bool _loading = true;
   String? _loadError;
   String _activeTab = _allTab;
-  Set<int> _selectedIds = <int>{};
 
   List<_HomeTabSpec> get _tabs => <_HomeTabSpec>[
     const _HomeTabSpec(id: _allTab, label: '全部音频'),
@@ -188,14 +182,24 @@ class _HomePageState extends State<HomePage> {
     }
   }
 
-  bool get _isSelectionMode => _selectedIds.isNotEmpty;
+  Set<int> get _selectedIds => _selectionController.selectedValues;
+
+  List<int> get _visibleItemIds => _visibleItems
+      .map((_RecordingPreview item) => item.id)
+      .toList(growable: false);
+
+  bool get _isSelectionMode => _selectionController.hasSelection;
+
+  bool get _allVisibleSelected {
+    final List<int> ids = _visibleItemIds;
+    return ids.isNotEmpty && ids.every(_selectedIds.contains);
+  }
+
   bool get _hasPlaceholderSelection => _visibleItems
       .where((item) => _selectedIds.contains(item.id))
       .any((item) => item.id <= 0);
-  bool get _canSelectAll =>
-      _visibleItems.isNotEmpty &&
-      _selectedIds.length != _visibleItems.length &&
-      !_visibleItems.any((item) => item.id <= 0);
+  bool get _canToggleSelectAll => _visibleItems.isNotEmpty;
+  String get _selectionTrailingLabel => _allVisibleSelected ? '取消全选' : '全选';
   bool get _canRenameSelection =>
       _activeTab != _recentlyDeletedTab &&
       _selectedIds.length == 1 &&
@@ -219,8 +223,42 @@ class _HomePageState extends State<HomePage> {
   @override
   void initState() {
     super.initState();
+    _repository = widget.recordingsRepository ?? RecordingsRepository();
+    _foldersRepository = widget.foldersRepository ?? FoldersRepository();
+    _transcriptionJobsRepository =
+        widget.transcriptionJobsRepository ?? TranscriptionJobsRepository();
+    _transcriptSegmentsRepository =
+        widget.transcriptSegmentsRepository ?? TranscriptSegmentsRepository();
+    _selectionController = GooSelectionController<int>(
+      enableHapticFeedback: true,
+    )..addListener(_handleSelectionChanged);
     _placeholderItems = List<_RecordingPreview>.of(_visualPlaceholderItems);
     _load();
+  }
+
+  @override
+  void dispose() {
+    _selectionController
+      ..removeListener(_handleSelectionChanged)
+      ..dispose();
+    super.dispose();
+  }
+
+  void _handleSelectionChanged() {
+    if (mounted) {
+      setState(() {});
+    }
+  }
+
+  void _reconcileSelectionWithVisibleItems({required bool haptic}) {
+    final Set<int> visibleIds = _visibleItemIds.toSet();
+    final List<int> nextSelection = _selectedIds
+        .where(visibleIds.contains)
+        .toList(growable: false);
+    if (nextSelection.length == _selectedIds.length) {
+      return;
+    }
+    _selectionController.replaceSelection(nextSelection, haptic: haptic);
   }
 
   Future<void> _load() async {
@@ -248,10 +286,8 @@ class _HomePageState extends State<HomePage> {
         _folders = folders;
         _items = records.map(_RecordingPreview.fromEntity).toList();
         _loading = false;
-        _selectedIds = _selectedIds
-            .where((int id) => _items.any((item) => item.id == id))
-            .toSet();
       });
+      _reconcileSelectionWithVisibleItems(haptic: false);
     } catch (error) {
       if (!mounted) return;
       setState(() {
@@ -259,8 +295,8 @@ class _HomePageState extends State<HomePage> {
         _items = const <_RecordingPreview>[];
         _loading = false;
         _loadError = '列表加载失败，请稍后重试';
-        _selectedIds = <int>{};
       });
+      _selectionController.clearSelection(haptic: false);
       ScaffoldMessenger.of(
         context,
       ).showSnackBar(const SnackBar(content: Text('列表加载失败，请稍后重试')));
@@ -271,43 +307,32 @@ class _HomePageState extends State<HomePage> {
     if (_activeTab == tabId) return;
     setState(() {
       _activeTab = tabId;
-      _selectedIds = <int>{};
       _loading = true;
       _loadError = null;
     });
+    _selectionController.clearSelection(haptic: false);
     _load();
   }
 
   void _enterSelection(_RecordingPreview item) {
-    setState(() {
-      _selectedIds = <int>{item.id};
-    });
+    _selectionController.replaceSelection(<int>[item.id]);
   }
 
   void _toggleSelection(_RecordingPreview item) {
-    final Set<int> next = <int>{..._selectedIds};
-    if (next.contains(item.id)) {
-      next.remove(item.id);
-    } else {
-      next.add(item.id);
-    }
-    setState(() {
-      _selectedIds = next;
-    });
+    _selectionController.toggle(item.id);
   }
 
   void _clearSelection() {
-    if (_selectedIds.isEmpty) return;
-    setState(() {
-      _selectedIds = <int>{};
-    });
+    _selectionController.clearSelection();
   }
 
-  void _selectAll() {
-    if (!_canSelectAll) return;
-    setState(() {
-      _selectedIds = _visibleItems.map((item) => item.id).toSet();
-    });
+  void _toggleSelectAll() {
+    if (!_canToggleSelectAll) return;
+    if (_allVisibleSelected) {
+      _selectionController.clearSelection();
+      return;
+    }
+    _selectionController.selectAll(_visibleItemIds);
   }
 
   _RecordingPreview? get _singleSelectedItem {
@@ -451,8 +476,8 @@ class _HomePageState extends State<HomePage> {
             title: displayName,
           );
         }
-        _selectedIds = <int>{};
       });
+      _selectionController.clearSelection(haptic: false);
       ScaffoldMessenger.of(
         context,
       ).showSnackBar(const SnackBar(content: Text('样式占位已重命名')));
@@ -468,8 +493,8 @@ class _HomePageState extends State<HomePage> {
         }
         return current.copyWith(title: displayName);
       }).toList();
-      _selectedIds = <int>{};
     });
+    _selectionController.clearSelection(haptic: false);
     ScaffoldMessenger.of(
       context,
     ).showSnackBar(const SnackBar(content: Text('重命名成功')));
@@ -641,32 +666,30 @@ class _HomePageState extends State<HomePage> {
 
   Future<void> _showItemActions(_RecordingPreview item) async {
     if (_activeTab == _recentlyDeletedTab) {
-      final String? action = await showModalBottomSheet<String>(
+      final Color destructiveColor = HomePagePalette.of(context).favorite;
+      final GooShareTarget? target = await showGooSharePanel(
         context: context,
-        isScrollControlled: true,
-        backgroundColor: Colors.transparent,
-        builder: (BuildContext context) {
-          return _HomeActionSheet(
-            title: item.title,
-            options: <_HomeActionSheetOption>[
-              const _HomeActionSheetOption(
-                id: 'restore',
-                label: '恢复',
-                icon: LucideIcons.rotateCcw300,
-              ),
-              const _HomeActionSheetOption(
-                id: 'delete',
-                label: '彻底删除',
-                icon: LucideIcons.trash300,
-                destructive: true,
-              ),
-            ],
-          );
-        },
+        title: item.title,
+        leadingActionLabel: '取消',
+        previewText: '${item.duration} · ${item.date}',
+        channels: const <GooShareTarget>[],
+        targets: <GooShareTarget>[
+          const GooShareTarget(
+            id: 'restore',
+            label: '恢复',
+            iconName: 'rotate-ccw',
+          ),
+          GooShareTarget(
+            id: 'delete',
+            label: '彻底删除',
+            iconName: 'trash-2',
+            iconColor: destructiveColor,
+          ),
+        ],
       );
 
-      if (!mounted || action == null) return;
-      switch (action) {
+      if (!mounted || target == null) return;
+      switch (target.resolvedId) {
         case 'restore':
           await _restoreItems(<_RecordingPreview>[item]);
           return;
@@ -679,52 +702,43 @@ class _HomePageState extends State<HomePage> {
     }
 
     final String favoriteLabel = item.favorite ? '取消收藏' : '收藏';
-    final IconData favoriteIcon = item.favorite
-        ? LucideIcons.heartOff300
-        : LucideIcons.heart300;
-    final List<_HomeActionSheetOption> options = <_HomeActionSheetOption>[
-      _HomeActionSheetOption(
-        id: 'rename',
-        label: '重命名',
-        icon: LucideIcons.pencilLine300,
-        enabled: true,
-      ),
-      const _HomeActionSheetOption(
-        id: 'move',
-        label: '移动到',
-        icon: LucideIcons.folderInput300,
-      ),
-      _HomeActionSheetOption(
-        id: 'favorite',
-        label: favoriteLabel,
-        icon: favoriteIcon,
-        enabled: true,
-      ),
-      const _HomeActionSheetOption(
-        id: 'share',
-        label: '分享',
-        icon: LucideIcons.share300,
-      ),
-      _HomeActionSheetOption(
-        id: 'delete',
-        label: '删除',
-        icon: LucideIcons.trash300,
-        enabled: true,
-        destructive: true,
-      ),
-    ];
-    final String? action = await showModalBottomSheet<String>(
+    final String favoriteIconName = item.favorite ? 'heart-off' : 'heart';
+    final Color destructiveColor = HomePagePalette.of(context).favorite;
+    final GooShareTarget? target = await showGooSharePanel(
       context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      builder: (BuildContext context) {
-        return _HomeActionSheet(title: item.title, options: options);
-      },
+      title: item.title,
+      leadingActionLabel: '取消',
+      previewText: '${item.duration} · ${item.date}',
+      channels: const <GooShareTarget>[],
+      targets: <GooShareTarget>[
+        const GooShareTarget(
+          id: 'rename',
+          label: '重命名',
+          iconName: 'pencil-line',
+        ),
+        const GooShareTarget(
+          id: 'move',
+          label: '移动到',
+          iconName: 'folder-input',
+        ),
+        GooShareTarget(
+          id: 'favorite',
+          label: favoriteLabel,
+          iconName: favoriteIconName,
+        ),
+        const GooShareTarget(id: 'share', label: '分享', iconName: 'share-2'),
+        GooShareTarget(
+          id: 'delete',
+          label: '删除',
+          iconName: 'trash-2',
+          iconColor: destructiveColor,
+        ),
+      ],
     );
 
-    if (!mounted || action == null) return;
+    if (!mounted || target == null) return;
 
-    switch (action) {
+    switch (target.resolvedId) {
       case 'rename':
         await _openRenameDialog(item);
         return;
@@ -870,8 +884,13 @@ class _HomePageState extends State<HomePage> {
         _placeholderItems.removeWhere(
           (_RecordingPreview item) => placeholderIds.contains(item.id),
         );
-        _selectedIds.removeWhere(placeholderIds.contains);
       });
+      _selectionController.replaceSelection(
+        _selectedIds
+            .where((int id) => !placeholderIds.contains(id))
+            .toList(growable: false),
+        haptic: false,
+      );
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
@@ -909,9 +928,7 @@ class _HomePageState extends State<HomePage> {
         ),
       ),
     );
-    setState(() {
-      _selectedIds = <int>{};
-    });
+    _selectionController.clearSelection(haptic: false);
     await _load();
   }
 
@@ -928,9 +945,7 @@ class _HomePageState extends State<HomePage> {
         content: Text(items.length == 1 ? '已恢复' : '已恢复 ${items.length} 条记录'),
       ),
     );
-    setState(() {
-      _selectedIds = <int>{};
-    });
+    _selectionController.clearSelection(haptic: false);
     await _load();
   }
 
@@ -952,6 +967,80 @@ class _HomePageState extends State<HomePage> {
     }
   }
 
+  PreferredSizeWidget _buildAppBar(
+    HomePagePalette palette,
+    AppThemeModeController? themeController,
+  ) {
+    if (_viewMode == _HomeViewMode.selection) {
+      return GooAppBar.secondaryEditing(
+        title: '音频',
+        subtitle: '已选择 ${_selectedIds.length} 项',
+        leadingActionLabel: '取消',
+        trailingActionLabel: _selectionTrailingLabel,
+        onLeadingAction: _clearSelection,
+        onTrailingAction: _canToggleSelectAll ? _toggleSelectAll : null,
+        backgroundColor: palette.background,
+      );
+    }
+
+    return GooAppBar.secondary(
+      title: '音频',
+      backgroundColor: palette.background,
+      actions: <GooAppBarIconAction>[
+        GooAppBarIconAction(
+          iconName: 'search',
+          semanticLabel: '搜索',
+          tooltip: '搜索',
+          onPressed: () => _showComingSoon('搜索功能即将上线'),
+        ),
+        GooAppBarIconAction(
+          iconName: 'file-input',
+          semanticLabel: '导入',
+          tooltip: '导入',
+          onPressed: () {},
+        ),
+        GooAppBarIconAction(
+          iconName: themeController?.isDarkMode == true ? 'moon' : 'sun',
+          semanticLabel: '主题',
+          tooltip: '主题',
+          onPressed: () => themeController?.toggle(),
+        ),
+      ],
+    );
+  }
+
+  List<GooToolBarItem> _selectionToolbarItems(
+    BuildContext context,
+    GooSelectionState<int> state,
+  ) {
+    if (!state.hasSelection) {
+      return const <GooToolBarItem>[];
+    }
+
+    return <GooToolBarItem>[
+      GooToolBarItem(
+        iconName: 'pencil-line',
+        label: '重命名',
+        semanticLabel: '重命名所选音频',
+        onPressed: _canRenameSelection
+            ? () {
+                _openRenameDialogForSelection();
+              }
+            : null,
+      ),
+      GooToolBarItem(
+        iconName: 'trash-2',
+        label: '删除',
+        semanticLabel: '删除所选音频',
+        onPressed: _canDeleteSelection
+            ? () {
+                _deleteSelected();
+              }
+            : null,
+      ),
+    ];
+  }
+
   @override
   Widget build(BuildContext context) {
     final HomePagePalette palette = HomePagePalette.of(context);
@@ -961,75 +1050,40 @@ class _HomePageState extends State<HomePage> {
     final double bottomInset = MediaQuery.of(context).padding.bottom;
     final double fabBottom = bottomInset + HomePageMetrics.fabBottomSpacing;
     final double selectionToolbarInset =
-        HomePageMetrics.selectionToolbarButtonHeight +
-        HomePageMetrics.selectionToolbarInsetTop +
-        bottomInset +
-        HomePageMetrics.selectionToolbarBottomGap;
+        HomePageMetrics.selectionToolbarDockHeight +
+        HomePageMetrics.selectionToolbarDockGap +
+        bottomInset;
 
     return Scaffold(
-      body: ColoredBox(
-        color: palette.background,
-        child: SafeArea(
-          bottom: false,
+      appBar: _buildAppBar(palette, themeController),
+      body: GooSelectionOverlay<int>(
+        controller: _selectionController,
+        toolbarSemanticLabel: '音频选择操作',
+        toolbarBuilder: _selectionToolbarItems,
+        body: ColoredBox(
+          color: palette.background,
           child: Stack(
             children: <Widget>[
               Column(
                 children: <Widget>[
-                  Padding(
-                    padding: const EdgeInsets.fromLTRB(
-                      HomePageMetrics.horizontalPadding,
-                      HomePageMetrics.topBarPaddingTop,
-                      HomePageMetrics.horizontalPadding,
-                      HomePageMetrics.topBarPaddingBottom,
-                    ),
-                    child: SizedBox(
-                      height: HomePageMetrics.topBarHeight,
-                      child: _HomeHeader(
-                        mode: _viewMode,
-                        palette: palette,
-                        selectedCount: _selectedIds.length,
-                        onSearch: () => _showComingSoon('搜索功能即将上线'),
-                        onImport: () {},
-                        onTheme: () => themeController?.toggle(),
-                        themeIcon: themeController?.isDarkMode == true
-                            ? LucideIcons.moon300
-                            : LucideIcons.sun300,
-                        onDeleteSelection: _deleteSelected,
-                        onCancelSelection: _clearSelection,
-                        onSelectAll: _selectAll,
-                        canSelectAll: _canSelectAll,
-                      ),
-                    ),
-                  ),
-                  _GroupTabs(
-                    palette: palette,
+                  _HomeTabs(
                     tabs: _tabs,
                     activeTab: _activeTab,
                     onTabPressed: _selectTab,
-                    onLibraryPressed: () {
-                      _createFolder();
-                    },
+                    onCreateFolder: _createFolder,
                   ),
                   Expanded(
-                    child: Container(
-                      decoration: BoxDecoration(
-                        color: palette.surface,
-                        borderRadius: BorderRadius.vertical(
-                          top: Radius.circular(HomePageMetrics.panelRadius),
-                        ),
-                      ),
-                      child: _HomeContent(
-                        mode: _viewMode,
-                        palette: palette,
-                        items: _visibleItems,
-                        selectedIds: _selectedIds,
-                        emptyText: _emptyText(),
-                        selectionBottomInset: selectionToolbarInset,
-                        onOpenItem: _openItem,
-                        onLongPressItem: _enterSelection,
-                        onToggleSelection: _toggleSelection,
-                        onMorePressed: _showItemActions,
-                      ),
+                    child: _HomeContent(
+                      mode: _viewMode,
+                      palette: palette,
+                      items: _visibleItems,
+                      selectedIds: _selectedIds,
+                      emptyText: _emptyText(),
+                      selectionBottomInset: selectionToolbarInset,
+                      onOpenItem: _openItem,
+                      onLongPressItem: _enterSelection,
+                      onToggleSelection: _toggleSelection,
+                      onMorePressed: _showItemActions,
                     ),
                   ),
                 ],
@@ -1045,20 +1099,6 @@ class _HomePageState extends State<HomePage> {
                     },
                   ),
                 ),
-              if (_isSelectionMode)
-                Positioned(
-                  left: 0,
-                  right: 0,
-                  bottom: 0,
-                  child: _SelectionToolbar(
-                    palette: palette,
-                    bottomInset: bottomInset,
-                    canRename: _canRenameSelection,
-                    canDelete: _canDeleteSelection,
-                    onRename: _openRenameDialogForSelection,
-                    onDelete: _deleteSelected,
-                  ),
-                ),
             ],
           ),
         ),
@@ -1068,152 +1108,44 @@ class _HomePageState extends State<HomePage> {
   }
 }
 
-class _HomeHeader extends StatelessWidget {
-  const _HomeHeader({
-    required this.mode,
-    required this.palette,
-    required this.selectedCount,
-    required this.onSearch,
-    required this.onImport,
-    required this.onTheme,
-    required this.themeIcon,
-    required this.onDeleteSelection,
-    required this.onCancelSelection,
-    required this.onSelectAll,
-    required this.canSelectAll,
-  });
-
-  final _HomeViewMode mode;
-  final HomePagePalette palette;
-  final int selectedCount;
-  final VoidCallback onSearch;
-  final VoidCallback onImport;
-  final VoidCallback onTheme;
-  final IconData themeIcon;
-  final VoidCallback onDeleteSelection;
-  final VoidCallback onCancelSelection;
-  final VoidCallback onSelectAll;
-  final bool canSelectAll;
-
-  @override
-  Widget build(BuildContext context) {
-    if (mode == _HomeViewMode.selection) {
-      return Row(
-        crossAxisAlignment: CrossAxisAlignment.center,
-        children: <Widget>[
-          Expanded(
-            child: Align(
-              alignment: Alignment.centerLeft,
-              child: _HeaderTextButton(
-                label: '取消',
-                onPressed: onCancelSelection,
-                style: HomePageTextStyles.selectionAction(
-                  palette,
-                ).copyWith(color: palette.favorite),
-              ),
-            ),
-          ),
-          Expanded(
-            child: Text(
-              '已选择 $selectedCount 项',
-              textAlign: TextAlign.center,
-              style: HomePageTextStyles.selectionTitle(palette),
-            ),
-          ),
-          Expanded(
-            child: Align(
-              alignment: Alignment.centerRight,
-              child: _HeaderTextButton(
-                label: '全选',
-                onPressed: canSelectAll ? onSelectAll : null,
-                style: HomePageTextStyles.selectionAction(palette),
-              ),
-            ),
-          ),
-        ],
-      );
-    }
-
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.center,
-      children: <Widget>[
-        Expanded(child: Text('音频', style: HomePageTextStyles.title(palette))),
-        _HeaderIconButton(
-          palette: palette,
-          icon: LucideIcons.search300,
-          tooltip: '搜索',
-          onPressed: onSearch,
-        ),
-        const SizedBox(width: 20),
-        _HeaderIconButton(
-          palette: palette,
-          icon: LucideIcons.fileInput300,
-          tooltip: '导入',
-          onPressed: onImport,
-        ),
-        const SizedBox(width: 20),
-        _HeaderIconButton(
-          palette: palette,
-          icon: themeIcon,
-          tooltip: '主题',
-          onPressed: onTheme,
-        ),
-      ],
-    );
-  }
-}
-
-class _GroupTabs extends StatelessWidget {
-  const _GroupTabs({
-    required this.palette,
+class _HomeTabs extends StatelessWidget {
+  const _HomeTabs({
     required this.tabs,
     required this.activeTab,
     required this.onTabPressed,
-    required this.onLibraryPressed,
+    required this.onCreateFolder,
   });
 
-  final HomePagePalette palette;
   final List<_HomeTabSpec> tabs;
   final String activeTab;
   final ValueChanged<String> onTabPressed;
-  final VoidCallback onLibraryPressed;
+  final VoidCallback onCreateFolder;
 
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding: const EdgeInsets.fromLTRB(
-        HomePageMetrics.horizontalPadding,
-        HomePageMetrics.tabsPaddingVertical,
-        0,
-        HomePageMetrics.tabsPaddingVertical,
-      ),
-      child: SizedBox(
-        height: HomePageMetrics.tabHeight,
-        child: Row(
-          children: <Widget>[
-            _IconTab(palette: palette, onPressed: onLibraryPressed),
-            const SizedBox(width: 8),
-            Expanded(
-              child: SingleChildScrollView(
-                scrollDirection: Axis.horizontal,
-                child: Row(
-                  children: tabs.map((tab) {
-                    final bool isActive = tab.id == activeTab;
-                    return Padding(
-                      padding: const EdgeInsets.only(right: 8),
-                      child: _TextTab(
-                        palette: palette,
-                        label: tab.label,
-                        active: isActive,
-                        onPressed: () => onTabPressed(tab.id),
-                      ),
-                    );
-                  }).toList(),
-                ),
+      padding: const EdgeInsets.only(top: HomePageMetrics.tabsPaddingVertical),
+      child: GooTabs(
+        value: activeTab,
+        onValueChange: onTabPressed,
+        layout: GooTabsLayout.overlength,
+        showContent: false,
+        actions: <GooTabAction>[
+          GooTabAction(
+            iconName: 'folder-plus',
+            semanticLabel: '新建分组',
+            onPressed: onCreateFolder,
+          ),
+        ],
+        tabs: tabs
+            .map(
+              (_HomeTabSpec tab) => GooTabItem(
+                value: tab.id,
+                label: GooText.inherit(tab.label),
+                child: const SizedBox.shrink(),
               ),
-            ),
-          ],
-        ),
+            )
+            .toList(growable: false),
       ),
     );
   }
@@ -1270,7 +1202,8 @@ class _HomeContent extends StatelessWidget {
       case _HomeViewMode.selection:
       case _HomeViewMode.normal:
         final bool showSelection = mode == _HomeViewMode.selection;
-        return ListView.separated(
+        return SingleChildScrollView(
+          physics: const ClampingScrollPhysics(),
           padding: EdgeInsets.fromLTRB(
             0,
             0,
@@ -1279,304 +1212,125 @@ class _HomeContent extends StatelessWidget {
                 ? selectionBottomInset
                 : HomePageMetrics.listBottomInset,
           ),
-          itemCount: items.length,
-          separatorBuilder: (BuildContext context, int index) => Container(
-            height: 1,
-            margin: const EdgeInsets.symmetric(
-              horizontal: HomePageMetrics.horizontalPadding,
-            ),
-            color: palette.divider,
+          child: GooList.builder(
+            itemCount: items.length,
+            backgroundColor: palette.surface,
+            itemBuilder: (BuildContext context, int index) {
+              final _RecordingPreview item = items[index];
+              return _HomeListRow(
+                item: item,
+                selected: selectedIds.contains(item.id),
+                selectionMode: showSelection,
+                onTap: () {
+                  if (showSelection) {
+                    onToggleSelection(item);
+                    return;
+                  }
+                  onOpenItem(item);
+                },
+                onLongPress: () {
+                  if (showSelection) {
+                    onToggleSelection(item);
+                    return;
+                  }
+                  onLongPressItem(item);
+                },
+                onMorePressed: () => onMorePressed(item),
+              );
+            },
           ),
-          itemBuilder: (BuildContext context, int index) {
-            final _RecordingPreview item = items[index];
-            return _HomeListRow(
-              palette: palette,
-              item: item,
-              selected: selectedIds.contains(item.id),
-              selectionMode: showSelection,
-              onTap: () {
-                if (showSelection) {
-                  onToggleSelection(item);
-                  return;
-                }
-                onOpenItem(item);
-              },
-              onLongPress: () {
-                if (showSelection) {
-                  onToggleSelection(item);
-                  return;
-                }
-                onLongPressItem(item);
-              },
-              onMorePressed: () => onMorePressed(item),
-            );
-          },
         );
     }
   }
 }
 
-class _HomeListRow extends StatelessWidget {
+class _HomeListRow extends StatelessWidget implements GooListRowChild {
   const _HomeListRow({
-    required this.palette,
     required this.item,
     required this.selected,
     required this.selectionMode,
     required this.onTap,
     required this.onLongPress,
     required this.onMorePressed,
+    this.showDivider = true,
+    this.padding,
+    this.minHeight,
   });
 
-  final HomePagePalette palette;
   final _RecordingPreview item;
   final bool selected;
   final bool selectionMode;
   final VoidCallback onTap;
   final VoidCallback onLongPress;
   final VoidCallback onMorePressed;
+  final bool showDivider;
+  final EdgeInsetsGeometry? padding;
+  final double? minHeight;
 
   @override
-  Widget build(BuildContext context) {
-    return Material(
-      color: selected ? palette.selectionFill : Colors.transparent,
-      child: InkWell(
-        onTap: onTap,
-        onLongPress: onLongPress,
-        child: SizedBox(
-          height: HomePageMetrics.rowHeight,
-          child: Padding(
-            padding: const EdgeInsets.all(HomePageMetrics.horizontalPadding),
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.center,
-              children: <Widget>[
-                Expanded(
-                  child: Padding(
-                    padding: const EdgeInsets.only(right: 16),
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: <Widget>[
-                        Row(
-                          children: <Widget>[
-                            if (item.favorite) ...<Widget>[
-                              Icon(
-                                LucideIcons.heart300,
-                                size: 17,
-                                color: palette.favorite,
-                              ),
-                              const SizedBox(width: 4),
-                            ],
-                            Expanded(
-                              child: Text(
-                                item.title,
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                                style: HomePageTextStyles.rowTitle(palette),
-                              ),
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: HomePageMetrics.rowGap),
-                        Wrap(
-                          spacing: 16,
-                          runSpacing: 4,
-                          children: <Widget>[
-                            _MetaChip(
-                              palette: palette,
-                              icon: LucideIcons.clock300,
-                              label: item.duration,
-                            ),
-                            _MetaChip(
-                              palette: palette,
-                              icon: LucideIcons.calendar300,
-                              label: item.date,
-                            ),
-                          ],
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-                selectionMode
-                    ? _SelectionIndicator(palette: palette, selected: selected)
-                    : _MoreButton(palette: palette, onPressed: onMorePressed),
-              ],
-            ),
-          ),
-        ),
-      ),
+  Widget copyWithListRow({
+    bool? showDivider,
+    EdgeInsetsGeometry? padding,
+    double? minHeight,
+    GooListStyle? listStyle,
+    GooListRowPosition? rowPosition,
+  }) {
+    return _HomeListRow(
+      item: item,
+      selected: selected,
+      selectionMode: selectionMode,
+      onTap: onTap,
+      onLongPress: onLongPress,
+      onMorePressed: onMorePressed,
+      showDivider: showDivider ?? this.showDivider,
+      padding: padding ?? this.padding,
+      minHeight: minHeight ?? this.minHeight,
     );
   }
-}
-
-class _SelectionIndicator extends StatelessWidget {
-  const _SelectionIndicator({required this.palette, required this.selected});
-
-  final HomePagePalette palette;
-  final bool selected;
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      width: HomePageMetrics.iconActionBoxSize,
-      height: HomePageMetrics.iconActionBoxSize,
-      decoration: BoxDecoration(
-        color: selected ? palette.fab : Colors.transparent,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(
-          color: selected ? palette.fab : palette.selectionStroke,
-        ),
-      ),
-      alignment: Alignment.center,
-      child: Icon(
-        selected ? Icons.check_rounded : Icons.circle_outlined,
-        size: 18,
-        color: selected ? Colors.white : palette.mutedText,
+    return GestureDetector(
+      behavior: HitTestBehavior.translucent,
+      onLongPress: onLongPress,
+      child: GooListItem(
+        title: item.title,
+        subtitle: '${item.duration} · ${item.date}',
+        leadingIconName: item.favorite ? 'file-heart' : 'file-audio',
+        leadingIconTone: item.favorite
+            ? GooListIconTone.red
+            : GooListIconTone.blue,
+        trailing: selectionMode
+            ? GooCheckbox(
+                checked: selected,
+                onCheckedChange: (_) => onTap(),
+                semanticLabel: '选择 ${item.title}',
+              )
+            : _MoreButton(onPressed: onMorePressed),
+        onTap: onTap,
+        selected: selected,
+        pressed: selected,
+        showDivider: showDivider,
+        padding: padding,
+        minHeight: minHeight ?? HomePageMetrics.rowHeight,
+        semanticLabel: '${item.title}，${item.duration}，${item.date}',
       ),
     );
   }
 }
 
 class _MoreButton extends StatelessWidget {
-  const _MoreButton({required this.palette, required this.onPressed});
+  const _MoreButton({required this.onPressed});
 
-  final HomePagePalette palette;
   final VoidCallback onPressed;
 
   @override
   Widget build(BuildContext context) {
-    return _IconActionButton(
-      palette: palette,
-      icon: LucideIcons.ellipsis300,
-      iconSize: HomePageMetrics.trailingActionIconSize,
+    return GooActionIcon(
+      iconName: 'ellipsis',
+      semanticLabel: '更多操作',
+      size: GooActionIconSize.standard,
       onPressed: onPressed,
-    );
-  }
-}
-
-class _MetaChip extends StatelessWidget {
-  const _MetaChip({
-    required this.palette,
-    required this.icon,
-    required this.label,
-  });
-
-  final HomePagePalette palette;
-  final IconData icon;
-  final String label;
-
-  @override
-  Widget build(BuildContext context) {
-    return Row(
-      mainAxisSize: MainAxisSize.min,
-      children: <Widget>[
-        Icon(icon, size: 14, color: palette.mutedText),
-        const SizedBox(width: 6),
-        Text(label, style: HomePageTextStyles.meta(palette)),
-      ],
-    );
-  }
-}
-
-class _SelectionToolbar extends StatelessWidget {
-  const _SelectionToolbar({
-    required this.palette,
-    required this.bottomInset,
-    required this.canRename,
-    required this.canDelete,
-    required this.onRename,
-    required this.onDelete,
-  });
-
-  final HomePagePalette palette;
-  final double bottomInset;
-  final bool canRename;
-  final bool canDelete;
-  final VoidCallback onRename;
-  final VoidCallback onDelete;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      color: palette.surface,
-      padding: EdgeInsets.fromLTRB(
-        HomePageMetrics.horizontalPadding,
-        HomePageMetrics.selectionToolbarInsetTop,
-        HomePageMetrics.horizontalPadding,
-        bottomInset + HomePageMetrics.selectionToolbarBottomGap,
-      ),
-      child: Row(
-        children: <Widget>[
-          Expanded(
-            child: _SelectionToolbarButton(
-              palette: palette,
-              icon: LucideIcons.pencil300,
-              label: '重命名',
-              enabled: canRename,
-              onPressed: onRename,
-            ),
-          ),
-          Expanded(
-            child: _SelectionToolbarButton(
-              palette: palette,
-              icon: LucideIcons.trash2Weight300,
-              label: '删除',
-              enabled: canDelete,
-              color: palette.favorite,
-              onPressed: onDelete,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _SelectionToolbarButton extends StatelessWidget {
-  const _SelectionToolbarButton({
-    required this.palette,
-    required this.icon,
-    required this.label,
-    required this.enabled,
-    required this.onPressed,
-    this.color,
-  });
-
-  final HomePagePalette palette;
-  final IconData icon;
-  final String label;
-  final bool enabled;
-  final VoidCallback onPressed;
-  final Color? color;
-
-  @override
-  Widget build(BuildContext context) {
-    final Color resolvedColor = color ?? palette.text;
-    return Opacity(
-      opacity: enabled ? 1 : 0.5,
-      child: Material(
-        color: Colors.transparent,
-        child: InkWell(
-          onTap: enabled ? onPressed : null,
-          borderRadius: BorderRadius.circular(999),
-          child: SizedBox(
-            height: HomePageMetrics.selectionToolbarButtonHeight,
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: <Widget>[
-                Icon(icon, size: 18, color: resolvedColor),
-                const SizedBox(height: 6),
-                Text(
-                  label,
-                  style: HomePageTextStyles.selectionToolbarLabel(
-                    palette,
-                  ).copyWith(color: resolvedColor),
-                ),
-              ],
-            ),
-          ),
-        ),
-      ),
     );
   }
 }
@@ -1588,19 +1342,16 @@ class _ActionSheetItem extends StatelessWidget {
     required this.label,
     required this.enabled,
     required this.onTap,
-    this.destructive = false,
   });
 
   final HomePagePalette palette;
   final IconData icon;
   final String label;
   final bool enabled;
-  final bool destructive;
   final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
-    final Color color = destructive ? palette.favorite : palette.text;
     return Opacity(
       opacity: enabled ? 1 : 0.5,
       child: Material(
@@ -1617,105 +1368,19 @@ class _ActionSheetItem extends StatelessWidget {
                 SizedBox(
                   width: HomePageMetrics.actionSheetOptionIconBox,
                   height: HomePageMetrics.actionSheetOptionIconBox,
-                  child: Center(child: Icon(icon, size: 18, color: color)),
+                  child: Center(
+                    child: Icon(icon, size: 18, color: palette.text),
+                  ),
                 ),
                 const SizedBox(width: 12),
                 Expanded(
                   child: Text(
                     label,
-                    style: HomePageTextStyles.actionSheetOption(
-                      palette,
-                    ).copyWith(color: color),
+                    style: HomePageTextStyles.actionSheetOption(palette),
                   ),
                 ),
               ],
             ),
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class _HomeActionSheet extends StatelessWidget {
-  const _HomeActionSheet({required this.title, required this.options});
-
-  final String title;
-  final List<_HomeActionSheetOption> options;
-
-  @override
-  Widget build(BuildContext context) {
-    final HomePagePalette palette = HomePagePalette.of(context);
-    final double bottomInset = MediaQuery.of(context).padding.bottom;
-    return SafeArea(
-      top: false,
-      child: Align(
-        alignment: Alignment.bottomCenter,
-        child: Container(
-          decoration: BoxDecoration(
-            color: palette.surface,
-            borderRadius: BorderRadius.vertical(
-              top: Radius.circular(HomePageMetrics.actionSheetRadius),
-            ),
-          ),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: <Widget>[
-              Padding(
-                padding: const EdgeInsets.fromLTRB(
-                  HomePageMetrics.actionSheetHeaderHorizontal,
-                  HomePageMetrics.actionSheetHeaderTop,
-                  HomePageMetrics.actionSheetHeaderHorizontal,
-                  HomePageMetrics.actionSheetHeaderBottom,
-                ),
-                child: Text(
-                  title,
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                  textAlign: TextAlign.center,
-                  style: HomePageTextStyles.actionSheetTitle(palette),
-                ),
-              ),
-              ConstrainedBox(
-                constraints: const BoxConstraints(maxHeight: 300),
-                child: ListView.separated(
-                  shrinkWrap: true,
-                  itemCount: options.length,
-                  separatorBuilder: (BuildContext context, int index) =>
-                      Divider(height: 1, color: palette.divider),
-                  itemBuilder: (BuildContext context, int index) {
-                    final _HomeActionSheetOption option = options[index];
-                    return _ActionSheetItem(
-                      palette: palette,
-                      icon: option.icon,
-                      label: option.label,
-                      enabled: option.enabled,
-                      destructive: option.destructive,
-                      onTap: () => Navigator.of(context).pop(option.id),
-                    );
-                  },
-                ),
-              ),
-              Divider(height: 1, color: palette.divider),
-              TextButton(
-                onPressed: () => Navigator.of(context).pop(),
-                style: TextButton.styleFrom(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: HomePageMetrics.actionSheetHeaderHorizontal,
-                    vertical: HomePageMetrics.actionSheetCancelVertical,
-                  ),
-                  minimumSize: const Size.fromHeight(0),
-                  tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                ),
-                child: Center(
-                  child: Text(
-                    '取消',
-                    style: HomePageTextStyles.actionSheetCancel(palette),
-                  ),
-                ),
-              ),
-              SizedBox(height: bottomInset),
-            ],
           ),
         ),
       ),
@@ -1865,175 +1530,6 @@ class _HomeEmptyState extends StatelessWidget {
             style: HomePageTextStyles.emptyText(palette),
           ),
         ],
-      ),
-    );
-  }
-}
-
-class _TextTab extends StatelessWidget {
-  const _TextTab({
-    required this.palette,
-    required this.label,
-    required this.active,
-    required this.onPressed,
-  });
-
-  final HomePagePalette palette;
-  final String label;
-  final bool active;
-  final VoidCallback onPressed;
-
-  @override
-  Widget build(BuildContext context) {
-    return Material(
-      color: active ? palette.surfaceActive : palette.surface,
-      borderRadius: BorderRadius.circular(HomePageMetrics.tabRadius),
-      child: InkWell(
-        onTap: onPressed,
-        borderRadius: BorderRadius.circular(HomePageMetrics.tabRadius),
-        child: Container(
-          height: HomePageMetrics.tabHeight,
-          padding: const EdgeInsets.symmetric(horizontal: 16),
-          alignment: Alignment.center,
-          child: Text(
-            label,
-            style: active
-                ? HomePageTextStyles.tabActive(palette)
-                : HomePageTextStyles.tab(palette),
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class _IconTab extends StatelessWidget {
-  const _IconTab({required this.palette, required this.onPressed});
-
-  final HomePagePalette palette;
-  final VoidCallback onPressed;
-
-  @override
-  Widget build(BuildContext context) {
-    return Material(
-      color: palette.surface,
-      borderRadius: BorderRadius.circular(HomePageMetrics.tabRadius),
-      child: InkWell(
-        onTap: onPressed,
-        borderRadius: BorderRadius.circular(HomePageMetrics.tabRadius),
-        child: SizedBox(
-          width: HomePageMetrics.tabHeight,
-          height: HomePageMetrics.tabHeight,
-          child: Icon(LucideIcons.library300, size: 18, color: palette.text),
-        ),
-      ),
-    );
-  }
-}
-
-class _HeaderIconButton extends StatelessWidget {
-  const _HeaderIconButton({
-    required this.palette,
-    required this.icon,
-    required this.tooltip,
-    required this.onPressed,
-  });
-
-  final HomePagePalette palette;
-  final IconData icon;
-  final String tooltip;
-  final VoidCallback onPressed;
-
-  @override
-  Widget build(BuildContext context) {
-    return _IconActionButton(
-      palette: palette,
-      icon: icon,
-      tooltip: tooltip,
-      onPressed: onPressed,
-    );
-  }
-}
-
-class _IconActionButton extends StatelessWidget {
-  const _IconActionButton({
-    required this.palette,
-    required this.icon,
-    required this.onPressed,
-    this.iconSize = HomePageMetrics.iconActionIconSize,
-    this.tooltip,
-  });
-
-  final HomePagePalette palette;
-  final IconData icon;
-  final String? tooltip;
-  final VoidCallback onPressed;
-  final double iconSize;
-
-  @override
-  Widget build(BuildContext context) {
-    Widget child = SizedBox(
-      width: HomePageMetrics.iconActionBoxSize,
-      height: HomePageMetrics.iconActionBoxSize,
-      child: Material(
-        color: Colors.transparent,
-        borderRadius: BorderRadius.circular(HomePageMetrics.iconActionRadius),
-        child: InkWell(
-          onTap: onPressed,
-          borderRadius: BorderRadius.circular(HomePageMetrics.iconActionRadius),
-          overlayColor: WidgetStateProperty.resolveWith<Color?>((
-            Set<WidgetState> states,
-          ) {
-            if (states.contains(WidgetState.pressed)) {
-              return palette.surfaceActive;
-            }
-            if (states.contains(WidgetState.hovered) ||
-                states.contains(WidgetState.focused)) {
-              return palette.surfaceActive.withValues(
-                alpha: HomePageMetrics.iconActionHoverOpacity,
-              );
-            }
-            return null;
-          }),
-          child: Center(
-            child: Icon(icon, size: iconSize, color: palette.text),
-          ),
-        ),
-      ),
-    );
-
-    if (tooltip == null || tooltip!.isEmpty) {
-      return child;
-    }
-
-    return Tooltip(message: tooltip, child: child);
-  }
-}
-
-class _HeaderTextButton extends StatelessWidget {
-  const _HeaderTextButton({
-    required this.label,
-    required this.onPressed,
-    required this.style,
-  });
-
-  final String label;
-  final VoidCallback? onPressed;
-  final TextStyle style;
-
-  @override
-  Widget build(BuildContext context) {
-    return Opacity(
-      opacity: onPressed == null ? 0.5 : 1,
-      child: TextButton(
-        onPressed: onPressed,
-        style: TextButton.styleFrom(
-          foregroundColor: style.color,
-          padding: const EdgeInsets.symmetric(horizontal: 8),
-          minimumSize: const Size(40, HomePageMetrics.topBarHeight),
-          tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-        ),
-        child: Text(label, style: style),
       ),
     );
   }

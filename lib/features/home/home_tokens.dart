@@ -84,9 +84,8 @@ class HomePageMetrics {
   static const double listBottomInset = 116;
   static const double selectionListBottomInset = 24;
   static const double emptyIconSize = 52;
-  static const double selectionToolbarButtonHeight = 42;
-  static const double selectionToolbarInsetTop = 8;
-  static const double selectionToolbarBottomGap = 8;
+  static const double selectionToolbarDockHeight = 58;
+  static const double selectionToolbarDockGap = 16;
   static const double actionSheetRadius = 26;
   static const double actionSheetHeaderHorizontal = 20;
   static const double actionSheetHeaderTop = 20;
@@ -153,13 +152,6 @@ class HomePageTextStyles {
     fontSize: 15,
     fontWeight: FontWeight.w400,
     height: 1.6,
-  );
-
-  static TextStyle selectionToolbarLabel(HomePagePalette palette) => TextStyle(
-    color: palette.text,
-    fontSize: 15,
-    fontWeight: FontWeight.w400,
-    height: 1.2,
   );
 
   static TextStyle actionSheetTitle(HomePagePalette palette) => TextStyle(
