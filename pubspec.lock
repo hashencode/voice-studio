@@ -376,10 +376,10 @@ packages:
     dependency: transitive
     description:
       name: lucide_icons_flutter_dense
-      sha256: "178e59f4a2e2b7686ff4cbd30a0314f6b45c1c6a61f7393986a9605d4f1085dd"
+      sha256: "8129ee9f56d7c3d5314879e2fe001cb2da77ba1e3e54be6879eaa8433c01ed3f"
       url: "https://pub.dev"
     source: hosted
-    version: "3.1.14+2-dense.1"
+    version: "3.1.15+2-dense.1"
   matcher:
     dependency: transitive
     description:
