@@ -1,52 +1,120 @@
 import 'package:flutter/services.dart';
 
 import '../../../app/contracts/audio_contract.dart';
-
 import 'recorder_port.dart';
 
 class AndroidRecorderEngine implements RecorderPort {
-  AndroidRecorderEngine() : _channel = const MethodChannel(_channelName);
+  AndroidRecorderEngine({MethodChannel? channel})
+    : _channel = channel ?? const MethodChannel(AudioContract.recorderChannel);
 
-  static const String _channelName = AudioContract.recorderChannel;
   final MethodChannel _channel;
 
   @override
-  Future<void> start() async {
-    await _invokeVoid('start');
+  Future<RecordingSessionSnapshot> start({String? sessionId}) async {
+    final raw = await _invokeMap('start', <String, Object?>{
+      'sessionId': sessionId,
+    });
+    return RecordingSessionSnapshot.fromMap(raw);
   }
 
   @override
-  Future<void> pause() async {
-    await _invokeVoid('pause');
+  Future<RecordingSessionSnapshot> pause() async {
+    return RecordingSessionSnapshot.fromMap(await _invokeMap('pause'));
   }
 
   @override
-  Future<void> resume() async {
-    await _invokeVoid('resume');
+  Future<RecordingSessionSnapshot> resume() async {
+    return RecordingSessionSnapshot.fromMap(await _invokeMap('resume'));
   }
 
   @override
-  Future<RecorderResult> stop() async {
+  Future<RecorderResult> stop({String reason = 'user_stop'}) async {
+    final raw = await _invokeMap('stop', <String, Object?>{'reason': reason});
+    return RecorderResult.fromMap(raw);
+  }
+
+  @override
+  Future<RecordingSessionSnapshot> getState() async {
+    return RecordingSessionSnapshot.fromMap(
+      await _invokeMap('getRecordingState'),
+    );
+  }
+
+  @override
+  Future<List<RecordingInputDevice>> listInputDevices() async {
     try {
-      final Map<Object?, Object?>? raw = await _channel.invokeMapMethod<Object?, Object?>('stop');
-      if (raw == null) {
-        throw RecorderException('原生返回为空');
-      }
-
-      final String path = (raw['path'] as String?) ?? '';
-      final int durationMs = (raw['durationMs'] as int?) ?? 0;
-
-      return RecorderResult(path: path, durationMs: durationMs);
-    } on PlatformException catch (e) {
-      throw RecorderException(e.message ?? '停止录音失败');
+      final raw = await _channel.invokeListMethod<Object?>(
+        'listRecordingInputDevices',
+      );
+      return (raw ?? const <Object?>[])
+          .whereType<Map<Object?, Object?>>()
+          .map(RecordingInputDevice.fromMap)
+          .toList(growable: false);
+    } on PlatformException catch (error) {
+      throw RecorderException(error.message ?? '读取录音输入设备失败', code: error.code);
     }
   }
 
-  Future<void> _invokeVoid(String method) async {
+  @override
+  Future<RecordingSessionSnapshot> selectInputDevice(int? deviceId) async {
+    final raw = await _invokeMap(
+      'selectRecordingInputDevice',
+      <String, Object?>{'deviceId': deviceId},
+    );
+    return RecordingSessionSnapshot.fromMap(raw);
+  }
+
+  @override
+  Future<List<RecordingRecoveryCandidate>> listRecoveries() async {
     try {
-      await _channel.invokeMethod<void>(method);
-    } on PlatformException catch (e) {
-      throw RecorderException(e.message ?? '调用失败: $method');
+      final raw = await _channel.invokeListMethod<Object?>(
+        'listRecordingRecoveries',
+      );
+      return (raw ?? const <Object?>[])
+          .whereType<Map<Object?, Object?>>()
+          .map(RecordingRecoveryCandidate.fromMap)
+          .toList(growable: false);
+    } on PlatformException catch (error) {
+      throw RecorderException(error.message ?? '检查待恢复录音失败', code: error.code);
+    }
+  }
+
+  @override
+  Future<RecorderResult> recover(String sessionId) async {
+    return RecorderResult.fromMap(
+      await _invokeMap('recoverRecording', <String, Object?>{
+        'sessionId': sessionId,
+      }),
+    );
+  }
+
+  @override
+  Future<void> discardRecovery(String sessionId) async {
+    try {
+      await _channel.invokeMethod<void>(
+        'discardRecordingRecovery',
+        <String, Object?>{'sessionId': sessionId},
+      );
+    } on PlatformException catch (error) {
+      throw RecorderException(error.message ?? '清理临时录音失败', code: error.code);
+    }
+  }
+
+  Future<Map<Object?, Object?>> _invokeMap(
+    String method, [
+    Map<String, Object?>? arguments,
+  ]) async {
+    try {
+      final raw = await _channel.invokeMapMethod<Object?, Object?>(
+        method,
+        arguments,
+      );
+      if (raw == null) {
+        throw RecorderException('原生录音服务返回为空');
+      }
+      return raw;
+    } on PlatformException catch (error) {
+      throw RecorderException(error.message ?? '录音操作失败', code: error.code);
     }
   }
 }

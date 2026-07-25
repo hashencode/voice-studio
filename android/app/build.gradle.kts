@@ -54,17 +54,7 @@ android {
         targetSdk = flutter.targetSdkVersion
         versionCode = flutter.versionCode
         versionName = flutter.versionName
-    }
-
-    flavorDimensions += "runtime"
-    productFlavors {
-        create("ui") {
-            dimension = "runtime"
-            applicationIdSuffix = ".ui"
-        }
-        create("full") {
-            dimension = "runtime"
-        }
+        testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
 
     buildTypes {
@@ -80,13 +70,7 @@ android {
     }
 
     sourceSets {
-        getByName("ui") {
-            java.srcDir("src/ui/kotlin")
-        }
-        getByName("full") {
-            java.srcDir("src/full/kotlin")
-        }
-        maybeCreate("fullDebug").apply {
+        getByName("debug").apply {
             java.srcDir("../../benchmark/android/src/debug/kotlin")
         }
     }
@@ -94,7 +78,11 @@ android {
 
 
 dependencies {
-    add("fullImplementation", files("libs/sherpa-onnx.aar"))
+    implementation(files("libs/sherpa-onnx.aar"))
+    testImplementation("junit:junit:4.13.2")
+    testImplementation("org.json:json:20250517")
+    androidTestImplementation("androidx.test:runner:1.2.0")
+    androidTestImplementation("androidx.test.ext:junit:1.1.1")
 }
 
 flutter {

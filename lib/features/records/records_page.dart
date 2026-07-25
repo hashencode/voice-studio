@@ -1,11 +1,12 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_components/flutter_components.dart';
+import 'package:path/path.dart' as p;
 
 import '../shared/utils/formatters.dart';
 import '../shared/widgets/build_info_footer.dart';
 import '../shared/widgets/common_empty_state.dart';
 import 'model/recording_entity.dart';
 import 'repository/recordings_repository.dart';
-import 'package:path/path.dart' as p;
 import 'widgets/recording_details_sheet.dart';
 
 class RecordsPage extends StatefulWidget {
@@ -40,27 +41,32 @@ class _RecordsPageState extends State<RecordsPage> {
   }
 
   Future<void> _showItemActions(RecordingEntity item) async {
-    final String? action = await showModalBottomSheet<String>(
+    final String? action = await showGooPanel<String>(
       context: context,
-      showDragHandle: true,
-      builder: (BuildContext context) {
-        return SafeArea(
-          child: Wrap(
-            children: <Widget>[
-              ListTile(
-                leading: const Icon(Icons.info_outline),
-                title: const Text('查看详情'),
-                onTap: () => Navigator.of(context).pop('detail'),
-              ),
-              ListTile(
-                leading: const Icon(Icons.delete_outline, color: Colors.red),
-                title: const Text('删除记录', style: TextStyle(color: Colors.red)),
-                onTap: () => Navigator.of(context).pop('delete'),
-              ),
-            ],
-          ),
-        );
-      },
+      title: _displayTitle(item),
+      builder:
+          (
+            BuildContext _,
+            GooPanelController<String> controller,
+            ScrollController _,
+          ) {
+            return GooList(
+              children: <Widget>[
+                GooListItem(
+                  title: '查看详情',
+                  leadingIconName: GooIcons.info,
+                  onTap: () => controller.closeWithResult('detail'),
+                ),
+                GooListItem(
+                  title: '删除记录',
+                  leadingIconName: GooIcons.delete,
+                  leadingIconTone: GooListIconTone.red,
+                  titleTone: GooTextTone.error,
+                  onTap: () => controller.closeWithResult('delete'),
+                ),
+              ],
+            );
+          },
     );
 
     if (!mounted || action == null) return;
@@ -83,24 +89,24 @@ class _RecordsPageState extends State<RecordsPage> {
       durationMs: item.durationMs,
       createdAtMs: item.createdAtMs,
       latestJob: null,
+      recordingId: item.id,
     );
   }
 
   Future<void> _deleteItem(RecordingEntity item) async {
-    final bool? confirmed = await showDialog<bool>(
+    final bool? confirmed = await showGooDialog<bool>(
       context: context,
-      builder: (BuildContext context) {
-        return AlertDialog(
-          title: const Text('删除录音记录'),
-          content: const Text('会同时删除关联转写任务记录，此操作不可撤销。'),
-          actions: <Widget>[
-            TextButton(
-              onPressed: () => Navigator.of(context).pop(false),
-              child: const Text('取消'),
-            ),
-            FilledButton(
-              onPressed: () => Navigator.of(context).pop(true),
-              child: const Text('删除'),
+      builder: (BuildContext _) {
+        return const GooDialog<bool>.confirmation(
+          title: '删除录音记录',
+          description: '录音会移入最近删除，可在彻底删除前恢复。',
+          actions: <GooDialogAction>[
+            GooDialogAction(label: '取消', result: false),
+            GooDialogAction(
+              label: '删除',
+              tone: GooDialogActionTone.destructive,
+              style: GooDialogActionStyle.primary,
+              result: true,
             ),
           ],
         );
@@ -112,27 +118,31 @@ class _RecordsPageState extends State<RecordsPage> {
     await _repository.softDeleteById(item.id);
 
     if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('已移入最近删除')),
-    );
+    GooToastScope.of(context).success('已移入最近删除');
     await _load();
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('记录'),
-        actions: <Widget>[
-          IconButton(
+      appBar: GooAppBar.secondary(
+        title: '记录',
+        actions: <GooAppBarIconAction>[
+          GooAppBarIconAction(
+            iconName: GooIcons.refresh,
             onPressed: _load,
-            icon: const Icon(Icons.refresh),
             tooltip: '刷新',
           ),
         ],
       ),
       body: _loading
-          ? const Center(child: CircularProgressIndicator())
+          ? const Center(
+              child: GooSpinner(
+                showLabel: true,
+                label: '正在加载记录',
+                liveRegion: true,
+              ),
+            )
           : _items.isEmpty
           ? const CommonEmptyState(
               icon: Icons.library_music_outlined,
@@ -146,21 +156,21 @@ class _RecordsPageState extends State<RecordsPage> {
                   const SizedBox(height: 8),
               itemBuilder: (BuildContext context, int index) {
                 final item = _items[index];
-                return Card(
-                  child: ListTile(
-                    leading: const CircleAvatar(child: Icon(Icons.mic_none)),
-                    title: Text(_displayTitle(item)),
-                    subtitle: Text(
-                      '${formatDurationMs(item.durationMs)}  •  ${item.filePath}',
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                    onTap: () {
-                      _showDetails(item);
-                    },
-                    onLongPress: () {
-                      _showItemActions(item);
-                    },
+                return GestureDetector(
+                  onLongPress: () => _showItemActions(item),
+                  child: GooList(
+                    style: GooListStyle.grouped,
+                    children: <Widget>[
+                      GooListItem(
+                        title: _displayTitle(item),
+                        subtitle:
+                            '${formatDurationMs(item.durationMs)}  •  '
+                            '${item.filePath}',
+                        leadingIconName: GooIcons.mic,
+                        showGuide: true,
+                        onTap: () => _showDetails(item),
+                      ),
+                    ],
                   ),
                 );
               },

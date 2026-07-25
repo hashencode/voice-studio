@@ -1,8 +1,1 @@
-enum RecordingPhase {
-  idle,
-  starting,
-  recording,
-  paused,
-  stopping,
-  error,
-}
+enum RecordingPhase { idle, starting, recording, paused, stopping, error }

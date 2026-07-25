@@ -15,7 +15,8 @@ class BuildInfo {
 }
 
 class BuildInfoService {
-  BuildInfoService() : _channel = const MethodChannel(AudioContract.recorderChannel);
+  BuildInfoService()
+    : _channel = const MethodChannel(AudioContract.recorderChannel);
 
   final MethodChannel _channel;
   Future<BuildInfo>? _cache;
@@ -26,7 +27,8 @@ class BuildInfoService {
   }
 
   Future<BuildInfo> _loadInternal() async {
-    final Map<Object?, Object?>? map = await _channel.invokeMethod<Map<Object?, Object?>>('getBuildInfo');
+    final Map<Object?, Object?>? map = await _channel
+        .invokeMethod<Map<Object?, Object?>>('getBuildInfo');
     final packageName = (map?['packageName'] as String?) ?? 'unknown';
     final versionName = (map?['versionName'] as String?) ?? 'unknown';
     final lastUpdateTimeMs = (map?['lastUpdateTimeMs'] as int?) ?? 0;

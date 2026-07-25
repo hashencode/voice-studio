@@ -16,7 +16,6 @@ Starts ./tool/watch_ui_device.sh in the background only when:
 
 Environment:
   DEVICE_ID  Optional explicit Android device id.
-  FLAVOR     Optional Flutter flavor for the watcher. Defaults to ui.
 USAGE
 }
 
@@ -25,7 +24,6 @@ if [[ "${1:-}" == "-h" || "${1:-}" == "--help" ]]; then
   exit 0
 fi
 
-FLAVOR="${FLAVOR:-ui}"
 WATCH_SCRIPT="$ROOT/tool/watch_ui_device.sh"
 LOG_DIR="$ROOT/build/watch"
 START_LOG="$LOG_DIR/ensure-ui-watcher-$(date +%Y%m%d-%H%M%S).log"
@@ -124,7 +122,7 @@ if [[ -z "$device_id" ]]; then
 fi
 
 mkdir -p "$LOG_DIR"
-echo "Starting UI watcher for device=$device_id flavor=$FLAVOR"
+echo "Starting UI watcher for device=$device_id"
 echo "Log: $START_LOG"
 
 if command -v screen >/dev/null 2>&1; then
@@ -134,12 +132,12 @@ if command -v screen >/dev/null 2>&1; then
   } >"$START_LOG"
   (
     cd "$LOG_DIR"
-    screen -dmS "$SCREEN_SESSION" -L bash -lc 'cd "$1"; exec env FLAVOR="$2" WATCHER_PID_FILE="$3" ./tool/watch_ui_device.sh "$4"' \
-      _ "$ROOT" "$FLAVOR" "$PID_FILE" "$device_id"
+    screen -dmS "$SCREEN_SESSION" -L bash -lc 'cd "$1"; exec env WATCHER_PID_FILE="$2" ./tool/watch_ui_device.sh "$3"' \
+      _ "$ROOT" "$PID_FILE" "$device_id"
   )
 else
-  nohup bash -c 'cd "$1"; exec env FLAVOR="$2" WATCHER_PID_FILE="$3" ./tool/watch_ui_device.sh "$4"' \
-    _ "$ROOT" "$FLAVOR" "$PID_FILE" "$device_id" >>"$START_LOG" 2>&1 </dev/null &
+  nohup bash -c 'cd "$1"; exec env WATCHER_PID_FILE="$2" ./tool/watch_ui_device.sh "$3"' \
+    _ "$ROOT" "$PID_FILE" "$device_id" >>"$START_LOG" 2>&1 </dev/null &
   watcher_pid="$!"
   printf '%s\n' "$watcher_pid" >"$PID_FILE"
 fi

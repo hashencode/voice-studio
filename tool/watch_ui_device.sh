@@ -12,7 +12,6 @@ Usage:
 
 Environment:
   DEVICE_ID           Android device id. If omitted, uses the only attached adb device.
-  FLAVOR              Flutter flavor. Defaults to ui.
   DEBOUNCE_SECONDS    Stable period before action. Defaults to 60.
   POLL_SECONDS        File polling interval. Defaults to 2.
   RELOAD_CHECK_SECONDS Seconds to inspect flutter output after reload. Defaults to 12.
@@ -32,13 +31,12 @@ if [[ "${1:-}" == "-h" || "${1:-}" == "--help" ]]; then
 fi
 
 DEVICE_ID="${1:-${DEVICE_ID:-}}"
-FLAVOR="${FLAVOR:-ui}"
 DEBOUNCE_SECONDS="${DEBOUNCE_SECONDS:-60}"
 POLL_SECONDS="${POLL_SECONDS:-2}"
 RELOAD_CHECK_SECONDS="${RELOAD_CHECK_SECONDS:-12}"
 PID_FILE="${PID_FILE:-build/flutter-ui.pid}"
 LOG_DIR="build/watch"
-RUN_LOG="$LOG_DIR/flutter-run-${FLAVOR}-$(date +%Y%m%d-%H%M%S).log"
+RUN_LOG="$LOG_DIR/flutter-run-$(date +%Y%m%d-%H%M%S).log"
 WATCHER_PID_FILE="${WATCHER_PID_FILE:-$LOG_DIR/watch-ui-device.pid}"
 
 SNAPSHOT_BEFORE="$(mktemp "${TMPDIR:-/tmp}/voice2text-watch-before.XXXXXX")"
@@ -188,14 +186,13 @@ start_flutter_run() {
   rm -f "$PID_FILE"
 
   echo
-  echo "Starting flutter run: device=$DEVICE_ID flavor=$FLAVOR"
+  echo "Starting flutter run: device=$DEVICE_ID"
   echo "Log: $RUN_LOG"
 
   flutter_command=(
     flutter run
     -d "$DEVICE_ID" \
     --device-connection attached \
-    --flavor "$FLAVOR" \
     --debug \
     --pid-file "$PID_FILE"
   )
@@ -335,7 +332,6 @@ trap cleanup EXIT INT TERM
 
 echo "Watching UI device workflow"
 echo "Device: $DEVICE_ID"
-echo "Flavor: $FLAVOR"
 echo "Debounce: ${DEBOUNCE_SECONDS}s"
 echo "Poll: ${POLL_SECONDS}s"
 echo

@@ -1,16 +1,25 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:flutter_components/flutter_components.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 import 'package:path/path.dart' as p;
 
 import '../../app/theme/theme_mode_controller.dart';
+import '../importing/service/meeting_import_service.dart';
+import '../importing/widgets/import_progress_panel.dart';
+import '../meetings/service/meeting_export_service.dart';
+import '../records/service/meeting_deletion_coordinator.dart';
+import '../records/service/meeting_batch_operation_service.dart';
+import '../records/service/meeting_share_service.dart';
 import 'model/folder_entity.dart';
 import 'repository/folders_repository.dart';
 import '../records/model/recording_entity.dart';
 import '../records/repository/recordings_repository.dart';
 import '../records/widgets/recording_details_sheet.dart';
+import '../recording/service/recording_startup_reconciler.dart';
 import '../shared/utils/formatters.dart';
+import '../transcription/model/transcription_job_entity.dart';
 import '../transcription/repository/transcription_jobs_repository.dart';
 import '../transcription/repository/transcript_segments_repository.dart';
 import 'home_tokens.dart';
@@ -28,12 +37,24 @@ class HomePage extends StatefulWidget {
     this.foldersRepository,
     this.transcriptionJobsRepository,
     this.transcriptSegmentsRepository,
+    this.recordingStartupReconciler,
+    this.meetingImportService,
+    this.meetingDeletionCoordinator,
+    this.meetingShareService,
+    this.meetingBatchOperationService,
+    this.retryRecordings,
   });
 
   final RecordingsRepository? recordingsRepository;
   final FoldersRepository? foldersRepository;
   final TranscriptionJobsRepository? transcriptionJobsRepository;
   final TranscriptSegmentsRepository? transcriptSegmentsRepository;
+  final RecordingStartupReconciler? recordingStartupReconciler;
+  final MeetingImportService? meetingImportService;
+  final MeetingDeletionCoordinator? meetingDeletionCoordinator;
+  final MeetingShareService? meetingShareService;
+  final MeetingBatchOperationService? meetingBatchOperationService;
+  final RetryRecordings? retryRecordings;
 
   @override
   State<HomePage> createState() => _HomePageState();
@@ -43,110 +64,26 @@ class _HomePageState extends State<HomePage> {
   late final RecordingsRepository _repository;
   late final FoldersRepository _foldersRepository;
   late final TranscriptionJobsRepository _transcriptionJobsRepository;
-  late final TranscriptSegmentsRepository _transcriptSegmentsRepository;
-  static final List<_RecordingPreview> _visualPlaceholderItems =
-      <_RecordingPreview>[
-        _RecordingPreview(
-          id: -1,
-          filePath: '',
-          title: '导入音频-2605071125',
-          durationMs: 0,
-          createdAtMs: DateTime(2026, 5, 7, 11, 25).millisecondsSinceEpoch,
-          duration: '未知时长',
-          date: '2026-05-07 11:25',
-          favorite: true,
-        ),
-        _RecordingPreview(
-          id: -2,
-          filePath: '',
-          title: '产品讨论会-2605071410',
-          durationMs: 88000,
-          createdAtMs: DateTime(2026, 5, 7, 14, 10).millisecondsSinceEpoch,
-          duration: '01:28',
-          date: '2026-05-07 14:10',
-        ),
-        _RecordingPreview(
-          id: -3,
-          filePath: '',
-          title: '周会纪要-2605080932',
-          durationMs: 766000,
-          createdAtMs: DateTime(2026, 5, 8, 9, 32).millisecondsSinceEpoch,
-          duration: '12:46',
-          date: '2026-05-08 09:32',
-        ),
-        _RecordingPreview(
-          id: -4,
-          filePath: '',
-          title: '采访录音-2605081548',
-          durationMs: 1395000,
-          createdAtMs: DateTime(2026, 5, 8, 15, 48).millisecondsSinceEpoch,
-          duration: '23:15',
-          date: '2026-05-08 15:48',
-        ),
-        _RecordingPreview(
-          id: -5,
-          filePath: '',
-          title: '灵感速记-2605090806',
-          durationMs: 42000,
-          createdAtMs: DateTime(2026, 5, 9, 8, 6).millisecondsSinceEpoch,
-          duration: '00:42',
-          date: '2026-05-09 08:06',
-        ),
-        _RecordingPreview(
-          id: -6,
-          filePath: '',
-          title: '客户访谈-2605091630',
-          durationMs: 2048000,
-          createdAtMs: DateTime(2026, 5, 9, 16, 30).millisecondsSinceEpoch,
-          duration: '34:08',
-          date: '2026-05-09 16:30',
-          favorite: true,
-        ),
-        _RecordingPreview(
-          id: -7,
-          filePath: '',
-          title: '课程整理-2605101015',
-          durationMs: 534000,
-          createdAtMs: DateTime(2026, 5, 10, 10, 15).millisecondsSinceEpoch,
-          duration: '08:54',
-          date: '2026-05-10 10:15',
-        ),
-        _RecordingPreview(
-          id: -8,
-          filePath: '',
-          title: '晨会同步-2605101118',
-          durationMs: 201000,
-          createdAtMs: DateTime(2026, 5, 10, 11, 18).millisecondsSinceEpoch,
-          duration: '03:21',
-          date: '2026-05-10 11:18',
-        ),
-        _RecordingPreview(
-          id: -9,
-          filePath: '',
-          title: '需求评审-2605111342',
-          durationMs: 1059000,
-          createdAtMs: DateTime(2026, 5, 11, 13, 42).millisecondsSinceEpoch,
-          duration: '17:39',
-          date: '2026-05-11 13:42',
-        ),
-        _RecordingPreview(
-          id: -10,
-          filePath: '',
-          title: '导入音频-2605111816',
-          durationMs: 0,
-          createdAtMs: DateTime(2026, 5, 11, 18, 16).millisecondsSinceEpoch,
-          duration: '未知时长',
-          date: '2026-05-11 18:16',
-        ),
-      ];
+  late final RecordingStartupReconciler _recordingStartupReconciler;
+  late final MeetingImportService _meetingImportService;
+  late final bool _ownsMeetingImportService;
+  late final MeetingDeletionCoordinator _meetingDeletionCoordinator;
+  late final MeetingShareService _meetingShareService;
+  late final MeetingBatchOperationService _meetingBatchOperationService;
+  StreamSubscription<void>? _sharedMediaSubscription;
 
   List<_RecordingPreview> _items = const <_RecordingPreview>[];
   List<FolderEntity> _folders = const <FolderEntity>[];
   late final GooSelectionController<int> _selectionController;
-  late final List<_RecordingPreview> _placeholderItems;
+  late final TextEditingController _searchController;
   bool _loading = true;
+  bool _recordingStartupReconciled = false;
+  bool _handlingSharedImports = false;
+  bool _sharedImportRescanRequested = false;
+  int _loadEpoch = 0;
   String? _loadError;
   String _activeTab = _allTab;
+  String _searchQuery = '';
 
   List<_HomeTabSpec> get _tabs => <_HomeTabSpec>[
     const _HomeTabSpec(id: _allTab, label: '全部音频'),
@@ -158,28 +95,13 @@ class _HomePageState extends State<HomePage> {
     const _HomeTabSpec(id: _recentlyDeletedTab, label: '最近删除'),
   ];
 
-  bool get _isCustomGroupTab =>
-      _activeTab != _allTab &&
-      _activeTab != _meetingTab &&
-      _activeTab != _recentlyDeletedTab;
-
-  bool get _usesAllTabPlaceholder =>
-      _activeTab == _allTab &&
-      _items.isEmpty &&
-      _loadError == null &&
-      _placeholderItems.isNotEmpty;
-
   List<_RecordingPreview> get _visibleItems {
-    switch (_activeTab) {
-      case _recentlyDeletedTab:
-      case _meetingTab:
-        return _items;
-      case _allTab:
-      default:
-        return _isCustomGroupTab
-            ? _items
-            : (_usesAllTabPlaceholder ? _placeholderItems : _items);
-    }
+    final List<_RecordingPreview> tabItems = _items;
+    final query = _normalizeSearchText(_searchQuery);
+    if (query.isEmpty) return tabItems;
+    return tabItems
+        .where((item) => _normalizeSearchText(item.title).contains(query))
+        .toList(growable: false);
   }
 
   Set<int> get _selectedIds => _selectionController.selectedValues;
@@ -195,17 +117,23 @@ class _HomePageState extends State<HomePage> {
     return ids.isNotEmpty && ids.every(_selectedIds.contains);
   }
 
-  bool get _hasPlaceholderSelection => _visibleItems
-      .where((item) => _selectedIds.contains(item.id))
-      .any((item) => item.id <= 0);
   bool get _canToggleSelectAll => _visibleItems.isNotEmpty;
   String get _selectionTrailingLabel => _allVisibleSelected ? '取消全选' : '全选';
   bool get _canRenameSelection =>
+      _activeTab != _recentlyDeletedTab && _selectedIds.length == 1;
+  bool get _canDeleteSelection => _selectedIds.isNotEmpty;
+  bool get _canMoveSelection =>
+      _activeTab != _recentlyDeletedTab && _selectedIds.isNotEmpty;
+  bool get _canRetrySelection =>
       _activeTab != _recentlyDeletedTab &&
-      _selectedIds.length == 1 &&
-      !_hasPlaceholderSelection;
-  bool get _canDeleteSelection =>
-      _selectedIds.isNotEmpty && !_hasPlaceholderSelection;
+      _visibleItems.any(
+        (item) =>
+            _selectedIds.contains(item.id) &&
+            (item.latestJobStatus == 'failed' ||
+                item.latestJobStatus == 'canceled'),
+      );
+  bool get _canExportSelection =>
+      _activeTab != _recentlyDeletedTab && _selectedIds.isNotEmpty;
 
   _HomeViewMode get _viewMode {
     if (_loading) {
@@ -227,21 +155,85 @@ class _HomePageState extends State<HomePage> {
     _foldersRepository = widget.foldersRepository ?? FoldersRepository();
     _transcriptionJobsRepository =
         widget.transcriptionJobsRepository ?? TranscriptionJobsRepository();
-    _transcriptSegmentsRepository =
-        widget.transcriptSegmentsRepository ?? TranscriptSegmentsRepository();
+    _recordingStartupReconciler =
+        widget.recordingStartupReconciler ?? RecordingStartupReconciler();
+    _ownsMeetingImportService = widget.meetingImportService == null;
+    _meetingImportService =
+        widget.meetingImportService ?? MeetingImportService();
+    _meetingDeletionCoordinator =
+        widget.meetingDeletionCoordinator ?? MeetingDeletionCoordinator();
+    _meetingShareService = widget.meetingShareService ?? MeetingShareService();
+    _meetingBatchOperationService =
+        widget.meetingBatchOperationService ??
+        MeetingBatchOperationService(
+          recordingsRepository: _repository,
+          transcriptionJobsRepository: _transcriptionJobsRepository,
+          transcriptSegmentsRepository:
+              widget.transcriptSegmentsRepository ??
+              TranscriptSegmentsRepository(),
+          meetingDeletionCoordinator: _meetingDeletionCoordinator,
+          retryRecordings: widget.retryRecordings,
+        );
     _selectionController = GooSelectionController<int>(
       enableHapticFeedback: true,
     )..addListener(_handleSelectionChanged);
-    _placeholderItems = List<_RecordingPreview>.of(_visualPlaceholderItems);
+    _searchController = TextEditingController();
+    unawaited(_meetingBatchOperationService.cleanupStaleArtifacts());
+    _sharedMediaSubscription = _meetingImportService.sharedMediaAvailable
+        .listen((_) => _requestSharedImportScan());
     _load();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _requestSharedImportScan();
+    });
   }
 
   @override
   void dispose() {
+    _sharedMediaSubscription?.cancel();
+    if (_ownsMeetingImportService) {
+      _meetingImportService.dispose();
+    }
     _selectionController
       ..removeListener(_handleSelectionChanged)
       ..dispose();
+    _searchController.dispose();
     super.dispose();
+  }
+
+  void _requestSharedImportScan() {
+    if (!mounted) return;
+    if (_handlingSharedImports) {
+      _sharedImportRescanRequested = true;
+      return;
+    }
+    unawaited(_consumeSharedImports());
+  }
+
+  Future<void> _consumeSharedImports() async {
+    if (_handlingSharedImports) return;
+    _handlingSharedImports = true;
+    try {
+      while (mounted && await _meetingImportService.hasPendingSharedImport()) {
+        if (!mounted) return;
+        _showFeedback('正在导入分享的媒体…');
+        final MeetingImportOutcome? outcome = await _meetingImportService
+            .consumeSharedImport();
+        if (outcome == null || !mounted) break;
+        await _load();
+        if (!mounted) return;
+        _showFeedback(outcome.inserted ? '已从系统分享创建会议记录' : '该分享媒体已存在，未重复创建记录');
+      }
+    } on MeetingImportException catch (error) {
+      if (mounted) {
+        await _showMessageDialog(error.message);
+      }
+    } finally {
+      _handlingSharedImports = false;
+      if (_sharedImportRescanRequested && mounted) {
+        _sharedImportRescanRequested = false;
+        _requestSharedImportScan();
+      }
+    }
   }
 
   void _handleSelectionChanged() {
@@ -262,6 +254,7 @@ class _HomePageState extends State<HomePage> {
   }
 
   Future<void> _load() async {
+    final int loadEpoch = ++_loadEpoch;
     if (mounted) {
       setState(() {
         _loading = true;
@@ -270,6 +263,14 @@ class _HomePageState extends State<HomePage> {
     }
 
     try {
+      if (!_recordingStartupReconciled) {
+        try {
+          await _recordingStartupReconciler.reconcile();
+          _recordingStartupReconciled = true;
+        } catch (_) {
+          // A native reconciliation failure must not hide existing local data.
+        }
+      }
       final List<Object> results = await Future.wait<Object>(<Future<Object>>[
         _foldersRepository.listFolders(),
         switch (_activeTab) {
@@ -281,15 +282,32 @@ class _HomePageState extends State<HomePage> {
       ]);
       final List<FolderEntity> folders = results[0] as List<FolderEntity>;
       final List<RecordingEntity> records = results[1] as List<RecordingEntity>;
-      if (!mounted) return;
+      Map<String, TranscriptionJobEntity> latestJobs =
+          const <String, TranscriptionJobEntity>{};
+      try {
+        latestJobs = await _transcriptionJobsRepository
+            .findLatestByRecordingPaths(
+              records.map((RecordingEntity record) => record.filePath),
+            );
+      } catch (_) {
+        // Transcription status is supplementary; never hide local recordings.
+      }
+      if (!mounted || loadEpoch != _loadEpoch) return;
       setState(() {
         _folders = folders;
-        _items = records.map(_RecordingPreview.fromEntity).toList();
+        _items = records
+            .map(
+              (RecordingEntity record) => _RecordingPreview.fromEntity(
+                record,
+                latestJob: latestJobs[record.filePath],
+              ),
+            )
+            .toList();
         _loading = false;
       });
       _reconcileSelectionWithVisibleItems(haptic: false);
     } catch (error) {
-      if (!mounted) return;
+      if (!mounted || loadEpoch != _loadEpoch) return;
       setState(() {
         _folders = const <FolderEntity>[];
         _items = const <_RecordingPreview>[];
@@ -297,9 +315,7 @@ class _HomePageState extends State<HomePage> {
         _loadError = '列表加载失败，请稍后重试';
       });
       _selectionController.clearSelection(haptic: false);
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(const SnackBar(content: Text('列表加载失败，请稍后重试')));
+      _showFeedback('列表加载失败，请稍后重试');
     }
   }
 
@@ -314,6 +330,15 @@ class _HomePageState extends State<HomePage> {
     _load();
   }
 
+  void _searchTitles(String query) {
+    final normalized = query.trim();
+    if (_searchQuery == normalized) return;
+    setState(() {
+      _searchQuery = normalized;
+    });
+    _reconcileSelectionWithVisibleItems(haptic: false);
+  }
+
   void _enterSelection(_RecordingPreview item) {
     _selectionController.replaceSelection(<int>[item.id]);
   }
@@ -324,6 +349,10 @@ class _HomePageState extends State<HomePage> {
 
   void _clearSelection() {
     _selectionController.clearSelection();
+  }
+
+  void _showFeedback(String message) {
+    GooSnackbarScope.maybeOf(context)?.show(message: message);
   }
 
   void _toggleSelectAll() {
@@ -346,7 +375,7 @@ class _HomePageState extends State<HomePage> {
 
   Future<void> _openRenameDialogForSelection() async {
     final _RecordingPreview? item = _singleSelectedItem;
-    if (item == null || item.id <= 0) {
+    if (item == null) {
       return;
     }
     await _openRenameDialog(item);
@@ -358,26 +387,47 @@ class _HomePageState extends State<HomePage> {
     );
     String? errorText;
 
-    final String? nextName = await showDialog<String>(
+    final String? nextName = await showGooDialog<String>(
       context: context,
       builder: (BuildContext context) {
         return StatefulBuilder(
           builder: (BuildContext context, StateSetter setModalState) {
-            return AlertDialog(
-              title: const Text('重命名文件'),
-              content: Column(
+            void submit() {
+              final String? validationError = _validateDisplayName(
+                controller.text,
+                item.id,
+              );
+              if (validationError != null) {
+                setModalState(() {
+                  errorText = validationError;
+                });
+                return;
+              }
+              Navigator.of(context).pop(controller.text.trim());
+            }
+
+            return GooDialog<String>.custom(
+              title: '重命名文件',
+              description: '只修改显示名称，不会修改原始文件名。',
+              customContentCenterChild: false,
+              actions: <GooDialogAction>[
+                const GooDialogAction(label: '取消'),
+                GooDialogAction(
+                  label: '保存',
+                  style: GooDialogActionStyle.primary,
+                  closesDialog: false,
+                  onPressed: submit,
+                ),
+              ],
+              child: Column(
                 mainAxisSize: MainAxisSize.min,
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: <Widget>[
-                  const Text('只修改显示名称，不会修改原始文件名。'),
-                  const SizedBox(height: 12),
-                  TextField(
+                  GooInput(
                     controller: controller,
-                    autofocus: true,
-                    decoration: InputDecoration(
-                      hintText: '输入新的文件名',
-                      errorText: errorText,
-                    ),
+                    placeholder: '输入新的文件名',
+                    error: errorText,
+                    showClearButton: true,
                     onChanged: (_) {
                       if (errorText != null) {
                         setModalState(() {
@@ -385,44 +435,10 @@ class _HomePageState extends State<HomePage> {
                         });
                       }
                     },
-                    onSubmitted: (_) {
-                      final String? validationError = _validateDisplayName(
-                        controller.text,
-                        item.id,
-                      );
-                      if (validationError != null) {
-                        setModalState(() {
-                          errorText = validationError;
-                        });
-                        return;
-                      }
-                      Navigator.of(context).pop(controller.text.trim());
-                    },
+                    onSubmitted: (_) => submit(),
                   ),
                 ],
               ),
-              actions: <Widget>[
-                TextButton(
-                  onPressed: () => Navigator.of(context).pop(),
-                  child: const Text('取消'),
-                ),
-                FilledButton(
-                  onPressed: () {
-                    final String? validationError = _validateDisplayName(
-                      controller.text,
-                      item.id,
-                    );
-                    if (validationError != null) {
-                      setModalState(() {
-                        errorText = validationError;
-                      });
-                      return;
-                    }
-                    Navigator.of(context).pop(controller.text.trim());
-                  },
-                  child: const Text('保存'),
-                ),
-              ],
             );
           },
         );
@@ -452,10 +468,7 @@ class _HomePageState extends State<HomePage> {
       return '名称不合法';
     }
     final String normalized = value.toLowerCase();
-    final List<_RecordingPreview> source = _usesAllTabPlaceholder
-        ? _placeholderItems
-        : _items;
-    for (final _RecordingPreview entry in source) {
+    for (final _RecordingPreview entry in _items) {
       if (entry.id == itemId) continue;
       if (entry.title.trim().toLowerCase() == normalized) {
         return '名称已存在，请使用其他名称';
@@ -465,25 +478,6 @@ class _HomePageState extends State<HomePage> {
   }
 
   Future<void> _renameItem(_RecordingPreview item, String displayName) async {
-    if (item.id <= 0) {
-      if (!mounted) return;
-      setState(() {
-        final int index = _placeholderItems.indexWhere(
-          (_RecordingPreview current) => current.id == item.id,
-        );
-        if (index != -1) {
-          _placeholderItems[index] = _placeholderItems[index].copyWith(
-            title: displayName,
-          );
-        }
-      });
-      _selectionController.clearSelection(haptic: false);
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(const SnackBar(content: Text('样式占位已重命名')));
-      return;
-    }
-
     await _repository.updateDisplayName(id: item.id, displayName: displayName);
     if (!mounted) return;
     setState(() {
@@ -495,9 +489,7 @@ class _HomePageState extends State<HomePage> {
       }).toList();
     });
     _selectionController.clearSelection(haptic: false);
-    ScaffoldMessenger.of(
-      context,
-    ).showSnackBar(const SnackBar(content: Text('重命名成功')));
+    _showFeedback('重命名成功');
   }
 
   bool _isReservedGroupName(String name) {
@@ -533,20 +525,41 @@ class _HomePageState extends State<HomePage> {
     final TextEditingController controller = TextEditingController();
     String? errorText;
 
-    final String? nextName = await showDialog<String>(
+    final String? nextName = await showGooDialog<String>(
       context: context,
       builder: (BuildContext context) {
         return StatefulBuilder(
           builder: (BuildContext context, StateSetter setModalState) {
-            return AlertDialog(
-              title: const Text('新建分组'),
-              content: TextField(
-                controller: controller,
-                autofocus: true,
-                decoration: InputDecoration(
-                  hintText: '输入分组名称',
-                  errorText: errorText,
+            void submit() {
+              final String? validationError = _validateGroupName(
+                controller.text,
+              );
+              if (validationError != null) {
+                setModalState(() {
+                  errorText = validationError;
+                });
+                return;
+              }
+              Navigator.of(context).pop(controller.text.trim());
+            }
+
+            return GooDialog<String>.custom(
+              title: '新建分组',
+              customContentCenterChild: false,
+              actions: <GooDialogAction>[
+                const GooDialogAction(label: '取消'),
+                GooDialogAction(
+                  label: '创建',
+                  style: GooDialogActionStyle.primary,
+                  closesDialog: false,
+                  onPressed: submit,
                 ),
+              ],
+              child: GooInput(
+                controller: controller,
+                placeholder: '输入分组名称',
+                error: errorText,
+                showClearButton: true,
                 onChanged: (_) {
                   if (errorText != null) {
                     setModalState(() {
@@ -554,40 +567,8 @@ class _HomePageState extends State<HomePage> {
                     });
                   }
                 },
-                onSubmitted: (_) {
-                  final String? validationError = _validateGroupName(
-                    controller.text,
-                  );
-                  if (validationError != null) {
-                    setModalState(() {
-                      errorText = validationError;
-                    });
-                    return;
-                  }
-                  Navigator.of(context).pop(controller.text.trim());
-                },
+                onSubmitted: (_) => submit(),
               ),
-              actions: <Widget>[
-                TextButton(
-                  onPressed: () => Navigator.of(context).pop(),
-                  child: const Text('取消'),
-                ),
-                FilledButton(
-                  onPressed: () {
-                    final String? validationError = _validateGroupName(
-                      controller.text,
-                    );
-                    if (validationError != null) {
-                      setModalState(() {
-                        errorText = validationError;
-                      });
-                      return;
-                    }
-                    Navigator.of(context).pop(controller.text.trim());
-                  },
-                  child: const Text('创建'),
-                ),
-              ],
             );
           },
         );
@@ -602,9 +583,7 @@ class _HomePageState extends State<HomePage> {
     if (!mounted || folderName == null) return null;
     await _foldersRepository.createFolder(folderName);
     if (!mounted) return null;
-    ScaffoldMessenger.of(
-      context,
-    ).showSnackBar(const SnackBar(content: Text('分组创建成功')));
+    _showFeedback('分组创建成功');
     await _load();
     return folderName;
   }
@@ -613,43 +592,33 @@ class _HomePageState extends State<HomePage> {
     _RecordingPreview item, {
     required String targetGroup,
   }) async {
-    if (item.id <= 0) {
-      setState(() {
-        final int index = _placeholderItems.indexWhere(
-          (_RecordingPreview current) => current.id == item.id,
-        );
-        if (index != -1) {
-          _placeholderItems[index] = _placeholderItems[index].copyWith(
-            groupName: targetGroup,
-          );
-        }
-      });
-      if (!mounted) return;
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text('样式占位已移动到$targetGroup')));
-      return;
-    }
-
-    await _repository.updateGroupName(id: item.id, groupName: targetGroup);
+    final result = await _meetingBatchOperationService.move(<int>[
+      item.id,
+    ], targetGroup: targetGroup);
     if (!mounted) return;
-    ScaffoldMessenger.of(
-      context,
-    ).showSnackBar(SnackBar(content: Text('已移动到$targetGroup')));
+    _showBatchFeedback('移动', result);
     await _load();
   }
 
   Future<void> _openMoveSheet(_RecordingPreview item) async {
-    final String? targetGroup = await showModalBottomSheet<String>(
+    final String? targetGroup = await showGooPanel<String>(
       context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      builder: (BuildContext context) {
-        return _MoveGroupSheet(
-          title: item.title,
-          folders: _folders.map((FolderEntity folder) => folder.name).toList(),
-        );
-      },
+      title: '移动“${item.title}”',
+      semanticLabel: '${item.title} 移动分组',
+      builder:
+          (
+            BuildContext context,
+            GooPanelController<String> controller,
+            ScrollController scrollController,
+          ) {
+            return _MoveGroupPanel(
+              folders: _folders
+                  .map((FolderEntity folder) => folder.name)
+                  .toList(),
+              controller: controller,
+              scrollController: scrollController,
+            );
+          },
     );
 
     if (!mounted || targetGroup == null) return;
@@ -662,6 +631,93 @@ class _HomePageState extends State<HomePage> {
     }
 
     await _moveItemToGroup(item, targetGroup: targetGroup);
+  }
+
+  Future<void> _openMoveSheetForSelection() async {
+    if (!_canMoveSelection) return;
+    final String? targetGroup = await showGooPanel<String>(
+      context: context,
+      title: '移动 ${_selectedIds.length} 条记录',
+      semanticLabel: '批量移动分组',
+      builder:
+          (
+            BuildContext context,
+            GooPanelController<String> controller,
+            ScrollController scrollController,
+          ) {
+            return _MoveGroupPanel(
+              folders: _folders
+                  .map((FolderEntity folder) => folder.name)
+                  .toList(),
+              controller: controller,
+              scrollController: scrollController,
+            );
+          },
+    );
+    if (!mounted || targetGroup == null) return;
+    String resolvedGroup = targetGroup;
+    if (targetGroup == '__create__') {
+      final created = await _createFolder();
+      if (!mounted || created == null) return;
+      resolvedGroup = created;
+    }
+    final result = await _meetingBatchOperationService.move(
+      _selectedIds,
+      targetGroup: resolvedGroup,
+    );
+    if (!mounted) return;
+    _showBatchFeedback('移动', result);
+    _selectionController.clearSelection(haptic: false);
+    await _load();
+  }
+
+  Future<void> _retrySelected() async {
+    if (!_canRetrySelection) return;
+    final result = await _meetingBatchOperationService.retry(_selectedIds);
+    if (!mounted) return;
+    _showBatchFeedback('重试', result);
+    _selectionController.clearSelection(haptic: false);
+    await _load();
+  }
+
+  Future<void> _exportSelected() async {
+    if (!_canExportSelection) return;
+    final format = await showGooPanel<MeetingExportFormat>(
+      context: context,
+      title: '批量导出格式',
+      semanticLabel: '选择批量导出格式',
+      builder:
+          (
+            BuildContext context,
+            GooPanelController<MeetingExportFormat> controller,
+            ScrollController scrollController,
+          ) {
+            return _BatchExportFormatPanel(
+              controller: controller,
+              scrollController: scrollController,
+            );
+          },
+    );
+    if (!mounted || format == null) return;
+    _showFeedback('正在生成批量导出…');
+    final result = await _meetingBatchOperationService.export(
+      _selectedIds,
+      format: format,
+    );
+    if (!mounted) return;
+    if (result.artifact == null) {
+      _showBatchFeedback('导出', result);
+      return;
+    }
+    try {
+      await _meetingBatchOperationService.shareExport(result);
+      if (!mounted) return;
+      _showBatchFeedback('导出', result);
+      _selectionController.clearSelection(haptic: false);
+    } catch (_) {
+      if (!mounted) return;
+      await _showMessageDialog('批量导出已生成，但无法打开系统分享。临时文件已清理。');
+    }
   }
 
   Future<void> _showItemActions(_RecordingPreview item) async {
@@ -677,12 +733,12 @@ class _HomePageState extends State<HomePage> {
           const GooShareTarget(
             id: 'restore',
             label: '恢复',
-            iconName: 'rotate-ccw',
+            iconName: GooIcons.recover,
           ),
           GooShareTarget(
             id: 'delete',
             label: '彻底删除',
-            iconName: 'trash-2',
+            iconName: GooIcons.delete,
             iconColor: destructiveColor,
           ),
         ],
@@ -702,7 +758,9 @@ class _HomePageState extends State<HomePage> {
     }
 
     final String favoriteLabel = item.favorite ? '取消收藏' : '收藏';
-    final String favoriteIconName = item.favorite ? 'heart-off' : 'heart';
+    final GooIconId favoriteIconName = item.favorite
+        ? GooIcons.favoriteFill
+        : GooIcons.favorite;
     final Color destructiveColor = HomePagePalette.of(context).favorite;
     final GooShareTarget? target = await showGooSharePanel(
       context: context,
@@ -714,23 +772,27 @@ class _HomePageState extends State<HomePage> {
         const GooShareTarget(
           id: 'rename',
           label: '重命名',
-          iconName: 'pencil-line',
+          iconName: GooIcons.rename,
         ),
         const GooShareTarget(
           id: 'move',
           label: '移动到',
-          iconName: 'folder-input',
+          iconName: GooIcons.folder,
         ),
         GooShareTarget(
           id: 'favorite',
           label: favoriteLabel,
           iconName: favoriteIconName,
         ),
-        const GooShareTarget(id: 'share', label: '分享', iconName: 'share-2'),
+        const GooShareTarget(
+          id: 'share',
+          label: '分享',
+          iconName: GooIcons.share,
+        ),
         GooShareTarget(
           id: 'delete',
           label: '删除',
-          iconName: 'trash-2',
+          iconName: GooIcons.delete,
           iconColor: destructiveColor,
         ),
       ],
@@ -760,25 +822,6 @@ class _HomePageState extends State<HomePage> {
   }
 
   Future<void> _toggleFavorite(_RecordingPreview item) async {
-    if (item.id <= 0) {
-      setState(() {
-        final int index = _placeholderItems.indexWhere(
-          (_RecordingPreview current) => current.id == item.id,
-        );
-        if (index != -1) {
-          final _RecordingPreview current = _placeholderItems[index];
-          _placeholderItems[index] = current.copyWith(
-            favorite: !current.favorite,
-          );
-        }
-      });
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(item.favorite ? '已取消收藏样式占位' : '已收藏样式占位')),
-      );
-      return;
-    }
-
     final bool nextFavorite = !item.favorite;
     await _repository.updateFavorite(id: item.id, isFavorite: nextFavorite);
     if (!mounted) return;
@@ -790,37 +833,81 @@ class _HomePageState extends State<HomePage> {
         return current.copyWith(favorite: nextFavorite);
       }).toList();
     });
-    ScaffoldMessenger.of(
-      context,
-    ).showSnackBar(SnackBar(content: Text(nextFavorite ? '已收藏文件' : '已取消收藏文件')));
+    _showFeedback(nextFavorite ? '已收藏文件' : '已取消收藏文件');
   }
 
   Future<void> _openItem(_RecordingPreview item) async {
-    final latestJob = item.id <= 0
-        ? null
-        : await _transcriptionJobsRepository.findLatestByRecordingPath(
-            item.filePath,
-          );
+    TranscriptionJobEntity? latestJob;
+    try {
+      latestJob = await _transcriptionJobsRepository.findLatestByRecordingPath(
+        item.filePath,
+      );
+    } catch (_) {
+      // The recording remains usable even when supplementary status is absent.
+    }
     if (!mounted) return;
     await showRecordingDetailsSheet(
       context: context,
       title: item.title,
-      path: item.filePath.isEmpty ? '样式占位数据' : item.filePath,
+      path: item.filePath,
       durationMs: item.durationMs,
       createdAtMs: item.createdAtMs,
       latestJob: latestJob,
+      recordingId: item.id,
     );
   }
 
   Future<void> _shareItem(_RecordingPreview item) async {
-    final String shareText = item.filePath.isNotEmpty
-        ? item.filePath
-        : '${item.title}\n${item.date} · ${item.duration}';
-    await Clipboard.setData(ClipboardData(text: shareText));
-    if (!mounted) return;
-    ScaffoldMessenger.of(
-      context,
-    ).showSnackBar(const SnackBar(content: Text('已复制分享内容')));
+    try {
+      await _meetingShareService.share(
+        recordingId: item.id,
+        path: item.filePath,
+        displayName: item.title,
+      );
+    } catch (error) {
+      if (!mounted) return;
+      await _showMessageDialog('无法打开系统分享，请确认文件仍存在。');
+    }
+  }
+
+  Future<void> _importMeetingMedia() async {
+    final outcome = await showGooPanel<MeetingImportOutcome?>(
+      context: context,
+      title: '导入会议媒体',
+      useRootNavigator: true,
+      enableBackdropDismiss: false,
+      enableDragDismiss: false,
+      builder:
+          (
+            BuildContext context,
+            GooPanelController<MeetingImportOutcome?> panelController,
+            ScrollController scrollController,
+          ) {
+            return ImportProgressPanel(
+              service: _meetingImportService,
+              onCancel: panelController.close,
+              onCompleted: panelController.closeWithResult,
+              scrollController: scrollController,
+            );
+          },
+    );
+    if (!mounted || outcome == null) return;
+    await _load();
+  }
+
+  Future<void> _showMessageDialog(String message) {
+    return showGooDialog<void>(
+      context: context,
+      builder: (BuildContext context) {
+        return GooDialog<void>.confirmation(
+          title: '提示',
+          description: message,
+          actions: const <GooDialogAction>[
+            GooDialogAction(label: '知道了', style: GooDialogActionStyle.primary),
+          ],
+        );
+      },
+    );
   }
 
   Future<void> _deleteSelected() async {
@@ -834,42 +921,33 @@ class _HomePageState extends State<HomePage> {
   }
 
   Future<void> _deleteItems(List<_RecordingPreview> items) async {
-    final bool? confirmed = await showDialog<bool>(
+    final bool isRecentlyDeleted = _activeTab == _recentlyDeletedTab;
+    final String title = isRecentlyDeleted
+        ? (items.length == 1 ? '确认彻底删除' : '批量彻底删除')
+        : (items.length == 1 ? '确认删除' : '批量删除');
+    final String description = isRecentlyDeleted
+        ? (items.length == 1
+              ? '删除后无法恢复，会同时清理关联转写数据。'
+              : '删除后无法恢复，会同时清理 ${items.length} 条录音的关联转写数据。')
+        : (items.length == 1
+              ? '会将该录音移入最近删除。'
+              : '会将 ${items.length} 条录音移入最近删除。');
+    final String confirmLabel = isRecentlyDeleted ? '彻底删除' : '确认删除';
+    final bool? confirmed = await showGooDialog<bool>(
       context: context,
       builder: (BuildContext context) {
-        final bool isRecentlyDeleted = _activeTab == _recentlyDeletedTab;
-        final bool hasPlaceholder = items.any((item) => item.id <= 0);
-        return AlertDialog(
-          title: Text(
-            hasPlaceholder
-                ? (items.length == 1 ? '移除样式占位' : '批量移除样式占位')
-                : isRecentlyDeleted
-                ? (items.length == 1 ? '确认彻底删除' : '批量彻底删除')
-                : (items.length == 1 ? '确认删除' : '批量删除'),
-          ),
-          content: Text(
-            hasPlaceholder
-                ? (items.length == 1
-                      ? '会从当前首页样式预览中移除该占位项。'
-                      : '会从当前首页样式预览中移除 ${items.length} 个占位项。')
-                : isRecentlyDeleted
-                ? (items.length == 1
-                      ? '删除后无法恢复，会同时清理关联转写数据。'
-                      : '删除后无法恢复，会同时清理 ${items.length} 条录音的关联转写数据。')
-                : (items.length == 1
-                      ? '会将该录音移入最近删除。'
-                      : '会将 ${items.length} 条录音移入最近删除。'),
-          ),
-          actions: <Widget>[
-            TextButton(
-              onPressed: () => Navigator.of(context).pop(false),
-              child: const Text('取消'),
-            ),
-            FilledButton(
-              onPressed: () => Navigator.of(context).pop(true),
-              child: Text(
-                hasPlaceholder ? '移除' : (isRecentlyDeleted ? '彻底删除' : '确认删除'),
-              ),
+        return GooDialog<bool>.confirmation(
+          title: title,
+          description: description,
+          actions: <GooDialogAction>[
+            const GooDialogAction(label: '取消', result: false),
+            GooDialogAction(
+              label: confirmLabel,
+              result: true,
+              style: GooDialogActionStyle.primary,
+              tone: isRecentlyDeleted
+                  ? GooDialogActionTone.destructive
+                  : GooDialogActionTone.defaultStyle,
             ),
           ],
         );
@@ -878,85 +956,40 @@ class _HomePageState extends State<HomePage> {
 
     if (confirmed != true) return;
 
-    if (items.any((item) => item.id <= 0)) {
-      final Set<int> placeholderIds = items.map((item) => item.id).toSet();
-      setState(() {
-        _placeholderItems.removeWhere(
-          (_RecordingPreview item) => placeholderIds.contains(item.id),
-        );
-      });
-      _selectionController.replaceSelection(
-        _selectedIds
-            .where((int id) => !placeholderIds.contains(id))
-            .toList(growable: false),
-        haptic: false,
-      );
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            items.length == 1 ? '已移除样式占位' : '已移除 ${items.length} 个样式占位',
-          ),
-        ),
-      );
-      return;
-    }
-
-    for (final _RecordingPreview item in items) {
-      if (_activeTab == _recentlyDeletedTab) {
-        await _repository.deleteById(item.id);
-        await _transcriptionJobsRepository.deleteByRecordingPath(item.filePath);
-        await _transcriptSegmentsRepository.deleteByRecordingPath(
-          item.filePath,
-        );
-      } else {
-        await _repository.softDeleteById(item.id);
-      }
-    }
-
+    final ids = items.map((item) => item.id);
+    final result = isRecentlyDeleted
+        ? await _meetingBatchOperationService.permanentlyDelete(ids)
+        : await _meetingBatchOperationService.softDelete(ids);
     if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(
-          _activeTab == _recentlyDeletedTab
-              ? (items.length == 1
-                    ? '已彻底删除记录并清理关联数据'
-                    : '已彻底删除 ${items.length} 条记录并清理关联数据')
-              : (items.length == 1
-                    ? '已移入最近删除'
-                    : '已将 ${items.length} 条记录移入最近删除'),
-        ),
-      ),
-    );
+    _showBatchFeedback(isRecentlyDeleted ? '彻底删除' : '删除', result);
+    if (isRecentlyDeleted &&
+        result.items.any((item) => item.reason == 'deletion_pending')) {
+      await _showMessageDialog('部分文件暂时无法删除，任务已保留，可稍后幂等重试。');
+    }
     _selectionController.clearSelection(haptic: false);
     await _load();
+  }
+
+  void _showBatchFeedback(String action, MeetingBatchOperationResult result) {
+    _showFeedback(
+      '$action完成：成功 ${result.succeededCount}，'
+      '跳过 ${result.skippedCount}，失败 ${result.failedCount}',
+    );
   }
 
   Future<void> _restoreItems(List<_RecordingPreview> items) async {
     for (final _RecordingPreview item in items) {
-      if (item.id <= 0) {
-        continue;
-      }
       await _repository.restoreById(item.id);
     }
     if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(items.length == 1 ? '已恢复' : '已恢复 ${items.length} 条记录'),
-      ),
-    );
+    _showFeedback(items.length == 1 ? '已恢复' : '已恢复 ${items.length} 条记录');
     _selectionController.clearSelection(haptic: false);
     await _load();
   }
 
-  void _showComingSoon(String message) {
-    ScaffoldMessenger.of(
-      context,
-    ).showSnackBar(SnackBar(content: Text(message)));
-  }
-
   String _emptyText() {
     if (_loadError != null) return _loadError!;
+    if (_searchQuery.isNotEmpty) return '没有匹配的记录标题';
     switch (_activeTab) {
       case _recentlyDeletedTab:
         return '最近删除为空';
@@ -988,22 +1021,24 @@ class _HomePageState extends State<HomePage> {
       backgroundColor: palette.background,
       actions: <GooAppBarIconAction>[
         GooAppBarIconAction(
-          iconName: 'search',
-          semanticLabel: '搜索',
-          tooltip: '搜索',
-          onPressed: () => _showComingSoon('搜索功能即将上线'),
-        ),
-        GooAppBarIconAction(
-          iconName: 'file-input',
+          iconName: GooIcons.upload,
           semanticLabel: '导入',
           tooltip: '导入',
-          onPressed: () {},
+          onPressed: _importMeetingMedia,
         ),
         GooAppBarIconAction(
-          iconName: themeController?.isDarkMode == true ? 'moon' : 'sun',
+          iconName: themeController?.isDarkMode == true
+              ? GooIcons.darkMode
+              : GooIcons.sunny,
           semanticLabel: '主题',
           tooltip: '主题',
           onPressed: () => themeController?.toggle(),
+        ),
+        GooAppBarIconAction(
+          iconName: GooIcons.settings,
+          semanticLabel: '设置',
+          tooltip: '设置',
+          onPressed: () => Navigator.of(context).pushNamed('/settings'),
         ),
       ],
     );
@@ -1019,7 +1054,7 @@ class _HomePageState extends State<HomePage> {
 
     return <GooToolBarItem>[
       GooToolBarItem(
-        iconName: 'pencil-line',
+        iconName: GooIcons.rename,
         label: '重命名',
         semanticLabel: '重命名所选音频',
         onPressed: _canRenameSelection
@@ -1029,7 +1064,25 @@ class _HomePageState extends State<HomePage> {
             : null,
       ),
       GooToolBarItem(
-        iconName: 'trash-2',
+        iconName: GooIcons.folder,
+        label: '移动',
+        semanticLabel: '移动所选音频',
+        onPressed: _canMoveSelection ? _openMoveSheetForSelection : null,
+      ),
+      GooToolBarItem(
+        iconName: GooIcons.refresh,
+        label: '重试',
+        semanticLabel: '重试所选转写任务',
+        onPressed: _canRetrySelection ? _retrySelected : null,
+      ),
+      GooToolBarItem(
+        iconName: GooIcons.download,
+        label: '导出',
+        semanticLabel: '导出所选会议转写',
+        onPressed: _canExportSelection ? _exportSelected : null,
+      ),
+      GooToolBarItem(
+        iconName: GooIcons.delete,
         label: '删除',
         semanticLabel: '删除所选音频',
         onPressed: _canDeleteSelection
@@ -1072,6 +1125,28 @@ class _HomePageState extends State<HomePage> {
                     onTabPressed: _selectTab,
                     onCreateFolder: _createFolder,
                   ),
+                  if (!_isSelectionMode)
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(
+                        HomePageMetrics.horizontalPadding,
+                        8,
+                        HomePageMetrics.horizontalPadding,
+                        8,
+                      ),
+                      child: GooSearchBar(
+                        controller: _searchController,
+                        mode: GooSearchBarMode.defaultBar,
+                        activatedMode: GooSearchBarMode.activatedInstant,
+                        placeholder: '搜索当前分组的记录标题',
+                        showVoiceIcon: false,
+                        onSearch: _searchTitles,
+                        onClear: () => _searchTitles(''),
+                        onCancel: () {
+                          _searchController.clear();
+                          _searchTitles('');
+                        },
+                      ),
+                    ),
                   Expanded(
                     child: _HomeContent(
                       mode: _viewMode,
@@ -1132,7 +1207,7 @@ class _HomeTabs extends StatelessWidget {
         showContent: false,
         actions: <GooTabAction>[
           GooTabAction(
-            iconName: 'folder-plus',
+            iconName: GooIcons.addFolder,
             semanticLabel: '新建分组',
             onPressed: onCreateFolder,
           ),
@@ -1180,7 +1255,9 @@ class _HomeContent extends StatelessWidget {
   Widget build(BuildContext context) {
     switch (mode) {
       case _HomeViewMode.loading:
-        return const Center(child: CircularProgressIndicator());
+        return const Center(
+          child: GooSpinner(semanticLabel: '正在加载会议记录', liveRegion: true),
+        );
       case _HomeViewMode.empty:
         return LayoutBuilder(
           builder: (BuildContext context, BoxConstraints constraints) {
@@ -1295,8 +1372,10 @@ class _HomeListRow extends StatelessWidget implements GooListRowChild {
       onLongPress: onLongPress,
       child: GooListItem(
         title: item.title,
-        subtitle: '${item.duration} · ${item.date}',
-        leadingIconName: item.favorite ? 'file-heart' : 'file-audio',
+        subtitle: '${item.duration} · ${item.date} · ${item.lifecycleLabel}',
+        leadingIconName: item.favorite
+            ? GooIcons.favoriteFill
+            : GooIcons.audioFiles,
         leadingIconTone: item.favorite
             ? GooListIconTone.red
             : GooListIconTone.blue,
@@ -1313,7 +1392,8 @@ class _HomeListRow extends StatelessWidget implements GooListRowChild {
         showDivider: showDivider,
         padding: padding,
         minHeight: minHeight ?? HomePageMetrics.rowHeight,
-        semanticLabel: '${item.title}，${item.duration}，${item.date}',
+        semanticLabel:
+            '${item.title}，${item.duration}，${item.date}，${item.lifecycleLabel}',
       ),
     );
   }
@@ -1327,7 +1407,7 @@ class _MoreButton extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return GooActionIcon(
-      iconName: 'ellipsis',
+      iconName: GooIcons.more,
       semanticLabel: '更多操作',
       size: GooActionIconSize.standard,
       onPressed: onPressed,
@@ -1335,168 +1415,95 @@ class _MoreButton extends StatelessWidget {
   }
 }
 
-class _ActionSheetItem extends StatelessWidget {
-  const _ActionSheetItem({
-    required this.palette,
-    required this.icon,
-    required this.label,
-    required this.enabled,
-    required this.onTap,
+class _MoveGroupPanel extends StatelessWidget {
+  const _MoveGroupPanel({
+    required this.folders,
+    required this.controller,
+    required this.scrollController,
   });
 
-  final HomePagePalette palette;
-  final IconData icon;
-  final String label;
-  final bool enabled;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    return Opacity(
-      opacity: enabled ? 1 : 0.5,
-      child: Material(
-        color: Colors.transparent,
-        child: InkWell(
-          onTap: enabled ? onTap : null,
-          child: Padding(
-            padding: const EdgeInsets.symmetric(
-              horizontal: HomePageMetrics.actionSheetOptionHorizontal,
-              vertical: HomePageMetrics.actionSheetOptionVertical,
-            ),
-            child: Row(
-              children: <Widget>[
-                SizedBox(
-                  width: HomePageMetrics.actionSheetOptionIconBox,
-                  height: HomePageMetrics.actionSheetOptionIconBox,
-                  child: Center(
-                    child: Icon(icon, size: 18, color: palette.text),
-                  ),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Text(
-                    label,
-                    style: HomePageTextStyles.actionSheetOption(palette),
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class _MoveGroupSheet extends StatelessWidget {
-  const _MoveGroupSheet({required this.title, required this.folders});
-
-  final String title;
   final List<String> folders;
+  final GooPanelController<String> controller;
+  final ScrollController scrollController;
 
   @override
   Widget build(BuildContext context) {
-    final HomePagePalette palette = HomePagePalette.of(context);
     final List<_HomeTabSpec> targets = <_HomeTabSpec>[
       const _HomeTabSpec(id: _meetingTab, label: '会议音频'),
       ...folders.map((String name) => _HomeTabSpec(id: name, label: name)),
     ];
-    final double bottomInset = MediaQuery.of(context).padding.bottom;
 
-    return SafeArea(
-      top: false,
-      child: Align(
-        alignment: Alignment.bottomCenter,
-        child: Container(
-          decoration: BoxDecoration(
-            color: palette.surface,
-            borderRadius: const BorderRadius.vertical(
-              top: Radius.circular(HomePageMetrics.actionSheetRadius),
+    return ListView(
+      controller: scrollController,
+      padding: EdgeInsets.zero,
+      children: <Widget>[
+        const GooText('选择目标分组', variant: GooTextVariant.subtitle),
+        const SizedBox(height: 12),
+        GooList(
+          style: GooListStyle.grouped,
+          children: <Widget>[
+            ...targets.map(
+              (_HomeTabSpec target) => GooListItem(
+                title: target.label,
+                leadingIconName: target.id == _meetingTab
+                    ? GooIcons.group
+                    : GooIcons.folder,
+                onTap: () => controller.closeWithResult(target.id),
+              ),
             ),
-          ),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: <Widget>[
-              Padding(
-                padding: const EdgeInsets.fromLTRB(
-                  HomePageMetrics.actionSheetHeaderHorizontal,
-                  HomePageMetrics.actionSheetHeaderTop,
-                  HomePageMetrics.actionSheetHeaderHorizontal,
-                  HomePageMetrics.actionSheetHeaderBottom,
-                ),
-                child: Column(
-                  children: <Widget>[
-                    Text(
-                      title,
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
-                      textAlign: TextAlign.center,
-                      style: HomePageTextStyles.actionSheetTitle(palette),
-                    ),
-                    const SizedBox(height: 6),
-                    Text(
-                      '选择目标分组',
-                      style: HomePageTextStyles.emptyText(
-                        palette,
-                      ).copyWith(fontSize: 13),
-                    ),
-                  ],
-                ),
-              ),
-              ConstrainedBox(
-                constraints: const BoxConstraints(maxHeight: 320),
-                child: ListView.separated(
-                  shrinkWrap: true,
-                  itemCount: targets.length + 1,
-                  separatorBuilder: (BuildContext context, int index) =>
-                      Divider(height: 1, color: palette.divider),
-                  itemBuilder: (BuildContext context, int index) {
-                    if (index == targets.length) {
-                      return _ActionSheetItem(
-                        palette: palette,
-                        icon: LucideIcons.plus300,
-                        label: '新建分组',
-                        enabled: true,
-                        onTap: () => Navigator.of(context).pop('__create__'),
-                      );
-                    }
-
-                    final _HomeTabSpec target = targets[index];
-                    return _ActionSheetItem(
-                      palette: palette,
-                      icon: target.id == _meetingTab
-                          ? LucideIcons.users300
-                          : LucideIcons.folder300,
-                      label: target.label,
-                      enabled: true,
-                      onTap: () => Navigator.of(context).pop(target.id),
-                    );
-                  },
-                ),
-              ),
-              Divider(height: 1, color: palette.divider),
-              TextButton(
-                onPressed: () => Navigator.of(context).pop(),
-                style: TextButton.styleFrom(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: HomePageMetrics.actionSheetHeaderHorizontal,
-                    vertical: HomePageMetrics.actionSheetCancelVertical,
-                  ),
-                  minimumSize: const Size.fromHeight(0),
-                  tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                ),
-                child: Center(
-                  child: Text(
-                    '取消',
-                    style: HomePageTextStyles.actionSheetCancel(palette),
-                  ),
-                ),
-              ),
-              SizedBox(height: bottomInset),
-            ],
-          ),
+            GooListItem(
+              title: '新建分组',
+              leadingIconName: GooIcons.addFolder,
+              onTap: () => controller.closeWithResult('__create__'),
+            ),
+          ],
         ),
-      ),
+        const SizedBox(height: 12),
+        GooButton.text(onPressed: controller.close, child: const Text('取消')),
+      ],
+    );
+  }
+}
+
+class _BatchExportFormatPanel extends StatelessWidget {
+  const _BatchExportFormatPanel({
+    required this.controller,
+    required this.scrollController,
+  });
+
+  final GooPanelController<MeetingExportFormat> controller;
+  final ScrollController scrollController;
+
+  @override
+  Widget build(BuildContext context) {
+    return ListView(
+      controller: scrollController,
+      padding: EdgeInsets.zero,
+      children: <Widget>[
+        const GooText(
+          '所有可导出记录使用同一种格式；不可导出的项目会写入清单。',
+          variant: GooTextVariant.body,
+        ),
+        const SizedBox(height: 12),
+        GooList(
+          style: GooListStyle.grouped,
+          children: MeetingExportFormat.values
+              .map(
+                (format) => GooListItem(
+                  title: _exportFormatLabel(format),
+                  subtitle: _exportFormatDescription(format),
+                  leadingIconName: GooIcons.download,
+                  onTap: () => controller.closeWithResult(format),
+                ),
+              )
+              .toList(growable: false),
+        ),
+        const SizedBox(height: 12),
+        GooButton.text(
+          onPressed: controller.close,
+          child: const GooText.inherit('取消'),
+        ),
+      ],
     );
   }
 }
@@ -1588,10 +1595,15 @@ class _RecordingPreview {
     required this.createdAtMs,
     required this.duration,
     required this.date,
+    required this.lifecycleLabel,
+    this.latestJobStatus,
     this.favorite = false,
   });
 
-  factory _RecordingPreview.fromEntity(RecordingEntity entity) {
+  factory _RecordingPreview.fromEntity(
+    RecordingEntity entity, {
+    TranscriptionJobEntity? latestJob,
+  }) {
     return _RecordingPreview(
       id: entity.id,
       filePath: entity.filePath,
@@ -1603,6 +1615,8 @@ class _RecordingPreview {
           ? formatDurationMs(entity.durationMs)
           : '未知时长',
       date: _formatDate(entity.createdAtMs),
+      lifecycleLabel: _transcriptionLifecycleLabel(latestJob),
+      latestJobStatus: latestJob?.status,
       favorite: entity.isFavorite,
     );
   }
@@ -1615,6 +1629,8 @@ class _RecordingPreview {
   final int createdAtMs;
   final String duration;
   final String date;
+  final String lifecycleLabel;
+  final String? latestJobStatus;
   final bool favorite;
 
   _RecordingPreview copyWith({
@@ -1622,6 +1638,8 @@ class _RecordingPreview {
     String? groupName,
     String? duration,
     String? date,
+    String? lifecycleLabel,
+    String? latestJobStatus,
     bool? favorite,
   }) {
     return _RecordingPreview(
@@ -1633,9 +1651,24 @@ class _RecordingPreview {
       createdAtMs: createdAtMs,
       duration: duration ?? this.duration,
       date: date ?? this.date,
+      lifecycleLabel: lifecycleLabel ?? this.lifecycleLabel,
+      latestJobStatus: latestJobStatus ?? this.latestJobStatus,
       favorite: favorite ?? this.favorite,
     );
   }
+}
+
+String _transcriptionLifecycleLabel(TranscriptionJobEntity? job) {
+  if (job == null) return '未转写';
+  final progressPercent = ((job.progress ?? 0).clamp(0, 1) * 100).round();
+  return switch (job.status) {
+    'pending' => '待转写',
+    'processing' => '转写中 $progressPercent%',
+    'completed' => '转写完成',
+    'failed' => '转写失败',
+    'canceled' => '转写已取消',
+    _ => '转写状态未知',
+  };
 }
 
 String _titleFromEntity(RecordingEntity entity) {
@@ -1662,4 +1695,33 @@ String _formatDate(int createdAtMs) {
   final String hour = time.hour.toString().padLeft(2, '0');
   final String minute = time.minute.toString().padLeft(2, '0');
   return '$year-$month-$day $hour:$minute';
+}
+
+String _normalizeSearchText(String value) {
+  return value
+      .trim()
+      .toLowerCase()
+      .split(RegExp(r'\s+', unicode: true))
+      .where((part) => part.isNotEmpty)
+      .join(' ');
+}
+
+String _exportFormatLabel(MeetingExportFormat format) {
+  return switch (format) {
+    MeetingExportFormat.text => '纯文本 TXT',
+    MeetingExportFormat.markdown => 'Markdown',
+    MeetingExportFormat.json => '结构化 JSON',
+    MeetingExportFormat.srt => '字幕 SRT',
+    MeetingExportFormat.vtt => '字幕 VTT',
+  };
+}
+
+String _exportFormatDescription(MeetingExportFormat format) {
+  return switch (format) {
+    MeetingExportFormat.text => '只保留转写正文',
+    MeetingExportFormat.markdown => '包含标题和时间范围',
+    MeetingExportFormat.json => '包含片段字段与复核状态',
+    MeetingExportFormat.srt => '适合常见字幕工具',
+    MeetingExportFormat.vtt => '适合 Web 与标准字幕流程',
+  };
 }

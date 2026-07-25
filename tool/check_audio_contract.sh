@@ -36,6 +36,8 @@ pairs=(
   "eventTypeSessionStarted:EVENT_TYPE_SESSION_STARTED"
   "eventTypeSessionStopped:EVENT_TYPE_SESSION_STOPPED"
   "recordingDirName:RECORDING_DIR_NAME"
+  "recordingJournalSuffix:RECORDING_JOURNAL_SUFFIX"
+  "transcriptExportDirName:TRANSCRIPT_EXPORT_DIR_NAME"
   "recordingExtension:RECORDING_EXTENSION"
   "realtimeRecordingExtension:REALTIME_RECORDING_EXTENSION"
   "sampleRateHz:SAMPLE_RATE_HZ"

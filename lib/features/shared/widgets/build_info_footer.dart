@@ -21,13 +21,17 @@ class _BuildInfoFooterState extends State<BuildInfoFooter> {
 
   @override
   Widget build(BuildContext context) {
-    final textStyle = Theme.of(context).textTheme.bodySmall?.copyWith(color: Colors.grey.shade600, fontSize: 11);
+    final textStyle = Theme.of(
+      context,
+    ).textTheme.bodySmall?.copyWith(color: Colors.grey.shade600, fontSize: 11);
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
       decoration: BoxDecoration(
         color: Colors.grey.withValues(alpha: 0.06),
-        border: Border(top: BorderSide(color: Colors.grey.withValues(alpha: 0.2))),
+        border: Border(
+          top: BorderSide(color: Colors.grey.withValues(alpha: 0.2)),
+        ),
       ),
       child: FutureBuilder<BuildInfo>(
         future: _future,
@@ -36,7 +40,9 @@ class _BuildInfoFooterState extends State<BuildInfoFooter> {
             return Text('构建信息: 加载中...', style: textStyle);
           }
           final info = snapshot.data!;
-          final updated = DateTime.fromMillisecondsSinceEpoch(info.lastUpdateTimeMs);
+          final updated = DateTime.fromMillisecondsSinceEpoch(
+            info.lastUpdateTimeMs,
+          );
           final updatedLabel =
               '${updated.year}-${updated.month.toString().padLeft(2, '0')}-${updated.day.toString().padLeft(2, '0')} '
               '${updated.hour.toString().padLeft(2, '0')}:${updated.minute.toString().padLeft(2, '0')}:${updated.second.toString().padLeft(2, '0')}';

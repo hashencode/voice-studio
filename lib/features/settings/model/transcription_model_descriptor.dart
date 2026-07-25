@@ -1,3 +1,16 @@
+class TranscriptionCapabilityGate {
+  const TranscriptionCapabilityGate({
+    required this.available,
+    required this.verified,
+    required this.reason,
+  }) : assert(!verified || available),
+       assert(verified || reason != '');
+
+  final bool available;
+  final bool verified;
+  final String reason;
+}
+
 class TranscriptionModelDescriptor {
   const TranscriptionModelDescriptor({
     required this.id,
@@ -6,7 +19,10 @@ class TranscriptionModelDescriptor {
     required this.offlineReady,
     required this.vadReady,
     required this.punctuationReady,
-    required this.denoiseReady,
+    required this.itn,
+    required this.confidence,
+    required this.hotwords,
+    required this.enhancement,
     required this.selectable,
   });
 
@@ -16,10 +32,14 @@ class TranscriptionModelDescriptor {
   final bool offlineReady;
   final bool vadReady;
   final bool punctuationReady;
-  final bool denoiseReady;
+  final TranscriptionCapabilityGate itn;
+  final TranscriptionCapabilityGate confidence;
+  final TranscriptionCapabilityGate hotwords;
+  final TranscriptionCapabilityGate enhancement;
   final bool selectable;
 
   bool get canTranscribeOffline => selectable && offlineReady;
+  bool get denoiseReady => enhancement.verified;
 
   static const List<TranscriptionModelDescriptor> known =
       <TranscriptionModelDescriptor>[
@@ -29,29 +49,28 @@ class TranscriptionModelDescriptor {
           description: '当前已验证的本地离线识别模型；录音保存后使用 VAD 切片识别。',
           offlineReady: true,
           vadReady: true,
-          punctuationReady: false,
-          denoiseReady: false,
+          punctuationReady: true,
+          itn: TranscriptionCapabilityGate(
+            available: false,
+            verified: false,
+            reason: 'itn_asset_missing',
+          ),
+          confidence: TranscriptionCapabilityGate(
+            available: false,
+            verified: false,
+            reason: 'recognizer_confidence_unavailable',
+          ),
+          hotwords: TranscriptionCapabilityGate(
+            available: false,
+            verified: false,
+            reason: 'paraformer_hotwords_unsupported',
+          ),
+          enhancement: TranscriptionCapabilityGate(
+            available: true,
+            verified: false,
+            reason: 'enhancement_benchmark_pending',
+          ),
           selectable: true,
-        ),
-        TranscriptionModelDescriptor(
-          id: 'sherpa-streaming-zh',
-          name: 'Sherpa Streaming 中文模型',
-          description: '预留流式模型入口；当前资源和原生 API 未完成验证，暂不开放选择。',
-          offlineReady: false,
-          vadReady: false,
-          punctuationReady: false,
-          denoiseReady: false,
-          selectable: false,
-        ),
-        TranscriptionModelDescriptor(
-          id: 'sherpa-offline-zh',
-          name: 'Sherpa Offline 中文模型',
-          description: '历史 UI 选项；当前统一映射到 Paraformer，避免作为独立模型展示。',
-          offlineReady: false,
-          vadReady: false,
-          punctuationReady: false,
-          denoiseReady: false,
-          selectable: false,
         ),
       ];
 

@@ -74,8 +74,10 @@ void main() {
     expect(find.text('音频'), findsOneWidget);
     expect(find.text('实时'), findsNothing);
     expect(find.text('全部音频'), findsOneWidget);
-    expect(find.byTooltip('搜索'), findsOneWidget);
+    expect(find.byTooltip('搜索'), findsNothing);
     expect(find.byIcon(LucideIcons.mic300), findsOneWidget);
+    expect(find.byType(GooToastScope), findsOneWidget);
+    expect(find.byType(GooSnackbarScope), findsOneWidget);
   });
 
   testWidgets('home page navigates to recording page', (
@@ -88,9 +90,32 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('未命名录音'), findsOneWidget);
-    expect(find.text('编辑'), findsOneWidget);
-    expect(find.byIcon(Icons.stop_rounded), findsOneWidget);
+    expect(find.text('备注'), findsOneWidget);
+    expect(find.byIcon(Icons.mic_rounded), findsOneWidget);
     expect(find.text('点击中间按钮开始录音'), findsOneWidget);
+  });
+
+  testWidgets('empty repository shows a truthful empty state', (
+    WidgetTester tester,
+  ) async {
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: AppTheme.light(),
+        home: HomePage(
+          recordingsRepository: _FakeRecordingsRepository(
+            const <RecordingEntity>[],
+          ),
+          foldersRepository: _FakeFoldersRepository(),
+          transcriptionJobsRepository: _FakeTranscriptionJobsRepository(),
+          transcriptSegmentsRepository: _FakeTranscriptSegmentsRepository(),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('暂无录音文件'), findsOneWidget);
+    expect(find.byType(GooListItem), findsNothing);
+    expect(find.text('产品讨论会-2605071410'), findsNothing);
   });
 
   testWidgets('home selection uses Goo overlay toolbar and haptics', (
@@ -114,6 +139,9 @@ void main() {
     expect(selectionClickCount(platformCalls), 1);
     expect(find.text('已选择 1 项'), findsOneWidget);
     expect(find.text('重命名'), findsOneWidget);
+    expect(find.text('移动'), findsOneWidget);
+    expect(find.text('重试'), findsOneWidget);
+    expect(find.text('导出'), findsOneWidget);
     expect(find.text('删除'), findsOneWidget);
     expect(find.bySemanticsLabel('音频选择操作'), findsOneWidget);
     expect(find.byIcon(LucideIcons.mic300), findsNothing);

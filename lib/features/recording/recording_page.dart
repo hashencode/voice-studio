@@ -1,30 +1,50 @@
+import 'dart:async';
 import 'dart:io' show Platform;
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
+import 'package:flutter_components/flutter_components.dart';
 import 'package:permission_handler/permission_handler.dart';
 
-import '../records/repository/recordings_repository.dart';
 import '../settings/repository/app_settings_repository.dart';
 import '../transcription/repository/transcription_jobs_repository.dart';
 import '../transcription/service/android_transcription_service.dart';
 import '../transcription/service/fake_transcription_service.dart';
 import '../transcription/service/transcription_port.dart';
+import '../transcription/service/transcription_job_reconciler.dart';
+import '../transcription/service/transcription_queue_coordinator.dart';
 import 'controller/recording_controller.dart';
 import 'engine/android_recorder_engine.dart';
 import 'engine/fake_recorder_engine.dart';
 import 'engine/recorder_port.dart';
+import 'model/recording_annotation_entity.dart';
 import 'model/recording_phase.dart';
+import 'repository/recording_annotations_repository.dart';
+import 'repository/recording_sessions_repository.dart';
+import 'service/recording_recovery_coordinator.dart';
 import 'services/microphone_permission_service.dart';
+import 'widgets/recording_recovery_panel.dart';
 
 const List<String> _rulerLabels = <String>['00:02', '00:04', '00:06', '00:08'];
 const int _rulerTickCount = 22;
 const int _waveSegmentCount = 72;
 const int _waveCenterIndex = _waveSegmentCount ~/ 2;
+const String _automaticInputSelection = 'automatic';
 const List<FontFeature> _tabular = <FontFeature>[FontFeature.tabularFigures()];
 
 class RecordingPage extends StatefulWidget {
-  const RecordingPage({super.key});
+  const RecordingPage({
+    super.key,
+    this.controller,
+    this.transcriptionQueueCoordinator,
+    this.recordingAnnotationsRepository,
+    this.initializeController = true,
+  });
+
+  final RecordingController? controller;
+  final TranscriptionQueueCoordinator? transcriptionQueueCoordinator;
+  final RecordingAnnotationsRepository? recordingAnnotationsRepository;
+  final bool initializeController;
 
   @override
   State<RecordingPage> createState() => _RecordingPageState();
@@ -33,26 +53,77 @@ class RecordingPage extends StatefulWidget {
 class _RecordingPageState extends State<RecordingPage>
     with WidgetsBindingObserver {
   late final RecordingController _controller;
+  late final bool _ownsController;
+  late final RecordingAnnotationsRepository _recordingAnnotationsRepository;
+  TranscriptionQueueCoordinator? _ownedTranscriptionQueueCoordinator;
   bool _interruptionHandling = false;
+  bool _showNotificationPermissionWarning = false;
+  bool _recoveryPanelOpen = false;
+  bool _inputDevicePanelOpen = false;
   String? _pendingInterruptionNotice;
   String _displayName = '未命名录音';
   String _remarkText = '';
   final List<int> _markerTimestamps = <int>[];
+  String? _annotationSessionId;
+  int _annotationLoadEpoch = 0;
+  bool _annotationsLoading = false;
+  bool _annotationSaving = false;
 
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
-    _controller = RecordingController(
-      permissionService: MicrophonePermissionService(),
-      recorder: _buildRecorder(),
-      recordingsRepository: RecordingsRepository(),
-      transcriptionJobsRepository: TranscriptionJobsRepository(),
-      transcriptionService: _buildTranscriptionService(),
-      appSettingsRepository: AppSettingsRepository(),
-    );
+    _ownsController = widget.controller == null;
+    _controller = widget.controller ?? _buildController();
+    _recordingAnnotationsRepository =
+        widget.recordingAnnotationsRepository ??
+        RecordingAnnotationsRepository();
     _controller.addListener(_onControllerChanged);
-    _controller.reloadSettings();
+    _syncAnnotationsForSession(_controller.activeSessionId);
+    if (widget.initializeController) {
+      _initialize();
+    }
+  }
+
+  RecordingController _buildController() {
+    final RecorderPort recorder = _buildRecorder();
+    final RecordingSessionsRepository recordingSessionsRepository =
+        RecordingSessionsRepository();
+    final TranscriptionJobsRepository jobsRepository =
+        TranscriptionJobsRepository();
+    final AppSettingsRepository settingsRepository = AppSettingsRepository();
+    final TranscriptionPort transcriptionPort = _buildTranscriptionService();
+    final TranscriptionQueueCoordinator queueCoordinator =
+        widget.transcriptionQueueCoordinator ??
+        TranscriptionQueueCoordinator(
+          repository: jobsRepository,
+          transcriptionPort: transcriptionPort,
+          settingsRepository: settingsRepository,
+          reconciler: TranscriptionJobReconciler(repository: jobsRepository),
+        );
+    if (widget.transcriptionQueueCoordinator == null) {
+      _ownedTranscriptionQueueCoordinator = queueCoordinator;
+      unawaited(queueCoordinator.start());
+    }
+    return RecordingController(
+      permissionService: MicrophonePermissionService(),
+      recorder: recorder,
+      recordingSessionsRepository: recordingSessionsRepository,
+      recoveryCoordinator: RecordingRecoveryCoordinator(
+        recorder: recorder,
+        sessionsRepository: recordingSessionsRepository,
+      ),
+      transcriptionJobsRepository: jobsRepository,
+      transcriptionService: transcriptionPort,
+      appSettingsRepository: settingsRepository,
+      transcriptionQueueCoordinator: queueCoordinator,
+    );
+  }
+
+  Future<void> _initialize() async {
+    await _controller.initialize();
+    if (!mounted) return;
+    await _showRecoveryPanelIfNeeded();
   }
 
   TranscriptionPort _buildTranscriptionService() {
@@ -73,7 +144,13 @@ class _RecordingPageState extends State<RecordingPage>
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
     _controller.removeListener(_onControllerChanged);
-    _controller.dispose();
+    if (_ownsController) {
+      _controller.dispose();
+    }
+    final ownedQueue = _ownedTranscriptionQueueCoordinator;
+    if (ownedQueue != null) {
+      unawaited(ownedQueue.dispose());
+    }
     super.dispose();
   }
 
@@ -86,13 +163,74 @@ class _RecordingPageState extends State<RecordingPage>
       return;
     }
     if (state == AppLifecycleState.resumed) {
+      _reattachAfterResume();
       _flushPendingInterruptionNotice();
     }
   }
 
+  Future<void> _reattachAfterResume() async {
+    await _controller.reattach();
+    if (!mounted) return;
+    await _controller.refreshRecoveries();
+    if (!mounted) return;
+    await _showRecoveryPanelIfNeeded();
+  }
+
   void _onControllerChanged() {
     if (!mounted) return;
+    _syncAnnotationsForSession(_controller.activeSessionId);
     setState(() {});
+  }
+
+  void _syncAnnotationsForSession(String? sessionId) {
+    if (_annotationSessionId == sessionId) return;
+    _annotationSessionId = sessionId;
+    final int loadEpoch = ++_annotationLoadEpoch;
+    if (sessionId == null) {
+      _annotationsLoading = false;
+      _remarkText = '';
+      _markerTimestamps.clear();
+      return;
+    }
+    _annotationsLoading = true;
+    unawaited(_loadAnnotations(sessionId, loadEpoch));
+  }
+
+  Future<void> _loadAnnotations(String sessionId, int loadEpoch) async {
+    try {
+      final annotations = await _recordingAnnotationsRepository.listForSession(
+        sessionId,
+      );
+      if (!mounted ||
+          loadEpoch != _annotationLoadEpoch ||
+          _annotationSessionId != sessionId) {
+        return;
+      }
+      setState(() {
+        _annotationsLoading = false;
+        _markerTimestamps
+          ..clear()
+          ..addAll(
+            annotations
+                .where((item) => item.kind == RecordingAnnotationKind.marker)
+                .map((item) => item.positionMs),
+          );
+        _remarkText =
+            annotations
+                .where((item) => item.kind == RecordingAnnotationKind.note)
+                .firstOrNull
+                ?.text ??
+            '';
+      });
+    } catch (_) {
+      if (!mounted ||
+          loadEpoch != _annotationLoadEpoch ||
+          _annotationSessionId != sessionId) {
+        return;
+      }
+      setState(() => _annotationsLoading = false);
+      GooToastScope.of(context).error('无法读取本次录音的标记和备注');
+    }
   }
 
   Future<void> _handleInterruption() async {
@@ -106,10 +244,8 @@ class _RecordingPageState extends State<RecordingPage>
       return;
     }
 
-    if (result == InterruptionResult.autoSaved) {
-      _pendingInterruptionNotice = '录音因系统中断已自动停止并保存';
-    } else if (result == InterruptionResult.failed) {
-      _pendingInterruptionNotice = '录音被系统中断，自动保存失败，请重试';
+    if (result == InterruptionResult.continuesInBackground) {
+      _pendingInterruptionNotice = '录音将在后台继续，通知栏可随时停止并保存';
     }
 
     _flushPendingInterruptionNotice();
@@ -123,123 +259,305 @@ class _RecordingPageState extends State<RecordingPage>
     if (lifecycle != AppLifecycleState.resumed) return;
 
     _pendingInterruptionNotice = null;
-    ScaffoldMessenger.of(
+    GooToastScope.of(
       context,
-    ).showSnackBar(SnackBar(content: Text(message)));
+    ).show(message: message, variant: GooToastVariant.info);
   }
 
   Future<void> _openRemarkSheet() async {
+    final String? sessionId = _controller.activeSessionId;
+    if (sessionId == null ||
+        !_controller.canStop ||
+        _annotationsLoading ||
+        _annotationSaving) {
+      return;
+    }
     final TextEditingController textController = TextEditingController(
       text: _remarkText,
     );
-    await showModalBottomSheet<void>(
+    final bool? saved = await showGooPanel<bool>(
       context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.white,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
-      ),
-      builder: (BuildContext context) {
-        return Padding(
-          padding: EdgeInsets.fromLTRB(
-            20,
-            20,
-            20,
-            MediaQuery.of(context).viewInsets.bottom + 20,
-          ),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: <Widget>[
-              const Text(
-                '灵感速记',
-                style: TextStyle(
-                  fontSize: 20,
-                  fontWeight: FontWeight.w700,
-                  color: Color(0xFF111827),
+      title: '灵感速记',
+      useRootNavigator: true,
+      builder:
+          (
+            BuildContext _,
+            GooPanelController<bool> panelController,
+            ScrollController scrollController,
+          ) {
+            return ListView(
+              controller: scrollController,
+              padding: EdgeInsets.zero,
+              children: <Widget>[
+                GooTextArea(
+                  controller: textController,
+                  label: '备注',
+                  placeholder: '输入灵感速记',
+                  minHeight: 176,
+                  maxHeight: 280,
+                  autoGrow: true,
+                  showClearButton: true,
                 ),
-              ),
-              const SizedBox(height: 14),
-              TextField(
-                controller: textController,
-                maxLines: 7,
-                minLines: 6,
-                decoration: InputDecoration(
-                  hintText: '输入灵感速记',
-                  filled: true,
-                  fillColor: const Color(0xFFF8FAFC),
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(20),
-                    borderSide: BorderSide.none,
+                const SizedBox(height: 16),
+                SizedBox(
+                  width: double.infinity,
+                  child: GooButton(
+                    onPressed: () => panelController.closeWithResult(true),
+                    child: const Text('保存备注'),
                   ),
                 ),
-              ),
-              const SizedBox(height: 16),
-              SizedBox(
-                width: double.infinity,
-                child: FilledButton(
-                  onPressed: () {
-                    setState(() {
-                      _remarkText = textController.text.trim();
-                    });
-                    Navigator.of(context).pop();
-                  },
-                  child: const Text('保存备注'),
-                ),
-              ),
-            ],
-          ),
-        );
-      },
+              ],
+            );
+          },
     );
+    if (saved == true && mounted) {
+      _annotationLoadEpoch += 1;
+      setState(() => _annotationSaving = true);
+      try {
+        final note = await _recordingAnnotationsRepository.saveNote(
+          sessionId: sessionId,
+          positionMs: _controller.elapsedMs,
+          text: textController.text,
+        );
+        if (mounted && _annotationSessionId == sessionId) {
+          setState(() {
+            _remarkText = note?.text ?? '';
+          });
+          GooToastScope.of(
+            context,
+          ).success(note == null ? '备注已清除' : '备注已保存到会议时间线');
+        }
+      } catch (_) {
+        if (mounted) {
+          GooToastScope.of(context).error('备注保存失败，请重试');
+        }
+      } finally {
+        if (mounted) setState(() => _annotationSaving = false);
+      }
+    }
     textController.dispose();
   }
 
   void _openRenameDialog() {
+    unawaited(_showRenameDialog());
+  }
+
+  Future<void> _showRenameDialog() async {
     final TextEditingController textController = TextEditingController(
       text: _displayName,
     );
-    showDialog<void>(
+    final bool? saved = await showGooDialog<bool>(
       context: context,
-      builder: (BuildContext context) {
-        return AlertDialog(
-          title: const Text('编辑标题'),
-          content: TextField(
-            controller: textController,
-            autofocus: true,
-            decoration: const InputDecoration(hintText: '输入录音标题'),
-          ),
-          actions: <Widget>[
-            TextButton(
-              onPressed: () => Navigator.of(context).pop(),
-              child: const Text('取消'),
+      builder: (BuildContext _) {
+        return GooDialog<bool>.custom(
+          title: '编辑标题',
+          customContentCenterChild: false,
+          actions: const <GooDialogAction>[
+            GooDialogAction(label: '取消', result: false),
+            GooDialogAction(
+              label: '保存',
+              style: GooDialogActionStyle.primary,
+              result: true,
             ),
-            FilledButton(
-              onPressed: () {
-                setState(() {
-                  _displayName = textController.text.trim().isEmpty
-                      ? '未命名录音'
-                      : textController.text.trim();
-                });
-                Navigator.of(context).pop();
-              },
-              child: const Text('保存'),
+          ],
+          child: GooInput(
+            controller: textController,
+            label: '录音标题',
+            placeholder: '输入录音标题',
+            showClearButton: true,
+          ),
+        );
+      },
+    );
+    if (saved == true && mounted) {
+      setState(() {
+        _displayName = textController.text.trim().isEmpty
+            ? '未命名录音'
+            : textController.text.trim();
+      });
+    }
+    textController.dispose();
+  }
+
+  Future<void> _handleStop() async {
+    final bool saved = await _controller.stop();
+    if (!mounted) return;
+    if (saved) {
+      GooToastScope.of(context).success('录音已保存');
+      setState(() {
+        _markerTimestamps.clear();
+      });
+    }
+  }
+
+  Future<void> _handleCenterAction() async {
+    if (_controller.canStart) {
+      final bool consented = await _ensureRecordingConsent();
+      if (!consented || !mounted) return;
+      await _controller.start();
+      return;
+    }
+    if (_controller.canStop) {
+      await _handleStop();
+    }
+  }
+
+  Future<bool> _ensureRecordingConsent() async {
+    if (await _controller.hasCurrentRecordingConsent()) {
+      await _refreshNotificationPermissionState(requestIfNeeded: false);
+      return true;
+    }
+    if (!mounted) return false;
+    final bool? accepted = await showGooDialog<bool>(
+      context: context,
+      dismissible: false,
+      builder: (BuildContext context) {
+        return const GooDialog<bool>.confirmation(
+          title: '开始会议录音',
+          description:
+              '请先确认已获得参会者同意。录音与离线转写默认只在本机处理；'
+              '锁屏或切到后台后，系统通知会持续显示录音状态。',
+          actionLayout: GooDialogActionLayout.horizontal,
+          actions: <GooDialogAction>[
+            GooDialogAction(label: '取消', result: false),
+            GooDialogAction(
+              label: '已获得同意',
+              style: GooDialogActionStyle.primary,
+              result: true,
             ),
           ],
         );
       },
-    ).then((_) => textController.dispose());
+    );
+    if (accepted != true) return false;
+    await _controller.acceptRecordingConsent();
+    await _refreshNotificationPermissionState(requestIfNeeded: true);
+    return true;
   }
 
-  Future<void> _handleStop() async {
-    final ScaffoldMessengerState messenger = ScaffoldMessenger.of(context);
-    final bool saved = await _controller.stop();
+  Future<void> _refreshNotificationPermissionState({
+    required bool requestIfNeeded,
+  }) async {
+    if (!Platform.isAndroid) return;
+    PermissionStatus status = await Permission.notification.status;
+    if (requestIfNeeded && status.isDenied) {
+      status = await Permission.notification.request();
+    }
     if (!mounted) return;
-    if (saved) {
-      messenger.showSnackBar(const SnackBar(content: Text('录音已保存')));
-      setState(() {
-        _markerTimestamps.clear();
-      });
+    setState(() {
+      _showNotificationPermissionWarning = !status.isGranted;
+    });
+  }
+
+  Future<void> _showRecoveryPanelIfNeeded() async {
+    if (_recoveryPanelOpen || _controller.recoveryCandidates.isEmpty) return;
+    _recoveryPanelOpen = true;
+    await showGooPanel<void>(
+      context: context,
+      title: '恢复未完成录音',
+      useRootNavigator: true,
+      enableBackdropDismiss: false,
+      enableDragDismiss: false,
+      builder:
+          (
+            BuildContext context,
+            GooPanelController<void> panelController,
+            ScrollController scrollController,
+          ) {
+            return RecordingRecoveryPanel(
+              candidates: _controller.recoveryCandidates,
+              onRecover: _controller.recoverRecording,
+              onDiscard: _controller.discardRecovery,
+              onAllResolved: panelController.close,
+            );
+          },
+    );
+    _recoveryPanelOpen = false;
+  }
+
+  Future<void> _openInputDevicePanel() async {
+    if (_inputDevicePanelOpen ||
+        _controller.phase == RecordingPhase.starting ||
+        _controller.phase == RecordingPhase.stopping) {
+      return;
+    }
+    _inputDevicePanelOpen = true;
+    final bool loaded = await _controller.refreshInputDevices();
+    if (!mounted) return;
+    if (!loaded) {
+      _inputDevicePanelOpen = false;
+      GooToastScope.of(
+        context,
+      ).error(_controller.inputRouteNotice ?? '读取录音输入设备失败');
+      return;
+    }
+
+    final String? selection = await showGooPanel<String>(
+      context: context,
+      title: '录音输入设备',
+      semanticLabel: '选择录音输入设备',
+      useRootNavigator: true,
+      builder:
+          (
+            BuildContext context,
+            GooPanelController<String> panelController,
+            ScrollController scrollController,
+          ) {
+            final List<Widget> deviceRows = <Widget>[
+              GooListItem(
+                title: '系统自动选择',
+                subtitle: '设备断开时优先回退到此模式，录音继续',
+                selected: _controller.preferredInputDeviceId == null,
+                semanticLabel:
+                    '系统自动选择${_controller.preferredInputDeviceId == null ? '，当前选中' : ''}',
+                onTap: () =>
+                    panelController.closeWithResult(_automaticInputSelection),
+              ),
+              for (final device in _controller.inputDevices)
+                GooListItem(
+                  title: device.name,
+                  subtitle: device.canSelect
+                      ? '${_inputDeviceTypeLabel(device.type)} · 可主动切换'
+                      : '${_inputDeviceTypeLabel(device.type)} · 当前系统仅可查看',
+                  selected: _controller.preferredInputDeviceId == device.id,
+                  disabled: !device.canSelect,
+                  semanticLabel:
+                      '${device.name}，${device.canSelect ? '可选择' : '当前系统不支持主动切换'}'
+                      '${_controller.preferredInputDeviceId == device.id ? '，当前选中' : ''}',
+                  onTap: () =>
+                      panelController.closeWithResult(device.id.toString()),
+                ),
+            ];
+            return ListView(
+              controller: scrollController,
+              padding: EdgeInsets.zero,
+              children: <Widget>[
+                const GooText(
+                  'Android 6 及以上可主动选择输入。所选设备断开时会先回退系统默认输入；'
+                  '只有无法安全回退时才停止并保存录音。',
+                  variant: GooTextVariant.body,
+                ),
+                const SizedBox(height: 16),
+                GooList(style: GooListStyle.plain, children: deviceRows),
+              ],
+            );
+          },
+    );
+    _inputDevicePanelOpen = false;
+    if (!mounted || selection == null) return;
+    final int? deviceId = selection == _automaticInputSelection
+        ? null
+        : int.tryParse(selection);
+    final bool selected = await _controller.selectInputDevice(deviceId);
+    if (!mounted) return;
+    if (selected) {
+      GooToastScope.of(
+        context,
+      ).success('录音输入已设为${_controller.preferredInputDeviceName}');
+    } else {
+      GooToastScope.of(
+        context,
+      ).error(_controller.inputRouteNotice ?? '切换录音输入失败');
     }
   }
 
@@ -251,11 +569,34 @@ class _RecordingPageState extends State<RecordingPage>
     _controller.togglePrimaryAction();
   }
 
-  void _handleAddMarker() {
-    if (!_controller.canStop) return;
-    setState(() {
-      _markerTimestamps.add(_controller.elapsedMs);
-    });
+  Future<void> _handleAddMarker() async {
+    final String? sessionId = _controller.activeSessionId;
+    if (sessionId == null ||
+        !_controller.canStop ||
+        _annotationsLoading ||
+        _annotationSaving) {
+      return;
+    }
+    _annotationLoadEpoch += 1;
+    setState(() => _annotationSaving = true);
+    try {
+      final marker = await _recordingAnnotationsRepository.addMarker(
+        sessionId: sessionId,
+        positionMs: _controller.elapsedMs,
+      );
+      if (!mounted || _annotationSessionId != sessionId) return;
+      setState(() {
+        _markerTimestamps
+          ..add(marker.positionMs)
+          ..sort();
+      });
+    } catch (_) {
+      if (mounted) {
+        GooToastScope.of(context).error('重点标记保存失败，请重试');
+      }
+    } finally {
+      if (mounted) setState(() => _annotationSaving = false);
+    }
   }
 
   bool get _isIdleLike =>
@@ -272,7 +613,7 @@ class _RecordingPageState extends State<RecordingPage>
       _elapsedPreciseText,
     );
     final List<double> waveHeights = _buildWaveHeights(
-      _controller.elapsedMs,
+      _controller.inputAmplitudeWindow,
       _controller.phase,
     );
     final ThemeData theme = Theme.of(context);
@@ -284,6 +625,17 @@ class _RecordingPageState extends State<RecordingPage>
           bottom: false,
           child: Column(
             children: <Widget>[
+              if (_showNotificationPermissionWarning)
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
+                  child: GooTopTip.button(
+                    message: '系统通知权限未开启；录音可继续，但通知栏可能不显示状态。',
+                    maxLines: 2,
+                    variant: GooTopTipVariant.warning,
+                    primaryActionLabel: '去设置',
+                    onPrimaryAction: openAppSettings,
+                  ),
+                ),
               Expanded(
                 child: Padding(
                   padding: const EdgeInsets.fromLTRB(20, 16, 20, 0),
@@ -302,8 +654,13 @@ class _RecordingPageState extends State<RecordingPage>
                           const SizedBox(width: 12),
                           _PillButton(
                             icon: Icons.edit_outlined,
-                            label: '编辑',
-                            onPressed: _openRemarkSheet,
+                            label: '备注',
+                            onPressed:
+                                _controller.canStop &&
+                                    !_annotationsLoading &&
+                                    !_annotationSaving
+                                ? _openRemarkSheet
+                                : null,
                           ),
                         ],
                       ),
@@ -339,13 +696,18 @@ class _RecordingPageState extends State<RecordingPage>
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: _rulerLabels
                             .map(
-                              (String label) => Text(
-                                label,
-                                style: const TextStyle(
-                                  color: Color(0xFF94A3B8),
-                                  fontSize: 22,
-                                  fontWeight: FontWeight.w400,
-                                  fontFeatures: _tabular,
+                              (String label) => Expanded(
+                                child: Text(
+                                  label,
+                                  maxLines: 1,
+                                  overflow: TextOverflow.clip,
+                                  textAlign: TextAlign.center,
+                                  style: const TextStyle(
+                                    color: Color(0xFF94A3B8),
+                                    fontSize: 14,
+                                    fontWeight: FontWeight.w400,
+                                    fontFeatures: _tabular,
+                                  ),
                                 ),
                               ),
                             )
@@ -453,24 +815,39 @@ class _RecordingPageState extends State<RecordingPage>
                 padding: const EdgeInsets.fromLTRB(24, 12, 24, 0),
                 child: Column(
                   children: <Widget>[
-                    Text(
-                      _controller.errorMessage ??
-                          '标记数 ${_markerTimestamps.length}',
-                      style: TextStyle(
-                        color: _controller.errorMessage == null
-                            ? const Color(0xFF94A3B8)
-                            : theme.colorScheme.error,
-                        fontSize: 14,
-                        fontWeight: FontWeight.w500,
+                    Semantics(
+                      liveRegion: true,
+                      label:
+                          _controller.errorMessage ??
+                          _controller.inputRouteNotice ??
+                          _inputStatusText,
+                      child: Text(
+                        _controller.errorMessage ??
+                            _controller.inputRouteNotice ??
+                            '$_inputStatusText · 标记数 ${_markerTimestamps.length}',
+                        style: TextStyle(
+                          color: _controller.errorMessage == null
+                              ? const Color(0xFF94A3B8)
+                              : theme.colorScheme.error,
+                          fontSize: 14,
+                          fontWeight: FontWeight.w500,
+                        ),
+                        textAlign: TextAlign.center,
                       ),
-                      textAlign: TextAlign.center,
+                    ),
+                    const SizedBox(height: 4),
+                    GooButton.text(
+                      onPressed: isBusy ? null : _openInputDevicePanel,
+                      child: Text(
+                        '输入设备：${_controller.preferredInputDeviceName}',
+                      ),
                     ),
                     if (_controller.permissionDenied) ...<Widget>[
                       const SizedBox(height: 8),
-                      TextButton.icon(
+                      GooButton.text(
                         onPressed: openAppSettings,
-                        icon: const Icon(Icons.settings_outlined),
-                        label: const Text('去系统设置开启权限'),
+                        iconName: GooIcons.settings,
+                        child: const Text('去系统设置开启权限'),
                       ),
                     ],
                     const SizedBox(height: 14),
@@ -482,20 +859,28 @@ class _RecordingPageState extends State<RecordingPage>
                           backgroundColor: Colors.white,
                           icon: Icons.flag_outlined,
                           iconColor: const Color(0xFF111827),
-                          disabled: !_controller.canStop || isBusy,
-                          onPressed: _handleAddMarker,
+                          disabled:
+                              !_controller.canStop ||
+                              isBusy ||
+                              _annotationsLoading ||
+                              _annotationSaving,
+                          onPressed: () => unawaited(_handleAddMarker()),
                         ),
                         _RoundControlButton(
                           size: 88,
                           backgroundColor: _controller.canStop
                               ? const Color(0xFFEF4444)
                               : Colors.white,
-                          icon: Icons.stop_rounded,
+                          icon: _controller.canStop
+                              ? Icons.stop_rounded
+                              : Icons.mic_rounded,
                           iconColor: _controller.canStop
                               ? Colors.white
-                              : const Color(0xFF94A3B8),
-                          disabled: !_controller.canStop || isBusy,
-                          onPressed: _handleStop,
+                              : const Color(0xFFEF4444),
+                          disabled:
+                              (!_controller.canStop && !_controller.canStart) ||
+                              isBusy,
+                          onPressed: _handleCenterAction,
                         ),
                         _RoundControlButton(
                           size: 72,
@@ -566,6 +951,33 @@ class _RecordingPageState extends State<RecordingPage>
       return '正在启动录音...';
     }
     return '点击中间按钮开始录音';
+  }
+
+  String get _inputStatusText {
+    if (_controller.phase == RecordingPhase.paused ||
+        _controller.inputStatus == RecordingInputStatus.paused) {
+      return '录音已暂停';
+    }
+    final String device = _controller.inputDeviceName?.trim().isNotEmpty == true
+        ? _controller.inputDeviceName!.trim()
+        : _inputDeviceTypeLabel(_controller.inputDeviceType);
+    return switch (_controller.inputStatus) {
+      RecordingInputStatus.available => '$device · 输入正常',
+      RecordingInputStatus.silent => '$device · 当前静音',
+      RecordingInputStatus.paused => '录音已暂停',
+      RecordingInputStatus.unknown => '输入状态未知',
+    };
+  }
+
+  String _inputDeviceTypeLabel(RecordingInputDeviceType type) {
+    return switch (type) {
+      RecordingInputDeviceType.builtIn => '内置麦克风',
+      RecordingInputDeviceType.wired => '有线麦克风',
+      RecordingInputDeviceType.bluetooth => '蓝牙麦克风',
+      RecordingInputDeviceType.usb => 'USB 麦克风',
+      RecordingInputDeviceType.external => '外部麦克风',
+      RecordingInputDeviceType.unknown => '输入设备未知',
+    };
   }
 
   String _phaseLabel(RecordingPhase phase) {
@@ -639,36 +1051,35 @@ class _PillButton extends StatelessWidget {
 
   final IconData icon;
   final String label;
-  final VoidCallback onPressed;
+  final VoidCallback? onPressed;
 
   @override
   Widget build(BuildContext context) {
-    return Material(
-      color: Colors.white,
-      borderRadius: BorderRadius.circular(999),
-      child: InkWell(
-        onTap: onPressed,
+    return Opacity(
+      opacity: onPressed == null ? 0.55 : 1,
+      child: Material(
+        color: Colors.white,
         borderRadius: BorderRadius.circular(999),
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: <Widget>[
-              const Icon(
-                Icons.edit_outlined,
-                size: 16,
-                color: Color(0xFF111827),
-              ),
-              const SizedBox(width: 6),
-              Text(
-                label,
-                style: const TextStyle(
-                  color: Color(0xFF111827),
-                  fontSize: 12,
-                  fontWeight: FontWeight.w600,
+        child: InkWell(
+          onTap: onPressed,
+          borderRadius: BorderRadius.circular(999),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: <Widget>[
+                Icon(icon, size: 16, color: const Color(0xFF111827)),
+                const SizedBox(width: 6),
+                Text(
+                  label,
+                  style: const TextStyle(
+                    color: Color(0xFF111827),
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600,
+                  ),
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
         ),
       ),
@@ -737,22 +1148,15 @@ class _RoundControlButton extends StatelessWidget {
   );
 }
 
-List<double> _buildWaveHeights(int elapsedMs, RecordingPhase phase) {
-  final bool isLive =
-      phase == RecordingPhase.recording || phase == RecordingPhase.paused;
-  final int frame = elapsedMs ~/ 90;
-
+List<double> _buildWaveHeights(List<double> amplitudes, RecordingPhase phase) {
   return List<double>.generate(_waveSegmentCount, (int index) {
-    if (index >= _waveCenterIndex) {
+    if (phase != RecordingPhase.recording || index >= _waveCenterIndex) {
       return 3;
     }
-
-    if (!isLive) {
-      return index % 3 == 0 ? 8 : 6;
-    }
-
-    final double signalA = math.sin((index + frame) * 0.42);
-    final double signalB = math.cos((index * 0.68 + frame) * 0.26);
-    return 6 + (signalA + signalB).abs() * 9;
+    final int sampleIndex = amplitudes.length - _waveCenterIndex + index;
+    final double amplitude = sampleIndex >= 0 && sampleIndex < amplitudes.length
+        ? amplitudes[sampleIndex].clamp(0, 1).toDouble()
+        : 0;
+    return 3 + amplitude * 24;
   });
 }

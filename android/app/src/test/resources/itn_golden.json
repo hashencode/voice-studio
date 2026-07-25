@@ -1,0 +1,82 @@
+{
+  "schemaVersion": 1,
+  "cases": [
+    {
+      "id": "number_people",
+      "category": "number",
+      "input": "参会人数二十八人",
+      "expected": "参会人数28人",
+      "transformed": true
+    },
+    {
+      "id": "date_full",
+      "category": "date",
+      "input": "二零二六年七月二十四日",
+      "expected": "2026年7月24日",
+      "transformed": true
+    },
+    {
+      "id": "time_24_hour",
+      "category": "time",
+      "input": "会议在十四点三十分开始",
+      "expected": "会议在14:30开始",
+      "transformed": true
+    },
+    {
+      "id": "time_12_hour",
+      "category": "time",
+      "input": "下午三点半复盘",
+      "expected": "下午3:30复盘",
+      "transformed": true
+    },
+    {
+      "id": "amount_rmb",
+      "category": "amount",
+      "input": "人民币三十六元五角",
+      "expected": "人民币36.5元",
+      "transformed": true
+    },
+    {
+      "id": "unit_distance",
+      "category": "unit",
+      "input": "距离二十公里",
+      "expected": "距离20公里",
+      "transformed": true
+    },
+    {
+      "id": "ambiguous_approximate_time",
+      "category": "ambiguous",
+      "input": "会议在三点左右",
+      "expected": "会议在三点左右",
+      "transformed": false
+    },
+    {
+      "id": "mixed_language_amount",
+      "category": "mixed_language",
+      "input": "预算三十美元USD",
+      "expected": "预算三十美元USD",
+      "transformed": false
+    },
+    {
+      "id": "serial_number",
+      "category": "serial",
+      "input": "型号A一二三B",
+      "expected": "型号A一二三B",
+      "transformed": false
+    },
+    {
+      "id": "phone_number",
+      "category": "phone",
+      "input": "联系电话幺三八零零幺三八零零零",
+      "expected": "联系电话幺三八零零幺三八零零零",
+      "transformed": false
+    },
+    {
+      "id": "partial_match",
+      "category": "partial",
+      "input": "人民币三十六元五角整预算草案",
+      "expected": "人民币三十六元五角整预算草案",
+      "transformed": false
+    }
+  ]
+}

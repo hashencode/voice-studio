@@ -18,6 +18,9 @@ class ModelReadinessChecker(
             .filterNot { assetManager.assetExists(it) }
         val hasAssets = missing.isEmpty()
         val vadReady = !descriptor.vadRequired || assetManager.assetExists(VAD_ASSET_PATH)
+        val punctuationReady =
+            descriptor.punctuationReady &&
+                assetManager.assetExists(PUNCTUATION_ASSET_PATH)
 
         val reason = when {
             !descriptor.offlineReady -> "模型暂未开放"
@@ -30,7 +33,7 @@ class ModelReadinessChecker(
             modelId = descriptor.id,
             offlineReady = descriptor.offlineReady && hasAssets,
             vadReady = vadReady,
-            punctuationReady = descriptor.punctuationReady,
+            punctuationReady = punctuationReady,
             denoiseReady = descriptor.denoiseReady,
             reason = reason,
         )
@@ -38,5 +41,7 @@ class ModelReadinessChecker(
 
     companion object {
         private const val VAD_ASSET_PATH = ModelAssetManager.VAD_ASSET_PATH
+        private const val PUNCTUATION_ASSET_PATH =
+            ModelAssetManager.PUNCTUATION_ASSET_PATH
     }
 }

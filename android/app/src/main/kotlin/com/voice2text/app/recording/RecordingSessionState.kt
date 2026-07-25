@@ -1,8 +1,11 @@
 package com.voice2text.app.recording
 
 data class RecordingSessionResult(
+    val sessionId: String,
     val path: String,
     val durationMs: Int,
+    val state: String,
+    val stopReason: String?,
 )
 
 class RecordingSessionException(
