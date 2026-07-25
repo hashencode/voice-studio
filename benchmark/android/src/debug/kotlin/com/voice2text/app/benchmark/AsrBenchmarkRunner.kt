@@ -3,6 +3,7 @@ package com.voice2text.app.benchmark
 import android.content.Context
 import android.os.Debug
 import android.os.SystemClock
+import com.voice2text.app.transcription.AdaptiveEnergySpeechSegmenter
 import com.k2fsa.sherpa.onnx.FeatureConfig
 import com.k2fsa.sherpa.onnx.OfflineModelConfig
 import com.k2fsa.sherpa.onnx.OfflineParaformerModelConfig
@@ -675,6 +676,7 @@ internal class AsrBenchmarkRunner(
         val startedCpu = Debug.threadCpuTimeNanos()
         val segments = JSONArray()
         val texts = mutableListOf<String>()
+        val energySegmenter = AdaptiveEnergySpeechSegmenter()
         var index = 0
         var speechSampleCount = 0L
 
@@ -682,25 +684,31 @@ internal class AsrBenchmarkRunner(
             fun drainDetectedSegments() {
                 while (!vad.empty()) {
                     val speech = vad.front()
-                    val segmentSamples = speech.samples
-                    val startSample = speech.start
-                    val endSample = startSample + segmentSamples.size
-                    val outcome = decodeOne(segmentSamples, sampleRate)
-                    if (outcome.text.isNotBlank()) texts.add(outcome.text)
-                    speechSampleCount += segmentSamples.size.toLong()
-                    segments.put(
-                        JSONObject()
-                            .put("index", index)
-                            .put("startMs", ((startSample.toDouble() / sampleRate) * 1000.0).roundToInt())
-                            .put("endMs", ((endSample.toDouble() / sampleRate) * 1000.0).roundToInt())
-                            .put("sampleCount", segmentSamples.size)
-                            .put("decodeWallMs", outcome.wallMs)
-                            .put("decodeCpuMs", outcome.cpuMs)
-                            .put("emptyResult", outcome.text.isBlank())
-                            .put("text", outcome.text),
-                    )
+                    energySegmenter.split(speech.samples, sampleRate).forEach { range ->
+                        val segmentSamples =
+                            speech.samples.copyOfRange(
+                                range.startOffset,
+                                range.endOffsetExclusive,
+                            )
+                        val startSample = speech.start + range.startOffset
+                        val endSample = startSample + segmentSamples.size
+                        val outcome = decodeOne(segmentSamples, sampleRate)
+                        if (outcome.text.isNotBlank()) texts.add(outcome.text)
+                        speechSampleCount += segmentSamples.size.toLong()
+                        segments.put(
+                            JSONObject()
+                                .put("index", index)
+                                .put("startMs", ((startSample.toDouble() / sampleRate) * 1000.0).roundToInt())
+                                .put("endMs", ((endSample.toDouble() / sampleRate) * 1000.0).roundToInt())
+                                .put("sampleCount", segmentSamples.size)
+                                .put("decodeWallMs", outcome.wallMs)
+                                .put("decodeCpuMs", outcome.cpuMs)
+                                .put("emptyResult", outcome.text.isBlank())
+                                .put("text", outcome.text),
+                        )
+                        index += 1
+                    }
                     vad.pop()
-                    index += 1
                 }
             }
 
@@ -730,6 +738,7 @@ internal class AsrBenchmarkRunner(
             .put("decodeWallMs", elapsedMsSince(startedWall))
             .put("decodeCpuMs", elapsedThreadCpuMsSince(startedCpu))
             .put("segmentCount", index)
+            .put("boundarySource", "silero_vad_then_adaptive_energy")
             .put("vadModel", vadModelFile.name)
             .put("vadSampleRate", vadConfig.sampleRate)
             .put("vadThreshold", vadConfig.threshold.toDouble())

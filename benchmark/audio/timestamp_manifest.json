@@ -1,0 +1,41 @@
+{
+  "schemaVersion": 1,
+  "thresholdP95Ms": 1500,
+  "timebase": "cropped_audio_milliseconds",
+  "annotationPolicy": "Only reviewStatus=approved cases may satisfy the release gate. Provisional energy-assisted boundaries are tooling fixtures, not product evidence.",
+  "cases": [
+    {
+      "id": "zh_timestamp_window_000",
+      "audio": "zh.wav",
+      "audioSha256": "9345f80fc835ae2afc9bb58ccdbd5047797d7de3afc4cb3a2c6ef44444a2a562",
+      "reviewClipSha256": "1ce9167760943aef5d4ab60232ae24bd2432542f694a5dcd70a96a59d56815b2",
+      "windowStartMs": 0,
+      "windowEndMs": 20000,
+      "reviewStatus": "provisional",
+      "annotationMethod": "20ms RMS energy-assisted; requires independent listening review",
+      "referenceSegments": [
+        {"sequenceId": 0, "startMs": 560, "endMs": 3020},
+        {"sequenceId": 1, "startMs": 4080, "endMs": 7980},
+        {"sequenceId": 2, "startMs": 8860, "endMs": 11260},
+        {"sequenceId": 3, "startMs": 12120, "endMs": 14580},
+        {"sequenceId": 4, "startMs": 15640, "endMs": 19560}
+      ]
+    },
+    {
+      "id": "en_timestamp_window_000",
+      "audio": "en.wav",
+      "audioSha256": "4944f83f611e6997b45d7b399bd4cf34ae1fac30d8969eb8a4362dd00d3874c9",
+      "reviewClipSha256": "03b439dcee9b713bc104759ea1186b61e695daa15db1c6c25416200ebbd542e6",
+      "windowStartMs": 0,
+      "windowEndMs": 18000,
+      "reviewStatus": "provisional",
+      "annotationMethod": "20ms RMS energy-assisted; requires independent listening review",
+      "referenceSegments": [
+        {"sequenceId": 0, "startMs": 560, "endMs": 5380},
+        {"sequenceId": 1, "startMs": 6400, "endMs": 10160},
+        {"sequenceId": 2, "startMs": 11280, "endMs": 14560},
+        {"sequenceId": 3, "startMs": 14880, "endMs": 17620}
+      ]
+    }
+  ]
+}

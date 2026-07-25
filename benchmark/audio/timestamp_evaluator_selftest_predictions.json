@@ -1,0 +1,25 @@
+{
+  "schemaVersion": 1,
+  "fixturePurpose": "Evaluator contract self-test only; copied from provisional references and not ASR product evidence.",
+  "cases": [
+    {
+      "id": "zh_timestamp_window_000",
+      "segments": [
+        {"sequenceId": 0, "startMs": 560, "endMs": 3020},
+        {"sequenceId": 1, "startMs": 4080, "endMs": 7980},
+        {"sequenceId": 2, "startMs": 8860, "endMs": 11260},
+        {"sequenceId": 3, "startMs": 12120, "endMs": 14580},
+        {"sequenceId": 4, "startMs": 15640, "endMs": 19560}
+      ]
+    },
+    {
+      "id": "en_timestamp_window_000",
+      "segments": [
+        {"sequenceId": 0, "startMs": 560, "endMs": 5380},
+        {"sequenceId": 1, "startMs": 6400, "endMs": 10160},
+        {"sequenceId": 2, "startMs": 11280, "endMs": 14560},
+        {"sequenceId": 3, "startMs": 14880, "endMs": 17620}
+      ]
+    }
+  ]
+}

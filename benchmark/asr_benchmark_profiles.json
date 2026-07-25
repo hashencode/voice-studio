@@ -1,8 +1,7 @@
 {
   "version": 1,
   "defaultProfileIds": [
-    "standard_vad_silero_warm_t2",
-    "live_vad_silero_paced_t2_f100"
+    "standard_vad_silero_warm_t2"
   ],
   "profiles": [
     {

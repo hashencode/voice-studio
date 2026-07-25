@@ -1,0 +1,144 @@
+{
+  "schemaVersion": 1,
+  "status": "mid_device_complete_blocked",
+  "model": {
+    "family": "GTCRN",
+    "upstreamName": "gtcrn_simple.onnx",
+    "packagedPath": "assets/sherpa/onnx/speech-enhancement.onnx",
+    "downloadUrl": "https://github.com/k2-fsa/sherpa-onnx/releases/download/speech-enhancement-models/gtcrn_simple.onnx",
+    "sha256": "e77603ac0c23dac3227dd2d7135b3a585cbee2679048aecfa886657d3ae1b534",
+    "bytes": 535638,
+    "license": "MIT",
+    "licensePath": "assets/sherpa/onnx/GTCRN_LICENSE.txt",
+    "upstreamProject": "https://github.com/Xiaobin-Rong/gtcrn"
+  },
+  "source": {
+    "audio": "benchmark/audio/zh.wav",
+    "reference": "benchmark/audio/zh.txt",
+    "audioSha256": "9345f80fc835ae2afc9bb58ccdbd5047797d7de3afc4cb3a2c6ef44444a2a562",
+    "referenceSha256": "40046fed2ac99717645087d59dfc54d764ec84e6554ec0879e699bbc4cdb231a",
+    "sampleRate": 16000,
+    "channels": 1,
+    "bitsPerSample": 16
+  },
+  "recognitionModel": {
+    "id": "paraformer-zh-2025-10-07",
+    "modelSha256": "53813ee1d41722cc6370a571c887e6d0b391d25b8312cf714a31af85ea603812",
+    "tokensSha256": "59aba8873a2ed1e122c25fee421e25f283b63290efbde85c1f01a853d83cb6e6"
+  },
+  "generation": {
+    "script": "benchmark/prepare_s2_noise_audio.py",
+    "outputDirectory": "build/asr_benchmark/s2_noise",
+    "seed": 20260724,
+    "noise": "deterministic uniform white noise scaled to the declared signal-to-noise ratio",
+    "preserveSource": true
+  },
+  "cases": [
+    {
+      "id": "quiet_clean",
+      "kind": "quiet",
+      "sourceGain": 1.0,
+      "noiseSnrDb": null,
+      "burstWindowsMs": []
+    },
+    {
+      "id": "steady_noise_5db",
+      "kind": "steady_noise",
+      "sourceGain": 1.0,
+      "noiseSnrDb": 5.0,
+      "burstWindowsMs": []
+    },
+    {
+      "id": "burst_noise_0db",
+      "kind": "burst_noise",
+      "sourceGain": 1.0,
+      "noiseSnrDb": 0.0,
+      "burstWindowsMs": [
+        [2000, 3500],
+        [12000, 14000],
+        [30000, 32500],
+        [60000, 63000],
+        [120000, 123000],
+        [240000, 243000]
+      ]
+    },
+    {
+      "id": "near_talk",
+      "kind": "near_talk",
+      "sourceGain": 1.25,
+      "noiseSnrDb": null,
+      "burstWindowsMs": []
+    },
+    {
+      "id": "far_talk_5db",
+      "kind": "far_talk",
+      "sourceGain": 0.25,
+      "noiseSnrDb": 5.0,
+      "burstWindowsMs": []
+    }
+  ],
+  "preregisteredGates": {
+    "quietCerAbsoluteRegressionMax": 0.005,
+    "noiseMeanCerAbsoluteImprovementMin": 0.05,
+    "perNoiseCaseCerAbsoluteRegressionMax": 0.02,
+    "timestampP95MsMax": 1500,
+    "timestampP95DeltaMsMax": 250,
+    "enhancementRtfMax": 0.25,
+    "combinedPipelineRtfMax": 1.0,
+    "peakJavaHeapDeltaBytesMax": 67108864,
+    "peakNativeHeapDeltaBytesMax": 134217728,
+    "requiredDeviceClasses": [
+      "low",
+      "mid"
+    ],
+    "thermalThrottlingAllowed": false,
+    "originalAudioMustRemainByteIdentical": true
+  },
+  "completedEvidence": {
+    "apiAbiSmoke": {
+      "device": "Xiaomi M2102J2SC Android 13",
+      "classification": "mid",
+      "test": "SpeechEnhancementModelSmokeTest.officialGtcrnRunsOnDeterministicNoisySpeech",
+      "inputSamples": 80000,
+      "outputSamples": 79872,
+      "costMs": 389,
+      "rtf": 0.0778,
+      "javaHeapBytes": 23992600,
+      "nativeHeapBytes": 17506536,
+      "result": "api_abi_smoke_passed"
+    },
+    "pairedMidDevice": {
+      "device": "Xiaomi M2102J2SC Android 13",
+      "classification": "mid",
+      "test": "SpeechEnhancementPairedGateTest.testPreregisteredRawAndEnhancedPairs",
+      "caseCount": 5,
+      "caseDurationSec": 300.6549375,
+      "rawEvidenceSha256": "05749363f647b30cf337bf61c0a843cd288937aa7f3ff416835120b231f23362",
+      "modelIdentityEvidenceSha256": "2fec9d260f8bedf82edb32b9933442a6a0073e61922eb6823e89d48a197e5bb3",
+      "evaluationSha256": "b7ae589b0c8494a06c1b5952c462a2a20319a83859d845da9b42474dffa3a14a",
+      "quietCerAbsoluteRegression": 0.008875739644970411,
+      "meanNoiseCerAbsoluteImprovement": 0.0023011176857331006,
+      "maximumEnhancementRtf": 0.3272987991424554,
+      "maximumCombinedPipelineRtf": 0.5014685647728636,
+      "maximumJavaHeapDeltaBytes": 62823400,
+      "maximumNativeHeapDeltaBytes": 349676096,
+      "comparableTimestampCaseCount": 3,
+      "maximumPairedBoundaryP95DeltaMs": 616,
+      "thermalStatusBefore": 0,
+      "thermalStatusAfter": 0,
+      "batteryCapacityBeforePercent": 100,
+      "batteryCapacityAfterPercent": 100,
+      "result": "preregistered_mid_device_gates_failed"
+    }
+  },
+  "missingEvidence": [
+    "independently reviewed timestamp comparison",
+    "low-device physical run",
+    "acoustic echo cancellation implementation and evidence"
+  ],
+  "productGate": {
+    "verified": false,
+    "reason": "enhancement_preregistered_gates_failed",
+    "aecSupported": false
+  }
+}

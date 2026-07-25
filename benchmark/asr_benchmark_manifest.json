@@ -21,11 +21,17 @@
       "languages": ["zh"],
       "archiveUrl": "https://github.com/k2-fsa/sherpa-onnx/releases/download/asr-models/sherpa-onnx-paraformer-zh-int8-2025-10-07.tar.bz2",
       "archiveName": "sherpa-onnx-paraformer-zh-int8-2025-10-07.tar.bz2",
+      "archiveSha256": "a071ee5419e14adb34d7f970ab98105a45e6608018b168f023ca2e4810744abe",
+      "archiveBytes": 228262632,
       "extractedDir": "sherpa-onnx-paraformer-zh-int8-2025-10-07",
       "numThreads": 2,
       "requiredFiles": {
         "model": "model.int8.onnx",
         "tokens": "tokens.txt"
+      },
+      "requiredFileSha256": {
+        "model": "53813ee1d41722cc6370a571c887e6d0b391d25b8312cf714a31af85ea603812",
+        "tokens": "59aba8873a2ed1e122c25fee421e25f283b63290efbde85c1f01a853d83cb6e6"
       }
     },
     {
@@ -36,6 +42,8 @@
       "languages": ["en"],
       "archiveUrl": "https://github.com/k2-fsa/sherpa-onnx/releases/download/asr-models/sherpa-onnx-paraformer-en-2024-03-09.tar.bz2",
       "archiveName": "sherpa-onnx-paraformer-en-2024-03-09.tar.bz2",
+      "archiveSha256": "8ecca99e86f295b6f84bdab8498361f1658aeddc3e6e1cf2f51dfef26d1048b3",
+      "archiveBytes": 1021641665,
       "extractedDir": "sherpa-onnx-paraformer-en-2024-03-09",
       "numThreads": 2,
       "requiredFiles": {

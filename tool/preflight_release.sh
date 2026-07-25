@@ -69,6 +69,13 @@ else
   add_todo "执行 ./tool/check_audio_contract.sh 并修复输出的 MISMATCH"
 fi
 
+if ./tool/check_runtime_contract.sh >/dev/null 2>&1; then
+  ok "单一真实运行时契约检查通过"
+else
+  err "单一真实运行时契约检查失败"
+  add_todo "执行 ./tool/check_runtime_contract.sh 并移除 Flavor、stub 或移动端实时入口残留"
+fi
+
 # 4) key templates and signing fields
 if [[ -f "$KEY_EXAMPLE" ]]; then
   ok "key.properties.example 模板存在"
@@ -157,6 +164,36 @@ if flutter test >/dev/null 2>&1; then
 else
   err "flutter test 未通过"
   add_todo "执行 flutter test 并修复失败用例"
+fi
+
+# 8) meeting product-loop and privacy boundaries
+if [[ -f "$ROOT/integration_test/meeting_offline_flow_test.dart" ]] &&
+   [[ -f "$ROOT/integration_test/meeting_recovery_flow_test.dart" ]] &&
+   [[ -x "$ROOT/tool/run_meeting_flow_smoke.sh" ]]; then
+  ok "会议离线流、恢复流和真机脚本存在"
+else
+  err "会议产品闭环集成测试或真机脚本缺失/不可执行"
+  add_todo "补齐 integration_test/meeting_*_flow_test.dart 并 chmod +x tool/run_meeting_flow_smoke.sh"
+fi
+
+if ./tool/check_privacy_contract.sh >/dev/null 2>&1; then
+  ok "隐私、备份、分享边界与日志契约检查通过"
+else
+  err "隐私、备份、分享边界或日志契约检查失败"
+  add_todo "执行 ./tool/check_privacy_contract.sh 并修复输出"
+fi
+
+timestamp_result="$(
+  python3 benchmark/evaluate_transcript_timestamps.py \
+    --predictions benchmark/audio/timestamp_evaluator_selftest_predictions.json \
+    --allow-provisional 2>/dev/null || true
+)"
+if [[ "$timestamp_result" == *'"releaseEligible": true'* ]] ||
+   [[ "$timestamp_result" == *'"releaseEligible":true'* ]]; then
+  ok "时间戳 benchmark 使用独立批准标注并满足发布门槛"
+else
+  warn "时间戳 benchmark 仍非 release-eligible"
+  add_todo "完成独立听审标注、真机预测并使 P95 边界误差 <= 1.5 秒"
 fi
 
 echo

@@ -1,0 +1,47 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
+    <application android:label="Voice2Text share verifier">
+        <activity
+            android:name="androidx.test.core.app.InstrumentationActivityInvoker$BootstrapActivity"
+            android:exported="false"
+            tools:replace="android:exported" />
+        <activity
+            android:name="androidx.test.core.app.InstrumentationActivityInvoker$EmptyActivity"
+            android:exported="false"
+            tools:replace="android:exported" />
+        <activity
+            android:name="androidx.test.core.app.InstrumentationActivityInvoker$EmptyFloatingActivity"
+            android:exported="false"
+            tools:replace="android:exported" />
+        <activity
+            android:name="com.voice2text.app.test.ShareReceiverActivity"
+            android:exported="true"
+            android:label="Voice2Text share verifier"
+            android:theme="@android:style/Theme.Material.Light.Dialog.Alert">
+            <intent-filter>
+                <action android:name="android.intent.action.SEND" />
+
+                <category android:name="android.intent.category.DEFAULT" />
+
+                <data android:mimeType="audio/*" />
+                <data android:mimeType="text/plain" />
+                <data android:mimeType="text/markdown" />
+                <data android:mimeType="application/json" />
+                <data android:mimeType="application/x-subrip" />
+                <data android:mimeType="text/vtt" />
+                <data android:mimeType="application/octet-stream" />
+            </intent-filter>
+        </activity>
+        <activity
+            android:name="com.voice2text.app.test.ShareSenderActivity"
+            android:exported="true"
+            android:label="Voice2Text external share sender"
+            android:theme="@android:style/Theme.Material.Light.Dialog.Alert" />
+        <provider
+            android:name="com.voice2text.app.test.ShareFixtureProvider"
+            android:authorities="com.voice2text.app.test.sender"
+            android:exported="false"
+            android:grantUriPermissions="true" />
+    </application>
+</manifest>

@@ -1,10 +1,10 @@
 # Paraformer ASR Benchmark Test Plan
 
-This file defines the repeatable benchmark standard. The shipped production route is standard recording, Silero VAD segmentation, and offline Paraformer recognition. `live_vad_paced` is tracked as the realtime production-candidate route.
+This file defines the repeatable mobile benchmark standard. The shipped route is standard recording, Silero VAD segmentation, and offline Paraformer recognition. Live VAD profiles are isolated historical/future-PC research inputs and are excluded from mobile smoke and release validation.
 
 Physical-device validation is required before changing production defaults. Emulator results are screening evidence.
 
-The 508-case regular standard below is the convergence and release-validation target. It is not the first-pass tuning entry point. Use the fast exploration path first, then spend full validation time only on candidates that survive the smaller gates.
+The 494-case regular standard below is the convergence and release-validation target. It is not the first-pass tuning entry point. Use the fast exploration path first, then spend full validation time only on candidates that survive the smaller gates.
 
 Execution reliability and thermal safety are mandatory for all plans:
 
@@ -17,10 +17,10 @@ Execution reliability and thermal safety are mandatory for all plans:
 
 | Part | Source | Profiles | Audio cases | Test cases | Purpose |
 | --- | --- | ---: | ---: | ---: | --- |
-| Smoke | `benchmark/asr_benchmark_profiles.json`, excluding debug fast replay | 2 | 2 | 4 | Verify assets, runner, model loading, standard VAD, `live_vad_paced`, and report generation. |
+| Smoke | `benchmark/asr_benchmark_profiles.json` default profile | 1 | 2 | 2 | Verify assets, runner, model loading, standard VAD, and report generation. |
 | Focused | `generate_asr_profile_matrix.py --preset focused` on `asr-validation-manifest.json` | 96 | 5 | 480 | Main standard VAD micro-sweep around the current stable region. |
-| Length / release validation | selected standard VAD + `live_vad_paced` profiles on `asr-length-decision-manifest.json` | 2 | 12 | 24 | Validate selected behavior across complete-audio lengths. |
-| Total | - | - | - | 508 | Normal benchmark standard. |
+| Length / release validation | selected standard VAD profile on `asr-length-decision-manifest.json` | 1 | 12 | 12 | Validate selected behavior across complete-audio lengths. |
+| Total | - | - | - | 494 | Normal mobile benchmark standard. |
 
 Optional search layers:
 
@@ -32,20 +32,31 @@ Optional search layers:
 
 Generated matrices, raw results, and temporary selected-profile files stay under `build/asr_benchmark/` and are not committed.
 
+## S2 Speech Enhancement Gate
+
+Speech enhancement is an isolated paired experiment until every preregistered gate in `audio/s2_noise_manifest.json` passes. Generate the five deterministic inputs with:
+
+```bash
+python3 benchmark/prepare_s2_noise_audio.py
+```
+
+For each `quiet_clean`, `steady_noise_5db`, `burst_noise_0db`, `near_talk`, and `far_talk_5db` case, run the same production Paraformer/VAD configuration first on the generated input and then on GTCRN output. The original WAV remains byte-identical. Record raw/enhanced CER, timestamp P95, enhancement and combined RTF, Java/native peak-memory deltas, battery/thermal observations, device class, model hash, and output hash.
+
+The initial physical GTCRN API/ABI smoke is not an accuracy gate. Promotion additionally requires every manifest threshold, both low- and mid-class physical-device runs, and no thermal throttling. GTCRN is noise suppression, not acoustic echo cancellation; it cannot satisfy an AEC claim. Until the complete paired report passes, `enhancement.verified`, `denoiseReady`, the request default, and product settings remain false.
+
 ## Fast Exploration Path
 
-Use this path before the regular focused run when tuning VAD or realtime accuracy. It keeps Chinese and English separate, uses one representative audio case per language first, and promotes only a small candidate set to broader validation.
+Use this path before the regular focused run when tuning standard offline VAD. It keeps Chinese and English separate and uses one representative audio case per language first.
 
 | Step | Device | Input | Output | Gate |
 | --- | --- | --- | --- | --- |
 | 1. Static validation | local | Python/JSON scripts | no syntax errors | Profile generation and report scripts compile. |
-| 2. Smoke | physical preferred, emulator acceptable | `standard_vad_silero_warm_t2` + `live_vad_silero_paced_t2_f100` on core `zh`/`en` | one result JSON | 4 test cases complete with zero failures. |
+| 2. Smoke | physical preferred, emulator acceptable | `standard_vad_silero_warm_t2` on core `zh`/`en` | one result JSON | 2 test cases complete with zero failures. |
 | 3. Single-audio screening | physical preferred | `--preset screening`, run once with one Chinese audio case and once with one English audio case | two small result JSON files | Identify direction for threshold, min silence, max speech, and recognizer threads. |
 | 4. Single-audio focused | physical preferred | `--preset focused`, still one Chinese case and one English case | up to 192 focused rows | Run only if screening shows a non-default direction or the default is not clearly best. |
 | 5. Candidate selection | local | screening/focused results | selected profile JSON | Keep at most 3 standard VAD profiles per language/model. |
 | 6. Candidate validation | physical or stable emulator | selected standard VAD profiles on the 5-case validation manifest | selected result JSON/report | Candidate must improve accuracy or tie accuracy while improving RTF. |
-| 7. Live VAD candidate replay | physical required before promotion | default `live_vad_paced` plus live variants for selected standard VAD candidates | realtime-candidate result JSON | Check accuracy parity and live latency metrics. |
-| 8. Release validation | physical | final standard VAD + `live_vad_paced` on length manifest | length result JSON/report | Required before changing production defaults or exposing realtime behavior. |
+| 7. Release validation | physical | final standard VAD on length manifest | length result JSON/report | Required before changing mobile production defaults. |
 
 Reliability continuation notes for Fast Exploration:
 
@@ -95,18 +106,18 @@ Use this after the fast exploration path has identified candidates, or when runn
 | Step | Device | Input | Output | Gate |
 | --- | --- | --- | --- | --- |
 | 1. Static validation | local | Python/JSON scripts | no syntax errors | Run before using device time. |
-| 2. Smoke | emulator or physical | `standard_vad_silero_warm_t2` + `live_vad_silero_paced_t2_f100` on core `zh`/`en` | one result JSON | 4 test cases complete with zero failures. |
+| 2. Smoke | emulator or physical | `standard_vad_silero_warm_t2` on core `zh`/`en` | one result JSON | 2 test cases complete with zero failures. |
 | 3. Validation audio | local | `prepare_asr_validation_audio.py --mode all` | generated manifests/audio | Every scored audio case has reference text. |
 | 4. Focused micro-sweep | emulator | `--preset focused` on the 5-case validation manifest | focused result JSON/TSV | 480 test cases complete; no recurring failures. |
 | 5. Candidate selection | local | focused results | selected profile JSON | Top profiles selected per language/model. |
 | 6. Neighbor sweep | emulator, conditional | selected profiles plus full matrix neighbors | follow-up profile JSON/results | Run only if a candidate clears improvement thresholds. |
-| 7. Length / release validation | emulator or physical | selected standard VAD + `live_vad_paced` profiles on the 12-case length manifest | length result JSON/report | 24 test cases complete; no length-specific regression. |
+| 7. Length / release validation | emulator or physical | selected standard VAD profile on the 12-case length manifest | length result JSON/report | 12 test cases complete; no length-specific regression. |
 | 8. Physical rerun | physical device | selected finalists | physical result JSON/report | Required before production defaults change. |
 | 9. Deep search | stable emulator or physical, optional | `coarse` or `full` batches | additional evidence | Only when focused evidence is inconclusive or a model/VAD/device change resets the search space. |
 
 ## Live VAD Experiment Boundary
 
-The standard workflow above remains the production benchmark standard. `live_vad_paced` is the only realtime-candidate profile counted in formal smoke and length / release validation. `live_vad_replay` is debug-only and is not counted in the 508 regular test cases.
+The workflow above is the complete mobile production benchmark standard. Live VAD profiles are not counted in the 494 regular cases. They remain debug-only historical/future-PC research inputs, require explicit profile IDs, and cannot be promoted into the mobile product from this benchmark.
 
 Standard VAD and `live_vad` benchmark routes share the same Silero VAD model, VAD parameter names, and Paraformer recognizer. With the default `liveFrameMs=100`, `live_vad` uses the same effective input cadence as the standard route's 100 ms VAD chunking. Therefore, broad VAD parameter search should run on the standard route first. Reuse those results to choose `live_vad` candidates instead of replaying the full standard matrix on the live route.
 
@@ -119,7 +130,7 @@ Standard VAD and `live_vad` benchmark routes share the same Silero VAD model, VA
 
 For `live_vad`, accuracy alone is not enough. Also review `firstSegmentResultWallMs`, `p95BoundaryLatencyMs`, `p95PaceLagMs`, `liveProcessingWallMs`, `segmentCount`, and empty segment counts.
 
-The realtime path must not restore RMS production code. RMS can appear only as historical baseline data or isolated debug replay evidence. Any user-visible realtime route requires physical-device validation after emulator screening.
+The research path must not restore RMS or Live VAD mobile production code. Any user-visible realtime route requires a separate PC product plan.
 
 ## Focused Matrix
 
@@ -194,7 +205,7 @@ Add nearest neighbors for another emulator focused sweep:
 | recognizer `numThreads` | `4` |
 | VAD `numThreads` | `1` |
 
-## Live VAD Production Candidate Default
+## Isolated Live VAD Research Reference
 
 | Field | Value |
 | --- | --- |
@@ -207,6 +218,8 @@ Add nearest neighbors for another emulator focused sweep:
 | VAD `numThreads` | `1` |
 | `liveFrameMs` | `100` |
 | `liveRealtimePace` | `true` |
+
+This table is retained only to reproduce historical experiments. It is not a mobile default, smoke profile, release profile, or product capability.
 
 ## Additional Sweep Ideas
 

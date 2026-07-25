@@ -1,0 +1,31 @@
+{
+  "schemaVersion": 1,
+  "candidateId": "streaming-zipformer-zh-14m-2023-02-23",
+  "corpus": {
+    "audio": "zh.wav",
+    "audioSha256": "9345f80fc835ae2afc9bb58ccdbd5047797d7de3afc4cb3a2c6ef44444a2a562",
+    "reference": "zh.txt",
+    "referenceSha256": "40046fed2ac99717645087d59dfc54d764ec84e6554ec0879e699bbc4cdb231a",
+    "targetPhrases": [
+      "英特尔",
+      "相思风雨中"
+    ]
+  },
+  "decoder": {
+    "method": "modified_beam_search",
+    "modelingUnit": "cjkchar",
+    "maxActivePaths": 4,
+    "hotwordsFile": "online_candidate_hotwords.txt",
+    "hotwordsFileSha256": "22a1bcfb2c756b24d022bd33942a0a2ba24489a1d9e3818d2d8e5c6b5769e611",
+    "hotwordsScore": 1.5
+  },
+  "gatePolicy": {
+    "hotwordPassRequiresMeasuredDecoderImprovement": true,
+    "rawYsProbsAreNotConfidence": true,
+    "confidenceRequiresHeldOutCalibration": true,
+    "requiredDeviceClasses": [
+      "low",
+      "mid"
+    ]
+  }
+}
