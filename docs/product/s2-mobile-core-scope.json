@@ -1,0 +1,441 @@
+{
+  "schemaVersion": 1,
+  "decisionId": "S2-MOBILE-CORE-2026-07-25",
+  "effectiveDate": "2026-07-25",
+  "legacyS2Conclusion": "BLOCKED_NOT_RELEASE_READY",
+  "productionMobileAsr": "paraformer-zh",
+  "originalS2BaselineIds": [
+    "ASR-004",
+    "ASR-005",
+    "ASR-006",
+    "ASR-007",
+    "ASR-008",
+    "EXP-004",
+    "EXP-009",
+    "POST-003",
+    "POST-004",
+    "POST-005",
+    "POST-006",
+    "POST-008",
+    "REC-006",
+    "REC-008",
+    "REC-009",
+    "REC-010",
+    "SEC-003",
+    "SEC-004",
+    "TIM-001",
+    "TIM-002",
+    "TIM-003"
+  ],
+  "mobileCore": {
+    "status": "BLOCKED",
+    "gateCount": 18,
+    "passCount": 17,
+    "requiredGateIds": [
+      "ASR-004-PUNCTUATION",
+      "ASR-005-TIMESTAMP-INDEPENDENT",
+      "ASR-006-MANUAL-REVIEW",
+      "EXP-004-ACCESSIBILITY",
+      "EXP-009-OFFLINE-HELP",
+      "POST-003-CORE-SEARCH",
+      "POST-004-BATCH-MANAGEMENT",
+      "POST-005-CORE-EDITING",
+      "POST-006-BASE-EXPORT",
+      "POST-008-LOCAL-SHARE",
+      "REC-006-BACKGROUND-RECORDING",
+      "REC-008-SHARE-IMPORT",
+      "REC-010-MEETING-ANNOTATIONS",
+      "SEC-003-DELETE-RETENTION",
+      "SEC-004-PLATFORM-DATA-PROTECTION",
+      "TIM-001-PLAYER",
+      "TIM-002-SEGMENT-SEEK",
+      "TIM-003-SEGMENT-EDIT"
+    ],
+    "remainingBlockers": [
+      "ASR-005-TIMESTAMP-INDEPENDENT"
+    ]
+  },
+  "overallProduct": {
+    "status": "NOT_RELEASE_READY",
+    "blockers": [
+      "S1-HIGH-END-REFERENCE-DEVICE",
+      "EXP-005-ANDROID-PRODUCTION-RELEASE",
+      "S2-MOBILE-CORE",
+      "RELEASE-DELIVERY"
+    ]
+  },
+  "timestampGate": {
+    "gateId": "ASR-005-TIMESTAMP-INDEPENDENT",
+    "independentReviewRequired": true,
+    "releaseEligible": false,
+    "p95ThresholdMs": 1500,
+    "provisionalEngineeringP95Ms": 182
+  },
+  "futurePcAsr": {
+    "productionModelSelected": false,
+    "hotwordDecoderContract": "transducer_modified_beam_search",
+    "offlineCandidateClass": "offline_zipformer_transducer",
+    "liveCandidateClass": "online_zipformer_transducer",
+    "confidenceSignalContract": "raw_score_requires_independent_calibration_and_held_out_validation",
+    "officialSources": [
+      "https://k2-fsa.github.io/sherpa/onnx/hotwords/index.html",
+      "https://k2-fsa.github.io/sherpa/onnx/pretrained_models/offline-transducer/index.html",
+      "https://k2-fsa.github.io/sherpa/onnx/pretrained_models/online-transducer/zipformer-transducer-models.html"
+    ]
+  },
+  "items": [
+    {
+      "id": "ASR-004",
+      "originalStage": "S2",
+      "disposition": "split",
+      "mandatoryGateId": "ASR-004-PUNCTUATION",
+      "mobileCoreStatus": "PASS",
+      "mobileCoreRequirement": "真实离线标点与确定性长文本分段",
+      "deferredParts": [
+        {
+          "capability": "数字、日期、时间、金额和单位 ITN",
+          "target": "PC_TEXT_QUALITY",
+          "status": "DEFERRED_NOT_PASSED",
+          "historicalStatus": "BLOCKED_ASSET_LICENSE"
+        }
+      ]
+    },
+    {
+      "id": "ASR-005",
+      "originalStage": "S2",
+      "disposition": "mandatory",
+      "mandatoryGateId": "ASR-005-TIMESTAMP-INDEPENDENT",
+      "mobileCoreStatus": "BLOCKED",
+      "mobileCoreRequirement": "结构化时间戳、生产分段和独立听审 P95",
+      "deferredParts": []
+    },
+    {
+      "id": "ASR-006",
+      "originalStage": "S2",
+      "disposition": "split",
+      "mandatoryGateId": "ASR-006-MANUAL-REVIEW",
+      "mobileCoreStatus": "PASS",
+      "mobileCoreRequirement": "未复核、待复核、已复核人工三态",
+      "deferredParts": [
+        {
+          "capability": "自动 confidence 与低置信度阈值",
+          "target": "PC_ASR",
+          "status": "DEFERRED_NOT_PASSED",
+          "historicalStatus": "BLOCKED_UNCALIBRATED_SIGNAL"
+        }
+      ]
+    },
+    {
+      "id": "ASR-007",
+      "originalStage": "S2",
+      "disposition": "deferred",
+      "mobileCoreStatus": "NOT_APPLICABLE",
+      "mobileCoreRequirement": null,
+      "deferredParts": [
+        {
+          "capability": "解码热词与专业词库",
+          "target": "PC_ASR",
+          "status": "DEFERRED_NOT_PASSED",
+          "historicalStatus": "BLOCKED_NO_TARGET_HIT_IMPROVEMENT"
+        }
+      ]
+    },
+    {
+      "id": "ASR-008",
+      "originalStage": "S2",
+      "disposition": "deferred",
+      "mobileCoreStatus": "NOT_APPLICABLE",
+      "mobileCoreRequirement": null,
+      "aecProvided": false,
+      "deferredParts": [
+        {
+          "capability": "GTCRN 噪声抑制与独立 AEC",
+          "target": "ADVANCED_AUDIO",
+          "status": "DEFERRED_NOT_PASSED",
+          "historicalStatus": "FAIL_PAIRED_PRODUCTION_GATES"
+        }
+      ]
+    },
+    {
+      "id": "EXP-004",
+      "originalStage": "S2",
+      "disposition": "mandatory",
+      "mandatoryGateId": "EXP-004-ACCESSIBILITY",
+      "mobileCoreStatus": "PASS",
+      "mobileCoreRequirement": "会议复核核心流程无障碍与大字体",
+      "deferredParts": []
+    },
+    {
+      "id": "EXP-009",
+      "originalStage": "S2",
+      "disposition": "split",
+      "mandatoryGateId": "EXP-009-OFFLINE-HELP",
+      "mobileCoreStatus": "PASS",
+      "mobileCoreRequirement": "离线帮助与用户主动安全诊断分享",
+      "deferredParts": [
+        {
+          "capability": "获批服务端反馈上传",
+          "target": "ADVANCED_SERVICE",
+          "status": "DEFERRED_NOT_PASSED",
+          "historicalStatus": "NOT_IMPLEMENTED"
+        }
+      ]
+    },
+    {
+      "id": "POST-003",
+      "originalStage": "S2",
+      "disposition": "split",
+      "mandatoryGateId": "POST-003-CORE-SEARCH",
+      "mobileCoreStatus": "PASS",
+      "mobileCoreRequirement": "标题、原文、时间范围和复核状态搜索",
+      "deferredParts": [
+        {
+          "capability": "说话人搜索",
+          "target": "S3",
+          "status": "DEFERRED_NOT_PASSED",
+          "historicalStatus": "BLOCKED_BY_SPEAKER_DATA"
+        }
+      ]
+    },
+    {
+      "id": "POST-004",
+      "originalStage": "S2",
+      "disposition": "mandatory",
+      "mandatoryGateId": "POST-004-BATCH-MANAGEMENT",
+      "mobileCoreStatus": "PASS",
+      "mobileCoreRequirement": "批量移动、删除、重试和导出",
+      "deferredParts": []
+    },
+    {
+      "id": "POST-005",
+      "originalStage": "S2-S3",
+      "disposition": "split",
+      "mandatoryGateId": "POST-005-CORE-EDITING",
+      "mobileCoreStatus": "PASS",
+      "mobileCoreRequirement": "标题和转写片段人工编辑与撤销",
+      "deferredParts": [
+        {
+          "capability": "说话人、完整纪要、结论和待办编辑",
+          "target": "S3",
+          "status": "DEFERRED_NOT_PASSED",
+          "historicalStatus": "PARTIAL"
+        }
+      ]
+    },
+    {
+      "id": "POST-006",
+      "originalStage": "S2",
+      "disposition": "mandatory",
+      "mandatoryGateId": "POST-006-BASE-EXPORT",
+      "mobileCoreStatus": "PASS",
+      "mobileCoreRequirement": "TXT、Markdown、JSON、SRT 和 VTT 全量或范围导出",
+      "deferredParts": []
+    },
+    {
+      "id": "POST-008",
+      "originalStage": "S2",
+      "disposition": "mandatory",
+      "mandatoryGateId": "POST-008-LOCAL-SHARE",
+      "mobileCoreStatus": "PASS",
+      "mobileCoreRequirement": "通过受控只读 URI 本地分享真实文件",
+      "deferredParts": []
+    },
+    {
+      "id": "REC-006",
+      "originalStage": "S2",
+      "disposition": "mandatory",
+      "mandatoryGateId": "REC-006-BACKGROUND-RECORDING",
+      "mobileCoreStatus": "PASS",
+      "mobileCoreRequirement": "后台与锁屏长时间录音",
+      "deferredParts": []
+    },
+    {
+      "id": "REC-008",
+      "originalStage": "S2",
+      "disposition": "mandatory",
+      "mandatoryGateId": "REC-008-SHARE-IMPORT",
+      "mobileCoreStatus": "PASS",
+      "mobileCoreRequirement": "系统分享导入",
+      "deferredParts": []
+    },
+    {
+      "id": "REC-009",
+      "originalStage": "S2",
+      "disposition": "deferred",
+      "mobileCoreStatus": "NOT_APPLICABLE",
+      "mobileCoreRequirement": null,
+      "deferredParts": [
+        {
+          "capability": "蓝牙、有线和 USB 麦克风主动切换真机验收",
+          "target": "MOBILE_HARDWARE_COMPATIBILITY",
+          "status": "DEFERRED_NOT_PASSED",
+          "historicalStatus": "BLOCKED_EXTERNAL_HARDWARE"
+        }
+      ]
+    },
+    {
+      "id": "REC-010",
+      "originalStage": "S2",
+      "disposition": "mandatory",
+      "mandatoryGateId": "REC-010-MEETING-ANNOTATIONS",
+      "mobileCoreStatus": "PASS",
+      "mobileCoreRequirement": "会中重点标记、文字备注和时间线回跳",
+      "deferredParts": []
+    },
+    {
+      "id": "SEC-003",
+      "originalStage": "S2",
+      "disposition": "mandatory",
+      "mandatoryGateId": "SEC-003-DELETE-RETENTION",
+      "mobileCoreStatus": "PASS",
+      "mobileCoreRequirement": "完整删除、最近删除恢复与自动保留",
+      "deferredParts": []
+    },
+    {
+      "id": "SEC-004",
+      "originalStage": "S2",
+      "disposition": "mandatory",
+      "mandatoryGateId": "SEC-004-PLATFORM-DATA-PROTECTION",
+      "mobileCoreStatus": "PASS",
+      "mobileCoreRequirement": "app-private、备份排除、受控分享与敏感日志治理",
+      "deferredParts": []
+    },
+    {
+      "id": "TIM-001",
+      "originalStage": "S2",
+      "disposition": "mandatory",
+      "mandatoryGateId": "TIM-001-PLAYER",
+      "mobileCoreStatus": "PASS",
+      "mobileCoreRequirement": "完整播放器",
+      "deferredParts": []
+    },
+    {
+      "id": "TIM-002",
+      "originalStage": "S2",
+      "disposition": "mandatory",
+      "mandatoryGateId": "TIM-002-SEGMENT-SEEK",
+      "mobileCoreStatus": "PASS",
+      "mobileCoreRequirement": "段落播放联动与回跳",
+      "deferredParts": []
+    },
+    {
+      "id": "TIM-003",
+      "originalStage": "S2",
+      "disposition": "mandatory",
+      "mandatoryGateId": "TIM-003-SEGMENT-EDIT",
+      "mobileCoreStatus": "PASS",
+      "mobileCoreRequirement": "片段编辑、撤销、重做与版本保存",
+      "deferredParts": []
+    }
+  ],
+  "authoritativeDocuments": [
+    {
+      "path": "README.md",
+      "requiredMarkers": [
+        "S2-MOBILE-CORE-2026-07-25",
+        "S2 Mobile Core",
+        "NOT RELEASE-READY"
+      ]
+    },
+    {
+      "path": "docs/product/meeting-voice-recognition-prd-v1.0.md",
+      "requiredMarkers": [
+        "S2-MOBILE-CORE-2026-07-25",
+        "S2 Mobile Core",
+        "DEFERRED_TO_PC",
+        "BLOCKED"
+      ]
+    },
+    {
+      "path": "docs/product/s2-closure-status.md",
+      "requiredMarkers": [
+        "S2-MOBILE-CORE-2026-07-25",
+        "S2 Mobile Core",
+        "BLOCKED",
+        "NOT RELEASE-READY"
+      ]
+    },
+    {
+      "path": "docs/product/s2-asr-closure-status.md",
+      "requiredMarkers": [
+        "S2-MOBILE-CORE-2026-07-25",
+        "S2 Mobile Core",
+        "DEFERRED_TO_PC",
+        "BLOCKED"
+      ]
+    },
+    {
+      "path": "docs/product/mobile-capability-matrix.md",
+      "requiredMarkers": [
+        "S2-MOBILE-CORE-2026-07-25",
+        "S2 Mobile Core",
+        "DEFERRED_NOT_PASSED"
+      ]
+    },
+    {
+      "path": "docs/REAL_DEVICE_REGRESSION_MATRIX.md",
+      "requiredMarkers": [
+        "S2-MOBILE-CORE-2026-07-25",
+        "S2 Mobile Core",
+        "ASR-005-TIMESTAMP-INDEPENDENT"
+      ]
+    },
+    {
+      "path": "docs/BETA_RELEASE_CHECKLIST.md",
+      "requiredMarkers": [
+        "S2-MOBILE-CORE-2026-07-25",
+        "ASR-005-TIMESTAMP-INDEPENDENT",
+        "Deferred advanced"
+      ]
+    },
+    {
+      "path": "benchmark/S2_ASR_CAPABILITY_REVIEW.md",
+      "requiredMarkers": [
+        "S2-MOBILE-CORE-2026-07-25",
+        "S2 Mobile Core"
+      ]
+    },
+    {
+      "path": "benchmark/S2_ITN_BLOCKER.md",
+      "requiredMarkers": [
+        "S2-MOBILE-CORE-2026-07-25",
+        "DEFERRED_TO_PC"
+      ]
+    },
+    {
+      "path": "benchmark/S2_CONFIDENCE_REVIEW.md",
+      "requiredMarkers": [
+        "S2-MOBILE-CORE-2026-07-25",
+        "DEFERRED_TO_PC"
+      ]
+    },
+    {
+      "path": "benchmark/S2_HOTWORD_BLOCKER.md",
+      "requiredMarkers": [
+        "S2-MOBILE-CORE-2026-07-25",
+        "DEFERRED_TO_PC"
+      ]
+    },
+    {
+      "path": "benchmark/S2_ENHANCEMENT_REVIEW.md",
+      "requiredMarkers": [
+        "S2-MOBILE-CORE-2026-07-25",
+        "DEFERRED_TO_ADVANCED"
+      ]
+    },
+    {
+      "path": "benchmark/TIMESTAMP_REVIEW.md",
+      "requiredMarkers": [
+        "S2-MOBILE-CORE-2026-07-25",
+        "ASR-005-TIMESTAMP-INDEPENDENT"
+      ]
+    },
+    {
+      "path": "benchmark/S2_PHYSICAL_EVIDENCE.md",
+      "requiredMarkers": [
+        "S2-MOBILE-CORE-2026-07-25",
+        "S2 Mobile Core"
+      ]
+    }
+  ]
+}
