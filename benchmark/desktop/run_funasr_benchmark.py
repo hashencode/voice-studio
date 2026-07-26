@@ -17,6 +17,14 @@ from typing import Any
 
 import psutil
 
+try:
+    from benchmark.desktop.asr_comparison.asr_scoring import (
+        edit_statistics,
+        lexical_characters,
+    )
+except ModuleNotFoundError:
+    from asr_comparison.asr_scoring import edit_statistics, lexical_characters
+
 
 FIXTURE_SHA256 = "9345f80fc835ae2afc9bb58ccdbd5047797d7de3afc4cb3a2c6ef44444a2a562"
 REFERENCE_SHA256 = "40046fed2ac99717645087d59dfc54d764ec84e6554ec0879e699bbc4cdb231a"
@@ -69,23 +77,11 @@ def directory_identity(root: Path) -> dict[str, Any]:
 
 
 def normalize(text: str) -> str:
-    return "".join(character for character in text.lower() if character.isalnum())
+    return "".join(lexical_characters(text))
 
 
 def edit_distance(left: str, right: str) -> int:
-    previous = list(range(len(right) + 1))
-    for left_index, left_value in enumerate(left, start=1):
-        current = [left_index]
-        for right_index, right_value in enumerate(right, start=1):
-            current.append(
-                min(
-                    current[-1] + 1,
-                    previous[right_index] + 1,
-                    previous[right_index - 1] + (left_value != right_value),
-                )
-            )
-        previous = current
-    return previous[-1]
+    return int(edit_statistics(list(left), list(right))["distance"])
 
 
 def system_value(name: str) -> str:

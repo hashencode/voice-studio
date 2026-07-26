@@ -6,12 +6,16 @@ from benchmark.evaluate_online_transducer_candidate import (
     alignment,
     expected_calibration_error,
     index_runs,
+    normalize,
     roc_auc,
     validate_evidence_identity,
 )
 
 
 class EvaluateOnlineTransducerCandidateTest(unittest.TestCase):
+    def test_normalization_uses_shared_nfkc_casefold_rules(self) -> None:
+        self.assertEqual(normalize("ＡＢＣ， Smoke Test"), "abcsmoketest")
+
     def test_alignment_labels_substitutions_and_insertions(self) -> None:
         distance, labels = alignment("abcd", "abxcd")
         self.assertEqual(distance, 1)

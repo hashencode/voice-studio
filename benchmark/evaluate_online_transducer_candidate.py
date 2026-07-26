@@ -7,9 +7,19 @@ import argparse
 import hashlib
 import json
 import math
-import unicodedata
 from pathlib import Path
 from typing import Any
+
+try:
+    from benchmark.desktop.asr_comparison.asr_scoring import (
+        alignment_labels as shared_alignment,
+        lexical_characters,
+    )
+except ModuleNotFoundError:
+    from desktop.asr_comparison.asr_scoring import (
+        alignment_labels as shared_alignment,
+        lexical_characters,
+    )
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -45,49 +55,11 @@ def sha256(path: Path) -> str:
 
 
 def normalize(text: str) -> str:
-    return "".join(
-        character
-        for character in unicodedata.normalize("NFKC", text)
-        if not character.isspace() and not unicodedata.category(character).startswith("P")
-    )
+    return "".join(lexical_characters(text))
 
 
 def alignment(reference: str, hypothesis: str) -> tuple[int, list[bool]]:
-    rows = len(reference) + 1
-    columns = len(hypothesis) + 1
-    costs = [[0] * columns for _ in range(rows)]
-    for row in range(rows):
-        costs[row][0] = row
-    for column in range(columns):
-        costs[0][column] = column
-    for row in range(1, rows):
-        for column in range(1, columns):
-            costs[row][column] = min(
-                costs[row - 1][column] + 1,
-                costs[row][column - 1] + 1,
-                costs[row - 1][column - 1]
-                + (reference[row - 1] != hypothesis[column - 1]),
-            )
-
-    labels = [False] * len(hypothesis)
-    row = len(reference)
-    column = len(hypothesis)
-    while row > 0 or column > 0:
-        if (
-            row > 0
-            and column > 0
-            and costs[row][column]
-            == costs[row - 1][column - 1]
-            + (reference[row - 1] != hypothesis[column - 1])
-        ):
-            labels[column - 1] = reference[row - 1] == hypothesis[column - 1]
-            row -= 1
-            column -= 1
-        elif column > 0 and costs[row][column] == costs[row][column - 1] + 1:
-            column -= 1
-        else:
-            row -= 1
-    return costs[-1][-1], labels
+    return shared_alignment(reference, hypothesis)
 
 
 def expected_calibration_error(

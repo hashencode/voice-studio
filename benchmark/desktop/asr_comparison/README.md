@@ -81,3 +81,14 @@ The local-only acquisition and review checklist is in
 Publishable evidence is bounded JSON. It contains hashes and aggregate metrics,
 not audio, PCM, transcripts, embeddings, voiceprints, secrets, private labels,
 user-home paths, or absolute paths.
+
+## Shared scoring and aggregation
+
+`asr_scoring.py` is the only comparison-v2 lexical/display scorer. It keeps
+recognition edits separate from punctuation and ITN rendering, and exposes
+terminology, numeric, code-switch, and non-speech hallucination measures.
+`aggregate_results.py` first aggregates fixtures within scenarios and then
+computes an equal-weight scenario macro. It preserves individual repetitions,
+excludes warm-ups from aggregates, applies CER/RTF/RSS hard gates before
+material-benefit evaluation, and emits Pareto inputs rather than a weighted
+winner score.
