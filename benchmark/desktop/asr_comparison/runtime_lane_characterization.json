@@ -1,0 +1,65 @@
+{
+  "schemaVersion": 2,
+  "laneId": "sherpa-onnx-dart-1.13.4-macos-arm64",
+  "resolvedDependency": {
+    "package": "sherpa_onnx",
+    "version": "1.13.4",
+    "pubLockPackageSha256": "889c03cf7a8788795e3a6d35bf9f20b66d1862ea7a73a1b6aaf6e450715c870a",
+    "workspaceLockSha256": "ee12013f6b6092092153cab85053121cefb4950926cfc6c74009befda33d983a"
+  },
+  "apiSources": {
+    "offlineRecognizerDartSha256": "34ef7118aa742293fb4569e61f69b657a49664d0b4e68838e59aa41963f74680",
+    "onlineRecognizerDartSha256": "406e2bbe4374a4051fabf5d5c295e5af26243edb5d474caad69a54bd94153b9d"
+  },
+  "macosRuntime": {
+    "cApiSha256": "7710492d16eff9094543baf46a6edd15952da1b06d690e700735c9d1f691f104",
+    "cxxApiSha256": "cedeb94d8d8dfc67519e18890019522c8237064d7774e0bd7f24416cc5f924d5",
+    "onnxRuntimeSha256": "a95d3599c1d8e76570648e97cc4375756955d0a699e01cba0a1e9cf6db5db305",
+    "binaryArchitectures": [
+      "arm64",
+      "x86_64"
+    ]
+  },
+  "familySupport": {
+    "streaming_transducer": {
+      "state": "SUPPORTED",
+      "dartTypes": [
+        "OnlineTransducerModelConfig",
+        "OnlineModelConfig",
+        "OnlineRecognizerConfig"
+      ]
+    },
+    "offline_paraformer": {
+      "state": "SUPPORTED",
+      "dartTypes": [
+        "OfflineParaformerModelConfig",
+        "OfflineModelConfig",
+        "OfflineRecognizerConfig"
+      ]
+    },
+    "funasr_nano": {
+      "state": "SUPPORTED",
+      "dartTypes": [
+        "OfflineFunAsrNanoModelConfig",
+        "OfflineModelConfig",
+        "OfflineRecognizerConfig"
+      ]
+    },
+    "firered_asr_ctc": {
+      "state": "SUPPORTED",
+      "dartTypes": [
+        "OfflineFireRedAsrCtcModelConfig",
+        "OfflineModelConfig",
+        "OfflineRecognizerConfig"
+      ]
+    }
+  },
+  "characterizationTest": "apps/desktop/test/desktop_asr_candidate_worker_test.dart",
+  "outcome": "SUPPORTED",
+  "runtimeUpgradeRequired": false,
+  "baselineRerunRequiredOnAnyFutureUpgrade": true,
+  "limitations": [
+    "Candidate archive/component hashes and model smoke decodes remain separate Stage 0 admission requirements.",
+    "Capability absence is reported per candidate and is not synthesized by the worker."
+  ]
+}

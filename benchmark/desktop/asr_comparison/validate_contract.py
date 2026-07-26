@@ -593,7 +593,13 @@ def validate_candidate_registry(
         )
         require(
             admission["status"]
-            in {"PENDING_ARTIFACTS", "PENDING_CHARACTERIZATION", "ADMITTED", "REJECTED"},
+            in {
+                "PENDING_ARTIFACTS",
+                "PENDING_CHARACTERIZATION",
+                "PENDING_SMOKE",
+                "ADMITTED",
+                "REJECTED",
+            },
             f"{candidate_id}: admission status",
         )
         require(
@@ -715,6 +721,89 @@ def validate_bundle(
     validate_scoring(scoring, contract)
 
 
+def validate_runtime_characterization(
+    characterization: dict[str, Any], contract: dict[str, Any]
+) -> None:
+    exact_fields(
+        characterization,
+        {
+            "schemaVersion",
+            "laneId",
+            "resolvedDependency",
+            "apiSources",
+            "macosRuntime",
+            "familySupport",
+            "characterizationTest",
+            "outcome",
+            "runtimeUpgradeRequired",
+            "baselineRerunRequiredOnAnyFutureUpgrade",
+            "limitations",
+        },
+        "runtime characterization",
+    )
+    require(characterization["schemaVersion"] == 2, "runtime characterization schema")
+    lanes = {
+        lane["laneId"]: lane for lane in contract["runtimeLanes"]
+    }
+    lane = lanes.get(characterization["laneId"])
+    require(lane is not None, "runtime characterization lane is unknown")
+    dependency = characterization["resolvedDependency"]
+    exact_fields(
+        dependency,
+        {"package", "version", "pubLockPackageSha256", "workspaceLockSha256"},
+        "resolvedDependency",
+    )
+    require(
+        dependency["package"] == lane["runtime"]["package"]
+        and dependency["version"] == lane["runtime"]["version"]
+        and is_hex64(dependency["pubLockPackageSha256"])
+        and is_hex64(dependency["workspaceLockSha256"]),
+        "runtime characterization dependency mismatch",
+    )
+    runtime = characterization["macosRuntime"]
+    exact_fields(
+        runtime,
+        {
+            "cApiSha256",
+            "cxxApiSha256",
+            "onnxRuntimeSha256",
+            "binaryArchitectures",
+        },
+        "characterized macos runtime",
+    )
+    require(
+        runtime["cApiSha256"] == lane["runtime"]["buildSha256"]
+        and all(
+            is_hex64(runtime[key])
+            for key in ("cApiSha256", "cxxApiSha256", "onnxRuntimeSha256")
+        )
+        and set(runtime["binaryArchitectures"]) == {"arm64", "x86_64"},
+        "characterized runtime hashes/architectures mismatch",
+    )
+    require(
+        set(characterization["familySupport"])
+        == {
+            "streaming_transducer",
+            "offline_paraformer",
+            "funasr_nano",
+            "firered_asr_ctc",
+        }
+        and all(
+            entry.get("state") == "SUPPORTED"
+            and isinstance(entry.get("dartTypes"), list)
+            and entry["dartTypes"]
+            for entry in characterization["familySupport"].values()
+        ),
+        "runtime family API support is incomplete",
+    )
+    require(
+        characterization["outcome"] == "SUPPORTED"
+        and characterization["runtimeUpgradeRequired"] is False
+        and characterization["baselineRerunRequiredOnAnyFutureUpgrade"] is True,
+        "runtime lane characterization outcome mismatch",
+    )
+
+
 def _parse_time(value: str, location: str) -> datetime:
     require(isinstance(value, str), f"{location} must be a timestamp")
     try:
@@ -831,6 +920,11 @@ def main() -> int:
     parser.add_argument(
         "--scoring", type=Path, default=root / "scoring_contract.json"
     )
+    parser.add_argument(
+        "--runtime-characterization",
+        type=Path,
+        default=root / "runtime_lane_characterization.json",
+    )
     parser.add_argument("--round-state", type=Path)
     parser.add_argument("--print-hashes", action="store_true")
     args = parser.parse_args()
@@ -839,6 +933,10 @@ def main() -> int:
         candidates = load_object(args.candidates)
         scoring = load_object(args.scoring)
         validate_bundle(contract, candidates, scoring)
+        if args.runtime_characterization.is_file():
+            validate_runtime_characterization(
+                load_object(args.runtime_characterization), contract
+            )
         if args.round_state is not None:
             validate_round_state(
                 load_object(args.round_state), contract, candidates

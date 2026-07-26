@@ -45,8 +45,8 @@
       "runtime": {
         "package": "sherpa_onnx",
         "version": "1.13.4",
-        "buildSha256": null,
-        "apiCharacterization": "PENDING"
+        "buildSha256": "7710492d16eff9094543baf46a6edd15952da1b06d690e700735c9d1f691f104",
+        "apiCharacterization": "SUPPORTED"
       },
       "target": {
         "operatingSystem": "macos",
@@ -60,8 +60,8 @@
         "sherpa-onnx-funasr-nano-int8-2025-12-30",
         "sherpa-onnx-fire-red-asr2-ctc-zh_en-int8-2026-02-25"
       ],
-      "rankable": false,
-      "state": "PENDING_U4_CHARACTERIZATION"
+      "rankable": true,
+      "state": "CHARACTERIZED_PENDING_CANDIDATE_ADMISSION"
     }
   ],
   "profiles": {

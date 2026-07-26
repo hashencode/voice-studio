@@ -5,7 +5,12 @@ import json
 import unittest
 from pathlib import Path
 
-from validate_contract import ContractError, validate_bundle, validate_round_state
+from validate_contract import (
+    ContractError,
+    validate_bundle,
+    validate_round_state,
+    validate_runtime_characterization,
+)
 
 
 ROOT = Path(__file__).resolve().parent
@@ -22,6 +27,12 @@ class ContractBundleTest(unittest.TestCase):
 
     def test_accepts_frozen_first_round_bundle(self) -> None:
         self.validate()
+
+    def test_runtime_characterization_matches_rankable_lane(self) -> None:
+        characterization = json.loads(
+            (ROOT / "runtime_lane_characterization.json").read_text()
+        )
+        validate_runtime_characterization(characterization, self.contract)
 
     def test_requires_exact_first_round_candidate_set(self) -> None:
         self.candidates["candidates"].pop()

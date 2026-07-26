@@ -92,3 +92,20 @@ computes an equal-weight scenario macro. It preserves individual repetitions,
 excludes warm-ups from aggregates, applies CER/RTF/RSS hard gates before
 material-benefit evaluation, and emits Pareto inputs rather than a weighted
 winner score.
+
+## Runtime and model assets
+
+`runtime_lane_characterization.json` binds the resolved `sherpa_onnx 1.13.4`
+Dart API and macOS runtime hashes. The installed API exposes the required
+streaming Transducer, offline Paraformer, FunASR Nano, and FireRedASR2 CTC
+configuration types, so this implementation does not create an upgraded lane.
+Any future runtime upgrade still requires a fresh Zipformer baseline in that
+new lane.
+
+`prepare_assets.py` reports which frozen candidates have complete hashes and
+license admission, then verifies locally provisioned components into an atomic
+build-cache tree. It never treats a pending hash or license review as admitted.
+`desktop_asr_candidate_worker.dart` is benchmark-only; it validates candidate,
+source, model-role, hash, and effective-profile identities before loading the
+native runtime and emits bounded JSONL observations with explicit unload
+events.
