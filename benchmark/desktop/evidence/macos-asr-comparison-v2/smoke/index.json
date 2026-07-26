@@ -1,0 +1,51 @@
+{
+  "contractId": "desktop-processing/macos-asr-comparison-v2",
+  "entries": [
+    {
+      "bytes": 12697,
+      "kind": "runSet",
+      "path": "runs.json",
+      "sha256": "1b80936553bc798fc6f42fe5d7601c5eca29b1dc9b81122e15973143860f2c05"
+    },
+    {
+      "bytes": 7166,
+      "kind": "aggregate",
+      "path": "aggregate.json",
+      "sha256": "6d1d9cf89b8b81fe96c2779ae8ed4a1172a2ab8025278e385964239cf03c69ca"
+    },
+    {
+      "bytes": 4023,
+      "kind": "reliability",
+      "path": "reliability.json",
+      "sha256": "810dc8153b6eb6cbd71eb3f095fd780f49fa019d0ce62b050c7463161bf70db9"
+    }
+  ],
+  "evidenceClass": "non_ranked_smoke",
+  "evidenceSetId": "macos-asr-comparison-v2-smoke",
+  "publicationBindings": {
+    "candidateRegistrySha256": "20d6e9f526601f6f52d72f9592bd62de960eda68220e2a80371546bcd4b501c8",
+    "contractSha256": "d6c1d2b9d21387a07e8fc715951866c39a50e5e6924146dbd292e7901b846f18",
+    "fixtureSha256": "9345f80fc835ae2afc9bb58ccdbd5047797d7de3afc4cb3a2c6ef44444a2a562",
+    "modelComponentsSha256": "44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a",
+    "profileSha256": "5af5faadde884a1d68127124f0c12d31f7e4a326e29febf49747dca057455510",
+    "referenceSha256": "40046fed2ac99717645087d59dfc54d764ec84e6554ec0879e699bbc4cdb231a",
+    "runtimeSha256": "01328ad249b1c29f731960419d4145c427b4e3456378d0a53645c4586ae081f9",
+    "scoringContractSha256": "4ff8a22f5a1184fb0cf09e6c9f30427fe6e7171827c7db98c9640c5a8108dbf7",
+    "targetFingerprintSha256": "6737496720b1a6d9452b6dfc1edb4599bbaab0191c81e5c5c28698f5ef2673e0",
+    "workerSha256": "487422514eb7a64c6d35b6fe55c616322c2592e059127e5e38d0ec3ea2d5f8df"
+  },
+  "rankEligible": false,
+  "schemaVersion": 2,
+  "targetFingerprint": {
+    "architecture": "arm64",
+    "cpuModel": "Apple M4",
+    "logicalCpuCount": 10,
+    "memoryBytes": 17179869184,
+    "operatingSystem": "macos",
+    "operatingSystemVersion": "15.7.5",
+    "runtimeId": "python-fake-contract-smoke",
+    "runtimeSha256": "01328ad249b1c29f731960419d4145c427b4e3456378d0a53645c4586ae081f9",
+    "runtimeVersion": "3.14.6"
+  },
+  "targetFingerprintSha256": "6737496720b1a6d9452b6dfc1edb4599bbaab0191c81e5c5c28698f5ef2673e0"
+}

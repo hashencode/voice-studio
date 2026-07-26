@@ -1,0 +1,140 @@
+{
+  "determinism": {
+    "distinctRawOutputCount": 1,
+    "repeatedRuns": 2,
+    "seed": 20260726,
+    "stable": true
+  },
+  "evidenceClass": "non_ranked_smoke",
+  "hallucination": {
+    "fixtureId": "generated-silence-1s",
+    "lexicalCharactersPerMinute": 0.0
+  },
+  "kind": "reliability",
+  "longRunPolicy": {
+    "executed": false,
+    "repeatWithinLimitFraction": 0.1,
+    "scope": "tooling_only_U7_U8_not_executed"
+  },
+  "probes": [
+    {
+      "details": {},
+      "disposition": "CRASH",
+      "outcome": "PASS",
+      "probeId": "crash"
+    },
+    {
+      "details": {},
+      "disposition": "TIMEOUT",
+      "outcome": "PASS",
+      "probeId": "timeout"
+    },
+    {
+      "details": {},
+      "disposition": "OOM",
+      "outcome": "PASS",
+      "probeId": "oom"
+    },
+    {
+      "details": {
+        "outputCharacters": 0
+      },
+      "disposition": "SUCCESS",
+      "outcome": "PASS",
+      "probeId": "empty_output"
+    },
+    {
+      "details": {},
+      "disposition": "MALFORMED_OUTPUT",
+      "outcome": "PASS",
+      "probeId": "malformed_output"
+    },
+    {
+      "details": {},
+      "disposition": "INVALID_INPUT",
+      "outcome": "PASS",
+      "probeId": "malformed_input"
+    },
+    {
+      "details": {
+        "durationSeconds": 0.05,
+        "outputCharacters": 0
+      },
+      "disposition": "SUCCESS",
+      "outcome": "PASS",
+      "probeId": "short_input"
+    },
+    {
+      "details": {
+        "durationSeconds": 1.0,
+        "outputCharacters": 0
+      },
+      "disposition": "SUCCESS",
+      "outcome": "PASS",
+      "probeId": "silent_input"
+    },
+    {
+      "details": {},
+      "disposition": "SUCCESS",
+      "outcome": "PASS",
+      "probeId": "deterministic_repeat"
+    },
+    {
+      "details": {
+        "descendantProcessesGone": true,
+        "processGroupGone": true,
+        "temporaryArtifactsReleased": true
+      },
+      "disposition": "TIMEOUT",
+      "outcome": "PASS",
+      "probeId": "term_resistant_cancellation"
+    },
+    {
+      "details": {
+        "temporaryArtifactsReleased": true
+      },
+      "disposition": "SUCCESS",
+      "outcome": "PASS",
+      "probeId": "temporary_cleanup"
+    },
+    {
+      "details": {
+        "networkPermissionDenied": true,
+        "userHomePermissionDenied": true
+      },
+      "disposition": "SUCCESS",
+      "outcome": "PASS",
+      "probeId": "sandbox_denial"
+    },
+    {
+      "details": {
+        "atomicActivation": true
+      },
+      "disposition": "SUCCESS",
+      "outcome": "PASS",
+      "probeId": "atomic_publication"
+    }
+  ],
+  "publicationBindings": {
+    "candidateRegistrySha256": "20d6e9f526601f6f52d72f9592bd62de960eda68220e2a80371546bcd4b501c8",
+    "contractSha256": "d6c1d2b9d21387a07e8fc715951866c39a50e5e6924146dbd292e7901b846f18",
+    "fixtureSha256": "9345f80fc835ae2afc9bb58ccdbd5047797d7de3afc4cb3a2c6ef44444a2a562",
+    "modelComponentsSha256": "44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a",
+    "profileSha256": "5af5faadde884a1d68127124f0c12d31f7e4a326e29febf49747dca057455510",
+    "referenceSha256": "40046fed2ac99717645087d59dfc54d764ec84e6554ec0879e699bbc4cdb231a",
+    "runtimeSha256": "01328ad249b1c29f731960419d4145c427b4e3456378d0a53645c4586ae081f9",
+    "scoringContractSha256": "4ff8a22f5a1184fb0cf09e6c9f30427fe6e7171827c7db98c9640c5a8108dbf7",
+    "targetFingerprintSha256": "6737496720b1a6d9452b6dfc1edb4599bbaab0191c81e5c5c28698f5ef2673e0",
+    "workerSha256": "487422514eb7a64c6d35b6fe55c616322c2592e059127e5e38d0ec3ea2d5f8df"
+  },
+  "rankEligible": false,
+  "rankedExecutionPrerequisites": [
+    "provision every frozen candidate artifact and approve licenses",
+    "prepare reviewed development and held-out local fixture packs",
+    "freeze profiles and target before any held-out decode",
+    "run Stage 0 admission and the development-only pilot",
+    "execute U7 and U8 only after the preceding conditions pass"
+  ],
+  "schemaVersion": 2,
+  "targetFingerprintSha256": "6737496720b1a6d9452b6dfc1edb4599bbaab0191c81e5c5c28698f5ef2673e0"
+}

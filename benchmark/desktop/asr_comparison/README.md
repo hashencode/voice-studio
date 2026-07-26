@@ -109,3 +109,28 @@ build-cache tree. It never treats a pending hash or license review as admitted.
 source, model-role, hash, and effective-profile identities before loading the
 native runtime and emits bounded JSONL observations with explicit unload
 events.
+
+## Orchestration and bounded evidence
+
+`run_macos_asr_comparison.py` owns deterministic Stage 0–3 scheduling,
+hash-bound run identities, fresh process execution, process-tree resource
+sampling, timeout/cancellation, partial-run quarantine, and resume. Its
+`--fake-smoke` mode is intentionally non-ranked and executes one warm-up plus
+five measured runs against the committed smoke fixture.
+
+The benchmark Dart launcher in
+`apps/desktop/tool/asr_benchmark/sandboxed_candidate_launcher.dart` reuses the
+desktop sidecar roots/profile and enters the native process-group launcher. It
+fails closed unless active network and user-home probes both produce a
+permission denial; connection refusal is not accepted as proof.
+
+`reliability_probes.py` exercises crash, timeout, simulated OOM, empty output,
+malformed input/output, short and silent fixtures, seeded determinism,
+TERM-resistant descendants, temporary cleanup, and sandboxed offline
+completion. `validate_evidence.py` rejects private or unbounded payloads before
+content-addressed atomic activation. The committed result is documented in
+`benchmark/desktop/evidence/macos-asr-comparison-v2/README.md`.
+
+Native FunASR remains a locked cross-runtime short-stage control through
+`native_funasr_adapter.py`; it is never admitted into a same-runtime sherpa
+ranking lane.

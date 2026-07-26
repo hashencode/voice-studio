@@ -27,6 +27,8 @@ def main() -> int:
             "timeout",
             "malformed",
             "crash",
+            "oom",
+            "reject_input",
             "term_resistant",
             "streaming",
         ],
@@ -50,6 +52,10 @@ def main() -> int:
     )
     if args.mode == "crash":
         return 17
+    if args.mode == "oom":
+        return 137
+    if args.mode == "reject_input":
+        return 65
     if args.mode == "term_resistant":
         signal.signal(signal.SIGTERM, signal.SIG_IGN)
         subprocess.Popen(

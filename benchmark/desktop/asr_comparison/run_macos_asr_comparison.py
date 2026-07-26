@@ -502,8 +502,13 @@ def execute_run(
                 break
         exit_code = process.wait(timeout=max(0.01, deadline - time.monotonic()))
         if exit_code != 0:
+            code = {
+                65: "INVALID_INPUT",
+                137: "OOM",
+                -signal.SIGKILL: "OOM",
+            }.get(exit_code, "CRASH")
             raise OrchestrationError(
-                "CRASH", f"worker exited with status {exit_code}"
+                code, f"worker exited with status {exit_code}"
             )
         if tuple(value for value in observed_types if value != "partial") != SUCCESS_SEQUENCE:
             raise OrchestrationError(
@@ -511,6 +516,12 @@ def execute_run(
             )
     except subprocess.TimeoutExpired as error:
         failure = OrchestrationError("TIMEOUT", "worker exceeded run timeout")
+        termination = terminate_process_group(process)
+        raise failure from error
+    except BrokenPipeError as error:
+        failure = OrchestrationError(
+            "CRASH", "worker exited before accepting the request"
+        )
         termination = terminate_process_group(process)
         raise failure from error
     except OrchestrationError as error:
@@ -523,6 +534,7 @@ def execute_run(
         timestamps["teardown"] = time.time()
         resources = sampler.stop()
         stderr_thread.join(timeout=1)
+        process.stdin and process.stdin.close()
         process.stdout and process.stdout.close()
         process.stderr and process.stderr.close()
         if failure is not None:
@@ -561,8 +573,15 @@ def execute_run(
         "events": events,
         "stderrSha256": sha256_bytes(bytes(stderr_output)),
     }
-    raw_bytes = canonical_json(raw_document)
-    raw_hash = sha256_bytes(raw_bytes)
+    raw_hash = sha256_bytes(
+        canonical_json(
+            {
+                "text": result_event.get("text"),
+                "tokens": result_event.get("tokens"),
+                "timestamps": result_event.get("timestamps"),
+            }
+        )
+    )
     raw_destination = raw_root / f"{run_id}.json"
     _atomic_json(raw_destination, raw_document)
     lexical = scoring["lexical"]

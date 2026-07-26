@@ -1,0 +1,203 @@
+{
+  "aggregate": {
+    "aggregationPolicy": {
+      "durationWeighted": false,
+      "scenarioMacroEqualWeight": true,
+      "warmupsExcluded": true
+    },
+    "candidateId": "fake-contract-smoke",
+    "determinism": {
+      "distinctRawOutputCount": 1,
+      "stable": true
+    },
+    "laneId": "fake-worker-non-ranked",
+    "macroMetrics": {
+      "cer": 0.0,
+      "numericEventAccuracy": null,
+      "terminologyRecall": null
+    },
+    "measuredRunCount": 5,
+    "observationSource": "fake_worker_contract_smoke",
+    "performance": {
+      "rtf": {
+        "count": 5,
+        "dispersion": 0.0,
+        "median": 6.652144204350544e-06,
+        "p95": 6.652144204350544e-06
+      }
+    },
+    "profileId": "fixed-resource",
+    "purpose": "orchestrator_scorer_aggregator_vertical_validation",
+    "rankEligible": false,
+    "resources": {
+      "incrementalPeakRssBytes": {
+        "count": 5,
+        "dispersion": 0.0,
+        "maximum": 0,
+        "median": 0.0,
+        "p95": 0.0
+      }
+    },
+    "runs": [
+      {
+        "fixtureId": "committed-zh-300s",
+        "metrics": {
+          "absolutePeakRssBytes": 20840448,
+          "cer": 0.0,
+          "decodeMilliseconds": 2.0,
+          "hallucinationLexicalCharactersPerMinute": null,
+          "incrementalPeakRssBytes": 0,
+          "loadMilliseconds": 1.0,
+          "numericEventAccuracy": null,
+          "retainedRssBytesAfterUnload": 0,
+          "rtf": 6.652144204350544e-06,
+          "terminologyRecall": null,
+          "wer": 0.0
+        },
+        "rawOutputSha256": "eb0eb462ff659a8afe1a2d6a2aad6c6a345ed1fe6f1667a356732dcf15261036",
+        "runId": "asr2-7e01dec24e1641ccf84d2e6e26ff9354",
+        "runIndex": 0,
+        "scenario": "clean_near_field_mandarin",
+        "scheduleOrder": 0,
+        "warmup": true
+      },
+      {
+        "fixtureId": "committed-zh-300s",
+        "metrics": {
+          "absolutePeakRssBytes": 21184512,
+          "cer": 0.0,
+          "decodeMilliseconds": 2.0,
+          "hallucinationLexicalCharactersPerMinute": null,
+          "incrementalPeakRssBytes": 0,
+          "loadMilliseconds": 1.0,
+          "numericEventAccuracy": null,
+          "retainedRssBytesAfterUnload": 0,
+          "rtf": 6.652144204350544e-06,
+          "terminologyRecall": null,
+          "wer": 0.0
+        },
+        "rawOutputSha256": "eb0eb462ff659a8afe1a2d6a2aad6c6a345ed1fe6f1667a356732dcf15261036",
+        "runId": "asr2-e020bd3d6929c9d03346050e35e2fc89",
+        "runIndex": 1,
+        "scenario": "clean_near_field_mandarin",
+        "scheduleOrder": 1,
+        "warmup": false
+      },
+      {
+        "fixtureId": "committed-zh-300s",
+        "metrics": {
+          "absolutePeakRssBytes": 20938752,
+          "cer": 0.0,
+          "decodeMilliseconds": 2.0,
+          "hallucinationLexicalCharactersPerMinute": null,
+          "incrementalPeakRssBytes": 0,
+          "loadMilliseconds": 1.0,
+          "numericEventAccuracy": null,
+          "retainedRssBytesAfterUnload": 0,
+          "rtf": 6.652144204350544e-06,
+          "terminologyRecall": null,
+          "wer": 0.0
+        },
+        "rawOutputSha256": "eb0eb462ff659a8afe1a2d6a2aad6c6a345ed1fe6f1667a356732dcf15261036",
+        "runId": "asr2-96eb3617ca7cb007f25f75603385a555",
+        "runIndex": 2,
+        "scenario": "clean_near_field_mandarin",
+        "scheduleOrder": 2,
+        "warmup": false
+      },
+      {
+        "fixtureId": "committed-zh-300s",
+        "metrics": {
+          "absolutePeakRssBytes": 20725760,
+          "cer": 0.0,
+          "decodeMilliseconds": 2.0,
+          "hallucinationLexicalCharactersPerMinute": null,
+          "incrementalPeakRssBytes": 0,
+          "loadMilliseconds": 1.0,
+          "numericEventAccuracy": null,
+          "retainedRssBytesAfterUnload": 0,
+          "rtf": 6.652144204350544e-06,
+          "terminologyRecall": null,
+          "wer": 0.0
+        },
+        "rawOutputSha256": "eb0eb462ff659a8afe1a2d6a2aad6c6a345ed1fe6f1667a356732dcf15261036",
+        "runId": "asr2-ea9b9d3024e050c52c07879fa680f9a0",
+        "runIndex": 3,
+        "scenario": "clean_near_field_mandarin",
+        "scheduleOrder": 3,
+        "warmup": false
+      },
+      {
+        "fixtureId": "committed-zh-300s",
+        "metrics": {
+          "absolutePeakRssBytes": 21004288,
+          "cer": 0.0,
+          "decodeMilliseconds": 2.0,
+          "hallucinationLexicalCharactersPerMinute": null,
+          "incrementalPeakRssBytes": 0,
+          "loadMilliseconds": 1.0,
+          "numericEventAccuracy": null,
+          "retainedRssBytesAfterUnload": 0,
+          "rtf": 6.652144204350544e-06,
+          "terminologyRecall": null,
+          "wer": 0.0
+        },
+        "rawOutputSha256": "eb0eb462ff659a8afe1a2d6a2aad6c6a345ed1fe6f1667a356732dcf15261036",
+        "runId": "asr2-2ca5bb0b59f25d3c1c431f9684300cdc",
+        "runIndex": 4,
+        "scenario": "clean_near_field_mandarin",
+        "scheduleOrder": 4,
+        "warmup": false
+      },
+      {
+        "fixtureId": "committed-zh-300s",
+        "metrics": {
+          "absolutePeakRssBytes": 21037056,
+          "cer": 0.0,
+          "decodeMilliseconds": 2.0,
+          "hallucinationLexicalCharactersPerMinute": null,
+          "incrementalPeakRssBytes": 0,
+          "loadMilliseconds": 1.0,
+          "numericEventAccuracy": null,
+          "retainedRssBytesAfterUnload": 0,
+          "rtf": 6.652144204350544e-06,
+          "terminologyRecall": null,
+          "wer": 0.0
+        },
+        "rawOutputSha256": "eb0eb462ff659a8afe1a2d6a2aad6c6a345ed1fe6f1667a356732dcf15261036",
+        "runId": "asr2-cb9a4ba27f8c2d056b108c2f921098c9",
+        "runIndex": 5,
+        "scenario": "clean_near_field_mandarin",
+        "scheduleOrder": 5,
+        "warmup": false
+      }
+    ],
+    "scenarioMetrics": {
+      "clean_near_field_mandarin": {
+        "cer": 0.0,
+        "measuredRuns": 5,
+        "numericEventAccuracy": null,
+        "terminologyRecall": null
+      }
+    },
+    "schemaVersion": 2,
+    "scorecard": "core_asr"
+  },
+  "evidenceClass": "non_ranked_smoke",
+  "kind": "aggregate",
+  "publicationBindings": {
+    "candidateRegistrySha256": "20d6e9f526601f6f52d72f9592bd62de960eda68220e2a80371546bcd4b501c8",
+    "contractSha256": "d6c1d2b9d21387a07e8fc715951866c39a50e5e6924146dbd292e7901b846f18",
+    "fixtureSha256": "9345f80fc835ae2afc9bb58ccdbd5047797d7de3afc4cb3a2c6ef44444a2a562",
+    "modelComponentsSha256": "44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a",
+    "profileSha256": "5af5faadde884a1d68127124f0c12d31f7e4a326e29febf49747dca057455510",
+    "referenceSha256": "40046fed2ac99717645087d59dfc54d764ec84e6554ec0879e699bbc4cdb231a",
+    "runtimeSha256": "01328ad249b1c29f731960419d4145c427b4e3456378d0a53645c4586ae081f9",
+    "scoringContractSha256": "4ff8a22f5a1184fb0cf09e6c9f30427fe6e7171827c7db98c9640c5a8108dbf7",
+    "targetFingerprintSha256": "6737496720b1a6d9452b6dfc1edb4599bbaab0191c81e5c5c28698f5ef2673e0",
+    "workerSha256": "487422514eb7a64c6d35b6fe55c616322c2592e059127e5e38d0ec3ea2d5f8df"
+  },
+  "rankEligible": false,
+  "schemaVersion": 2,
+  "targetFingerprintSha256": "6737496720b1a6d9452b6dfc1edb4599bbaab0191c81e5c5c28698f5ef2673e0"
+}
