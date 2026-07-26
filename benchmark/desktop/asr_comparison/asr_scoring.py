@@ -9,6 +9,13 @@ import unicodedata
 from collections import Counter
 from typing import Any, Sequence
 
+try:
+    from rapidfuzz.distance import Levenshtein
+except ModuleNotFoundError:
+    Levenshtein = None
+
+RAPIDFUZZ_AVAILABLE = Levenshtein is not None
+
 
 class ScoringError(ValueError):
     pass
@@ -59,6 +66,37 @@ def mixed_tokens(text: str) -> list[str]:
 def edit_statistics(
     reference: Sequence[str], hypothesis: Sequence[str]
 ) -> dict[str, Any]:
+    if Levenshtein is None:
+        return _fallback_edit_statistics(reference, hypothesis)
+    operations = Levenshtein.editops(reference, hypothesis)
+    substitutions = sum(operation.tag == "replace" for operation in operations)
+    deletions = sum(operation.tag == "delete" for operation in operations)
+    insertions = sum(operation.tag == "insert" for operation in operations)
+    hypothesis_correct = [True] * len(hypothesis)
+    for operation in operations:
+        if operation.tag in {"replace", "insert"}:
+            hypothesis_correct[operation.dest_pos] = False
+    correct = sum(hypothesis_correct)
+    return {
+        "distance": len(operations),
+        "substitutions": substitutions,
+        "deletions": deletions,
+        "insertions": insertions,
+        "correct": correct,
+        "referenceUnits": len(reference),
+        "hypothesisUnits": len(hypothesis),
+        "hypothesisCorrect": hypothesis_correct,
+    }
+
+
+def _fallback_edit_statistics(
+    reference: Sequence[str], hypothesis: Sequence[str]
+) -> dict[str, Any]:
+    """Keep small contract tests runnable; benchmark environments use RapidFuzz."""
+    require(
+        len(reference) * len(hypothesis) <= 4_000_000,
+        "rapidfuzz is required to score long fixtures",
+    )
     rows = len(reference) + 1
     columns = len(hypothesis) + 1
     costs = [[0] * columns for _ in range(rows)]
@@ -74,11 +112,7 @@ def edit_statistics(
                 costs[row - 1][column - 1]
                 + (reference[row - 1] != hypothesis[column - 1]),
             )
-
-    substitutions = 0
-    deletions = 0
-    insertions = 0
-    correct = 0
+    substitutions = deletions = insertions = correct = 0
     hypothesis_correct = [False] * len(hypothesis)
     row = len(reference)
     column = len(hypothesis)

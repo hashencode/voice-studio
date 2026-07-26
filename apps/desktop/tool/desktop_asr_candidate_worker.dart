@@ -18,10 +18,13 @@ const double _maximumDurationSeconds = 14400;
 Future<void> main(List<String> arguments) async {
   try {
     final options = _parseArguments(arguments);
-    final line = await stdin
-        .transform(utf8.decoder)
-        .transform(const LineSplitter())
-        .first;
+    final lines = StreamIterator<String>(
+      stdin.transform(utf8.decoder).transform(const LineSplitter()),
+    );
+    if (!await lines.moveNext()) {
+      throw const FormatException('worker request is missing');
+    }
+    final line = lines.current;
     if (utf8.encode(line).length > 4 * 1024 * 1024) {
       throw const FormatException('worker request exceeds the input bound');
     }
@@ -36,6 +39,11 @@ Future<void> main(List<String> arguments) async {
       'processId': pid,
       'runtimeBindingState': 'not_initialized',
     });
+    if (!await lines.moveNext()) {
+      throw const FormatException('baseline freeze acknowledgement is missing');
+    }
+    BaselineFreezeAck.validate(jsonDecode(lines.current), request);
+    await lines.cancel();
 
     final runtimeRoot = _required(options, 'runtime-root');
     sherpa.initBindings(runtimeRoot);
@@ -137,8 +145,8 @@ Future<Map<String, Object?>> _decodeOnline({
     'residentBytes': ProcessInfo.currentRss,
   });
   final stream = recognizer.createStream();
-  final decode = Stopwatch()..start();
-  final audioClock = Stopwatch()..start();
+  final liveClock = Stopwatch()..start();
+  var decodeMicroseconds = 0;
   var partialCount = 0;
   var previousText = '';
   try {
@@ -152,7 +160,10 @@ Future<Map<String, Object?>> _decodeOnline({
         sampleRate: wave.sampleRate,
       );
       while (recognizer.isReady(stream)) {
+        final decode = Stopwatch()..start();
         recognizer.decode(stream);
+        decode.stop();
+        decodeMicroseconds += decode.elapsedMicroseconds;
       }
       if (request.capabilities.partialResults) {
         final partial = recognizer.getResult(stream).text;
@@ -165,7 +176,7 @@ Future<Map<String, Object?>> _decodeOnline({
               'type': 'partial',
               'candidateId': request.candidateId,
               'audioSeconds': end / wave.sampleRate,
-              'wallMilliseconds': audioClock.elapsedMicroseconds / 1000,
+              'wallMilliseconds': liveClock.elapsedMicroseconds / 1000,
               'textSha256': sha256.convert(utf8.encode(partial)).toString(),
             });
           }
@@ -177,24 +188,30 @@ Future<Map<String, Object?>> _decodeOnline({
           microseconds: (end * Duration.microsecondsPerSecond / wave.sampleRate)
               .round(),
         );
-        final remaining = target - audioClock.elapsed;
+        final remaining = target - liveClock.elapsed;
         if (remaining > Duration.zero) await Future<void>.delayed(remaining);
       }
     }
     stream.inputFinished();
     while (recognizer.isReady(stream)) {
+      final decode = Stopwatch()..start();
       recognizer.decode(stream);
+      decode.stop();
+      decodeMicroseconds += decode.elapsedMicroseconds;
     }
     final result = recognizer.getResult(stream);
-    decode.stop();
+    liveClock.stop();
     return <String, Object?>{
       'text': result.text,
       'tokens': result.tokens,
       'timestamps': result.timestamps,
       'durationSeconds': wave.samples.length / wave.sampleRate,
       'loadMilliseconds': load.elapsedMicroseconds / 1000,
-      'decodeMilliseconds': decode.elapsedMicroseconds / 1000,
+      'decodeMilliseconds': decodeMicroseconds / 1000,
+      'liveElapsedMilliseconds': liveClock.elapsedMicroseconds / 1000,
       'partialCount': partialCount,
+      'droppedChunkCount': 0,
+      'maximumQueuedChunkCount': 1,
       'residentBytes': ProcessInfo.currentRss,
     };
   } finally {

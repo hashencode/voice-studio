@@ -33,7 +33,8 @@ void main() {
     expect(command[1], sandboxExecutable);
     expect(command[2], '-p');
     expect(command[3], contains('(deny network*)'));
-    expect(command.last, worker.path);
+    expect(command[4], worker.path);
+    expect(command.sublist(5), <String>['--runtime-root', roots.runtimeRoot]);
     expect(
       candidate.minimalEnvironment().keys,
       unorderedEquals(<String>[
@@ -91,14 +92,55 @@ void main() {
     );
   });
 
+  test('worker source and models must stay inside allowlisted roots', () async {
+    final roots = await createRoots(temporary);
+    final executable = File('${roots.toolRoot}/worker')..writeAsStringSync('x');
+    final source = File('${roots.jobRoot}/input.wav')
+      ..writeAsBytesSync(<int>[1]);
+    final model = File('${roots.modelRoot}/model.onnx')
+      ..writeAsBytesSync(<int>[2]);
+    final candidate = SandboxedCandidateLauncher(
+      roots: roots,
+      nativeProcessGroupLauncher: executable,
+      worker: executable,
+    );
+    final request = <String, Object?>{
+      'sourcePath': source.path,
+      'modelFiles': <String, Object?>{
+        'model': <String, Object?>{
+          'path': model.path,
+          'sha256': List<String>.filled(64, 'a').join(),
+        },
+      },
+    };
+    await expectLater(candidate.validateWorkerRequest(request), completes);
+    final outside = File('${temporary.path}/outside.onnx')
+      ..writeAsBytesSync(<int>[3]);
+    await expectLater(
+      candidate.validateWorkerRequest(<String, Object?>{
+        ...request,
+        'modelFiles': <String, Object?>{
+          'model': <String, Object?>{
+            'path': outside.path,
+            'sha256': List<String>.filled(64, 'a').join(),
+          },
+        },
+      }),
+      throwsA(isA<FileSystemException>()),
+    );
+  });
+
   test(
     'active macOS probe proves network and user-home permission denial',
     () async {
       final roots = await createRoots(temporary);
+      final launcher = File('${roots.toolRoot}/launcher')
+        ..writeAsStringSync('x');
+      final worker = File('${roots.toolRoot}/worker')..writeAsStringSync('x');
       final candidate = SandboxedCandidateLauncher(
         roots: roots,
-        nativeProcessGroupLauncher: File('/usr/bin/true'),
-        worker: File('/usr/bin/true'),
+        nativeProcessGroupLauncher: launcher,
+        worker: worker,
       );
       final evidence = await candidate.activeDenialProbe();
       expect(evidence.networkPermissionDenied, isTrue);

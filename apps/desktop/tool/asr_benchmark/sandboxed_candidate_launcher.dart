@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
+import 'package:path/path.dart' as path;
 import 'package:voice2text_desktop/features/processing/sidecar/sidecar_sandbox.dart';
 
 const sandboxExecutable = '/usr/bin/sandbox-exec';
@@ -51,8 +52,9 @@ class SandboxedCandidateLauncher {
     }
     for (final executable in <File>[nativeProcessGroupLauncher, worker]) {
       final resolved = await executable.resolveSymbolicLinks();
-      if (FileSystemEntity.typeSync(resolved, followLinks: false) !=
-          FileSystemEntityType.file) {
+      if (!_isContained(roots.toolRoot, resolved) ||
+          FileSystemEntity.typeSync(resolved, followLinks: false) !=
+              FileSystemEntityType.file) {
         throw StateError('BENCHMARK_EXECUTABLE_UNAVAILABLE');
       }
     }
@@ -64,6 +66,8 @@ class SandboxedCandidateLauncher {
     '-p',
     SidecarSandboxProfile.macos(roots),
     worker.path,
+    '--runtime-root',
+    roots.runtimeRoot,
   ];
 
   Map<String, String> minimalEnvironment() => <String, String>{
@@ -125,6 +129,24 @@ class SandboxedCandidateLauncher {
     );
   }
 
+  Future<void> validateWorkerRequest(Map<String, Object?> request) async {
+    final sourcePath = request['sourcePath'];
+    final modelFiles = request['modelFiles'];
+    if (sourcePath is! String || modelFiles is! Map<String, Object?>) {
+      throw const FormatException('candidate worker paths are missing');
+    }
+    await roots.requireContainedSource(File(sourcePath));
+    for (final value in modelFiles.values) {
+      if (value is! Map<String, Object?> || value['path'] is! String) {
+        throw const FormatException('candidate model path is invalid');
+      }
+      await _requireContainedRegularFile(
+        roots.modelRoot,
+        File(value['path']! as String),
+      );
+    }
+  }
+
   Future<ProcessResult> _probe(String profile, String source) {
     return Process.run(
       sandboxPath,
@@ -151,11 +173,13 @@ Future<int> runLauncherCli(List<String> arguments) async {
     stderr.writeln('sandboxed-candidate-launcher: unexpected arguments');
     return 64;
   }
-  final line = await stdin
-      .transform(utf8.decoder)
-      .transform(const LineSplitter())
-      .first
-      .timeout(const Duration(seconds: 5));
+  final input = StreamIterator<String>(
+    stdin.transform(utf8.decoder).transform(const LineSplitter()),
+  );
+  if (!await input.moveNext().timeout(const Duration(seconds: 5))) {
+    throw const FormatException('launcher request is required');
+  }
+  final line = input.current;
   final value = jsonDecode(line);
   if (value is! Map<String, dynamic>) {
     throw const FormatException('launcher request must be an object');
@@ -192,6 +216,9 @@ Future<int> runLauncherCli(List<String> arguments) async {
     nativeProcessGroupLauncher: File(launcherPath),
     worker: File(workerPath),
   );
+  await launcher.validateWorkerRequest(
+    Map<String, Object?>.from(workerRequest),
+  );
   final probe = await launcher.activeDenialProbe();
   stderr.writeln(
     jsonEncode(<String, Object?>{
@@ -202,14 +229,40 @@ Future<int> runLauncherCli(List<String> arguments) async {
   );
   final process = await launcher.start(requireProbe: false);
   process.stdin.writeln(jsonEncode(workerRequest));
-  await process.stdin.close();
   final stdoutForward = stdout.addStream(process.stdout);
   final stderrForward = stderr.addStream(process.stderr);
-  final exitCode = await process.exitCode;
-  await Future.wait(<Future<void>>[stdoutForward, stderrForward]);
-  return exitCode;
+  try {
+    if (!await input.moveNext().timeout(const Duration(seconds: 10))) {
+      throw const FormatException('baseline acknowledgement is required');
+    }
+    process.stdin.writeln(input.current);
+    await process.stdin.close();
+    final exitCode = await process.exitCode;
+    await Future.wait(<Future<void>>[stdoutForward, stderrForward]);
+    return exitCode;
+  } catch (_) {
+    process.kill();
+    await process.stdin.close();
+    await process.exitCode;
+    await Future.wait(<Future<void>>[stdoutForward, stderrForward]);
+    rethrow;
+  } finally {
+    await input.cancel();
+  }
 }
 
 Future<void> main(List<String> arguments) async {
   exitCode = await runLauncherCli(arguments);
 }
+
+Future<void> _requireContainedRegularFile(String root, File file) async {
+  final resolved = path.normalize(await file.resolveSymbolicLinks());
+  if (!_isContained(root, resolved) ||
+      FileSystemEntity.typeSync(resolved, followLinks: false) !=
+          FileSystemEntityType.file) {
+    throw const FileSystemException('BENCHMARK_PATH_ESCAPE');
+  }
+}
+
+bool _isContained(String root, String candidate) =>
+    path.isWithin(path.normalize(root), path.normalize(candidate));

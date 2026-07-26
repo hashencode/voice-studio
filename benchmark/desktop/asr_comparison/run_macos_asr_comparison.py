@@ -24,11 +24,11 @@ import psutil
 
 try:
     from aggregate_results import aggregate_candidate
-    from asr_scoring import score_text
+    from asr_scoring import ScoringError, score_text
     from resource_sampler import ProcessTreeSampler
 except ModuleNotFoundError:
     from benchmark.desktop.asr_comparison.aggregate_results import aggregate_candidate
-    from benchmark.desktop.asr_comparison.asr_scoring import score_text
+    from benchmark.desktop.asr_comparison.asr_scoring import ScoringError, score_text
     from benchmark.desktop.asr_comparison.resource_sampler import ProcessTreeSampler
 
 
@@ -36,6 +36,9 @@ SCHEMA_VERSION = 2
 MAX_LINE_BYTES = 256 * 1024
 MAX_OUTPUT_BYTES = 1024 * 1024
 MAX_EVENTS = 256
+MAX_TOKEN_COUNT = 100_000
+MAX_TIMESTAMP_COUNT = 100_000
+MAX_DURATION_SECONDS = 14_400
 SUCCESS_SEQUENCE = (
     "handshake",
     "effectiveConfig",
@@ -127,11 +130,120 @@ def deterministic_schedule(
     return scheduled
 
 
+def build_stage_plan(
+    contract: dict[str, Any],
+    registry: dict[str, Any],
+    fixture_manifest: dict[str, Any],
+    *,
+    stage_id: str,
+) -> dict[str, Any]:
+    """Resolve the frozen stage matrix without authorizing U7/U8 execution."""
+    stages = [
+        stage for stage in contract.get("stages", []) if stage.get("stageId") == stage_id
+    ]
+    if len(stages) != 1:
+        raise OrchestrationError("UNKNOWN_STAGE", f"unknown stage: {stage_id}")
+    stage = stages[0]
+    allowed_roles = set(stage.get("allowedFixtureRoles", []))
+    fixtures = [
+        fixture
+        for fixture in fixture_manifest.get("fixtures", [])
+        if fixture.get("fixtureRole") in allowed_roles
+    ]
+    candidates = registry.get("candidates")
+    frozen = registry.get("frozenCandidateSet")
+    if (
+        not isinstance(candidates, list)
+        or not isinstance(frozen, list)
+        or [candidate.get("candidateId") for candidate in candidates] != frozen
+    ):
+        raise OrchestrationError(
+            "REGISTRY_ORDER_MISMATCH", "candidate registry is not the frozen round"
+        )
+    entries: list[dict[str, Any]] = []
+    candidate_blockers: list[dict[str, Any]] = []
+    for candidate in candidates:
+        candidate_id = candidate["candidateId"]
+        profiles = candidate.get("profiles", {})
+        eligible_profiles = [
+            profile_id
+            for profile_id, profile in profiles.items()
+            if stage_id in profile.get("allowedStages", [])
+        ]
+        admission = candidate.get("admission", {})
+        blockers = (
+            [
+                f"ADMISSION_{admission.get('status', 'MISSING')}",
+                "LOCAL_MODEL_COMPONENTS_REQUIRED",
+            ]
+            if admission.get("status") != "ADMITTED"
+            else []
+        )
+        if candidate.get("runtimeKind") == "native_funasr" and stage_id not in {
+            "STAGE_0_ADMISSION",
+            "STAGE_1_SHORT",
+        }:
+            blockers.append("NATIVE_CONTROL_SHORT_STAGE_ONLY")
+        if blockers:
+            candidate_blockers.append(
+                {"candidateId": candidate_id, "blockers": sorted(set(blockers))}
+            )
+        lane_ids = candidate.get("runtimeLaneIds") or [
+            "native-funasr-python-1.3.22-macos-arm64-control"
+        ]
+        for profile_id in eligible_profiles:
+            profile = profiles[profile_id]
+            for fixture in fixtures:
+                entries.append(
+                    {
+                        "candidateId": candidate_id,
+                        "runtimeKind": candidate["runtimeKind"],
+                        "laneIds": lane_ids,
+                        "profileId": profile_id,
+                        "scorecard": profile["scorecard"],
+                        "fixtureId": fixture["fixtureId"],
+                        "fixtureRole": fixture["fixtureRole"],
+                        "scenario": fixture["scenario"],
+                        "rankEligible": (
+                            candidate["runtimeKind"] == "sherpa_onnx"
+                            and fixture["fixtureRole"] in {"development", "held_out"}
+                        ),
+                    }
+                )
+    execution_blockers = [
+        "U7_U8_EXECUTION_NOT_AUTHORIZED_BY_U1_U6_TOOLING",
+        *(
+            ["DEVELOPMENT_OR_HELD_OUT_LOCAL_PACK_REQUIRED"]
+            if any(
+                fixture.get("distributionState") == "local_only"
+                and fixture.get("freezeState") != "FROZEN"
+                for fixture in fixtures
+            )
+            else []
+        ),
+    ]
+    return {
+        "schemaVersion": SCHEMA_VERSION,
+        "contractId": contract.get("contractId"),
+        "registryId": registry.get("registryId"),
+        "fixtureManifestId": fixture_manifest.get("fixtureManifestId"),
+        "stageId": stage_id,
+        "purpose": stage.get("purpose"),
+        "planOnly": True,
+        "executionAuthorized": False,
+        "allowedFixtureRoles": sorted(allowed_roles),
+        "matrixEntries": entries,
+        "candidateBlockers": candidate_blockers,
+        "executionBlockers": execution_blockers,
+    }
+
+
 def binding_sha256(binding: dict[str, Any]) -> str:
     required = {
         "contractSha256",
         "candidateRegistrySha256",
         "scoringContractSha256",
+        "scorerSha256",
         "runtimeSha256",
         "workerSha256",
         "fixtureSha256",
@@ -194,7 +306,12 @@ def _quarantine(source: Path, quarantine_root: Path, reason: str) -> Path:
 
 
 def _read_reusable_run(
-    destination: Path, expected_binding_sha256: str
+    destination: Path,
+    *,
+    expected_binding_sha256: str,
+    run_id: str,
+    specification: dict[str, Any],
+    raw_root: Path,
 ) -> dict[str, Any] | None:
     if not destination.exists():
         return None
@@ -202,15 +319,110 @@ def _read_reusable_run(
         payload = json.loads(destination.read_text(encoding="utf-8"))
     except (OSError, json.JSONDecodeError):
         return None
-    if (
+    if not (
         isinstance(payload, dict)
         and payload.get("schemaVersion") == SCHEMA_VERSION
+        and payload.get("runId") == run_id
         and payload.get("complete") is True
         and payload.get("bindingSha256") == expected_binding_sha256
         and payload.get("disposition") == "SUCCESS"
+        and payload.get("temporaryArtifactsReleased") is True
     ):
-        return payload
-    return None
+        return None
+    for key in (
+        "candidateId",
+        "laneId",
+        "profileId",
+        "fixtureId",
+        "scenario",
+        "scorecard",
+        "runIndex",
+        "warmup",
+        "scheduleOrder",
+    ):
+        if payload.get(key) != specification.get(key):
+            return None
+    if not _finite_json_numbers(payload.get("metrics")) or not _finite_json_numbers(
+        payload.get("resources")
+    ):
+        return None
+    raw_path = raw_root / f"{run_id}.json"
+    try:
+        raw_document = json.loads(raw_path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return None
+    if (
+        not isinstance(raw_document, dict)
+        or raw_document.get("schemaVersion") != SCHEMA_VERSION
+        or raw_document.get("runId") != run_id
+        or not isinstance(raw_document.get("events"), list)
+    ):
+        return None
+    results = [
+        event
+        for event in raw_document["events"]
+        if isinstance(event, dict) and event.get("type") == "result"
+    ]
+    if len(results) != 1:
+        return None
+    result = results[0]
+    output_hash = sha256_bytes(
+        canonical_json(
+            {
+                "text": result.get("text"),
+                "tokens": result.get("tokens"),
+                "timestamps": result.get("timestamps"),
+            }
+        )
+    )
+    if payload.get("rawOutputSha256") != output_hash:
+        return None
+    try:
+        duration_seconds = float(result["durationSeconds"])
+        decode_milliseconds = float(result["decodeMilliseconds"])
+        load_milliseconds = float(result["loadMilliseconds"])
+        if (
+            duration_seconds <= 0
+            or not math.isfinite(duration_seconds)
+            or not math.isfinite(decode_milliseconds)
+            or not math.isfinite(load_milliseconds)
+        ):
+            return None
+        scoring = score_text(
+            str(specification["reference"]),
+            str(result["text"]),
+            duration_seconds=duration_seconds,
+            annotations=specification.get("annotations"),
+        )
+        lexical = scoring["lexical"]
+        expected_metrics = {
+            "cer": lexical["cer"],
+            "wer": lexical["wer"],
+            "terminologyRecall": lexical["terminologyRecall"],
+            "numericEventAccuracy": lexical["numericEventAccuracy"],
+            "hallucinationLexicalCharactersPerMinute": scoring["nonSpeech"][
+                "hallucinationLexicalCharactersPerMinute"
+            ],
+            "rtf": decode_milliseconds / (duration_seconds * 1000),
+            "loadMilliseconds": load_milliseconds,
+            "decodeMilliseconds": decode_milliseconds,
+        }
+    except (KeyError, TypeError, ValueError, ScoringError):
+        return None
+    metrics = payload["metrics"]
+    if any(metrics.get(key) != value for key, value in expected_metrics.items()):
+        return None
+    return payload
+
+
+def _finite_json_numbers(value: Any) -> bool:
+    if isinstance(value, dict):
+        return all(_finite_json_numbers(child) for child in value.values())
+    if isinstance(value, list):
+        return all(_finite_json_numbers(child) for child in value)
+    if isinstance(value, float):
+        return math.isfinite(value)
+    return value is None or isinstance(value, (str, bool, int))
 
 
 def _minimal_environment(temporary_root: Path) -> dict[str, str]:
@@ -327,6 +539,53 @@ def _validate_event(
     for key in ("profileId", "sourceSha256"):
         if key in event and event[key] != specification[key]:
             raise OrchestrationError("IDENTITY_MISMATCH", f"worker {key} changed")
+    if event_type == "handshake" and event.get("runtimeBindingState") != "not_initialized":
+        raise OrchestrationError(
+            "BASELINE_CONTAMINATED",
+            "worker initialized runtime bindings before the baseline freeze",
+        )
+    if event_type == "result":
+        text = event.get("text")
+        tokens = event.get("tokens")
+        timestamps = event.get("timestamps")
+        if (
+            not isinstance(text, str)
+            or len(text.encode()) > MAX_OUTPUT_BYTES
+            or not isinstance(tokens, list)
+            or len(tokens) > MAX_TOKEN_COUNT
+            or not isinstance(timestamps, list)
+            or len(timestamps) > MAX_TIMESTAMP_COUNT
+        ):
+            raise OrchestrationError(
+                "OUTPUT_BOUND", "worker result exceeds observation bounds"
+            )
+        previous_timestamp = 0.0
+        for timestamp in timestamps:
+            if (
+                not isinstance(timestamp, (int, float))
+                or isinstance(timestamp, bool)
+                or not math.isfinite(timestamp)
+                or timestamp < previous_timestamp
+            ):
+                raise OrchestrationError(
+                    "MALFORMED_OUTPUT", "worker timestamps must be finite and monotonic"
+                )
+            previous_timestamp = float(timestamp)
+        for key in ("durationSeconds", "loadMilliseconds", "decodeMilliseconds"):
+            value = event.get(key)
+            if (
+                not isinstance(value, (int, float))
+                or isinstance(value, bool)
+                or not math.isfinite(value)
+                or value < 0
+            ):
+                raise OrchestrationError(
+                    "MALFORMED_OUTPUT", f"worker {key} must be finite"
+                )
+        if event["durationSeconds"] <= 0 or event["durationSeconds"] > MAX_DURATION_SECONDS:
+            raise OrchestrationError(
+                "INVALID_DURATION", "worker duration is outside the contract envelope"
+            )
     if event_type == "partial":
         if "modelLoadComplete" not in observed_types or "result" in observed_types:
             raise OrchestrationError(
@@ -373,7 +632,13 @@ def execute_run(
     destination = run_root / f"{run_id}.json"
     quarantine_root = run_root / "quarantine"
     staging = run_root / ".staging" / f"{run_id}.json"
-    reusable = _read_reusable_run(destination, expected_binding_sha256)
+    reusable = _read_reusable_run(
+        destination,
+        expected_binding_sha256=expected_binding_sha256,
+        run_id=run_id,
+        specification=specification,
+        raw_root=raw_root,
+    )
     if reusable is not None:
         return {**reusable, "resumed": True}
     if destination.exists():
@@ -441,7 +706,7 @@ def execute_run(
         if len(encoded_request) > MAX_LINE_BYTES:
             raise OrchestrationError("INPUT_BOUND", "worker request exceeds line bound")
         process.stdin.write(encoded_request.decode() + "\n")
-        process.stdin.close()
+        process.stdin.flush()
         timestamps["firstInput"] = time.time()
         selector = selectors.DefaultSelector()
         selector.register(process.stdout, selectors.EVENT_READ)
@@ -488,6 +753,15 @@ def execute_run(
             events.append(event)
             if event_type == "handshake":
                 sampler.freeze_baseline()
+                acknowledgement = {
+                    "schemaVersion": SCHEMA_VERSION,
+                    "type": "baselineFrozen",
+                    "candidateId": specification["candidateId"],
+                    "profileId": specification["profileId"],
+                    "sourceSha256": specification["sourceSha256"],
+                }
+                process.stdin.write(canonical_json(acknowledgement).decode() + "\n")
+                process.stdin.close()
                 timestamps["runtimeBinding"] = time.time()
             elif event_type == "modelLoadComplete":
                 timestamps["modelLoad"] = time.time()
@@ -600,6 +874,14 @@ def execute_run(
         "incrementalPeakRssBytes": resources["incrementalPeakRssBytes"],
         "retainedRssBytesAfterUnload": resources["retainedRssBytesAfterUnload"],
     }
+    live_elapsed_milliseconds = result_event.get("liveElapsedMilliseconds")
+    if live_elapsed_milliseconds is not None:
+        metrics["liveElapsedMilliseconds"] = float(live_elapsed_milliseconds)
+    streaming_final_wall_milliseconds = (
+        float(live_elapsed_milliseconds)
+        if live_elapsed_milliseconds is not None
+        else decode_milliseconds
+    )
     record = {
         "schemaVersion": SCHEMA_VERSION,
         "runId": run_id,
@@ -639,6 +921,16 @@ def execute_run(
                     if event["type"] == "partial"
                 ),
                 None,
+            ),
+            "finalAudioSeconds": duration_seconds,
+            "finalWallMilliseconds": streaming_final_wall_milliseconds,
+            "endpointLatencyMilliseconds": max(
+                0.0,
+                streaming_final_wall_milliseconds - duration_seconds * 1000,
+            ),
+            "droppedChunkCount": int(result_event.get("droppedChunkCount", 0)),
+            "maximumQueuedChunkCount": int(
+                result_event.get("maximumQueuedChunkCount", 0)
             ),
             "pacingPolicy": specification.get("pacingPolicy", "unpaced"),
         },
@@ -724,6 +1016,7 @@ def _fake_smoke(root: Path, timeout_seconds: float) -> dict[str, Any]:
         "scoringContractSha256": sha256_file(
             comparison_root / "scoring_contract.json"
         ),
+        "scorerSha256": sha256_file(comparison_root / "asr_scoring.py"),
         "runtimeSha256": sha256_file(Path(sys.executable)),
         "workerSha256": sha256_file(worker),
         "fixtureSha256": sha256_file(audio),
@@ -788,13 +1081,32 @@ def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--root", type=Path, default=Path(__file__).resolve().parents[3])
     parser.add_argument("--fake-smoke", action="store_true")
+    parser.add_argument(
+        "--plan-stage",
+        choices=[
+            "STAGE_0_ADMISSION",
+            "STAGE_1_SHORT",
+            "STAGE_2_HELD_OUT",
+            "STAGE_3_FINALIST",
+        ],
+    )
     parser.add_argument("--timeout-seconds", type=float, default=10)
     args = parser.parse_args()
-    if not args.fake_smoke:
+    if args.fake_smoke == (args.plan_stage is not None):
         parser.error(
-            "U5 exposes only --fake-smoke until provisioned candidates pass Stage 0"
+            "choose exactly one of --fake-smoke or --plan-stage"
         )
-    result = _fake_smoke(args.root.resolve(), args.timeout_seconds)
+    root = args.root.resolve()
+    if args.fake_smoke:
+        result = _fake_smoke(root, args.timeout_seconds)
+    else:
+        comparison_root = root / "benchmark/desktop/asr_comparison"
+        result = build_stage_plan(
+            json.loads((comparison_root / "macos_contract.json").read_text()),
+            json.loads((comparison_root / "candidates.json").read_text()),
+            json.loads((comparison_root / "fixtures.json").read_text()),
+            stage_id=args.plan_stage,
+        )
     print(json.dumps(result, sort_keys=True))
     return 0
 

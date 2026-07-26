@@ -229,6 +229,34 @@ class CandidateWorkerRequest {
   final int settleMilliseconds;
 }
 
+class BaselineFreezeAck {
+  const BaselineFreezeAck._();
+
+  static void validate(Object? value, CandidateWorkerRequest request) {
+    if (value is! Map<String, Object?>) {
+      throw const FormatException(
+        'baseline freeze acknowledgement must be an object',
+      );
+    }
+    _requireExactKeys(value, const <String>{
+      'schemaVersion',
+      'type',
+      'candidateId',
+      'profileId',
+      'sourceSha256',
+    }, 'baseline freeze acknowledgement');
+    if (value['schemaVersion'] != 2 ||
+        value['type'] != 'baselineFrozen' ||
+        value['candidateId'] != request.candidateId ||
+        value['profileId'] != request.profileId ||
+        value['sourceSha256'] != request.sourceSha256) {
+      throw const FormatException(
+        'baseline freeze acknowledgement identity mismatch',
+      );
+    }
+  }
+}
+
 bool _isSha256(Object? value) =>
     value is String && RegExp(r'^[0-9a-f]{64}$').hasMatch(value);
 

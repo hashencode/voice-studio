@@ -182,6 +182,37 @@ void main() {
       throwsA(isA<FormatException>()),
     );
   });
+
+  test('baseline acknowledgement is identity-bound', () {
+    final request = CandidateWorkerRequest.fromJson(
+      requestFor(
+        family: 'offline_paraformer',
+        modelFiles: <String, Object?>{
+          'model': modelFile('/models/model.onnx'),
+          'tokens': modelFile('/models/tokens.txt'),
+        },
+        config: fixedConfig('offline_paraformer'),
+      ),
+    );
+    final acknowledgement = <String, Object?>{
+      'schemaVersion': 2,
+      'type': 'baselineFrozen',
+      'candidateId': request.candidateId,
+      'profileId': request.profileId,
+      'sourceSha256': request.sourceSha256,
+    };
+    expect(
+      () => BaselineFreezeAck.validate(acknowledgement, request),
+      returnsNormally,
+    );
+    expect(
+      () => BaselineFreezeAck.validate(<String, Object?>{
+        ...acknowledgement,
+        'sourceSha256': List<String>.filled(64, 'f').join(),
+      }, request),
+      throwsA(isA<FormatException>()),
+    );
+  });
 }
 
 Map<String, Object?> requestFor({

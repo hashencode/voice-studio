@@ -39,7 +39,7 @@ class ResourceSamplerTest(unittest.TestCase):
             )
             assert process.stdin is not None and process.stdout is not None
             process.stdin.write(json.dumps(request()) + "\n")
-            process.stdin.close()
+            process.stdin.flush()
             handshake = json.loads(process.stdout.readline())
             self.assertEqual(handshake["type"], "handshake")
             sampler = ProcessTreeSampler(
@@ -49,6 +49,19 @@ class ResourceSamplerTest(unittest.TestCase):
             )
             sampler.start()
             baseline = sampler.freeze_baseline()
+            process.stdin.write(
+                json.dumps(
+                    {
+                        "schemaVersion": 2,
+                        "type": "baselineFrozen",
+                        "candidateId": handshake["candidateId"],
+                        "profileId": handshake["profileId"],
+                        "sourceSha256": handshake["sourceSha256"],
+                    }
+                )
+                + "\n"
+            )
+            process.stdin.close()
             while True:
                 event = json.loads(process.stdout.readline())
                 if event["type"] == "unloadComplete":

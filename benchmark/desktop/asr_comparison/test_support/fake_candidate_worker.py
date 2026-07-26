@@ -50,6 +50,16 @@ def main() -> int:
             "runtimeBindingState": "not_initialized",
         }
     )
+    acknowledgement = json.loads(sys.stdin.readline())
+    expected_acknowledgement = {
+        "schemaVersion": 2,
+        "type": "baselineFrozen",
+        "candidateId": request["candidateId"],
+        "profileId": request["profileId"],
+        "sourceSha256": request["sourceSha256"],
+    }
+    if acknowledgement != expected_acknowledgement:
+        return 66
     if args.mode == "crash":
         return 17
     if args.mode == "oom":
@@ -133,7 +143,14 @@ def main() -> int:
             "durationSeconds": float(request["durationSeconds"]),
             "loadMilliseconds": 1.0,
             "decodeMilliseconds": 2.0,
+            "liveElapsedMilliseconds": (
+                float(request["durationSeconds"]) * 1000.0
+                if args.mode == "streaming"
+                else 2.0
+            ),
             "partialCount": 1 if args.mode == "streaming" else 0,
+            "droppedChunkCount": 0,
+            "maximumQueuedChunkCount": 1 if args.mode == "streaming" else 0,
             "residentBytes": 1,
         }
     )

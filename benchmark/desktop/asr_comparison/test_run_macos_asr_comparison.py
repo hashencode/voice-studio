@@ -10,6 +10,8 @@ from pathlib import Path
 from native_funasr_adapter import adapt_native_result
 from run_macos_asr_comparison import (
     OrchestrationError,
+    _validate_event,
+    build_stage_plan,
     deterministic_run_id,
     deterministic_schedule,
     execute_run,
@@ -26,6 +28,7 @@ def binding(**changes: str) -> dict[str, str]:
         "contractSha256": SHA,
         "candidateRegistrySha256": "b" * 64,
         "scoringContractSha256": "c" * 64,
+        "scorerSha256": "a" * 64,
         "runtimeSha256": "d" * 64,
         "workerSha256": "e" * 64,
         "fixtureSha256": "f" * 64,
@@ -72,6 +75,53 @@ def request(candidate: str = "fake-a") -> dict:
 
 
 class ScheduleTest(unittest.TestCase):
+    def test_handshake_must_precede_runtime_initialization(self) -> None:
+        with self.assertRaisesRegex(
+            OrchestrationError, "before the baseline freeze"
+        ):
+            _validate_event(
+                {
+                    "schemaVersion": 2,
+                    "type": "handshake",
+                    "candidateId": "fake-a",
+                    "profileId": "fixed-resource",
+                    "sourceSha256": "f" * 64,
+                    "runtimeBindingState": "initialized",
+                },
+                specification={
+                    **matrix_item(),
+                    "sourceSha256": "f" * 64,
+                },
+                observed_types=[],
+            )
+
+    def test_result_token_and_timestamp_counts_are_bounded(self) -> None:
+        with self.assertRaisesRegex(OrchestrationError, "observation bounds"):
+            _validate_event(
+                {
+                    "schemaVersion": 2,
+                    "type": "result",
+                    "candidateId": "fake-a",
+                    "profileId": "fixed-resource",
+                    "sourceSha256": "f" * 64,
+                    "text": "bounded",
+                    "tokens": [""] * 100_001,
+                    "timestamps": [],
+                    "durationSeconds": 1,
+                    "loadMilliseconds": 1,
+                    "decodeMilliseconds": 1,
+                },
+                specification={
+                    **matrix_item(),
+                    "sourceSha256": "f" * 64,
+                },
+                observed_types=[
+                    "handshake",
+                    "effectiveConfig",
+                    "modelLoadComplete",
+                ],
+            )
+
     def test_two_candidate_short_schedule_rotates_and_is_deterministic(self) -> None:
         matrix = [matrix_item("fake-a"), matrix_item("fake-b")]
         first = deterministic_schedule(
@@ -98,6 +148,39 @@ class ScheduleTest(unittest.TestCase):
             for run_index in range(6)
         ]
         self.assertGreater(len(set(round_orders)), 1)
+
+    def test_stage_plan_preserves_frozen_candidates_and_u7_u8_boundary(
+        self,
+    ) -> None:
+        contract = json.loads((ROOT / "macos_contract.json").read_text())
+        registry = json.loads((ROOT / "candidates.json").read_text())
+        fixtures = json.loads((ROOT / "fixtures.json").read_text())
+        short = build_stage_plan(
+            contract,
+            registry,
+            fixtures,
+            stage_id="STAGE_1_SHORT",
+        )
+        self.assertTrue(short["planOnly"])
+        self.assertFalse(short["executionAuthorized"])
+        self.assertEqual(
+            {entry["candidateId"] for entry in short["matrixEntries"]},
+            set(registry["frozenCandidateSet"]),
+        )
+        held_out = build_stage_plan(
+            contract,
+            registry,
+            fixtures,
+            stage_id="STAGE_2_HELD_OUT",
+        )
+        self.assertNotIn(
+            "native-funasr-1.3.22-paraformer-vad-punctuation",
+            {entry["candidateId"] for entry in held_out["matrixEntries"]},
+        )
+        self.assertIn(
+            "U7_U8_EXECUTION_NOT_AUTHORIZED_BY_U1_U6_TOOLING",
+            held_out["executionBlockers"],
+        )
 
 
 class ExecuteRunTest(unittest.TestCase):
@@ -165,6 +248,18 @@ class ExecuteRunTest(unittest.TestCase):
             result["streamingObservation"]["firstPartialWallMilliseconds"], 500
         )
         self.assertEqual(result["metrics"]["rtf"], 0.002)
+        self.assertEqual(result["metrics"]["liveElapsedMilliseconds"], 1000)
+        self.assertEqual(result["streamingObservation"]["finalAudioSeconds"], 1)
+        self.assertEqual(
+            result["streamingObservation"]["finalWallMilliseconds"], 1000
+        )
+        self.assertEqual(
+            result["streamingObservation"]["endpointLatencyMilliseconds"], 0
+        )
+        self.assertEqual(result["streamingObservation"]["droppedChunkCount"], 0)
+        self.assertEqual(
+            result["streamingObservation"]["maximumQueuedChunkCount"], 1
+        )
 
     def test_binding_change_cannot_reuse_prior_run_identity(self) -> None:
         first = self.execute()
@@ -173,6 +268,28 @@ class ExecuteRunTest(unittest.TestCase):
         )
         self.assertNotEqual(first["runId"], changed["runId"])
         self.assertFalse(changed["resumed"])
+
+    def test_tampered_run_or_raw_output_is_quarantined_and_rerun(self) -> None:
+        first = self.execute()
+        published_path = self.run_root / f"{first['runId']}.json"
+        published = json.loads(published_path.read_text())
+        published["metrics"]["cer"] = 0.75
+        published_path.write_text(json.dumps(published))
+        rerun = self.execute()
+        self.assertFalse(rerun["resumed"])
+        self.assertEqual(rerun["metrics"]["cer"], 0)
+        self.assertEqual(
+            len(list((self.run_root / "quarantine").iterdir())), 1
+        )
+        raw_path = self.raw_root / f"{first['runId']}.json"
+        raw = json.loads(raw_path.read_text())
+        next(
+            event for event in raw["events"] if event["type"] == "result"
+        )["text"] = "tampered"
+        raw_path.write_text(json.dumps(raw))
+        rerun_again = self.execute()
+        self.assertFalse(rerun_again["resumed"])
+        self.assertEqual(rerun_again["metrics"]["cer"], 0)
 
     def test_partial_staging_is_quarantined_before_rerun(self) -> None:
         specification = {

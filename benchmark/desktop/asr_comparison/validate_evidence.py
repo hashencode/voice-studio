@@ -54,6 +54,7 @@ PUBLICATION_BINDING_KEYS = {
     "contractSha256",
     "candidateRegistrySha256",
     "scoringContractSha256",
+    "scorerSha256",
     "runtimeSha256",
     "workerSha256",
     "modelComponentsSha256",
@@ -523,12 +524,13 @@ def validate_evidence_tree(root: Path) -> dict[str, Any]:
     )
     entries = index["entries"]
     require(
-        isinstance(entries, list) and 1 <= len(entries) <= 512,
+        isinstance(entries, list) and len(entries) == len(DOCUMENT_KINDS),
         "index entries invalid",
     )
     entry_fields = {"path", "kind", "sha256", "bytes"}
     paths: set[str] = set()
     documents: dict[str, dict[str, Any]] = {}
+    indexed_kinds: set[str] = set()
     total_bytes = index_path.stat().st_size
     for entry in entries:
         require(isinstance(entry, dict) and set(entry) == entry_fields, "entry fields")
@@ -543,6 +545,8 @@ def validate_evidence_tree(root: Path) -> dict[str, Any]:
         require(relative not in paths and relative != "index.json", "duplicate entry")
         paths.add(relative)
         require(entry["kind"] in DOCUMENT_KINDS, "unknown document kind")
+        require(entry["kind"] not in indexed_kinds, "duplicate document kind")
+        indexed_kinds.add(entry["kind"])
         source = root / relative
         require(source.is_file(), f"missing evidence file: {relative}")
         resolved = source.resolve(strict=True)
@@ -598,10 +602,28 @@ def publish_atomically(source_root: Path, publication_root: Path) -> dict[str, A
         shutil.rmtree(staging)
     shutil.copytree(source_root, staging)
     validate_evidence_tree(staging)
-    if version.exists():
-        shutil.rmtree(staging)
-    else:
+    if not version.exists():
         os.replace(staging, version)
+    else:
+        try:
+            existing = validate_evidence_tree(version)
+            require(
+                existing["indexSha256"] == version_id,
+                "existing publication version identity mismatch",
+            )
+        except (EvidenceValidationError, OSError, json.JSONDecodeError):
+            quarantine = publication_root / f".corrupt-{version_id}-{os.getpid()}"
+            require(not quarantine.exists(), "publication quarantine collision")
+            os.replace(version, quarantine)
+            try:
+                os.replace(staging, version)
+            except BaseException:
+                os.replace(quarantine, version)
+                raise
+            else:
+                shutil.rmtree(quarantine)
+        else:
+            shutil.rmtree(staging)
     temporary_link = publication_root / f".active-{os.getpid()}.tmp"
     temporary_link.symlink_to(Path("versions") / version_id)
     os.replace(temporary_link, publication_root / "active")

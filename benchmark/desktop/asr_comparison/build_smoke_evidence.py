@@ -104,8 +104,25 @@ def _public_run(run: dict[str, Any]) -> dict[str, Any]:
     return {key: run[key] for key in keys}
 
 
+def _safe_output_root(repository_root: Path, requested: Path) -> Path:
+    requested = requested if requested.is_absolute() else repository_root / requested
+    require_name = requested.name not in {"", ".", ".."}
+    if not require_name or requested.is_symlink():
+        raise ValueError("smoke evidence output is unsafe")
+    resolved = requested.parent.resolve() / requested.name
+    allowed = (
+        repository_root / "build/desktop_asr_comparison",
+        repository_root / "benchmark/desktop/evidence/macos-asr-comparison-v2",
+    )
+    if not any(resolved.is_relative_to(root.resolve()) for root in allowed):
+        raise ValueError("smoke evidence output must stay in a managed evidence root")
+    return resolved
+
+
 def build_smoke_evidence(repository_root: Path, output_root: Path) -> dict[str, Any]:
     repository_root = repository_root.resolve(strict=True)
+    output_root = _safe_output_root(repository_root, output_root)
+    output_root.parent.mkdir(parents=True, exist_ok=True)
     comparison_root = repository_root / "benchmark/desktop/asr_comparison"
     run_root = repository_root / "build/desktop_asr_comparison/runs"
     fixture_root = (
@@ -130,6 +147,7 @@ def build_smoke_evidence(repository_root: Path, output_root: Path) -> dict[str, 
         "scoringContractSha256": sha256_file(
             comparison_root / "scoring_contract.json"
         ),
+        "scorerSha256": sha256_file(comparison_root / "asr_scoring.py"),
         "runtimeSha256": sha256_file(Path(sys.executable)),
         "workerSha256": sha256_file(worker),
         "fixtureSha256": sha256_file(audio),
@@ -205,12 +223,13 @@ def build_smoke_evidence(repository_root: Path, output_root: Path) -> dict[str, 
             ],
         },
     }
-    if output_root.exists():
-        shutil.rmtree(output_root)
-    output_root.mkdir(parents=True)
+    staging = output_root.parent / f".{output_root.name}.staging-{os.getpid()}"
+    if staging.exists():
+        shutil.rmtree(staging)
+    staging.mkdir()
     entries = []
     for name, document in documents.items():
-        destination = output_root / name
+        destination = staging / name
         _atomic_json(destination, document)
         entries.append(
             {
@@ -231,7 +250,21 @@ def build_smoke_evidence(repository_root: Path, output_root: Path) -> dict[str, 
         "publicationBindings": publication_bindings,
         "entries": entries,
     }
-    _atomic_json(output_root / "index.json", index)
+    _atomic_json(staging / "index.json", index)
+    validate_evidence_tree(staging)
+    if output_root.exists():
+        backup = output_root.parent / f".{output_root.name}.previous-{os.getpid()}"
+        if backup.exists():
+            raise ValueError("smoke evidence activation backup already exists")
+        os.replace(output_root, backup)
+        try:
+            os.replace(staging, output_root)
+        except BaseException:
+            os.replace(backup, output_root)
+            raise
+        shutil.rmtree(backup)
+    else:
+        os.replace(staging, output_root)
     return validate_evidence_tree(output_root)
 
 

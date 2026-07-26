@@ -9,6 +9,7 @@ import unittest
 from pathlib import Path
 
 from aggregate_results import aggregate_candidate
+from build_smoke_evidence import _safe_output_root
 from validate_evidence import (
     EvidenceValidationError,
     canonical_json,
@@ -55,6 +56,7 @@ class EvidenceTree:
             "contractSha256": "2" * 64,
             "candidateRegistrySha256": "3" * 64,
             "scoringContractSha256": "4" * 64,
+            "scorerSha256": "a" * 64,
             "runtimeSha256": "1" * 64,
             "workerSha256": "5" * 64,
             "modelComponentsSha256": "6" * 64,
@@ -311,6 +313,20 @@ class ValidateEvidenceTest(unittest.TestCase):
             publish_atomically(self.root, publication)
         self.assertEqual((publication / "active").resolve(), old_target)
 
+    def test_duplicate_document_kind_is_rejected(self) -> None:
+        duplicate = copy.deepcopy(self.tree.documents["runs.json"])
+        self.tree.documents["extra-runs.json"] = duplicate
+        self.assert_invalid()
+
+    def test_corrupt_existing_version_is_replaced_before_activation(self) -> None:
+        publication = Path(self.temporary.name) / "publication-corrupt"
+        first = publish_atomically(self.root, publication)
+        version = publication / "versions" / first["versionId"]
+        (version / "runs.json").write_text("{}\n")
+        second = publish_atomically(self.root, publication)
+        self.assertEqual(second["status"], "PASS")
+        self.assertEqual(validate_evidence_tree(publication / "active")["status"], "PASS")
+
     def test_long_run_repeat_boundary_is_inclusive_at_ten_percent(self) -> None:
         self.assertTrue(
             long_run_repeat_required({"rtf": 0.455}, {"rtf": 0.5})
@@ -318,6 +334,13 @@ class ValidateEvidenceTest(unittest.TestCase):
         self.assertFalse(
             long_run_repeat_required({"rtf": 0.445}, {"rtf": 0.5})
         )
+
+    def test_evidence_builder_rejects_broad_or_unmanaged_output(self) -> None:
+        repository = Path(__file__).resolve().parents[3]
+        with self.assertRaises(ValueError):
+            _safe_output_root(repository, repository)
+        with self.assertRaises(ValueError):
+            _safe_output_root(repository, Path(self.temporary.name) / "outside")
 
 
 if __name__ == "__main__":

@@ -2,22 +2,22 @@
   "contractId": "desktop-processing/macos-asr-comparison-v2",
   "entries": [
     {
-      "bytes": 12697,
+      "bytes": 14244,
       "kind": "runSet",
       "path": "runs.json",
-      "sha256": "1b80936553bc798fc6f42fe5d7601c5eca29b1dc9b81122e15973143860f2c05"
+      "sha256": "e1d8b04034313653237e185426856f8b53b4a9e184fdb4ea2ec25c029a398a85"
     },
     {
-      "bytes": 7166,
+      "bytes": 7546,
       "kind": "aggregate",
       "path": "aggregate.json",
-      "sha256": "6d1d9cf89b8b81fe96c2779ae8ed4a1172a2ab8025278e385964239cf03c69ca"
+      "sha256": "8cf7c525d1844b1b4683da8174aaed117e31af6f7c173d7f7edc6262a3c6efa4"
     },
     {
-      "bytes": 4023,
+      "bytes": 4111,
       "kind": "reliability",
       "path": "reliability.json",
-      "sha256": "810dc8153b6eb6cbd71eb3f095fd780f49fa019d0ce62b050c7463161bf70db9"
+      "sha256": "1c24387815645242d61dad51ef36832b9c853bf52895ebeb10e94052634fb019"
     }
   ],
   "evidenceClass": "non_ranked_smoke",
@@ -30,9 +30,10 @@
     "profileSha256": "5af5faadde884a1d68127124f0c12d31f7e4a326e29febf49747dca057455510",
     "referenceSha256": "40046fed2ac99717645087d59dfc54d764ec84e6554ec0879e699bbc4cdb231a",
     "runtimeSha256": "01328ad249b1c29f731960419d4145c427b4e3456378d0a53645c4586ae081f9",
+    "scorerSha256": "2b76fc02ff49a61e58c2633111dba82d9697ff1d4c5b772fba3b5c1e577b52a5",
     "scoringContractSha256": "4ff8a22f5a1184fb0cf09e6c9f30427fe6e7171827c7db98c9640c5a8108dbf7",
     "targetFingerprintSha256": "6737496720b1a6d9452b6dfc1edb4599bbaab0191c81e5c5c28698f5ef2673e0",
-    "workerSha256": "487422514eb7a64c6d35b6fe55c616322c2592e059127e5e38d0ec3ea2d5f8df"
+    "workerSha256": "c98c65cad42a538e1313aae6717f61fce62f7f512ab65bbcc33b5c6ed9b0e747"
   },
   "rankEligible": false,
   "schemaVersion": 2,

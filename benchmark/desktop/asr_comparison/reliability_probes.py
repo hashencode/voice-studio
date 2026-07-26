@@ -169,6 +169,7 @@ def run_reliability_probes(repository_root: Path) -> dict[str, Any]:
         "scoringContractSha256": sha256_file(
             comparison_root / "scoring_contract.json"
         ),
+        "scorerSha256": sha256_file(comparison_root / "asr_scoring.py"),
         "runtimeSha256": sha256_file(Path(sys.executable)),
         "workerSha256": sha256_file(fake),
         "fixtureSha256": "f" * 64,

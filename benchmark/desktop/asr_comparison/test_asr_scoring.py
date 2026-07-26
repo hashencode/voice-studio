@@ -3,7 +3,13 @@ from __future__ import annotations
 import math
 import unittest
 
-from asr_scoring import ScoringError, edit_statistics, normalize_lexical, score_text
+from asr_scoring import (
+    RAPIDFUZZ_AVAILABLE,
+    ScoringError,
+    edit_statistics,
+    normalize_lexical,
+    score_text,
+)
 
 
 class AsrScoringTest(unittest.TestCase):
@@ -24,6 +30,15 @@ class AsrScoringTest(unittest.TestCase):
         self.assertEqual(score["insertions"], 1)
         self.assertEqual(score["deletions"], 0)
         self.assertEqual(score["distance"], 2)
+
+    @unittest.skipUnless(RAPIDFUZZ_AVAILABLE, "locked benchmark environment required")
+    def test_long_fixture_scale_uses_bounded_native_editops(self) -> None:
+        reference = list("测" * 50_000 + "试")
+        hypothesis = list("测" * 50_000 + "验")
+        score = edit_statistics(reference, hypothesis)
+        self.assertEqual(score["distance"], 1)
+        self.assertEqual(score["substitutions"], 1)
+        self.assertEqual(score["correct"], 50_000)
 
     def test_itn_does_not_hide_lexical_number_error(self) -> None:
         score = score_text(

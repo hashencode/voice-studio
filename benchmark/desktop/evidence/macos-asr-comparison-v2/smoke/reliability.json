@@ -123,9 +123,10 @@
     "profileSha256": "5af5faadde884a1d68127124f0c12d31f7e4a326e29febf49747dca057455510",
     "referenceSha256": "40046fed2ac99717645087d59dfc54d764ec84e6554ec0879e699bbc4cdb231a",
     "runtimeSha256": "01328ad249b1c29f731960419d4145c427b4e3456378d0a53645c4586ae081f9",
+    "scorerSha256": "2b76fc02ff49a61e58c2633111dba82d9697ff1d4c5b772fba3b5c1e577b52a5",
     "scoringContractSha256": "4ff8a22f5a1184fb0cf09e6c9f30427fe6e7171827c7db98c9640c5a8108dbf7",
     "targetFingerprintSha256": "6737496720b1a6d9452b6dfc1edb4599bbaab0191c81e5c5c28698f5ef2673e0",
-    "workerSha256": "487422514eb7a64c6d35b6fe55c616322c2592e059127e5e38d0ec3ea2d5f8df"
+    "workerSha256": "c98c65cad42a538e1313aae6717f61fce62f7f512ab65bbcc33b5c6ed9b0e747"
   },
   "rankEligible": false,
   "rankedExecutionPrerequisites": [
