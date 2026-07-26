@@ -66,6 +66,12 @@ class DevelopmentFreezeTest(unittest.TestCase):
         self.assertFalse(freeze["rankEligible"])
         self.assertEqual(len(freeze["aggregateSha256"]), 8)
         self.assertEqual(len(freeze["comparisons"]), 6)
+        self.assertEqual(len(freeze["rankedFixtureIds"]), 12)
+        self.assertTrue(
+            set(freeze["developmentFixtureIds"]).issubset(
+                freeze["rankedFixtureIds"]
+            )
+        )
         self.assertEqual(freeze["targetFingerprint"]["cpuModel"], "Apple M4")
         self.assertEqual(
             freeze["materialBenefitRule"]["state"],
@@ -103,6 +109,37 @@ class DevelopmentFreezeTest(unittest.TestCase):
         with self.assertRaisesRegex(
             DevelopmentFreezeError,
             "contract is not sealed",
+        ):
+            build_development_freeze(
+                self.root,
+                self.matrix_root,
+                frozen_at="2026-07-26T16:00:00Z",
+            )
+
+    def test_rejects_pending_held_out_fixture_before_seal(self) -> None:
+        fixtures = copy.deepcopy(self.fixtures)
+        held_out = next(
+            fixture
+            for fixture in fixtures["fixtures"]
+            if fixture["fixtureRole"] == "held_out"
+        )
+        held_out["freezeState"] = "PENDING_LOCAL_ASSET"
+        held_out["referenceReview"] = "PENDING"
+        held_out["licenseOrConsent"] = "PENDING_LOCAL_REVIEW"
+        held_out["audio"]["sha256"] = None
+        held_out["audio"]["bytes"] = None
+        held_out["audio"]["durationSeconds"] = None
+        held_out["reference"]["sha256"] = None
+        held_out["reference"]["bytes"] = None
+        self._write_json("fixtures.json", fixtures)
+        result_path = self.matrix_root / "development-matrix-result.json"
+        result = json.loads(result_path.read_text())
+        result["fixtureManifestSha256"] = self._sha("fixtures.json")
+        self._write_path_json(result_path, result)
+
+        with self.assertRaisesRegex(
+            DevelopmentFreezeError,
+            "ranked fixture is not frozen",
         ):
             build_development_freeze(
                 self.root,
@@ -325,7 +362,11 @@ class DevelopmentFreezeTest(unittest.TestCase):
     def _frozen_fixtures(self) -> dict:
         fixtures = json.loads((SOURCE_ROOT / "fixtures.json").read_text())
         for fixture in fixtures["fixtures"]:
-            if fixture["fixtureRole"] != "development":
+            if fixture["fixtureRole"] not in {
+                "development",
+                "held_out",
+                "long_7200s",
+            }:
                 continue
             fixture["licenseOrConsent"] = (
                 "SIGNED_CONSENT_REVIEWED_FOR_LOCAL_BENCHMARK"
@@ -342,7 +383,11 @@ class DevelopmentFreezeTest(unittest.TestCase):
                         f"{fixture['fixtureId']}:audio".encode()
                     ).hexdigest(),
                     "bytes": 32044,
-                    "durationSeconds": 1.0,
+                    "durationSeconds": (
+                        7200.0
+                        if fixture["fixtureRole"] == "long_7200s"
+                        else 1.0
+                    ),
                 }
             )
             fixture["reference"].update(

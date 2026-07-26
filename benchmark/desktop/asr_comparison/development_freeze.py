@@ -66,6 +66,7 @@ FREEZE_FIELDS = {
     "bindings",
     "fixtureManifestId",
     "developmentFixtureIds",
+    "rankedFixtureIds",
     "admittedCandidateIds",
     "excludedCandidateDispositions",
     "schedule",
@@ -322,8 +323,7 @@ def build_development_freeze(
         validate_bundle(contract, registry, scoring)
         validate_manifest(
             fixtures_manifest,
-            ranked=False,
-            development=True,
+            ranked=True,
         )
     except (ContractError, FixtureError) as error:
         raise DevelopmentFreezeError(str(error)) from error
@@ -503,6 +503,12 @@ def build_development_freeze(
         "fixtureManifestId": fixtures_manifest["fixtureManifestId"],
         "developmentFixtureIds": sorted(
             fixture["fixtureId"] for fixture in development_fixtures
+        ),
+        "rankedFixtureIds": sorted(
+            fixture["fixtureId"]
+            for fixture in fixtures_manifest["fixtures"]
+            if fixture["fixtureRole"]
+            in {"development", "held_out", "long_7200s"}
         ),
         "admittedCandidateIds": sorted(
             candidate["candidateId"] for candidate in admitted

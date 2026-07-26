@@ -105,7 +105,9 @@ completes. Development output is explicitly not held-out ranking evidence.
 Use the first complete development matrix only to confirm or revise the
 material-benefit rule. Before held-out access, set the contract/materiality
 states together to `M4_DEVELOPMENT_FROZEN_HELD_OUT_SEALED` and `FROZEN`, rerun
-the development verification matrix under that exact contract, then seal it:
+the development verification matrix under that exact contract, freeze the
+complete development/held-out/7,200-second fixture manifest without decoding
+held-out audio, then seal it:
 
 ```bash
 python3 benchmark/desktop/asr_comparison/development_freeze.py \
