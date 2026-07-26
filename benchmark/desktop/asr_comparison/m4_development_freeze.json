@@ -1,0 +1,130 @@
+{
+  "schemaVersion": 1,
+  "kind": "m4_asr_development_freeze",
+  "frozenAt": "2026-07-27T06:26:01+08:00",
+  "runtimeLaneId": "sherpa-onnx-dart-1.13.4-macos-arm64",
+  "measurementContractRevision": "m4-zh-en-measurement-v1",
+  "resourceProfile": {
+    "provider": "cpu",
+    "numThreads": 2,
+    "concurrency": 1,
+    "segmentDurationSeconds": 15,
+    "warmupRuns": 1,
+    "measuredRuns": 5,
+    "scheduleSeed": 20260726
+  },
+  "hardGates": {
+    "maximumCer": 0.35,
+    "maximumWer": 0.35,
+    "maximumRtf": 0.5,
+    "maximumAbsolutePeakRssBytes": 2147483648
+  },
+  "bindings": {
+    "contractSha256": "5fba77673c05d15209207d959ce7564266c2d7c777db6876f22698e97797ee72",
+    "candidateRegistrySha256": "ac229c7439085cd1974a704cc1dcd3bb1b5d061588b021f55a67628acbc5dfc4",
+    "scoringContractSha256": "4ff8a22f5a1184fb0cf09e6c9f30427fe6e7171827c7db98c9640c5a8108dbf7",
+    "scorerSha256": "2b76fc02ff49a61e58c2633111dba82d9697ff1d4c5b772fba3b5c1e577b52a5",
+    "runtimeSha256": "102e8383640a6752dc9c51060836aba6f3da75bd644c3ddada1a0c15b8df0f02",
+    "workerSha256": "6192244279a6d96e9cf6b8ee63dd329074387885399ea27be46b7bad057efa34"
+  },
+  "corpusBindings": {
+    "developmentZhManifestSha256": "53be068c98bc5c3e92d19ddecb70ea6afeb4aef892e106acb90c8a3a440fd803",
+    "developmentEnManifestSha256": "58e5a15296f5785d7e2d502a41abd1502c9fab6dd2c816e5d3fef57f28746acf",
+    "heldOutZhManifestSha256": "453f0d5e3b8ffa32a30f41bc14a6dde3c5c83dbf8cd5257eed732f23f9799bd9",
+    "heldOutEnManifestSha256": "e0bb47c330b6e2b659e0d04699d29a169324753ae13edba96eb1191acfd04592"
+  },
+  "developmentEvidence": {
+    "zhSummarySha256": "4c750f5bf91ec910d487a2cdd39dd4324a08060e51f0b94c50db54be2e34c17f",
+    "enSummarySha256": "1711695e989d6bd3f4add6fba7e42407e2868345c5db0a3ac9bc5493668947c3"
+  },
+  "languageLanes": {
+    "zh": {
+      "lexicalMetric": "cer",
+      "finalistCandidateIds": [
+        "sherpa-onnx-paraformer-zh-int8-2025-10-07",
+        "sherpa-onnx-paraformer-zh-2024-03-09"
+      ],
+      "developmentResults": [
+        {
+          "candidateId": "sherpa-streaming-zipformer-zh-14m-2023-02-23",
+          "metric": 0.3724347793875246,
+          "disposition": "REJECTED_QUALITY_GATE"
+        },
+        {
+          "candidateId": "sherpa-onnx-paraformer-zh-int8-2025-10-07",
+          "metric": 0.16745675684980732,
+          "disposition": "FINALIST"
+        },
+        {
+          "candidateId": "sherpa-onnx-paraformer-zh-2024-03-09",
+          "metric": 0.1555812707458654,
+          "disposition": "FINALIST"
+        },
+        {
+          "candidateId": "sherpa-onnx-fire-red-asr2-ctc-zh_en-int8-2026-02-25",
+          "metric": 0.17618131026180156,
+          "disposition": "REJECTED_PARETO_DOMINATED"
+        },
+        {
+          "candidateId": "sherpa-onnx-sense-voice-zh-en-ja-ko-yue-int8-2024-07-17",
+          "metric": 0.16971678010692673,
+          "disposition": "REJECTED_LANGUAGE_LANE_DOWNSELECT"
+        }
+      ]
+    },
+    "en": {
+      "lexicalMetric": "wer",
+      "finalistCandidateIds": [
+        "sherpa-onnx-nemo-parakeet-tdt-0.6b-v2-int8-2025-05-01",
+        "sherpa-onnx-sense-voice-zh-en-ja-ko-yue-int8-2024-07-17"
+      ],
+      "developmentResults": [
+        {
+          "candidateId": "sherpa-onnx-whisper-base-en-int8-2023-01-31",
+          "metric": 0.4022714162626023,
+          "disposition": "REJECTED_QUALITY_GATE"
+        },
+        {
+          "candidateId": "sherpa-onnx-nemo-parakeet-tdt-0.6b-v2-int8-2025-05-01",
+          "metric": 0.3469202414163302,
+          "disposition": "FINALIST"
+        },
+        {
+          "candidateId": "sherpa-onnx-fire-red-asr2-ctc-zh_en-int8-2026-02-25",
+          "metric": 0.4412799610671622,
+          "disposition": "REJECTED_QUALITY_GATE"
+        },
+        {
+          "candidateId": "sherpa-onnx-sense-voice-zh-en-ja-ko-yue-int8-2024-07-17",
+          "metric": 0.33414344051004863,
+          "disposition": "FINALIST"
+        }
+      ]
+    }
+  },
+  "preDevelopmentRejections": [
+    {
+      "candidateId": "sherpa-onnx-funasr-nano-int8-2025-12-30",
+      "disposition": "REJECTED_RESOURCE_GATE"
+    },
+    {
+      "candidateId": "sherpa-onnx-streaming-zipformer-en-20m-2023-02-17",
+      "disposition": "REJECTED_QUALITY_GATE"
+    },
+    {
+      "candidateId": "sherpa-onnx-streaming-zipformer-zh-int8-2025-06-30",
+      "disposition": "REJECTED_RUNTIME_MODEL_METADATA"
+    },
+    {
+      "candidateId": "sherpa-onnx-moonshine-base-en-quantized-2026-02-27",
+      "disposition": "REJECTED_RUNTIME_MODEL_FORMAT"
+    }
+  ],
+  "privacy": {
+    "rawAudioPublished": false,
+    "referenceTextPublished": false,
+    "transcriptPublished": false,
+    "modelFilesPublished": false,
+    "absolutePathsPublished": false
+  }
+}
