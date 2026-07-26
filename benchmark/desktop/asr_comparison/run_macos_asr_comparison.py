@@ -53,6 +53,15 @@ SUCCESS_SEQUENCE = (
 )
 
 
+def _nearest_rank_percentile(values: Sequence[float], percentile: float) -> float:
+    if not values:
+        raise ValueError("percentile requires at least one value")
+    if percentile <= 0 or percentile > 1:
+        raise ValueError("percentile must be in (0, 1]")
+    ordered = sorted(float(value) for value in values)
+    return ordered[max(0, math.ceil(percentile * len(ordered)) - 1)]
+
+
 class OrchestrationError(RuntimeError):
     def __init__(self, code: str, message: str, *, details: dict[str, Any] | None = None):
         super().__init__(message)
@@ -384,11 +393,19 @@ def _read_reusable_run(
         duration_seconds = float(result["durationSeconds"])
         decode_milliseconds = float(result["decodeMilliseconds"])
         load_milliseconds = float(result["loadMilliseconds"])
+        segment_wall_milliseconds = [
+            float(value) for value in result["segmentWallMilliseconds"]
+        ]
         if (
             duration_seconds <= 0
             or not math.isfinite(duration_seconds)
             or not math.isfinite(decode_milliseconds)
             or not math.isfinite(load_milliseconds)
+            or not segment_wall_milliseconds
+            or any(
+                not math.isfinite(value) or value < 0
+                for value in segment_wall_milliseconds
+            )
         ):
             return None
         scoring = score_text(
@@ -409,12 +426,27 @@ def _read_reusable_run(
             "rtf": decode_milliseconds / (duration_seconds * 1000),
             "loadMilliseconds": load_milliseconds,
             "decodeMilliseconds": decode_milliseconds,
+            "segmentLatencyP50Milliseconds": _nearest_rank_percentile(
+                segment_wall_milliseconds, 0.5
+            ),
+            "segmentLatencyP95Milliseconds": _nearest_rank_percentile(
+                segment_wall_milliseconds, 0.95
+            ),
         }
     except (KeyError, TypeError, ValueError, ScoringError):
         return None
     metrics = payload["metrics"]
     if any(metrics.get(key) != value for key, value in expected_metrics.items()):
         return None
+    for key in ("endToEndWallMilliseconds", "processWallMilliseconds"):
+        value = metrics.get(key)
+        if (
+            not isinstance(value, (int, float))
+            or isinstance(value, bool)
+            or not math.isfinite(value)
+            or value < 0
+        ):
+            return None
     return payload
 
 
@@ -623,6 +655,26 @@ def _validate_event(
                 raise OrchestrationError(
                     "MALFORMED_OUTPUT", f"worker {key} must be finite"
                 )
+        segment_wall_milliseconds = event.get("segmentWallMilliseconds")
+        segment_count = event.get("segmentCount")
+        if (
+            not isinstance(segment_count, int)
+            or isinstance(segment_count, bool)
+            or segment_count <= 0
+            or not isinstance(segment_wall_milliseconds, list)
+            or len(segment_wall_milliseconds) != segment_count
+            or any(
+                not isinstance(value, (int, float))
+                or isinstance(value, bool)
+                or not math.isfinite(value)
+                or value < 0
+                for value in segment_wall_milliseconds
+            )
+        ):
+            raise OrchestrationError(
+                "MALFORMED_OUTPUT",
+                "worker segment timings must be finite and match segmentCount",
+            )
         if event["durationSeconds"] <= 0 or event["durationSeconds"] > MAX_DURATION_SECONDS:
             raise OrchestrationError(
                 "INVALID_DURATION", "worker duration is outside the contract envelope"
@@ -749,6 +801,13 @@ def execute_run(
         "completion": None,
         "teardown": None,
     }
+    monotonic_marks: dict[str, float | None] = {
+        "spawn": started,
+        "firstInput": None,
+        "firstPartial": None,
+        "firstFinal": None,
+        "completion": None,
+    }
     failure: OrchestrationError | None = None
     termination: dict[str, Any] | None = None
     try:
@@ -760,6 +819,7 @@ def execute_run(
         process.stdin.write(encoded_request.decode() + "\n")
         process.stdin.flush()
         timestamps["firstInput"] = time.time()
+        monotonic_marks["firstInput"] = time.monotonic()
         selector = selectors.DefaultSelector()
         selector.register(process.stdout, selectors.EVENT_READ)
         deadline = started + timeout_seconds
@@ -826,14 +886,17 @@ def execute_run(
                 timestamps["modelLoad"] = time.time()
             elif event_type == "partial" and timestamps["firstPartial"] is None:
                 timestamps["firstPartial"] = time.time()
+                monotonic_marks["firstPartial"] = time.monotonic()
             elif event_type == "result":
                 timestamps["firstFinal"] = time.time()
+                monotonic_marks["firstFinal"] = time.monotonic()
             elif event_type == "unloadComplete":
                 sampler.mark_unload_complete(
                     worker_reported_rss_bytes=int(event["residentBytes"])
                 )
             elif event_type == "complete":
                 timestamps["completion"] = time.time()
+                monotonic_marks["completion"] = time.monotonic()
                 break
         exit_code = process.wait(timeout=max(0.01, deadline - time.monotonic()))
         if exit_code != 0:
@@ -873,6 +936,10 @@ def execute_run(
         process.stdout and process.stdout.close()
         process.stderr and process.stderr.close()
         if failure is not None:
+            raw_root.mkdir(parents=True, exist_ok=True)
+            (raw_root / f"{run_id}.stderr.log").write_bytes(
+                bytes(stderr_output)
+            )
             disposition = {
                 "schemaVersion": SCHEMA_VERSION,
                 "runId": run_id,
@@ -920,6 +987,20 @@ def execute_run(
     raw_destination = raw_root / f"{run_id}.json"
     _atomic_json(raw_destination, raw_document)
     lexical = scoring["lexical"]
+    first_input_mark = monotonic_marks["firstInput"]
+    first_final_mark = monotonic_marks["firstFinal"]
+    completion_mark = monotonic_marks["completion"]
+    if first_input_mark is None or first_final_mark is None or completion_mark is None:
+        raise OrchestrationError(
+            "INCOMPLETE_OUTPUT", "worker timing boundaries are incomplete"
+        )
+    end_to_end_wall_milliseconds = (
+        first_final_mark - first_input_mark
+    ) * 1000
+    process_wall_milliseconds = (completion_mark - started) * 1000
+    segment_wall_milliseconds = [
+        float(value) for value in result_event["segmentWallMilliseconds"]
+    ]
     metrics = {
         "cer": lexical["cer"],
         "wer": lexical["wer"],
@@ -931,6 +1012,14 @@ def execute_run(
         "rtf": decode_milliseconds / (duration_seconds * 1000),
         "loadMilliseconds": float(result_event["loadMilliseconds"]),
         "decodeMilliseconds": decode_milliseconds,
+        "endToEndWallMilliseconds": end_to_end_wall_milliseconds,
+        "processWallMilliseconds": process_wall_milliseconds,
+        "segmentLatencyP50Milliseconds": _nearest_rank_percentile(
+            segment_wall_milliseconds, 0.5
+        ),
+        "segmentLatencyP95Milliseconds": _nearest_rank_percentile(
+            segment_wall_milliseconds, 0.95
+        ),
         "absolutePeakRssBytes": resources["absolutePeakRssBytes"],
         "incrementalPeakRssBytes": resources["incrementalPeakRssBytes"],
         "retainedRssBytesAfterUnload": resources["retainedRssBytesAfterUnload"],
@@ -942,6 +1031,21 @@ def execute_run(
         float(live_elapsed_milliseconds)
         if live_elapsed_milliseconds is not None
         else decode_milliseconds
+    )
+    streaming_supported = bool(
+        request.get("capabilities", {}).get("streaming", False)
+    )
+    paced_streaming = (
+        streaming_supported
+        and specification.get("pacingPolicy") == "realtime_audio_clock"
+    )
+    first_partial_wall_milliseconds = next(
+        (
+            float(event["wallMilliseconds"])
+            for event in events
+            if event["type"] == "partial"
+        ),
+        None,
     )
     record = {
         "schemaVersion": SCHEMA_VERSION,
@@ -966,6 +1070,9 @@ def execute_run(
         "resources": resources,
         "timestamps": timestamps,
         "streamingObservation": {
+            "applicability": (
+                "supported" if streaming_supported else "not_applicable"
+            ),
             "partialCount": sum(event["type"] == "partial" for event in events),
             "firstPartialAudioSeconds": next(
                 (
@@ -975,19 +1082,50 @@ def execute_run(
                 ),
                 None,
             ),
-            "firstPartialWallMilliseconds": next(
-                (
-                    float(event["wallMilliseconds"])
-                    for event in events
-                    if event["type"] == "partial"
-                ),
-                None,
+            "firstPartialWallMilliseconds": first_partial_wall_milliseconds,
+            "firstPartialStatus": (
+                "observed"
+                if first_partial_wall_milliseconds is not None
+                else "not_observed"
+                if streaming_supported
+                else "unsupported"
             ),
             "finalAudioSeconds": duration_seconds,
-            "finalWallMilliseconds": streaming_final_wall_milliseconds,
-            "endpointLatencyMilliseconds": max(
-                0.0,
-                streaming_final_wall_milliseconds - duration_seconds * 1000,
+            "finalWallMilliseconds": (
+                streaming_final_wall_milliseconds
+                if streaming_supported
+                else None
+            ),
+            "firstFinalWallMilliseconds": (
+                streaming_final_wall_milliseconds
+                if streaming_supported
+                else None
+            ),
+            "firstFinalStatus": (
+                "observed" if streaming_supported else "unsupported"
+            ),
+            "endpointLatencyMilliseconds": (
+                max(
+                    0.0,
+                    streaming_final_wall_milliseconds - duration_seconds * 1000,
+                )
+                if paced_streaming
+                else None
+            ),
+            "tailLatencyMilliseconds": (
+                max(
+                    0.0,
+                    streaming_final_wall_milliseconds - duration_seconds * 1000,
+                )
+                if paced_streaming
+                else None
+            ),
+            "tailLatencyStatus": (
+                "observed"
+                if paced_streaming
+                else "not_collected_fixed_resource"
+                if streaming_supported
+                else "unsupported"
             ),
             "droppedChunkCount": int(result_event.get("droppedChunkCount", 0)),
             "maximumQueuedChunkCount": int(

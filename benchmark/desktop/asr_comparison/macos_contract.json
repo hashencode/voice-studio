@@ -85,6 +85,58 @@
       "freezeBeforeHeldOut": true
     }
   },
+  "measurementContract": {
+    "revision": "m4-zh-en-measurement-v1",
+    "endToEndWallMilliseconds": {
+      "clock": "monotonic",
+      "startBoundary": "worker_request_flushed",
+      "endBoundary": "result_event_received",
+      "includes": [
+        "worker_handshake",
+        "runtime_binding",
+        "model_load",
+        "decode"
+      ],
+      "excludes": [
+        "model_unload",
+        "retained_rss_settle",
+        "process_teardown"
+      ]
+    },
+    "loadMilliseconds": {
+      "clock": "monotonic",
+      "startBoundary": "recognizer_constructor_start",
+      "endBoundary": "recognizer_constructor_complete"
+    },
+    "decodeMilliseconds": {
+      "clock": "monotonic",
+      "definition": "sum_of_recognizer_decode_calls_excluding_model_load"
+    },
+    "rtf": {
+      "numerator": "decodeMilliseconds",
+      "denominator": "decoded_audio_duration_milliseconds"
+    },
+    "streamingLatency": {
+      "applicability": "streaming_candidates_recommended_realtime_profile",
+      "firstPartialBoundary": "first_non_empty_changed_partial",
+      "firstFinalBoundary": "result_event",
+      "tailLatencyDefinition": "max(0, final_wall_ms - audio_duration_ms)"
+    },
+    "segmentLatency": {
+      "fixedSegmentSeconds": 15,
+      "clock": "monotonic",
+      "boundary": "segment_accept_start_through_result_retrieval",
+      "publishedStatistics": [
+        "p50_nearest_rank",
+        "p95_nearest_rank"
+      ]
+    },
+    "memory": {
+      "peak": "incremental_process_tree_rss_above_pre_runtime_handshake_baseline",
+      "retainedAfterUnload": "max(process_tree_sample, worker_self_report)_after_unload_settle"
+    },
+    "unavailableValuePolicy": "null_with_explicit_unsupported_not_applicable_or_not_observed_status_never_zero_substitution"
+  },
   "stages": [
     {
       "stageId": "STAGE_0_ADMISSION",
@@ -120,6 +172,7 @@
   ],
   "hardGates": {
     "maxCer": 0.35,
+    "maxWer": 0.35,
     "maxRtf": 0.5,
     "maxFinalistIncrementalPeakRssBytes": 2147483648,
     "applyBeforeMaterialBenefit": true

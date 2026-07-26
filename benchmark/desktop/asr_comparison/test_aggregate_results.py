@@ -32,7 +32,14 @@ def run(
             "cer": cer,
             "wer": wer,
             "rtf": rtf,
+            "loadMilliseconds": 10.0 + index,
+            "decodeMilliseconds": 20.0 + index,
+            "endToEndWallMilliseconds": 30.0 + index,
+            "segmentLatencyP50Milliseconds": 4.0 + index,
+            "segmentLatencyP95Milliseconds": 6.0 + index,
+            "absolutePeakRssBytes": rss + 200,
             "incrementalPeakRssBytes": rss,
+            "retainedRssBytesAfterUnload": rss + 50,
             "terminologyRecall": 0.5,
             "numericEventAccuracy": 0.5,
         },
@@ -58,6 +65,24 @@ class AggregateResultsTest(unittest.TestCase):
         self.assertEqual(len(aggregate["runs"]), 6)
         self.assertEqual(aggregate["measuredRunCount"], 5)
         self.assertEqual(aggregate["performance"]["rtf"]["median"], 0.2)
+        self.assertEqual(
+            aggregate["performance"]["loadMilliseconds"]["median"], 13.0
+        )
+        self.assertEqual(
+            aggregate["performance"]["decodeMilliseconds"]["p95"], 25.0
+        )
+        self.assertEqual(
+            aggregate["performance"]["endToEndWallMilliseconds"]["median"],
+            33.0,
+        )
+        self.assertEqual(
+            aggregate["performance"]["segmentLatencyP50Milliseconds"]["median"],
+            7.0,
+        )
+        self.assertEqual(
+            aggregate["performance"]["segmentLatencyP95Milliseconds"]["p95"],
+            11.0,
+        )
         self.assertIn("dispersion", aggregate["performance"]["rtf"])
 
     def test_english_lane_aggregates_and_gates_on_wer(self) -> None:

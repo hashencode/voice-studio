@@ -103,6 +103,7 @@ def validate_contract(contract: dict[str, Any]) -> None:
             "bundleArtifacts",
             "runtimeLanes",
             "profiles",
+            "measurementContract",
             "stages",
             "hardGates",
             "materialBenefitRule",
@@ -279,6 +280,65 @@ def validate_contract(contract: dict[str, Any]) -> None:
         "product-finalist policy mismatch",
     )
 
+    measurement = contract["measurementContract"]
+    exact_fields(
+        measurement,
+        {
+            "revision",
+            "endToEndWallMilliseconds",
+            "loadMilliseconds",
+            "decodeMilliseconds",
+            "rtf",
+            "streamingLatency",
+            "segmentLatency",
+            "memory",
+            "unavailableValuePolicy",
+        },
+        "measurementContract",
+    )
+    require(
+        measurement["revision"] == "m4-zh-en-measurement-v1",
+        "measurement contract revision mismatch",
+    )
+    require(
+        measurement["endToEndWallMilliseconds"]
+        == {
+            "clock": "monotonic",
+            "startBoundary": "worker_request_flushed",
+            "endBoundary": "result_event_received",
+            "includes": [
+                "worker_handshake",
+                "runtime_binding",
+                "model_load",
+                "decode",
+            ],
+            "excludes": [
+                "model_unload",
+                "retained_rss_settle",
+                "process_teardown",
+            ],
+        },
+        "end-to-end measurement boundary mismatch",
+    )
+    require(
+        measurement["segmentLatency"]
+        == {
+            "fixedSegmentSeconds": 15,
+            "clock": "monotonic",
+            "boundary": "segment_accept_start_through_result_retrieval",
+            "publishedStatistics": [
+                "p50_nearest_rank",
+                "p95_nearest_rank",
+            ],
+        },
+        "segment-latency measurement boundary mismatch",
+    )
+    require(
+        measurement["unavailableValuePolicy"]
+        == "null_with_explicit_unsupported_not_applicable_or_not_observed_status_never_zero_substitution",
+        "unavailable measurement policy mismatch",
+    )
+
     stages = contract["stages"]
     require(
         isinstance(stages, list)
@@ -300,6 +360,7 @@ def validate_contract(contract: dict[str, Any]) -> None:
         hard_gates,
         {
             "maxCer",
+            "maxWer",
             "maxRtf",
             "maxFinalistIncrementalPeakRssBytes",
             "applyBeforeMaterialBenefit",
@@ -308,6 +369,7 @@ def validate_contract(contract: dict[str, Any]) -> None:
     )
     require(
         hard_gates["maxCer"] == 0.35
+        and hard_gates["maxWer"] == 0.35
         and hard_gates["maxRtf"] == 0.5
         and hard_gates["maxFinalistIncrementalPeakRssBytes"] == 2 * 1024**3
         and hard_gates["applyBeforeMaterialBenefit"] is True,

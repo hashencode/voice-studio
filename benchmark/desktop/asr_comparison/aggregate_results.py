@@ -91,7 +91,14 @@ def aggregate_candidate(runs: list[dict[str, Any]]) -> dict[str, Any]:
         require(isinstance(metrics, dict), "run metrics must be an object")
         for metric in (
             "rtf",
+            "loadMilliseconds",
+            "decodeMilliseconds",
+            "endToEndWallMilliseconds",
+            "segmentLatencyP50Milliseconds",
+            "segmentLatencyP95Milliseconds",
+            "absolutePeakRssBytes",
             "incrementalPeakRssBytes",
+            "retainedRssBytesAfterUnload",
         ):
             _finite_number(metrics.get(metric), f"{run['runId']}.{metric}")
         for metric in (
@@ -133,9 +140,22 @@ def aggregate_candidate(runs: list[dict[str, Any]]) -> dict[str, Any]:
     }
     for metric in ("cer", "wer", "terminologyRecall", "numericEventAccuracy"):
         macro.setdefault(metric, None)
-    rtf_values = [float(run["metrics"]["rtf"]) for run in measured]
+    performance_metrics = (
+        "rtf",
+        "loadMilliseconds",
+        "decodeMilliseconds",
+        "endToEndWallMilliseconds",
+        "segmentLatencyP50Milliseconds",
+        "segmentLatencyP95Milliseconds",
+    )
     rss_values = [
         int(run["metrics"]["incrementalPeakRssBytes"]) for run in measured
+    ]
+    absolute_rss_values = [
+        int(run["metrics"]["absolutePeakRssBytes"]) for run in measured
+    ]
+    retained_rss_values = [
+        int(run["metrics"]["retainedRssBytesAfterUnload"]) for run in measured
     ]
     published_runs = [
         {
@@ -160,12 +180,25 @@ def aggregate_candidate(runs: list[dict[str, Any]]) -> dict[str, Any]:
         "measuredRunCount": len(measured),
         "scenarioMetrics": scenario_metrics,
         "macroMetrics": macro,
-        "performance": {"rtf": _distribution(rtf_values)},
+        "performance": {
+            metric: _distribution(
+                [float(run["metrics"][metric]) for run in measured]
+            )
+            for metric in performance_metrics
+        },
         "resources": {
+            "absolutePeakRssBytes": {
+                "maximum": max(absolute_rss_values),
+                **_distribution([float(value) for value in absolute_rss_values]),
+            },
             "incrementalPeakRssBytes": {
                 "maximum": max(rss_values),
                 **_distribution([float(value) for value in rss_values]),
-            }
+            },
+            "retainedRssBytesAfterUnload": {
+                "maximum": max(retained_rss_values),
+                **_distribution([float(value) for value in retained_rss_values]),
+            },
         },
         "determinism": {
             "distinctRawOutputCount": len(raw_hashes),

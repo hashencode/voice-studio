@@ -283,9 +283,13 @@ class ExecuteRunTest(unittest.TestCase):
             "warmup": False,
             "scheduleOrder": 0,
         }
+        worker_request = request(specification["candidateId"])
+        if specification.get("pacingPolicy") == "realtime_audio_clock":
+            worker_request["capabilities"]["streaming"] = True
+            worker_request["capabilities"]["partialResults"] = True
         return execute_run(
             command=[sys.executable, str(FAKE), "--mode", mode],
-            request=request(specification["candidateId"]),
+            request=worker_request,
             specification=specification,
             binding=run_binding or binding(),
             run_root=self.run_root,
@@ -300,6 +304,18 @@ class ExecuteRunTest(unittest.TestCase):
         self.assertTrue(first["complete"])
         self.assertEqual(first["metrics"]["cer"], 0)
         self.assertGreaterEqual(first["metrics"]["incrementalPeakRssBytes"], 0)
+        self.assertGreater(first["metrics"]["endToEndWallMilliseconds"], 0)
+        self.assertEqual(first["metrics"]["segmentLatencyP50Milliseconds"], 2)
+        self.assertEqual(first["metrics"]["segmentLatencyP95Milliseconds"], 2)
+        self.assertEqual(
+            first["streamingObservation"]["applicability"], "not_applicable"
+        )
+        self.assertEqual(
+            first["streamingObservation"]["firstPartialStatus"], "unsupported"
+        )
+        self.assertEqual(
+            first["streamingObservation"]["firstFinalStatus"], "unsupported"
+        )
         self.assertTrue(first["temporaryArtifactsReleased"])
         self.assertFalse(first["rankEligible"])
         self.assertTrue(second["resumed"])
@@ -329,7 +345,22 @@ class ExecuteRunTest(unittest.TestCase):
             result["streamingObservation"]["finalWallMilliseconds"], 1000
         )
         self.assertEqual(
+            result["streamingObservation"]["firstFinalWallMilliseconds"], 1000
+        )
+        self.assertEqual(
             result["streamingObservation"]["endpointLatencyMilliseconds"], 0
+        )
+        self.assertEqual(
+            result["streamingObservation"]["tailLatencyMilliseconds"], 0
+        )
+        self.assertEqual(
+            result["streamingObservation"]["applicability"], "supported"
+        )
+        self.assertEqual(
+            result["streamingObservation"]["firstPartialStatus"], "observed"
+        )
+        self.assertEqual(
+            result["streamingObservation"]["firstFinalStatus"], "observed"
         )
         self.assertEqual(result["streamingObservation"]["droppedChunkCount"], 0)
         self.assertEqual(

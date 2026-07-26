@@ -116,7 +116,10 @@ Future<void> main(List<String> arguments) async {
       'temporaryArtifactsReleased': true,
       'residentBytesAfterSettle': ProcessInfo.currentRss,
     });
-  } catch (error) {
+  } catch (error, stackTrace) {
+    stderr
+      ..writeln(error)
+      ..writeln(stackTrace);
     await _emit(<String, Object?>{
       'schemaVersion': 2,
       'type': 'error',
@@ -158,6 +161,7 @@ Future<Map<String, Object?>> _decodeOnline({
   final texts = <String>[];
   final tokens = <String>[];
   final timestamps = <double>[];
+  final segmentWallMilliseconds = <double>[];
   final segments = _decodeSegments(
     wave: wave,
     profileId: request.profileId,
@@ -169,6 +173,7 @@ Future<Map<String, Object?>> _decodeOnline({
         : max(1, wave.sampleRate ~/ 10);
     for (final segment in segments) {
       final stream = recognizer.createStream();
+      final segmentWall = Stopwatch()..start();
       try {
         for (
           var offset = segment.startSample;
@@ -233,6 +238,8 @@ Future<Map<String, Object?>> _decodeOnline({
           result.timestamps.map((value) => value + offsetSeconds),
         );
       } finally {
+        segmentWall.stop();
+        segmentWallMilliseconds.add(segmentWall.elapsedMicroseconds / 1000);
         stream.free();
       }
     }
@@ -244,6 +251,7 @@ Future<Map<String, Object?>> _decodeOnline({
       'durationSeconds': wave.samples.length / wave.sampleRate,
       'loadMilliseconds': load.elapsedMicroseconds / 1000,
       'decodeMilliseconds': decodeMicroseconds / 1000,
+      'segmentWallMilliseconds': segmentWallMilliseconds,
       'liveElapsedMilliseconds': liveClock.elapsedMicroseconds / 1000,
       'segmentCount': segments.length,
       'partialCount': partialCount,
@@ -275,6 +283,7 @@ Future<Map<String, Object?>> _decodeOffline({
   final texts = <String>[];
   final tokens = <String>[];
   final timestamps = <double>[];
+  final segmentWallMilliseconds = <double>[];
   String? language;
   String? event;
   final segments = _decodeSegments(
@@ -285,6 +294,7 @@ Future<Map<String, Object?>> _decodeOffline({
   try {
     for (final segment in segments) {
       final stream = recognizer.createStream();
+      final segmentWall = Stopwatch()..start();
       try {
         stream.acceptWaveform(
           samples: Float32List.sublistView(
@@ -305,6 +315,8 @@ Future<Map<String, Object?>> _decodeOffline({
         if (language == null && result.lang.isNotEmpty) language = result.lang;
         if (event == null && result.event.isNotEmpty) event = result.event;
       } finally {
+        segmentWall.stop();
+        segmentWallMilliseconds.add(segmentWall.elapsedMicroseconds / 1000);
         stream.free();
       }
     }
@@ -318,6 +330,7 @@ Future<Map<String, Object?>> _decodeOffline({
       'durationSeconds': wave.samples.length / wave.sampleRate,
       'loadMilliseconds': load.elapsedMicroseconds / 1000,
       'decodeMilliseconds': decode.elapsedMicroseconds / 1000,
+      'segmentWallMilliseconds': segmentWallMilliseconds,
       'segmentCount': segments.length,
       'partialCount': 0,
       'residentBytes': ProcessInfo.currentRss,
@@ -417,6 +430,17 @@ void _validateResult(
     if (value is! num || !value.toDouble().isFinite || value < 0) {
       throw StateError('worker timing is non-finite');
     }
+  }
+  final segmentWallMilliseconds = result['segmentWallMilliseconds'];
+  final segmentCount = result['segmentCount'];
+  if (segmentWallMilliseconds is! List ||
+      segmentCount is! int ||
+      segmentCount <= 0 ||
+      segmentWallMilliseconds.length != segmentCount ||
+      segmentWallMilliseconds.any(
+        (value) => value is! num || !value.toDouble().isFinite || value < 0,
+      )) {
+    throw StateError('worker segment timing is invalid');
   }
 }
 

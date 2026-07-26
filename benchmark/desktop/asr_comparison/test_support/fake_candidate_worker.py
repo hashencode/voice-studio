@@ -143,6 +143,8 @@ def main() -> int:
             "durationSeconds": float(request["durationSeconds"]),
             "loadMilliseconds": 1.0,
             "decodeMilliseconds": 2.0,
+            "segmentWallMilliseconds": [2.0],
+            "segmentCount": 1,
             "liveElapsedMilliseconds": (
                 float(request["durationSeconds"]) * 1000.0
                 if args.mode == "streaming"
