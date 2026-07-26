@@ -84,6 +84,35 @@ def safe_relative(value: Any, location: str) -> Path:
     return path
 
 
+def resolve_fixture_source(
+    manifest: dict[str, Any],
+    fixture: dict[str, Any],
+    metadata: dict[str, Any],
+    *,
+    repository_root: Path,
+    location: str,
+) -> Path:
+    relative = safe_relative(metadata["relativePath"], location)
+    if fixture["distributionState"] != "local_only":
+        return repository_root / relative
+    local_root_relative = safe_relative(
+        manifest["privacyPolicy"]["localOnlyRoot"],
+        "privacyPolicy.localOnlyRoot",
+    )
+    require(
+        len(relative.parts) > 1
+        and relative.parts[0] == local_root_relative.name,
+        f"{location}: local-only namespace mismatch",
+    )
+    local_root = repository_root / local_root_relative
+    candidate = local_root / Path(*relative.parts[1:])
+    require(
+        candidate.resolve().is_relative_to(local_root.resolve()),
+        f"{location}: local-only source escapes privacy root",
+    )
+    return candidate
+
+
 def _reject_private_strings(value: Any, location: str = "$") -> None:
     if isinstance(value, dict):
         for key, child in value.items():
@@ -201,6 +230,19 @@ def validate_manifest(
         )
         safe_relative(audio["relativePath"], f"{fixture_id}.audio")
         safe_relative(reference["relativePath"], f"{fixture_id}.reference")
+        if fixture["distributionState"] == "local_only":
+            local_namespace = Path(privacy["localOnlyRoot"]).name
+            for value, location in (
+                (fixture["source"], f"{fixture_id}.source"),
+                (audio["relativePath"], f"{fixture_id}.audio"),
+                (reference["relativePath"], f"{fixture_id}.reference"),
+            ):
+                relative = safe_relative(value, location)
+                require(
+                    len(relative.parts) > 1
+                    and relative.parts[0] == local_namespace,
+                    f"{location}: local-only namespace mismatch",
+                )
         for payload, label in ((audio, "audio"), (reference, "reference")):
             digest = payload["sha256"]
             size = payload["bytes"]
@@ -468,11 +510,19 @@ def prepare(
                     audio_metadata["generator"]
                 )
             else:
-                audio_source = repository_root / safe_relative(
-                    audio_metadata["relativePath"], f"{fixture_id}.audio"
+                audio_source = resolve_fixture_source(
+                    manifest,
+                    fixture,
+                    audio_metadata,
+                    repository_root=repository_root,
+                    location=f"{fixture_id}.audio",
                 )
-                reference_source = repository_root / safe_relative(
-                    reference_metadata["relativePath"], f"{fixture_id}.reference"
+                reference_source = resolve_fixture_source(
+                    manifest,
+                    fixture,
+                    reference_metadata,
+                    repository_root=repository_root,
+                    location=f"{fixture_id}.reference",
                 )
                 require(audio_source.is_file(), f"{fixture_id}: audio source missing")
                 require(

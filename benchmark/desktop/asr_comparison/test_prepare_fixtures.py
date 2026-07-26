@@ -6,7 +6,12 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from prepare_fixtures import FixtureError, prepare, validate_manifest
+from prepare_fixtures import (
+    FixtureError,
+    prepare,
+    resolve_fixture_source,
+    validate_manifest,
+)
 
 
 ROOT = Path(__file__).resolve().parent
@@ -138,6 +143,73 @@ class PrepareFixturesTest(unittest.TestCase):
         manifest["fixtures"][0]["audio"]["relativePath"] = "/Users/person/private.wav"
         with self.assertRaisesRegex(FixtureError, "relative path"):
             validate_manifest(manifest, ranked=False)
+
+    def test_local_only_sources_resolve_under_ignored_privacy_root(self) -> None:
+        fixture = next(
+            item
+            for item in self.manifest["fixtures"]
+            if item["fixtureId"] == "development-common-voice-clean"
+        )
+        repository_root = Path("/workspace")
+
+        resolved = resolve_fixture_source(
+            self.manifest,
+            fixture,
+            fixture["audio"],
+            repository_root=repository_root,
+            location=f"{fixture['fixtureId']}.audio",
+        )
+
+        self.assertEqual(
+            resolved,
+            repository_root
+            / "build/desktop_asr_comparison/fixtures/local_sources"
+            / "common_voice/development_clean.wav",
+        )
+        self.assertNotEqual(
+            resolved,
+            repository_root / "local_sources/common_voice/development_clean.wav",
+        )
+
+    def test_local_only_source_must_use_manifest_namespace(self) -> None:
+        manifest = copy.deepcopy(self.manifest)
+        fixture = next(
+            item
+            for item in manifest["fixtures"]
+            if item["fixtureId"] == "development-common-voice-clean"
+        )
+        fixture["audio"]["relativePath"] = "private/development_clean.wav"
+
+        with self.assertRaisesRegex(FixtureError, "local-only namespace"):
+            validate_manifest(manifest, ranked=False)
+
+    def test_local_only_source_rejects_symlink_escape(self) -> None:
+        fixture = next(
+            item
+            for item in self.manifest["fixtures"]
+            if item["fixtureId"] == "development-common-voice-clean"
+        )
+        repository_root = Path(self.temporary.name)
+        local_root = (
+            repository_root
+            / "build/desktop_asr_comparison/fixtures/local_sources"
+        )
+        outside = repository_root / "outside"
+        local_root.mkdir(parents=True)
+        outside.mkdir()
+        (local_root / "common_voice").symlink_to(
+            outside,
+            target_is_directory=True,
+        )
+
+        with self.assertRaisesRegex(FixtureError, "escapes privacy root"):
+            resolve_fixture_source(
+                self.manifest,
+                fixture,
+                fixture["audio"],
+                repository_root=repository_root,
+                location=f"{fixture['fixtureId']}.audio",
+            )
 
     def test_hash_drift_does_not_activate_partial_pack(self) -> None:
         manifest = copy.deepcopy(self.manifest)
