@@ -1,10 +1,10 @@
-import 'dart:async';
-
 import 'package:flutter/services.dart';
+import 'package:meeting_workflows/meeting_workflows.dart';
+import 'package:processing_contracts/processing_contracts.dart';
 
-import '../../../app/contracts/audio_contract.dart';
 import '../../records/repository/recordings_repository.dart';
 import '../model/import_candidate.dart';
+import 'meeting_media_import_port.dart';
 
 class MeetingImportException implements Exception {
   const MeetingImportException(this.code, this.message);
@@ -33,87 +33,80 @@ class MeetingImportOutcome {
 class MeetingImportService {
   MeetingImportService({
     MethodChannel? channel,
+    MeetingMediaImportPort? mediaImportPort,
     RecordingsRepository? recordingsRepository,
     void Function()? onQueueChanged,
-  }) : _channel = channel ?? const MethodChannel(AudioContract.recorderChannel),
+  }) : assert(
+         channel == null || mediaImportPort == null,
+         'Pass channel or mediaImportPort, not both.',
+       ),
+       _mediaImportPort =
+           mediaImportPort ?? AndroidMeetingMediaImportPort(channel: channel),
        _recordingsRepository = recordingsRepository ?? RecordingsRepository(),
        _onQueueChanged = onQueueChanged {
-    _channel.setMethodCallHandler(_handleNativeMethod);
+    _workflow = MeetingImportWorkflow(
+      commitPort: _RecordingsImportCommitPort(_recordingsRepository),
+    );
   }
 
-  final MethodChannel _channel;
+  final MeetingMediaImportPort _mediaImportPort;
   final RecordingsRepository _recordingsRepository;
   final void Function()? _onQueueChanged;
-  final StreamController<void> _sharedMediaAvailableController =
-      StreamController<void>.broadcast();
+  late final MeetingImportWorkflow _workflow;
+
+  bool get isAvailable => _mediaImportPort.isAvailable;
 
   Stream<void> get sharedMediaAvailable =>
-      _sharedMediaAvailableController.stream;
+      _mediaImportPort.sharedMediaAvailable;
 
-  Future<bool> hasPendingSharedImport() async {
-    try {
-      return await _channel.invokeMethod<bool>(
-            'hasPendingSharedMeetingMedia',
-          ) ??
-          false;
-    } on MissingPluginException {
-      return false;
-    }
-  }
+  Future<bool> hasPendingSharedImport() =>
+      _mediaImportPort.hasPendingSharedImport();
 
-  Future<void> cancelImport() async {
-    try {
-      await _channel.invokeMethod<void>('cancelMeetingImport');
-    } on PlatformException {
-      // The import result remains authoritative if native cancellation races
-      // with a copy that has already completed.
-    }
-  }
+  Future<void> cancelImport() => _mediaImportPort.cancelImport();
 
   Future<MeetingImportOutcome?> pickAndImport() async {
-    return _importFromNative('pickMeetingMedia');
+    return _importFromPort(_mediaImportPort.pickMeetingMedia);
   }
 
   Future<MeetingImportOutcome?> consumeSharedImport() async {
-    return _importFromNative('consumeSharedMeetingMedia');
+    return _importFromPort(_mediaImportPort.consumeSharedMeetingMedia);
   }
 
-  Future<MeetingImportOutcome?> _importFromNative(String method) async {
+  Future<MeetingImportOutcome?> _importFromPort(
+    Future<MeetingMediaCandidate?> Function() select,
+  ) async {
     ImportCandidate? candidate;
     try {
-      final raw = await _channel.invokeMapMethod<Object?, Object?>(method);
-      if (raw == null) return null;
-      candidate = ImportCandidate.fromMap(raw);
-      if (candidate.path.isEmpty ||
-          candidate.fingerprintSha256.isEmpty ||
-          candidate.durationMs <= 0) {
+      candidate = await select();
+      if (candidate == null) return null;
+      if (!candidate.isValid) {
         throw const MeetingImportException(
           'IMPORT_RESULT_INVALID',
           '系统返回的导入结果不完整',
         );
       }
-      final commit = await _recordingsRepository.insertImported(
-        filePath: candidate.path,
-        displayName: candidate.displayName,
-        fingerprintSha256: candidate.fingerprintSha256,
-        durationMs: candidate.durationMs,
-      );
+      final commit = await _workflow.commit(candidate);
       if (!commit.inserted &&
           !candidate.duplicateAsset &&
           candidate.path != commit.existingPath) {
         await _discardBestEffort(candidate.path);
       }
-      if (commit.transcriptionJobId != null) {
+      if (commit.processingJob != null) {
         _onQueueChanged?.call();
       }
       return MeetingImportOutcome(
         candidate: candidate,
         recordingId: commit.recordingId,
         inserted: commit.inserted,
-        transcriptionJobId: commit.transcriptionJobId,
+        transcriptionJobId: commit.processingJob?.id,
       );
     } on PlatformException catch (error) {
       throw MeetingImportException(error.code, error.message ?? '导入媒体失败');
+    } on UnsupportedError {
+      throw const MeetingImportException(
+        'IMPORT_CAPABILITY_UNAVAILABLE',
+        '当前平台尚未配置真实的会议媒体导入能力',
+      );
     } catch (error) {
       if (candidate != null && !candidate.duplicateAsset) {
         await _discardBestEffort(candidate.path);
@@ -126,27 +119,43 @@ class MeetingImportService {
     }
   }
 
-  Future<Object?> _handleNativeMethod(MethodCall call) async {
-    if (call.method == 'sharedMeetingMediaAvailable' &&
-        !_sharedMediaAvailableController.isClosed) {
-      _sharedMediaAvailableController.add(null);
-    }
-    return null;
-  }
-
-  void dispose() {
-    _channel.setMethodCallHandler(null);
-    _sharedMediaAvailableController.close();
-  }
+  void dispose() => _mediaImportPort.dispose();
 
   Future<void> _discardBestEffort(String path) async {
     try {
-      await _channel.invokeMethod<void>(
-        'discardImportedMedia',
-        <String, Object?>{'path': path},
-      );
+      await _mediaImportPort.discardImportedMedia(path);
     } catch (_) {
       // Startup reconciliation owns any remnant that cannot be removed here.
     }
+  }
+}
+
+class _RecordingsImportCommitPort implements MeetingImportCommitPort {
+  const _RecordingsImportCommitPort(this._repository);
+
+  final RecordingsRepository _repository;
+
+  @override
+  Future<MeetingImportCommitResult> commit(
+    MeetingMediaCandidate candidate,
+  ) async {
+    final commit = await _repository.insertImported(
+      filePath: candidate.path,
+      displayName: candidate.displayName,
+      fingerprintSha256: candidate.fingerprintSha256,
+      durationMs: candidate.durationMs,
+    );
+    return MeetingImportCommitResult(
+      recordingId: commit.recordingId,
+      inserted: commit.inserted,
+      existingPath: commit.existingPath,
+      processingJob: commit.transcriptionJobId == null
+          ? null
+          : ProcessingJobReference(
+              id: commit.transcriptionJobId!,
+              state: ProcessingJobState.queued,
+              inputSha256: candidate.fingerprintSha256,
+            ),
+    );
   }
 }

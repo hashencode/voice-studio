@@ -1,0 +1,121 @@
+{
+  "schemaVersion": 1,
+  "unit": "U5",
+  "target": "macos",
+  "capturedAt": "2026-07-26",
+  "targetFingerprint": {
+    "operatingSystem": "macos",
+    "operatingSystemVersion": "15.7.5",
+    "architecture": "arm64",
+    "cpuModel": "Apple M2",
+    "logicalCpuCount": 8,
+    "memoryBytes": 17179869184,
+    "runtimeId": "sherpa-onnx-c-api",
+    "runtimeVersion": "1.13.4",
+    "runtimeSha256": "102e8383640a6752dc9c51060836aba6f3da75bd644c3ddada1a0c15b8df0f02"
+  },
+  "benchmarkContract": {
+    "id": "desktop-processing/macos-sherpa-1.13.4-v1",
+    "path": "benchmark/desktop/desktop_benchmark_contract.json",
+    "configuration": {
+      "numThreads": 2,
+      "peakRssSampling": "every_native_progress_callback"
+    }
+  },
+  "operationalEnvelope": {
+    "maxSourceBytes": 4294967296,
+    "maxDurationSeconds": 14400,
+    "maxDecodedPcmBytes": 2147483648,
+    "maxSegments": 200000,
+    "maxQueuedJobs": 20,
+    "maxConcurrentEngines": 1,
+    "temporaryStorageMultiplier": 2.25,
+    "minimumFreeBytesAfterImport": 2147483648
+  },
+  "asrBaseline": {
+    "status": "PASS",
+    "modelId": "sherpa-streaming-zipformer-zh-14m-2023-02-23",
+    "modelSha256": "dbc43dfe2e490fae801a6619f558730a721e8f8a674003f14ad020a6b5f205cc",
+    "licenseDisposition": "APACHE_2_0_ARCHIVE_README_PINNED",
+    "fixtureSha256": "9345f80fc835ae2afc9bb58ccdbd5047797d7de3afc4cb3a2c6ef44444a2a562",
+    "durationSeconds": 300.6549375,
+    "cer": 0.03550295857988166,
+    "rtf": 0.020461995572582273,
+    "evidencePath": "benchmark/desktop/evidence/macos-sherpa-1.13.4/asr.json",
+    "evidenceSha256": "01bcdad940b51a3b38f9c5fb0b7cb8ea5b545a7e22a07299ce7e1e926c1aec4a"
+  },
+  "diarizationFunctionalBaseline": {
+    "status": "PASS",
+    "modelIds": [
+      "sherpa-pyannote-segmentation-3.0",
+      "3dspeaker-eres2net-base-zh-16k"
+    ],
+    "modelSha256": [
+      "220ad67ca923bef2fa91f2390c786097bf305bceb5e261d4af67b38e938e1079",
+      "1a331345f04805badbb495c775a6ddffcdd1a732567d5ec8b3d5749e3c7a5e4b"
+    ],
+    "licenseDisposition": "UPSTREAM_REVIEWED_BENCHMARK_ONLY",
+    "fixtureSha256": "7e2757eb30176edc36a2c14a6511bbf297caa5dbfa9541e119cd94fd23a6d4ec",
+    "durationSeconds": 300.0,
+    "anonymousSpeakerCount": 2,
+    "segmentCount": 70,
+    "overlapRepresented": true,
+    "detectedSilenceRegionCount": 54,
+    "speakerOverlapSecondsAfterSilenceSuppression": 0.0,
+    "rtf": 0.25739333333333336,
+    "incrementalPeakRssBytes": 204800000,
+    "evidencePath": "benchmark/desktop/evidence/macos-sherpa-1.13.4/diarization-functional.json",
+    "evidenceSha256": "6f025044317d3a8a4f9ac20f40f89d672d71cf6c7a19452812de260c782eaf6f"
+  },
+  "diarizationResourceGate": {
+    "status": "PASS",
+    "fixtureSha256": "6a4f0849cee47ad9daecac04d92977c8cf6b48de1dd43849ad60852de5b336c3",
+    "durationSeconds": 7200.0,
+    "completedFullDuration": true,
+    "oom": false,
+    "timedOut": false,
+    "segmentCount": 1611,
+    "rtf": 0.27456708333333335,
+    "incrementalPeakRssBytes": 216252416,
+    "evidencePath": "benchmark/desktop/evidence/macos-sherpa-1.13.4/diarization-resource.json",
+    "evidenceSha256": "88b0b0de27a6b706ad0cac1730447e14f3147dfbfa86a98eaa4c3e1e077bfb20"
+  },
+  "cancellationGate": {
+    "status": "PASS",
+    "boundary": "separate_process_group",
+    "nativeProgressCallbackCancellationSupported": false,
+    "nativeCallbackReturnValueDisposition": "ignored_by_sherpa_1_13_4",
+    "nativeCheckpointReached": true,
+    "terminationSignal": "SIGTERM",
+    "processGroupGone": true,
+    "partialOutputPublished": false,
+    "temporaryArtifactsReleased": true,
+    "evidencePath": "benchmark/desktop/evidence/macos-sherpa-1.13.4/cancellation/cancellation.json",
+    "evidenceSha256": "e0a61f812bc87d52c4d2611324b681126e0e8145826b043774d5e576c50b8444"
+  },
+  "offlineVerticalSlice": {
+    "status": "PASS",
+    "source": "local_private_file",
+    "cloudProvidersInvoked": [],
+    "aiFeaturesInvoked": [],
+    "reviewState": "manual_correction_available",
+    "exportFormat": "webvtt",
+    "segmentCount": 978,
+    "speakerAssignments": [
+      "anonymous",
+      "overlap",
+      "unknown"
+    ],
+    "evidencePath": "benchmark/desktop/evidence/macos-sherpa-1.13.4/offline-vertical-slice.json",
+    "evidenceSha256": "a0fa329b078525b02b99f1d72699f4f4e8e9753c0944ab015fbefbec1152efbc",
+    "exportPath": "benchmark/desktop/evidence/macos-sherpa-1.13.4/offline-vertical-slice.vtt",
+    "exportSha256": "0be0c0427adf3aea0d0fd6c02f8c2bb9c046116d7f6419935d3430934c403200"
+  },
+  "runtimeStagingDiagnostic": {
+    "status": "PASS",
+    "disposition": "USE_XCODE_THINNED_AND_SIGNED_APP_FRAMEWORK",
+    "evidencePath": "benchmark/desktop/evidence/runtime-staging-diagnostic.json",
+    "evidenceSha256": "772c59fd1555b5688e57de19cdf16d632c3e0d254555ce7b0325f0d2e7d14ea3"
+  },
+  "disposition": "BENCHMARK_PASS_PROVISIONAL_OFFLINE_VERTICAL_SLICE"
+}

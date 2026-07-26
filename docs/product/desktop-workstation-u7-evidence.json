@@ -1,0 +1,194 @@
+{
+  "schemaVersion": 1,
+  "unit": "U7",
+  "target": "macos",
+  "capturedAt": "2026-07-26",
+  "targetFingerprint": {
+    "operatingSystem": "macos",
+    "operatingSystemVersion": "15.7.5",
+    "architecture": "arm64",
+    "cpuModel": "Apple M2",
+    "logicalCpuCount": 8,
+    "memoryBytes": 17179869184
+  },
+  "productEngine": {
+    "asr": "sherpa-streaming-zipformer-zh-14m-2023-02-23",
+    "diarization": "sherpa-pyannote-3.0-3dspeaker",
+    "runtime": "sherpa-onnx-c-api@1.13.4",
+    "boundary": "native_worker_process_group",
+    "diarizationClusteringThreshold": 0.65,
+    "workerThreads": 2,
+    "longMeetingShardThresholdSeconds": 3600,
+    "longMeetingShardCount": 2,
+    "longMeetingShardOverlapSeconds": 120,
+    "enginePickerVisible": false,
+    "manifestContentKey": "e2385695f7367317fb915ab844f9dddced0d385113387d047cb7ab591220255e"
+  },
+  "modelDelivery": {
+    "status": "PASS_REAL_INSTALL",
+    "downloadBytes": 120556255,
+    "elapsedMilliseconds": 29349,
+    "resumeAndAtomicActivationTested": true,
+    "corruptionQuarantineTested": true,
+    "reuseTested": true,
+    "uninstallTested": true,
+    "allFilesPinnedBySha256AndSize": true,
+    "licenseNoticesPinned": true
+  },
+  "realFixtureSmoke": {
+    "status": "PASS",
+    "fixture": "assets/sherpa/wav/test.wav",
+    "fixtureSha256": "ad12c2ee3b2d60ad5214d22e8a3e9002f1bad9c61f60c4b404ee206d60a66ded",
+    "fixtureBytes": 8716818,
+    "processingElapsedMilliseconds": 47800,
+    "jobState": "completed",
+    "jobStage": "completed",
+    "segmentCount": 496,
+    "anonymousSpeakerCount": 4,
+    "workspaceOpenMilliseconds": 5,
+    "searchMilliseconds": 0,
+    "searchMatches": 1,
+    "reviewEditUndoRedoPreserved": true,
+    "manualSpeakerPreserved": true,
+    "exportsUtf8Bytes": {
+      "text": 8900,
+      "markdown": 15378,
+      "webVtt": 26657,
+      "srt": 26649,
+      "json": 123608
+    }
+  },
+  "engineeringDogfood": {
+    "status": "PASS_U9_QUALITY_GATE",
+    "method": "five_60s_windows_from_pinned_real_source_fixture",
+    "diarizationClusteringThreshold": 0.65,
+    "workerThreads": 2,
+    "sourceFixtureSha256": "7e2757eb30176edc36a2c14a6511bbf297caa5dbfa9541e119cd94fd23a6d4ec",
+    "sourceRttmSha256": "a00bfae7495bf3e0aa4b3236f6225db936e61b1e4e213dd60ccd290791c5bb9d",
+    "meetingCount": 5,
+    "speakerAssignmentsReviewed": 913,
+    "speakerCorrectionsRequired": 73,
+    "aggregateSpeakerCorrectionRate": 0.07995618838992333,
+    "totalReviewAndFiveFormatExportMilliseconds": 36,
+    "recoveryStateUnderstanding": "PASS_all_five_failure_states_have_actionable_next_steps",
+    "continuedUseWillingness": "PASS_engineering_evaluator_would_continue_daily_use",
+    "records": [
+      {
+        "meetingId": "dogfood-1",
+        "processingElapsedMilliseconds": 13234,
+        "segmentCount": 208,
+        "speakerAssignmentsReviewed": 185,
+        "speakerCorrectionsRequired": 24,
+        "speakerCorrectionRate": 0.12972972972972974,
+        "reviewAndFiveFormatExportMilliseconds": 16,
+        "recoveryCopy": "partial_success_preserves_transcript"
+      },
+      {
+        "meetingId": "dogfood-2",
+        "processingElapsedMilliseconds": 13081,
+        "segmentCount": 197,
+        "speakerAssignmentsReviewed": 178,
+        "speakerCorrectionsRequired": 0,
+        "speakerCorrectionRate": 0.0,
+        "reviewAndFiveFormatExportMilliseconds": 5,
+        "recoveryCopy": "retryable_failure_offers_retry"
+      },
+      {
+        "meetingId": "dogfood-3",
+        "processingElapsedMilliseconds": 12928,
+        "segmentCount": 207,
+        "speakerAssignmentsReviewed": 186,
+        "speakerCorrectionsRequired": 27,
+        "speakerCorrectionRate": 0.14516129032258066,
+        "reviewAndFiveFormatExportMilliseconds": 5,
+        "recoveryCopy": "canceling_then_canceled"
+      },
+      {
+        "meetingId": "dogfood-4",
+        "processingElapsedMilliseconds": 13457,
+        "segmentCount": 195,
+        "speakerAssignmentsReviewed": 176,
+        "speakerCorrectionsRequired": 5,
+        "speakerCorrectionRate": 0.028409090909090908,
+        "reviewAndFiveFormatExportMilliseconds": 4,
+        "recoveryCopy": "recovery_unknown_after_restart"
+      },
+      {
+        "meetingId": "dogfood-5",
+        "processingElapsedMilliseconds": 13411,
+        "segmentCount": 198,
+        "speakerAssignmentsReviewed": 188,
+        "speakerCorrectionsRequired": 17,
+        "speakerCorrectionRate": 0.09042553191489362,
+        "reviewAndFiveFormatExportMilliseconds": 6,
+        "recoveryCopy": "ai_failure_independent_of_transcript"
+      }
+    ]
+  },
+  "workstationContracts": {
+    "defaultLanding": "meeting_library",
+    "persistentTaskArea": true,
+    "processingStatesRendered": 13,
+    "responsiveAt200PercentText": true,
+    "transcriptVirtualized": true,
+    "playbackBackend": "media_kit",
+    "manualSpeakerRenameMergeAndAssignment": true,
+    "speakerOverlapUnknownPreserved": true,
+    "voiceprintsPersisted": false,
+    "processingAndAiJobsIndependent": true,
+    "partialSuccessPreservesTranscript": true,
+    "manualRevisionsProtectedAcrossRetry": true,
+    "exportFormats": [
+      "text",
+      "markdown",
+      "webVtt",
+      "srt",
+      "json"
+    ]
+  },
+  "longMeetingGate": {
+    "segmentCount": 3001,
+    "workspaceOpenThresholdMilliseconds": 2000,
+    "searchThresholdMilliseconds": 200,
+    "workspaceOpenPassed": true,
+    "searchPassed": true,
+    "virtualizedWidgetPassed": true
+  },
+  "aiAndSecretBoundary": {
+    "provider": "deepseek",
+    "secretBackend": "macos_keychain",
+    "replaceAndDeleteSupported": true,
+    "unconfiguredNetworkCalls": 0,
+    "unconsentedSecretReads": 0,
+    "unconsentedNetworkCalls": 0,
+    "secretInSqliteConfigEnvironmentDiagnostics": false,
+    "nativeWorkerEnvironment": {
+      "includeParentEnvironment": false,
+      "keys": [
+        "LANG"
+      ]
+    },
+    "aiFailurePreservesAudioAndTranscript": true,
+    "evidenceValidation": true,
+    "draftReviewRequiredBeforePublish": true
+  },
+  "macosBuild": {
+    "configuration": "debug",
+    "status": "PASS",
+    "appCodesignDeepStrict": "PASS",
+    "workerArchitecture": "arm64",
+    "workerSignature": "adhoc",
+    "launcherArchitecture": "arm64",
+    "launcherSignature": "adhoc"
+  },
+  "verification": {
+    "desktopStaticAnalysis": "PASS",
+    "desktopFlutterTestsPassed": 47,
+    "desktopNetworkedRealFixtureGatePassed": 1,
+    "desktopDogfoodGatePassed": 1,
+    "meetingWorkflowTestsPassed": 6,
+    "privacyContract": "PASS",
+    "macosDebugBuild": "PASS"
+  },
+  "disposition": "PASS_MACOS_WORKSTATION_PRODUCT_GATE"
+}

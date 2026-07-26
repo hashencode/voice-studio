@@ -1,0 +1,46 @@
+{
+  "schemaVersion": 1,
+  "runtimeId": "pyannote-community-1-macos-arm64",
+  "runtimeVersion": "pyannote-audio-4.0.4-python-3.12.13",
+  "platform": "macos",
+  "architecture": "arm64",
+  "python": {
+    "implementation": "cpython",
+    "version": "3.12.13",
+    "source": "uv-managed-standalone",
+    "globalPythonAllowed": false
+  },
+  "environmentLock": "uv.lock",
+  "environmentLockSha256": "d99371f2b225347ad69140f7eb9adb11c311eea34797ffb116c3ee2f9d2492a9",
+  "frameworks": {
+    "pyannote.audio": "4.0.4",
+    "torch": "2.11.0",
+    "torchaudio": "2.11.0",
+    "torchcodec": "0.11.1"
+  },
+  "nativeMediaDependency": {
+    "id": "ffmpeg",
+    "disposition": "REQUIRED_FOR_PRODUCT_PROVISIONING_NOT_BUNDLED"
+  },
+  "models": [
+    {
+      "id": "pyannote/speaker-diarization-community-1",
+      "revision": "3533c8cf8e369892e6b79ff1bf80f7b0286a54ee",
+      "role": "speaker_diarization_cpu",
+      "licenseSpdx": "CC-BY-4.0",
+      "userConditionsRequired": true
+    }
+  ],
+  "inference": {
+    "device": "cpu",
+    "offlineAfterProvisioning": true,
+    "anonymousSpeakersOnly": true,
+    "persistVoiceprints": false
+  },
+  "networkPolicy": {
+    "provisioning": "pinned_https_only_after_user_conditions",
+    "processing": "deny_all"
+  },
+  "licenseDisposition": "LAB_ONLY_USER_CONDITIONS_NOT_ACCEPTED",
+  "userConditionsAccepted": false
+}

@@ -1,0 +1,56 @@
+{
+  "schemaVersion": 1,
+  "contractId": "desktop-processing/macos-sherpa-1.13.4-v1",
+  "source": "macos_native_sherpa",
+  "complete": true,
+  "timedOut": false,
+  "cancelled": false,
+  "temporaryArtifactsReleased": true,
+  "targetFingerprint": {
+    "operatingSystem": "macos",
+    "operatingSystemVersion": "15.7.5",
+    "architecture": "arm64",
+    "cpuModel": "Apple M2",
+    "logicalCpuCount": 8,
+    "memoryBytes": 17179869184,
+    "runtimeId": "sherpa-onnx-c-api",
+    "runtimeVersion": "1.13.4",
+    "runtimeSha256": "102e8383640a6752dc9c51060836aba6f3da75bd644c3ddada1a0c15b8df0f02"
+  },
+  "probe": "asr",
+  "models": [
+    {
+      "id": "sherpa-streaming-zipformer-zh-14m-2023-02-23",
+      "version": "2023-02-23",
+      "sha256": "dbc43dfe2e490fae801a6619f558730a721e8f8a674003f14ad020a6b5f205cc",
+      "componentSha256": {
+        "encoder": "1c556ea57cec304e55ec4b72e52c1cc098bb01476ed7d90f3de939fe126487b1",
+        "decoder": "22f123bb8cba9b38974b3df18a3f45e7081f4985ebb2e075d9f21f618c468bbf",
+        "joiner": "a7cf9d82757bdcf786059454495a9ca95e4bd7347f72473fc08d794475c36169"
+      },
+      "licenseDisposition": "APACHE_2_0_ARCHIVE_README_PINNED"
+    }
+  ],
+  "fixture": {
+    "id": "fixed-zh-meeting-300s",
+    "sha256": "9345f80fc835ae2afc9bb58ccdbd5047797d7de3afc4cb3a2c6ef44444a2a562",
+    "durationSeconds": 300.6549375
+  },
+  "configuration": {
+    "numThreads": 2
+  },
+  "segments": [
+    {
+      "startSeconds": 0.0,
+      "endSeconds": 300.6549375,
+      "text": "在教学楼内释放大量烟雾不过英特尔之后不会继续接受如此大的损失替我播放相思风雨中在教学楼内释放大量烟雾不过英特尔之后不会继续接受如此大的损失替我播放相思风雨中在教学楼内放大量烟雾不过英特尔之后不会继续接受如此大的损失替我播放相思风雨中在教学楼内释放大量烟雾不过英特尔之后不会继续接受如此大的损失替我播放相思风雨中在教学楼内释放大量烟雾不过英特尔之后不会继续接受如此大的损失替我播放相思风雨中在教学楼内释放大量烟雾不过英特尔之后不会继续接受如此大的损失替我播放相思风雨中在教学楼内释放大量烟雾不过英特尔之后不会继续接受如此大的损失替我播放相思风雨中在教学楼内释放大量烟雾过英特尔之后不会继续接受如此大的损失替我播放相思风雨中在教学楼英特尔之后继续接受如此大的损失替我播放相思风雨中在教学楼内放大量烟雾不过英特尔之后不会继续接受如此大的损失替我播放相思风雨中在教学楼内释放大量烟雾不过英特尔之后不会继续接受如此大的损失替我播放相思风雨中在教学楼内释放大量烟雾不过英特尔之后不会继续接受如此大的损失替我播放相思风雨中在教学楼内释放大量烟雾不过英特尔之后不会继续接受如此大的损失替我播放相思风雨中在教学楼内释放大量烟雾过英特尔之后不会继续接受如此大的损失替我播放相思风雨中在教学楼内释放大量烟雾过英特尔之后不会继续接受如此大的损失替我播放相思风雨中在教学楼大量烟雾过英特尔之后会继续接受如此大的损失我播放相思风雨中在教学楼内放大量烟雾不过英特尔之后不会继续接受如此大的损失替我播放相思风雨中在教学楼内释放大量烟雾不过英特尔之后不会继续接受如此大的损失替我播放相思风雨中在教学楼内释放大量烟雾不过英特尔之后不会继续接受如此大的损失替我播放相思风雨中在教学楼内释放大量烟雾不过英特尔之后不会继续接受如此大的损失替我播放相思风雨中在教学楼内释放大量烟雾英特尔之后不会继续接受如此大的损失替我播放相思风雨中在教学楼内释放大量烟雾过英特尔之后不会接受如此大的损失替我播放相思风雨中在教学楼内释放大量烟雾过英特尔之后不会继续接受如此大的损失替我播放相思风雨中在教学楼内烟雾过英特尔之后不会继续接受如此大的损失替我播放相思风雨中在教学楼放大量烟雾不过英特尔之后不会继续接受如此大的损失替我播放相思风雨中在教学楼内释放大量烟雾不过英特尔之后不会继续接受如此大的损失替我播放相思风雨中"
+    }
+  ],
+  "tokenTimestampCount": 978,
+  "metrics": {
+    "elapsedMilliseconds": 6152,
+    "rtf": 0.020461995572582273,
+    "cer": 0.03550295857988166,
+    "residentBytesAfterProbe": 382156800
+  }
+}

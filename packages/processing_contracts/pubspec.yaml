@@ -1,0 +1,12 @@
+name: processing_contracts
+description: Versioned local processing job and result contracts.
+publish_to: none
+version: 0.1.0
+
+environment:
+  sdk: ^3.11.5
+
+resolution: workspace
+
+dev_dependencies:
+  test: any

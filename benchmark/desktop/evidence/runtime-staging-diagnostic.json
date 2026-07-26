@@ -1,0 +1,29 @@
+{
+  "schemaVersion": 1,
+  "target": {
+    "operatingSystem": "macos",
+    "operatingSystemVersion": "15.7.5",
+    "architecture": "arm64",
+    "cpuModel": "Apple M2"
+  },
+  "attempts": [
+    {
+      "runtimeSource": "pub_cache_unthinned_universal_binary",
+      "runtimeSha256": "7710492d16eff9094543baf46a6edd15952da1b06d690e700735c9d1f691f104",
+      "codeSignatureVerification": "FAIL",
+      "exitCode": 137,
+      "lastCheckpoint": "loading_sherpa_runtime",
+      "modelLoaded": false,
+      "disposition": "REJECT_RUNTIME_STAGING"
+    },
+    {
+      "runtimeSource": "xcode_thinned_and_signed_app_framework",
+      "runtimeSha256": "102e8383640a6752dc9c51060836aba6f3da75bd644c3ddada1a0c15b8df0f02",
+      "codeSignatureVerification": "PASS",
+      "lastCheckpoint": "sherpa_runtime_loaded",
+      "modelLoaded": true,
+      "disposition": "USE_FOR_TARGET_BOUND_BENCHMARK"
+    }
+  ],
+  "conclusion": "Command-line benchmarks must load the same thinned and signed Sherpa runtime that the macOS app ships. The universal pub-cache binary is not admissible runtime evidence."
+}

@@ -32,6 +32,13 @@ This folder contains the ASR benchmark lab. The shipped mobile production route 
 - `evaluate_online_transducer_candidate.py`: evaluates physical score/timestamp parity, CER, and fixed hotword A/B evidence without promoting raw scores to confidence.
 - `evaluate_s2_enhancement.py`: evaluates preregistered raw/enhanced CER, timestamp delta, RTF, memory, thermal, and source-preservation evidence.
 - `validate_itn_assets.py`: proves that ITN is either fully licensed/evidenced or explicitly fail-closed.
+- `speaker_diarization_admission_contract.json`: immutable schema-v2 speaker candidate, artifact, fixture, threshold, and device inputs.
+- `speaker_diarization_current_screening_contract.json`: frozen FP32 screening contract retained so its committed physical evidence remains reproducible after the canonical contract moved to the selected INT8 fallback.
+- `speaker_diarization_manifest.json`: generated speaker admission result; `VERIFIED` grants only later productization eligibility and never opens the product.
+- `speaker_diarization_contract.py`: validates the persistent admission manifest and its fail-closed product boundary.
+- `evaluate_speaker_diarization.py`: derives speaker gate status and preserves every failed gate while keeping product availability independent.
+- `speaker_diarization_candidates.json`: fixed fallback scorecard and one-fallback closure decision.
+- `evidence/speaker_diarization/`: schema-validated FP32/INT8 physical screening evidence, deterministic evaluations, and the resource-probe skip disposition.
 - `S2_ASR_CAPABILITY_REVIEW.md`: records the installed AAR, production model, bundled assets, license evidence, and current gate result for ITN, confidence, hotwords, and enhancement.
 - `S2_ITN_BLOCKER.md`: records the deterministic ITN integration contract, golden fixture, and the missing licensed FST/FAR blocker.
 - `S2_CONFIDENCE_REVIEW.md`: records the nullable production contract and the runtime-plus-model dependency for calibrated confidence.
@@ -120,6 +127,27 @@ python3 benchmark/prepare_asr_candidate.py \
 The candidate is `lab_only`. Running its Android instrumentation and evaluator
 does not add it to `TranscriptionModelRegistry` or make confidence/hotwords
 available in the product.
+
+## Speaker Admission Truth
+
+The speaker gate uses a fixed-input contract and a generated result manifest:
+
+```bash
+python3 benchmark/evaluate_speaker_diarization.py
+python3 tool/validate_s3_productization_scope.py
+```
+
+`VERIFIED` is the only admission success state. It means
+`eligibleForProductization=true`; it still requires
+`productAvailable=false`, closed product routes, unpackaged models, and no
+voiceprint persistence. Deferred results retain all failures in `failedGates`
+instead of hiding resource failure behind the primary functional status.
+The current result is `DEFERRED_NO_ADMISSIBLE_CANDIDATE`: the bounded FP32
+candidate and the single selected INT8 fallback both failed physical
+functional/projected-RTF screening, so the 120-minute probe was not started.
+Each candidate keeps its own frozen contract. The gate script selects the FP32
+screening contract for `sherpa-v1.13.3-pyannote-3dspeaker` and the canonical
+fallback contract for `sherpa-v1.13.3-pyannote-int8-3dspeaker`.
 
 ## Speech-Enhancement Gate
 

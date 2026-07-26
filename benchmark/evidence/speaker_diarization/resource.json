@@ -1,0 +1,16 @@
+{
+  "schemaVersion": 2,
+  "source": "deterministic_screening_decision",
+  "probe": "oneHundredTwentyMinute",
+  "contractId": "speaker-diarization-admission/sherpa-int8-fallback-v2",
+  "contractSha256": "1e6d8f6ec965b68be724235db6c277677b29902aedf27f146c6281d17dbfdd4b",
+  "candidateId": "sherpa-v1.13.3-pyannote-int8-3dspeaker",
+  "executed": false,
+  "executionDisposition": "SKIPPED_PROJECTED_RTF_HARD_FAILURE",
+  "reason": "The frozen 5-minute screening evidence projects a 120-minute RTF of 2.402002671510833, above the unchanged maximum of 0.5, so the plan forbids starting the expensive resource probe.",
+  "functionalEvidenceSha256": "f3b3454a56e3aa2514ac068c046d648d94e543324b32defd12f1546267400df4",
+  "screeningEvaluationSha256": "8d281f1e77927f3342a8cab848601d65ecd4cd508773648c311f19e2fb521504",
+  "projectedRtf": 2.402002671510833,
+  "maximumRtf": 0.5,
+  "decisionComplete": true
+}

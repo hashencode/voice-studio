@@ -1,0 +1,62 @@
+{
+  "schemaVersion": 1,
+  "contractId": "desktop-processing/macos-sherpa-1.13.4-v1",
+  "decisionPlatform": "macos",
+  "source": "macos_native_sherpa",
+  "runtime": {
+    "id": "sherpa-onnx-c-api",
+    "version": "1.13.4",
+    "sha256": "102e8383640a6752dc9c51060836aba6f3da75bd644c3ddada1a0c15b8df0f02",
+    "licenseSpdx": "Apache-2.0"
+  },
+  "benchmarkConfiguration": {
+    "numThreads": 2,
+    "peakRssSampling": "every_native_progress_callback"
+  },
+  "operationalEnvelope": {
+    "maxSourceBytes": 4294967296,
+    "maxDurationSeconds": 14400,
+    "maxDecodedPcmBytes": 2147483648,
+    "maxSegments": 200000,
+    "maxQueuedJobs": 20,
+    "maxConcurrentEngines": 1,
+    "temporaryStorageMultiplier": 2.25,
+    "minimumFreeBytesAfterImport": 2147483648
+  },
+  "models": {
+    "asr": [
+      {
+        "id": "sherpa-streaming-zipformer-zh-14m-2023-02-23",
+        "sha256": "dbc43dfe2e490fae801a6619f558730a721e8f8a674003f14ad020a6b5f205cc"
+      }
+    ],
+    "diarization": [
+      {
+        "id": "sherpa-pyannote-segmentation-3.0",
+        "sha256": "220ad67ca923bef2fa91f2390c786097bf305bceb5e261d4af67b38e938e1079"
+      },
+      {
+        "id": "3dspeaker-eres2net-base-zh-16k",
+        "sha256": "1a331345f04805badbb495c775a6ddffcdd1a732567d5ec8b3d5749e3c7a5e4b"
+      }
+    ]
+  },
+  "gates": {
+    "asr": {
+      "fixtureId": "fixed-zh-meeting-300s",
+      "fixtureSha256": "9345f80fc835ae2afc9bb58ccdbd5047797d7de3afc4cb3a2c6ef44444a2a562",
+      "referenceSha256": "40046fed2ac99717645087d59dfc54d764ec84e6554ec0879e699bbc4cdb231a",
+      "maxCer": 0.35,
+      "maxRtf": 0.5
+    },
+    "diarization": {
+      "functionalFixtureId": "fixed-speaker-functional-5m",
+      "functionalFixtureSha256": "7e2757eb30176edc36a2c14a6511bbf297caa5dbfa9541e119cd94fd23a6d4ec",
+      "resourceFixtureId": "fixed-speaker-resource-120m",
+      "resourceFixtureSha256": "6a4f0849cee47ad9daecac04d92977c8cf6b48de1dd43849ad60852de5b336c3",
+      "maxRtf": 0.5,
+      "maxIncrementalPeakRssBytes": 2147483648,
+      "requireTwoHourCompletion": true
+    }
+  }
+}

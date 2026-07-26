@@ -1,0 +1,43 @@
+{
+  "schemaVersion": 1,
+  "unit": "U6",
+  "candidate": "pyannote-community-1",
+  "targetFingerprint": {
+    "operatingSystem": "macos",
+    "operatingSystemVersion": "15.7.5",
+    "architecture": "arm64",
+    "cpuModel": "Apple M2",
+    "logicalCpuCount": 8,
+    "memoryBytes": 17179869184,
+    "runtimeId": "pyannote-community-1-macos-arm64",
+    "runtimeVersion": "pyannote-audio-4.0.4-python-3.12.13",
+    "runtimeSha256": "d99371f2b225347ad69140f7eb9adb11c311eea34797ffb116c3ee2f9d2492a9"
+  },
+  "environment": {
+    "python": "3.12.13",
+    "pyannote.audio": "4.0.4",
+    "torch": "2.11.0",
+    "torchaudio": "2.11.0",
+    "torchcodec": "0.11.1",
+    "ffmpeg": "REQUIRED_NOT_BUNDLED",
+    "environmentLockSha256": "d99371f2b225347ad69140f7eb9adb11c311eea34797ffb116c3ee2f9d2492a9"
+  },
+  "model": {
+    "id": "pyannote/speaker-diarization-community-1",
+    "revision": "3533c8cf8e369892e6b79ff1bf80f7b0286a54ee",
+    "licenseSpdx": "CC-BY-4.0",
+    "gated": true,
+    "userConditionsRequired": true,
+    "userConditionsAccepted": false,
+    "metadataSource": "https://huggingface.co/api/models/pyannote/speaker-diarization-community-1"
+  },
+  "status": "LAB_ONLY_USER_CONDITIONS_NOT_ACCEPTED",
+  "benchmarkExecuted": false,
+  "hardFailures": [
+    "USER_CONDITIONS_NOT_ACCEPTED",
+    "MODEL_CONTENT_NOT_PROVISIONED",
+    "FFMPEG_DELIVERY_NOT_FROZEN"
+  ],
+  "metrics": null,
+  "disposition": "NOT_PRODUCTIZABLE_NO_USER_ACTION_TAKEN"
+}

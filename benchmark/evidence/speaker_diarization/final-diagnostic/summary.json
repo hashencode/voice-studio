@@ -1,0 +1,105 @@
+{
+  "schemaVersion": 1,
+  "contractId": "speaker-diarization-final-diagnostic/v1",
+  "terminalDisposition": "MOBILE_DIARIZATION_CLOSED_NO_ADMISSIBLE_CANDIDATE",
+  "arms": [
+    {
+      "armId": "official-3dspeaker-t1",
+      "status": "FAIL",
+      "failedGates": [
+        "OVERLAP",
+        "SILENCE",
+        "RTF"
+      ],
+      "annotatedSpeechCoverage": 0.9252515233101885,
+      "der": 0.15746355308992388,
+      "overlapRepresented": false,
+      "noSpeakerInPreregisteredSilence": false,
+      "rtf": 1.9271688746100002,
+      "elapsedMs": 578150.662383,
+      "incrementalPeakPssKiB": 244951,
+      "maximumThermalStatus": "none",
+      "completeInputConsumption": true,
+      "transcriptSnapshotHashMatch": true,
+      "evidenceSha256": "c769cc7ae91f906c376706becd2772496309b47dafb329efcf61db330bef3c4c",
+      "rawEvidencePath": "benchmark/evidence/speaker_diarization/final-diagnostic/official-3dspeaker-t1.json",
+      "rawEvidenceSha256": "c769cc7ae91f906c376706becd2772496309b47dafb329efcf61db330bef3c4c",
+      "evaluationPath": "benchmark/evidence/speaker_diarization/final-diagnostic/official-3dspeaker-t1-evaluation.json",
+      "evaluationSha256": "a1103e5c1220667837465c569fca0ae949bfd56520280eb9564db71acac2e615"
+    },
+    {
+      "armId": "official-3dspeaker-t2",
+      "status": "FAIL",
+      "failedGates": [
+        "OVERLAP",
+        "SILENCE",
+        "RTF"
+      ],
+      "annotatedSpeechCoverage": 0.9252515233101885,
+      "der": 0.15746355308992388,
+      "overlapRepresented": false,
+      "noSpeakerInPreregisteredSilence": false,
+      "rtf": 1.74720876635,
+      "elapsedMs": 524162.629905,
+      "incrementalPeakPssKiB": 249241,
+      "maximumThermalStatus": "none",
+      "completeInputConsumption": true,
+      "transcriptSnapshotHashMatch": true,
+      "evidenceSha256": "493f67bfa863dbce5185fa76560de2d248d42b670af03c6f9abb531207165cee",
+      "rawEvidencePath": "benchmark/evidence/speaker_diarization/final-diagnostic/official-3dspeaker-t2.json",
+      "rawEvidenceSha256": "493f67bfa863dbce5185fa76560de2d248d42b670af03c6f9abb531207165cee",
+      "evaluationPath": "benchmark/evidence/speaker_diarization/final-diagnostic/official-3dspeaker-t2-evaluation.json",
+      "evaluationSha256": "fd8562d2d18e246b34448053236008bd3e429239e1d0bbe74005c2340f810c1d"
+    },
+    {
+      "armId": "official-3dspeaker-t4",
+      "status": "FAIL",
+      "failedGates": [
+        "OVERLAP",
+        "SILENCE",
+        "RTF"
+      ],
+      "annotatedSpeechCoverage": 0.9252515233101885,
+      "der": 0.15746355308992388,
+      "overlapRepresented": false,
+      "noSpeakerInPreregisteredSilence": false,
+      "rtf": 1.2732889278133335,
+      "elapsedMs": 381986.678344,
+      "incrementalPeakPssKiB": 230620,
+      "maximumThermalStatus": "none",
+      "completeInputConsumption": true,
+      "transcriptSnapshotHashMatch": true,
+      "evidenceSha256": "aac2ca70c0952b57354a32c22becf702668075ca7aee03eb64b3cb5456ce402d",
+      "rawEvidencePath": "benchmark/evidence/speaker_diarization/final-diagnostic/official-3dspeaker-t4.json",
+      "rawEvidenceSha256": "aac2ca70c0952b57354a32c22becf702668075ca7aee03eb64b3cb5456ce402d",
+      "evaluationPath": "benchmark/evidence/speaker_diarization/final-diagnostic/official-3dspeaker-t4-evaluation.json",
+      "evaluationSha256": "0dd5defd78ad5b14b88db18eb168a0120699e48f147f2d9ad93eac396afd117c"
+    },
+    {
+      "armId": "official-titanet-t2",
+      "status": "FAIL",
+      "failedGates": [
+        "DER",
+        "OVERLAP",
+        "SILENCE",
+        "RTF"
+      ],
+      "annotatedSpeechCoverage": 0.9252515233101885,
+      "der": 0.44355567023609854,
+      "overlapRepresented": false,
+      "noSpeakerInPreregisteredSilence": false,
+      "rtf": 0.9410758227333335,
+      "elapsedMs": 282322.74682,
+      "incrementalPeakPssKiB": 233974,
+      "maximumThermalStatus": "none",
+      "completeInputConsumption": true,
+      "transcriptSnapshotHashMatch": true,
+      "evidenceSha256": "3ce99a3fc5be37d50b21053a2aa917bbf60cb4e5bfebbaa05debad93dc1c011d",
+      "rawEvidencePath": "benchmark/evidence/speaker_diarization/final-diagnostic/official-titanet-t2.json",
+      "rawEvidenceSha256": "3ce99a3fc5be37d50b21053a2aa917bbf60cb4e5bfebbaa05debad93dc1c011d",
+      "evaluationPath": "benchmark/evidence/speaker_diarization/final-diagnostic/official-titanet-t2-evaluation.json",
+      "evaluationSha256": "a509907c02f93a32cbfc90085cb93c6483ed43d8a6fb421d1cbc5ebe61a2c58e"
+    }
+  ],
+  "nextCandidate": null
+}

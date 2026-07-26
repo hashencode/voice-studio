@@ -1,6 +1,5 @@
 import 'dart:async';
 
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_components/flutter_components.dart';
 
@@ -10,17 +9,21 @@ import '../shared/widgets/build_info_footer.dart';
 import '../shared/widgets/common_empty_state.dart';
 import 'model/transcription_job_entity.dart';
 import 'repository/transcription_jobs_repository.dart';
-import 'service/android_transcription_service.dart';
-import 'service/fake_transcription_service.dart';
 import 'service/transcription_job_reconciler.dart';
 import 'service/transcription_port.dart';
 import 'service/transcription_queue_coordinator.dart';
 
 class TranscriptionPage extends StatefulWidget {
-  const TranscriptionPage({super.key, this.repository, this.coordinator});
+  const TranscriptionPage({
+    super.key,
+    this.repository,
+    this.coordinator,
+    this.transcriptionPort,
+  });
 
   final TranscriptionJobsRepository? repository;
   final TranscriptionQueueCoordinator? coordinator;
+  final TranscriptionPort? transcriptionPort;
 
   @override
   State<TranscriptionPage> createState() => _TranscriptionPageState();
@@ -45,20 +48,17 @@ class _TranscriptionPageState extends State<TranscriptionPage> {
         widget.coordinator ??
         TranscriptionQueueCoordinator(
           repository: _repository,
-          transcriptionPort: _buildService(),
+          transcriptionPort:
+              widget.transcriptionPort ??
+              (throw StateError(
+                'TranscriptionPage requires an injected transcription port.',
+              )),
           settingsRepository: AppSettingsRepository(),
           reconciler: TranscriptionJobReconciler(repository: _repository),
         );
     _changesSubscription = _coordinator.changes.listen((_) => _load());
     unawaited(_coordinator.start());
     unawaited(_load(showLoading: true));
-  }
-
-  TranscriptionPort _buildService() {
-    if (defaultTargetPlatform == TargetPlatform.android) {
-      return AndroidTranscriptionService();
-    }
-    return FakeTranscriptionService();
   }
 
   @override

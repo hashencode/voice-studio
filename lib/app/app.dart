@@ -9,12 +9,10 @@ import '../features/recording/service/recording_startup_reconciler.dart';
 import '../features/records/service/meeting_retention_service.dart';
 import '../features/settings/repository/app_settings_repository.dart';
 import '../features/transcription/repository/transcription_jobs_repository.dart';
-import '../features/transcription/service/android_transcription_service.dart';
-import '../features/transcription/service/fake_transcription_service.dart';
 import '../features/transcription/service/transcription_job_reconciler.dart';
-import '../features/transcription/service/transcription_port.dart';
 import '../features/transcription/service/transcription_queue_coordinator.dart';
 import 'logging/privacy_safe_log.dart';
+import 'platform_composition.dart';
 import 'router.dart';
 import 'theme/app_theme.dart';
 import 'theme/theme_mode_controller.dart';
@@ -28,6 +26,7 @@ class Voice2TextApp extends StatefulWidget {
 
 class _Voice2TextAppState extends State<Voice2TextApp> {
   late final AppThemeModeController _themeController;
+  late final AppPlatformComposition _platformComposition;
   late final TranscriptionQueueCoordinator _transcriptionQueueCoordinator;
   late final MeetingImportService _meetingImportService;
   late final RecordingStartupReconciler _recordingStartupReconciler;
@@ -37,21 +36,23 @@ class _Voice2TextAppState extends State<Voice2TextApp> {
   void initState() {
     super.initState();
     _themeController = AppThemeModeController()..load();
+    _platformComposition = AppPlatformComposition.forTarget(
+      defaultTargetPlatform,
+    );
     final jobsRepository = TranscriptionJobsRepository();
-    final TranscriptionPort transcriptionPort =
-        defaultTargetPlatform == TargetPlatform.android
-        ? AndroidTranscriptionService()
-        : FakeTranscriptionService();
     _transcriptionQueueCoordinator = TranscriptionQueueCoordinator(
       repository: jobsRepository,
-      transcriptionPort: transcriptionPort,
+      transcriptionPort: _platformComposition.transcriptionPort,
       settingsRepository: AppSettingsRepository(),
       reconciler: TranscriptionJobReconciler(repository: jobsRepository),
     );
     _meetingImportService = MeetingImportService(
+      mediaImportPort: _platformComposition.mediaImportPort,
       onQueueChanged: _transcriptionQueueCoordinator.kick,
     );
     _recordingStartupReconciler = RecordingStartupReconciler(
+      recorder: _platformComposition.recorderPort,
+      enabled: _platformComposition.recordingRecoveryEnabled,
       onQueueChanged: _transcriptionQueueCoordinator.kick,
     );
     _meetingRetentionService = MeetingRetentionService();
@@ -120,6 +121,10 @@ class _Voice2TextAppState extends State<Voice2TextApp> {
               transcriptionQueueCoordinator: _transcriptionQueueCoordinator,
               meetingImportService: _meetingImportService,
               recordingStartupReconciler: _recordingStartupReconciler,
+              recorderPort: _platformComposition.recorderPort,
+              transcriptionPort: _platformComposition.transcriptionPort,
+              notificationPermissionEnabled:
+                  _platformComposition.notificationPermissionEnabled,
             ),
           );
         },

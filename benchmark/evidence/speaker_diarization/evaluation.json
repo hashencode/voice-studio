@@ -1,0 +1,42 @@
+{
+  "schemaVersion": 2,
+  "decision": "REJECT_CURRENT_CANDIDATE",
+  "candidateId": "sherpa-v1.13.3-pyannote-int8-3dspeaker",
+  "contractSha256": "1e6d8f6ec965b68be724235db6c277677b29902aedf27f146c6281d17dbfdd4b",
+  "failedGates": [
+    "FUNCTIONAL",
+    "PROJECTED_RTF"
+  ],
+  "fiveMinute": {
+    "status": "FAIL",
+    "annotatedSpeechCoverage": 0.936446081904492,
+    "der": 0.12191975229002709,
+    "orderedInBoundsTurns": true,
+    "overlapRepresented": true,
+    "noSpeakerInPreregisteredSilence": false,
+    "meetingGlobalSpeakerKeys": true,
+    "transcriptSnapshotBeforeSha256": "aed340cf0c0a78e6aa729314846992a1c4e85995251608c6abc02d705bead306",
+    "transcriptSnapshotAfterSha256": "aed340cf0c0a78e6aa729314846992a1c4e85995251608c6abc02d705bead306",
+    "transcriptUnchanged": true,
+    "semanticIntervalCount": 101,
+    "evidenceSha256": "f3b3454a56e3aa2514ac068c046d648d94e543324b32defd12f1546267400df4"
+  },
+  "timings": {
+    "initializationMs": 452.138958,
+    "pcmAndWindowingMs": 891.548177,
+    "diarizationMs": 668909.694432,
+    "embeddingMs": 50736.251282,
+    "reconciliationMs": 28.359897,
+    "stitchingMs": 16.108542,
+    "totalMs": 721034.101288
+  },
+  "projectedOneHundredTwentyMinute": {
+    "durationSeconds": 7200.0,
+    "initializationMsChargedOnce": 452.138958,
+    "steadyStateSourceDurationSeconds": 300.0,
+    "steadyStateSourceElapsedMs": 720581.96233,
+    "projectedElapsedMs": 17294419.234878,
+    "projectedRtf": 2.402002671510833,
+    "maximumRtf": 0.5
+  }
+}

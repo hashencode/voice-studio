@@ -1,0 +1,98 @@
+{
+  "schemaVersion": 1,
+  "setId": "sherpa-onnx-1.13.4-zipformer14m-pyannote3",
+  "platform": "macos",
+  "architecture": "arm64",
+  "contentKey": "e2385695f7367317fb915ab844f9dddced0d385113387d047cb7ab591220255e",
+  "licenseDisposition": "PRODUCT_ELIGIBLE_WITH_PINNED_NOTICES",
+  "requiresUserAcceptance": false,
+  "minimumFreeBytesAfterInstall": 536870912,
+  "downloads": [
+    {
+      "id": "asr-archive",
+      "source": "https://github.com/k2-fsa/sherpa-onnx/releases/download/asr-models/sherpa-onnx-streaming-zipformer-zh-14M-2023-02-23.tar.bz2",
+      "sha256": "2cbd71b640d9c37d3784f29367333a4577b0398b62e9deeed418170b081cba8b",
+      "bytes": 74004050,
+      "kind": "tar.bz2"
+    },
+    {
+      "id": "segmentation-archive",
+      "source": "https://github.com/k2-fsa/sherpa-onnx/releases/download/speaker-segmentation-models/sherpa-onnx-pyannote-segmentation-3-0.tar.bz2",
+      "sha256": "24615ee884c897d9d2ba09bb4d30da6bb1b15e685065962db5b02e76e4996488",
+      "bytes": 6958444,
+      "kind": "tar.bz2"
+    },
+    {
+      "id": "embedding-model",
+      "source": "https://github.com/k2-fsa/sherpa-onnx/releases/download/speaker-recongition-models/3dspeaker_speech_eres2net_base_sv_zh-cn_3dspeaker_16k.onnx",
+      "sha256": "1a331345f04805badbb495c775a6ddffcdd1a732567d5ec8b3d5749e3c7a5e4b",
+      "bytes": 39593761,
+      "kind": "file"
+    }
+  ],
+  "files": [
+    {
+      "relativePath": "asr/encoder.onnx",
+      "downloadId": "asr-archive",
+      "archiveMember": "sherpa-onnx-streaming-zipformer-zh-14M-2023-02-23/encoder-epoch-99-avg-1.int8.onnx",
+      "sha256": "1c556ea57cec304e55ec4b72e52c1cc098bb01476ed7d90f3de939fe126487b1",
+      "bytes": 21621684,
+      "licenseSpdx": "Apache-2.0"
+    },
+    {
+      "relativePath": "asr/decoder.onnx",
+      "downloadId": "asr-archive",
+      "archiveMember": "sherpa-onnx-streaming-zipformer-zh-14M-2023-02-23/decoder-epoch-99-avg-1.int8.onnx",
+      "sha256": "22f123bb8cba9b38974b3df18a3f45e7081f4985ebb2e075d9f21f618c468bbf",
+      "bytes": 1888682,
+      "licenseSpdx": "Apache-2.0"
+    },
+    {
+      "relativePath": "asr/joiner.onnx",
+      "downloadId": "asr-archive",
+      "archiveMember": "sherpa-onnx-streaming-zipformer-zh-14M-2023-02-23/joiner-epoch-99-avg-1.int8.onnx",
+      "sha256": "a7cf9d82757bdcf786059454495a9ca95e4bd7347f72473fc08d794475c36169",
+      "bytes": 1795562,
+      "licenseSpdx": "Apache-2.0"
+    },
+    {
+      "relativePath": "asr/tokens.txt",
+      "downloadId": "asr-archive",
+      "archiveMember": "sherpa-onnx-streaming-zipformer-zh-14M-2023-02-23/tokens.txt",
+      "sha256": "8b294db9045d6e5f94647f4c1eec1af4da143a75053c399611444b378ff966ac",
+      "bytes": 48697,
+      "licenseSpdx": "Apache-2.0"
+    },
+    {
+      "relativePath": "asr/README.md",
+      "downloadId": "asr-archive",
+      "archiveMember": "sherpa-onnx-streaming-zipformer-zh-14M-2023-02-23/README.md",
+      "sha256": "515751f07faad368f0863ae41773ff09635eba5920122d549abb8e45d5c88282",
+      "bytes": 226,
+      "licenseSpdx": "Apache-2.0"
+    },
+    {
+      "relativePath": "diarization/segmentation.onnx",
+      "downloadId": "segmentation-archive",
+      "archiveMember": "sherpa-onnx-pyannote-segmentation-3-0/model.onnx",
+      "sha256": "220ad67ca923bef2fa91f2390c786097bf305bceb5e261d4af67b38e938e1079",
+      "bytes": 5992913,
+      "licenseSpdx": "MIT"
+    },
+    {
+      "relativePath": "licenses/pyannote-segmentation-LICENSE",
+      "downloadId": "segmentation-archive",
+      "archiveMember": "sherpa-onnx-pyannote-segmentation-3-0/LICENSE",
+      "sha256": "14d7016ad68e7394d6e6b78d96cc2ae431c905287b89674cfdf021e79e62b8ba",
+      "bytes": 1061,
+      "licenseSpdx": "MIT"
+    },
+    {
+      "relativePath": "diarization/embedding.onnx",
+      "downloadId": "embedding-model",
+      "sha256": "1a331345f04805badbb495c775a6ddffcdd1a732567d5ec8b3d5749e3c7a5e4b",
+      "bytes": 39593761,
+      "licenseSpdx": "Apache-2.0"
+    }
+  ]
+}

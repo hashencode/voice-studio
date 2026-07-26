@@ -36,7 +36,7 @@ EXPECTED_ORIGINAL_S2_BASELINE_IDS = {
     "TIM-003",
 }
 EXPECTED_OVERALL_BLOCKERS = {
-    "S1-HIGH-END-REFERENCE-DEVICE",
+    "RELEASE-HIGH-END-COMPATIBILITY",
     "EXP-005-ANDROID-PRODUCTION-RELEASE",
     "S2-MOBILE-CORE",
     "RELEASE-DELIVERY",
@@ -380,8 +380,21 @@ def _validate_statuses(
     )
     if overall_blockers != EXPECTED_OVERALL_BLOCKERS:
         raise ValueError(
-            "overallProduct.blockers must preserve Mobile Core, S1 high-end, "
-            "EXP-005 and release-delivery boundaries"
+            "overallProduct.blockers must preserve Mobile Core, release "
+            "high-end compatibility, EXP-005 and release-delivery boundaries"
+        )
+    if overall.get("featureClosure") != "PASS_LOW_AND_MID_DEVICE":
+        raise ValueError(
+            "overallProduct.featureClosure must preserve the accepted low/mid "
+            "device feature PASS"
+        )
+    if (
+        overall.get("releaseDeviceMatrix")
+        != "PENDING_HIGH_END_REFERENCE_DEVICE"
+    ):
+        raise ValueError(
+            "overallProduct.releaseDeviceMatrix must keep high-end coverage "
+            "as a pending release compatibility gate"
         )
 
 
@@ -398,6 +411,13 @@ def _validate_special_contracts(manifest: dict[str, Any]) -> None:
     timestamp = _require_mapping(manifest.get("timestampGate"), "timestampGate")
     if timestamp.get("gateId") != "ASR-005-TIMESTAMP-INDEPENDENT":
         raise ValueError("timestampGate must bind ASR-005 mandatory gate")
+    if (
+        timestamp.get("executionDisposition")
+        != "SKIPPED_PENDING_USER_TEST"
+    ):
+        raise ValueError(
+            "ASR-005 execution must remain skipped pending user testing"
+        )
     if timestamp.get("independentReviewRequired") is not True:
         raise ValueError("ASR-005 must require an independent reviewer")
     if timestamp.get("releaseEligible") is not False:
@@ -488,7 +508,16 @@ def _validate_prd_trace(manifest: dict[str, Any], root: Path) -> None:
         row = next((line for line in lines if line.startswith(prefix)), None)
         if row is None:
             raise ValueError(f"PRD is missing original S2 item: {item_id}")
-        if item["mobileCoreStatus"] == "BLOCKED" and "BLOCKED" not in row:
+        if item_id == "ASR-005":
+            if (
+                "USER_PRE_RELEASE_ACCEPTANCE_ONLY" not in row
+                or "BLOCKED" in row
+            ):
+                raise ValueError(
+                    "PRD row ASR-005 must preserve the user-owned pre-release "
+                    "acceptance policy without restoring a development blocker"
+                )
+        elif item["mobileCoreStatus"] == "BLOCKED" and "BLOCKED" not in row:
             raise ValueError(
                 f"PRD row {item_id} must preserve the Mobile Core blocker"
             )

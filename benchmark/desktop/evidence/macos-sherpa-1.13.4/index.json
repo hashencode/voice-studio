@@ -1,0 +1,9 @@
+{
+  "schemaVersion": 1,
+  "contractId": "desktop-processing/macos-sherpa-1.13.4-v1",
+  "evidenceSha256": {
+    "asr": "01bcdad940b51a3b38f9c5fb0b7cb8ea5b545a7e22a07299ce7e1e926c1aec4a",
+    "diarization-functional": "6f025044317d3a8a4f9ac20f40f89d672d71cf6c7a19452812de260c782eaf6f",
+    "diarization-resource": "88b0b0de27a6b706ad0cac1730447e14f3147dfbfa86a98eaa4c3e1e077bfb20"
+  }
+}

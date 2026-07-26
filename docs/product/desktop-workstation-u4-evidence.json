@@ -1,0 +1,46 @@
+{
+  "schemaVersion": 1,
+  "unit": "U4",
+  "target": "macos",
+  "capturedAt": "2026-07-26",
+  "targetFingerprint": {
+    "os": "macOS 15.7.5",
+    "architecture": "arm64",
+    "cpu": "Apple M2",
+    "memoryBytes": 17179869184,
+    "buildMode": "debug"
+  },
+  "workspace": {
+    "singleResolution": "PASS",
+    "members": [
+      "voice2text_flutter",
+      "voice2text_desktop",
+      "meeting_core",
+      "meeting_storage",
+      "processing_contracts",
+      "meeting_workflows"
+    ],
+    "unsupportedOverrideAdded": false
+  },
+  "runtimeDependencies": {
+    "storage": "sqflite_common_ffi 2.4.0+3",
+    "filePicker": "file_selector 1.1.0",
+    "playback": "media_kit 1.2.6 / media_kit_libs_audio 1.0.7",
+    "secureStorage": "flutter_secure_storage 10.3.1",
+    "nativeRuntime": "sherpa_onnx 1.13.4"
+  },
+  "debugBuild": {
+    "status": "PASS",
+    "executableSha256": "1a3464a9cfd8695c7ae05bceef4808a6faa2dfba721f180f6acb61e6ff6bdf88"
+  },
+  "manualSmoke": {
+    "status": "PASS",
+    "source": "assets/sherpa/wav/test.wav",
+    "sourceSha256": "ad12c2ee3b2d60ad5214d22e8a3e9002f1bad9c61f60c4b404ee206d60a66ded",
+    "privateCopySha256": "ad12c2ee3b2d60ad5214d22e8a3e9002f1bad9c61f60c4b404ee206d60a66ded",
+    "persistentJobVisibleAfterRestart": true,
+    "jobStatus": "pending",
+    "fakeTranscriptGenerated": false
+  },
+  "disposition": "FOUNDATION_PASS_LOCAL_IMPORT"
+}

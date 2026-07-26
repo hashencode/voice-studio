@@ -1,0 +1,21 @@
+{
+  "armId": "official-titanet-t2",
+  "status": "FAIL",
+  "failedGates": [
+    "DER",
+    "OVERLAP",
+    "SILENCE",
+    "RTF"
+  ],
+  "annotatedSpeechCoverage": 0.9252515233101885,
+  "der": 0.44355567023609854,
+  "overlapRepresented": false,
+  "noSpeakerInPreregisteredSilence": false,
+  "rtf": 0.9410758227333335,
+  "elapsedMs": 282322.74682,
+  "incrementalPeakPssKiB": 233974,
+  "maximumThermalStatus": "none",
+  "completeInputConsumption": true,
+  "transcriptSnapshotHashMatch": true,
+  "evidenceSha256": "3ce99a3fc5be37d50b21053a2aa917bbf60cb4e5bfebbaa05debad93dc1c011d"
+}

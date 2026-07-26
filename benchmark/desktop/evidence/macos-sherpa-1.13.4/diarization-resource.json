@@ -1,0 +1,56 @@
+{
+  "schemaVersion": 1,
+  "contractId": "desktop-processing/macos-sherpa-1.13.4-v1",
+  "source": "macos_native_sherpa",
+  "complete": true,
+  "timedOut": false,
+  "cancelled": false,
+  "temporaryArtifactsReleased": true,
+  "targetFingerprint": {
+    "operatingSystem": "macos",
+    "operatingSystemVersion": "15.7.5",
+    "architecture": "arm64",
+    "cpuModel": "Apple M2",
+    "logicalCpuCount": 8,
+    "memoryBytes": 17179869184,
+    "runtimeId": "sherpa-onnx-c-api",
+    "runtimeVersion": "1.13.4",
+    "runtimeSha256": "102e8383640a6752dc9c51060836aba6f3da75bd644c3ddada1a0c15b8df0f02"
+  },
+  "probe": "diarization-resource",
+  "models": [
+    {
+      "id": "sherpa-pyannote-segmentation-3.0",
+      "version": "3.0",
+      "sha256": "220ad67ca923bef2fa91f2390c786097bf305bceb5e261d4af67b38e938e1079",
+      "licenseDisposition": "UPSTREAM_REVIEWED_BENCHMARK_ONLY"
+    },
+    {
+      "id": "3dspeaker-eres2net-base-zh-16k",
+      "version": "upstream-pinned",
+      "sha256": "1a331345f04805badbb495c775a6ddffcdd1a732567d5ec8b3d5749e3c7a5e4b",
+      "licenseDisposition": "UPSTREAM_REVIEWED_BENCHMARK_ONLY"
+    }
+  ],
+  "fixture": {
+    "id": "fixed-speaker-resource-120m",
+    "sha256": "6a4f0849cee47ad9daecac04d92977c8cf6b48de1dd43849ad60852de5b336c3",
+    "durationSeconds": 7200.0
+  },
+  "callbackCount": 15097,
+  "configuration": {
+    "numThreads": 2,
+    "peakRssSampling": "every_native_progress_callback"
+  },
+  "metrics": {
+    "elapsedMilliseconds": 1976883,
+    "rtf": 0.27456708333333335,
+    "residentBytesBeforeProbe": 363347968,
+    "peakSampledResidentBytes": 579600384,
+    "incrementalPeakRssBytes": 216252416,
+    "residentBytesAfterProbe": 287768576
+  },
+  "completedFullDuration": true,
+  "oom": false,
+  "segmentCount": 1611
+}

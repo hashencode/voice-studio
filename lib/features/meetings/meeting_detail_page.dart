@@ -3,13 +3,23 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter_components/flutter_components.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import '../meeting_intelligence/model/evidence_link_entity.dart';
+import '../meeting_intelligence/repository/meeting_intelligence_jobs_repository.dart';
 import '../meeting_intelligence/repository/meeting_intelligence_repository.dart';
+import '../meeting_intelligence/service/deepseek_meeting_intelligence_provider.dart';
+import '../meeting_intelligence/service/meeting_api_secret_store.dart';
+import '../meeting_intelligence/service/meeting_intelligence_job_coordinator.dart';
+import '../meeting_intelligence/service/meeting_intelligence_provider.dart';
 import '../meeting_intelligence/service/meeting_intelligence_review_service.dart';
+import '../meeting_intelligence/service/transcript_batch_planner.dart';
+import '../meeting_intelligence/widgets/cloud_processing_consent_panel.dart';
+import '../meeting_intelligence/widgets/meeting_generation_panel.dart';
 import '../meeting_intelligence/widgets/meeting_intelligence_section.dart';
 import '../records/service/meeting_share_service.dart';
 import '../transcription/model/transcript_segment_entity.dart';
+import '../settings/repository/app_settings_repository.dart';
 import 'controller/meeting_review_controller.dart';
 import 'model/meeting_record.dart';
 import 'service/meeting_export_service.dart';
@@ -34,6 +44,11 @@ class MeetingDetailPage extends StatefulWidget {
     this.shareService,
     this.intelligenceRepository,
     this.intelligenceReviewService,
+    this.intelligenceJobsRepository,
+    this.intelligenceCoordinator,
+    this.settingsRepository,
+    this.secretStore,
+    this.intelligenceProviderFactory,
   });
 
   final int recordingId;
@@ -42,6 +57,12 @@ class MeetingDetailPage extends StatefulWidget {
   final MeetingShareService? shareService;
   final MeetingIntelligenceRepository? intelligenceRepository;
   final MeetingIntelligenceReviewService? intelligenceReviewService;
+  final MeetingIntelligenceJobsRepository? intelligenceJobsRepository;
+  final MeetingIntelligenceJobCoordinator? intelligenceCoordinator;
+  final AppSettingsRepository? settingsRepository;
+  final MeetingApiSecretStore? secretStore;
+  final MeetingIntelligenceProvider Function(String modelId)?
+  intelligenceProviderFactory;
 
   @override
   State<MeetingDetailPage> createState() => _MeetingDetailPageState();
@@ -51,11 +72,21 @@ class _MeetingDetailPageState extends State<MeetingDetailPage> {
   late final MeetingReviewController _controller;
   late final MeetingExportService _exportService;
   late final MeetingShareService _shareService;
+  late final MeetingIntelligenceRepository _intelligenceRepository;
+  late final MeetingIntelligenceJobsRepository _intelligenceJobsRepository;
+  late final MeetingIntelligenceJobCoordinator _intelligenceCoordinator;
+  late final AppSettingsRepository _settingsRepository;
+  late final MeetingApiSecretStore _secretStore;
+  late final MeetingIntelligenceProvider Function(String modelId)
+  _intelligenceProviderFactory;
   final ScrollController _timelineController = ScrollController();
   final GlobalKey _followTargetKey = GlobalKey();
   int? _lastFollowedIndex;
   int? _followTargetIndex;
   int _followRequestId = 0;
+  bool _generatingIntelligence = false;
+  int _intelligenceReloadToken = 0;
+  MeetingIntelligenceCancellationToken? _intelligenceCancellationToken;
 
   @override
   void initState() {
@@ -65,9 +96,155 @@ class _MeetingDetailPageState extends State<MeetingDetailPage> {
         MeetingReviewController(recordingId: widget.recordingId);
     _exportService = widget.exportService ?? MeetingExportService();
     _shareService = widget.shareService ?? MeetingShareService();
+    _intelligenceRepository =
+        widget.intelligenceRepository ?? MeetingIntelligenceRepository();
+    _intelligenceJobsRepository =
+        widget.intelligenceJobsRepository ??
+        MeetingIntelligenceJobsRepository();
+    _intelligenceCoordinator =
+        widget.intelligenceCoordinator ??
+        MeetingIntelligenceJobCoordinator(
+          jobsRepository: _intelligenceJobsRepository,
+          intelligenceRepository: _intelligenceRepository,
+        );
+    _settingsRepository = widget.settingsRepository ?? AppSettingsRepository();
+    _secretStore = widget.secretStore ?? const MeetingApiSecretStore();
+    _intelligenceProviderFactory =
+        widget.intelligenceProviderFactory ??
+        (modelId) => DeepSeekMeetingIntelligenceProvider(
+          modelId: modelId,
+          secretStore: _secretStore,
+        );
     if (_controller.meeting == null) {
       unawaited(_controller.load());
     }
+  }
+
+  Future<void> _generateIntelligence(
+    MeetingRecord meeting, {
+    required bool userConfirmedRetry,
+  }) async {
+    if (_generatingIntelligence || meeting.segments.isEmpty) return;
+    try {
+      final settings = await _settingsRepository.load();
+      final providerId = settings.meetingAiProviderId;
+      final modelId = settings.meetingAiModelId;
+      final configured =
+          settings.meetingProcessingLocation ==
+              MeetingProcessingLocation.cloudDirect &&
+          providerId == 'deepseek' &&
+          modelId != null &&
+          settings.meetingAiSecretConfigured &&
+          await _secretStore.hasSecret('deepseek');
+      if (!configured) {
+        if (!mounted) return;
+        GooToastScope.of(context).error('请先在设置中配置 DeepSeek 云端直连');
+        return;
+      }
+      final generationId = meeting.generation?.id;
+      if (generationId == null) {
+        if (!mounted) return;
+        GooToastScope.of(context).error('当前会议没有可用于生成的稳定转写');
+        return;
+      }
+      const planner = TranscriptBatchPlanner();
+      final plan = planner.plan(meeting.segments);
+      if (!mounted) return;
+      final selection = await showMeetingGenerationPanel(
+        context: context,
+        payloadSummary: plan.payloadSummary,
+      );
+      if (selection == null || !mounted) return;
+      final startMs = meeting.segments
+          .map((segment) => segment.startMs)
+          .reduce((left, right) => left < right ? left : right);
+      final endMs = meeting.segments
+          .map((segment) => segment.endMs)
+          .reduce((left, right) => left > right ? left : right);
+      final consent = await showCloudProcessingConsentPanel(
+        context: context,
+        request: CloudProcessingConsentRequest(
+          providerLabel: 'DeepSeek',
+          modelId: modelId,
+          inputStartMs: startMs,
+          inputEndMs: endMs,
+          segmentCount: meeting.segments.length,
+          estimatedRequestCount: plan.estimatedRequestCount,
+          speakerLabelsIncluded: false,
+        ),
+        onOpenDataPolicy: () {
+          unawaited(
+            launchUrl(
+              Uri.parse(
+                'https://cdn.deepseek.com/policies/zh-CN/deepseek-privacy-policy.html',
+              ),
+              mode: LaunchMode.externalApplication,
+            ),
+          );
+        },
+      );
+      if (consent == null || !mounted) return;
+      final token = MeetingIntelligenceCancellationToken();
+      _intelligenceCancellationToken = token;
+      setState(() {
+        _generatingIntelligence = true;
+        _intelligenceReloadToken += 1;
+      });
+      final provider = _intelligenceProviderFactory(modelId);
+      await _intelligenceCoordinator.generate(
+        provider: provider,
+        request: MeetingIntelligenceRequest(
+          recordingId: meeting.recording.id,
+          generationId: generationId,
+          processingLocation: MeetingProcessingLocation.cloudDirect,
+          consentDecision: MeetingConsentDecision.granted,
+          inputStartMs: startMs,
+          inputEndMs: endMs,
+          segments: meeting.segments,
+          templateId: selection.templateId,
+          consentVersion: consent.version,
+          consentAtMs: consent.grantedAtMs,
+          payloadSummary: consent.payloadSummary,
+          estimatedRequestCount: plan.estimatedRequestCount,
+          speakerLabelsIncluded: false,
+        ),
+        cancellationToken: token,
+        userConfirmedRetry: userConfirmedRetry,
+      );
+      if (!mounted) return;
+      GooToastScope.of(context).success('会议纪要已生成，可开始审核');
+    } on MeetingIntelligenceProviderException catch (error) {
+      if (!mounted) return;
+      if (error.code != MeetingIntelligenceFailureCode.canceled) {
+        GooToastScope.of(context).error(error.userMessage);
+      }
+    } on Object {
+      if (!mounted) return;
+      GooToastScope.of(context).error('会议纪要生成失败，未保存不完整结果');
+    } finally {
+      _intelligenceCancellationToken = null;
+      if (mounted) {
+        setState(() {
+          _generatingIntelligence = false;
+          _intelligenceReloadToken += 1;
+        });
+      }
+    }
+  }
+
+  Future<void> _cancelIntelligence() async {
+    _intelligenceCancellationToken?.cancel();
+    final latest = await _intelligenceJobsRepository.findLatestForRecording(
+      widget.recordingId,
+    );
+    if (latest != null) {
+      await _intelligenceJobsRepository.requestCancel(latest.id);
+    }
+    if (!mounted) return;
+    setState(() {
+      _generatingIntelligence = false;
+      _intelligenceReloadToken += 1;
+    });
   }
 
   @override
@@ -211,8 +388,7 @@ class _MeetingDetailPageState extends State<MeetingDetailPage> {
       _timelineController.position.maxScrollExtent,
     );
     final distance = (targetOffset - _timelineController.offset).abs();
-    final nearbyThreshold =
-        _timelineController.position.viewportDimension * 3;
+    final nearbyThreshold = _timelineController.position.viewportDimension * 3;
     if (distance > nearbyThreshold) {
       // Animating through thousands of variable-height rows makes the sliver
       // lay out intermediate children and can stall a physical device. A
@@ -323,8 +499,17 @@ class _MeetingDetailPageState extends State<MeetingDetailPage> {
             child: SingleChildScrollView(
               child: MeetingIntelligenceSection(
                 recordingId: meeting.recording.id,
-                repository: widget.intelligenceRepository,
+                repository: _intelligenceRepository,
                 reviewService: widget.intelligenceReviewService,
+                jobsRepository: _intelligenceJobsRepository,
+                generating: _generatingIntelligence,
+                reloadToken: _intelligenceReloadToken,
+                onGenerate: (userConfirmedRetry) => _generateIntelligence(
+                  meeting,
+                  userConfirmedRetry: userConfirmedRetry,
+                ),
+                onCancelGeneration: _cancelIntelligence,
+                onTitleApplied: () => unawaited(_controller.load()),
                 onEvidenceSelected: (EvidenceLinkEntity evidence) {
                   final matching = meeting.segments.where(
                     (segment) => segment.id == evidence.segmentId,

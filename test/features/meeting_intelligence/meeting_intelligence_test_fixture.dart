@@ -79,7 +79,7 @@ createMeetingIntelligenceFixture() async {
     request: MeetingIntelligenceRequest(
       recordingId: recordingId,
       generationId: generationId,
-      processingLocation: MeetingProcessingLocation.local,
+      processingLocation: MeetingProcessingLocation.onDevice,
       consentDecision: MeetingConsentDecision.granted,
       inputStartMs: 0,
       inputEndMs: 10000,

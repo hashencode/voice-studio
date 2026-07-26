@@ -1,0 +1,90 @@
+{
+  "schemaVersion": 1,
+  "unit": "U8",
+  "status": "PASS_MACOS_ANDROID_LAN",
+  "protocol": {
+    "schema": "companion-media-transfer/v1",
+    "schemaPath": "docs/contracts/companion-media-transfer-v1.schema.json",
+    "architecturePath": "docs/architecture/companion-media-transfer-v1.md",
+    "providerV1Unchanged": true,
+    "discovery": "DNS-SD dynamic port",
+    "authentication": "paired device identities with scannable QR, matching six-digit short code, and single-use two-minute invitation",
+    "encryption": "HKDF-SHA256 directional AES-256-GCM sessions",
+    "identitySignatures": "Ed25519",
+    "replayProtection": "authenticated monotonic counters and session expiry",
+    "idempotency": "transfer ID plus whole-file SHA-256",
+    "receiptBoundary": "whole-file hash verified and desktop import committed"
+  },
+  "secureStorage": {
+    "android": "Android Keystore AES-GCM encrypted preferences, backup disabled",
+    "macos": "Keychain unlocked_this_device, non-synchronizable, Data Protection Keychain",
+    "sqliteContainsReusableCredentials": false
+  },
+  "persistence": {
+    "schemaVersion": 20,
+    "androidAndDesktopDatabasesIndependent": true,
+    "exchangeLiveDatabaseFiles": false,
+    "durableCheckpoints": true,
+    "durableTransferHistory": true
+  },
+  "physicalLanSmoke": {
+    "result": "PASS",
+    "date": "2026-07-26",
+    "desktop": {
+      "platform": "macOS",
+      "address": "192.168.1.233"
+    },
+    "phone": {
+      "platform": "Android",
+      "model": "Xiaomi M2102J2SC",
+      "serial": "a186e452",
+      "address": "192.168.1.39"
+    },
+    "sourceBytes": 25165824,
+    "chunkBytes": 262144,
+    "chunkCount": 96,
+    "interruptedAfterChunks": 25,
+    "resumedBytes": 18612224,
+    "sourceSha256": "e8b8072d05ac62b988231c156411f564afefce651327a9e43e03e324f8601cc7",
+    "committedSha256": "e8b8072d05ac62b988231c156411f564afefce651327a9e43e03e324f8601cc7",
+    "duplicateReturnedSameReceipt": true,
+    "duplicateReturnedSameRecordingId": true,
+    "desktopRecordingId": 7008,
+    "phoneSourceRetained": true,
+    "integrationCommandResult": "one test passed in 23s"
+  },
+  "encryptedCaptureInspection": {
+    "observer": "server raw application frame observer",
+    "frames": 403,
+    "bytes": 50463410,
+    "plaintextMeetingContentSeen": false,
+    "reusableCredentialSeen": false,
+    "tcpdumpAvailable": false,
+    "tcpdumpReason": "host BPF capture permission unavailable; no privilege escalation permitted"
+  },
+  "securityScenarios": [
+    "expired and brute-force-limited pairing",
+    "revoked peer rejection",
+    "peer key change rejection",
+    "backup-restored trust rejection",
+    "replay rejection",
+    "session expiry rejection",
+    "chunk and whole-file hash mismatch rejection",
+    "bounded metadata, offsets, and transfer conflict rejection",
+    "symbolic-link and multi-hard-link chunk substitution rejection",
+    "conflicting completed transfer is never overwritten",
+    "source path is never trusted as a destination path",
+    "receipt is issued only after committed import hash matches"
+  ],
+  "verification": {
+    "companionContractTests": 4,
+    "companionProtocolTests": 10,
+    "desktopCompanionRepositoryTests": 2,
+    "mobileCompanionRepositoryTests": 2,
+    "desktopCompanion200PercentWidgetTest": "PASS",
+    "macosDebugBuild": "PASS",
+    "androidDebugBuild": "PASS",
+    "physicalAndroidIntegrationTest": "PASS",
+    "flutterAnalyze": "PASS"
+  }
+}

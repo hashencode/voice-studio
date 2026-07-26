@@ -1,0 +1,20 @@
+{
+  "armId": "official-3dspeaker-t2",
+  "status": "FAIL",
+  "failedGates": [
+    "OVERLAP",
+    "SILENCE",
+    "RTF"
+  ],
+  "annotatedSpeechCoverage": 0.9252515233101885,
+  "der": 0.15746355308992388,
+  "overlapRepresented": false,
+  "noSpeakerInPreregisteredSilence": false,
+  "rtf": 1.74720876635,
+  "elapsedMs": 524162.629905,
+  "incrementalPeakPssKiB": 249241,
+  "maximumThermalStatus": "none",
+  "completeInputConsumption": true,
+  "transcriptSnapshotHashMatch": true,
+  "evidenceSha256": "493f67bfa863dbce5185fa76560de2d248d42b670af03c6f9abb531207165cee"
+}

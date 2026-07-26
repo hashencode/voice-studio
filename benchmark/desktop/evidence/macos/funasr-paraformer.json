@@ -1,0 +1,84 @@
+{
+  "candidate": "funasr-paraformer",
+  "components": {
+    "itnRequested": true,
+    "paraformer": true,
+    "punctuation": true,
+    "sentenceCount": 0,
+    "timestampCount": 941,
+    "timestamps": true,
+    "vad": true
+  },
+  "environment": {
+    "device": "cpu",
+    "environmentLockSha256": "e6e03f114b44d5aa51511e36c9edbacbb2806b11142ebab769be8465701c1ec7",
+    "funasr": "1.3.22",
+    "modelscope": "1.38.1",
+    "processingNetwork": "framework_offline_flags",
+    "python": "3.12.13",
+    "torch": "2.11.0"
+  },
+  "fixture": {
+    "durationSeconds": 300.6549375,
+    "id": "fixed-zh-meeting-300s",
+    "referenceSha256": "40046fed2ac99717645087d59dfc54d764ec84e6554ec0879e699bbc4cdb231a",
+    "sha256": "9345f80fc835ae2afc9bb58ccdbd5047797d7de3afc4cb3a2c6ef44444a2a562"
+  },
+  "hypothesis": "在教学楼内释放大量烟雾。不过，英特尔之后不会继续接受如此大的损失，替我播放相思风雨中在教学楼内释放大量烟雾。不过，英特尔之后不会继续接放如此大的损失，替我播放相思风雨中在教学楼内释放大量烟雾。不过，英特尔之后不会继续接受如此大的损失，替我播放相思风雨中在教学楼内释放大量烟雾。不过，英特尔之后不会继续接受如此大的损失，替我播放相思风雨中在教学楼内释放大量烟雾。不过，英特尔之后不会继续接受如此大的损失，替我播放相思风雨中在教学楼内释放烟烟养烟雾。不过，英特尔之后不会继续接受如此大的损失，替我播放相思风雨中在教学楼内释放大量烟雾。不过，英特尔之后不会继续接受如此大的损失，替我播放相思风雨中在教学楼内释放大量烟雾。不过，英特尔之后不会继续接受如此大的损失，替我播放相思风雨中在教学楼内释放大量烟雾。不过，英特尔之后不会继续接受如此大的损失，替我播放相思风雨中在教学楼内释放大量烟雾。不过，英特尔之后不会继续接受如此大的损失，替我播放相思风雨中在教学楼内释放大量烟雾。不过，英特尔之后不会继续接受如此大的损失，替我播放相思风雨中在教学楼内释放大量烟雾。不过，英特尔之后不会继续接受如此大的损失，替我播放相思风雨中在教学楼内释放大量烟雾。不过，英特尔之后不会继续接受如此大的损失，替我播放相思风雨中在教学楼内释放大量烟雾。不过，英特尔之后不会继续接受如此大的损失，替我播放相思风雨中在教学楼内释放大量烟雾。不过，英特尔之后不会继续接受如此大的损失，替我播放相思风雨中在教学楼内释放大量烟雾。不过，英特尔之后不会继续接受如此大的损失，替我播放相思风雨中在教学楼内释放大量烟雾。不过，英特尔之后不会继续接受如此大的损失，替我播放相思风雨中在教学楼内释放大量烟雾。不过，英特尔之后不会继续接受如此大的损失，替我播放相思风雨中在教学楼内释放大量烟雾。不过，英特尔之后不会继续接受如此大的损失，替我播放相思风雨中在教学楼内释放大量烟雾。不过，英特尔之后不会继续接受如此大的损失，替我播放相思风雨中在教学楼内释放大量烟雾。不过，英特尔之后不会继续接受如此大的损失，替我播放相思风雨中在教学楼内释放大量烟雾。不过，英特尔之后不会继续接受如此大的损失。不，我播放之后，不不会内释放大量烟损，替替我特我接受相此大的损中，替我我楼内释放量的烟误替教学楼，释释放量烟烟，我放受此大的损失。不，我特特尔后后释放大烟烟烟，替我特尔之后接放大的烟雾。不过，英雨风英语中。",
+  "metrics": {
+    "cer": 0.11637080867850098,
+    "coldStartupSeconds": 3.969134667015169,
+    "elapsedSeconds": 60.98028625000734,
+    "incrementalPeakRssBytes": 3130687488,
+    "inferenceRtf": 0.16733759292405095,
+    "inferenceSeconds": 50.31087354198098,
+    "peakResidentBytes": 3153608704,
+    "residentBytesBefore": 22921216,
+    "rtf": 0.20282482887881173
+  },
+  "models": {
+    "asr": {
+      "bytes": 909594136,
+      "fileCount": 11,
+      "id": "iic/speech_paraformer-large-vad-punc_asr_nat-zh-cn-16k-common-vocab8404-pytorch@v2.0.5",
+      "licenseSpdx": "Apache-2.0",
+      "sha256": "9e0e7740292ed73dd7100c6ad84297f4625a455958543fc4904351c2d931075b"
+    },
+    "punctuation": {
+      "bytes": 296360043,
+      "fileCount": 9,
+      "id": "iic/punc_ct-transformer_zh-cn-common-vocab272727-pytorch@v2.0.3",
+      "licenseSpdx": "Apache-2.0",
+      "sha256": "0ef2be6bb3f93efb7fe711c53f7ed62e37a83597c9076f4bcbbac08d90f58560"
+    },
+    "vad": {
+      "bytes": 4030689,
+      "fileCount": 8,
+      "id": "iic/speech_fsmn_vad_zh-cn-16k-common-pytorch@v2.0.4",
+      "licenseSpdx": "Apache-2.0",
+      "sha256": "60fb109b7aff385e5739787ae0aabfdcfea6894505e5b816ff1fe194f1127c16"
+    }
+  },
+  "rawShape": {
+    "keys": [
+      "key",
+      "text",
+      "timestamp"
+    ],
+    "sentenceCount": 0,
+    "timestampCount": 941
+  },
+  "schemaVersion": 1,
+  "targetFingerprint": {
+    "architecture": "arm64",
+    "cpuModel": "Apple M2",
+    "logicalCpuCount": 8,
+    "memoryBytes": 17179869184,
+    "operatingSystem": "macos",
+    "operatingSystemVersion": "15.7.5",
+    "runtimeId": "funasr-paraformer-macos-arm64",
+    "runtimeSha256": "e6e03f114b44d5aa51511e36c9edbacbb2806b11142ebab769be8465701c1ec7",
+    "runtimeVersion": "funasr-1.3.22-python-3.12.13"
+  },
+  "unit": "U6"
+}

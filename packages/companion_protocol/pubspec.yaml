@@ -1,0 +1,16 @@
+name: companion_protocol
+description: Versioned secure companion media transfer protocol for Voice2Text.
+publish_to: none
+version: 0.1.0
+
+environment:
+  sdk: ^3.11.5
+
+resolution: workspace
+
+dependencies:
+  crypto: ^3.0.7
+  cryptography: ^2.9.0
+
+dev_dependencies:
+  test: any

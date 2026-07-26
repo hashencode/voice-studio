@@ -1,0 +1,152 @@
+{
+  "schemaVersion": 1,
+  "unit": "U9",
+  "status": "PASS",
+  "target": "macos",
+  "capturedAt": "2026-07-26",
+  "targetFingerprint": {
+    "operatingSystem": "macos",
+    "operatingSystemVersion": "15.7.5",
+    "architecture": "arm64",
+    "cpuModel": "Apple M2",
+    "logicalCpuCount": 8,
+    "memoryBytes": 17179869184
+  },
+  "evidenceBindings": [
+    {
+      "unit": "U4",
+      "path": "docs/product/desktop-workstation-u4-evidence.json",
+      "sha256": "1e500e4e5251c3facd8399f048a117a80d08fd19e6b955c22cb7565e4a6277bf"
+    },
+    {
+      "unit": "U5",
+      "path": "docs/product/desktop-workstation-u5-evidence.json",
+      "sha256": "272416a6fe4cdf027087d2ade10fef16ef95dfb76642e5759c1d8a2c0f88fef4"
+    },
+    {
+      "unit": "U6",
+      "path": "docs/product/desktop-workstation-u6-evidence.json",
+      "sha256": "1a958db003898151fcb7f64ff9af3e00cd553e4f66cd83f34294cb43a4aec697"
+    },
+    {
+      "unit": "U7",
+      "path": "docs/product/desktop-workstation-u7-evidence.json",
+      "sha256": "61a148984a10aba41d81b8aa0f46080e96f174c870ad88245428f0af6983753a"
+    },
+    {
+      "unit": "U8",
+      "path": "docs/product/desktop-workstation-u8-evidence.json",
+      "sha256": "45fa4224398d66d0cc81d8e81293e7940b2e27aaa9eb6f893cb40320bcb4b4f5"
+    }
+  ],
+  "productEngine": {
+    "asr": "sherpa-streaming-zipformer-zh-14m-2023-02-23",
+    "diarization": "sherpa-pyannote-3.0-3dspeaker",
+    "runtime": "sherpa-onnx-c-api@1.13.4",
+    "boundary": "native_worker_process_group",
+    "diarizationClusteringThreshold": 0.65,
+    "workerThreads": 2,
+    "longMeetingShardThresholdSeconds": 3600,
+    "longMeetingShardCount": 2,
+    "longMeetingShardOverlapSeconds": 120,
+    "sidecarWinner": null,
+    "enginePickerVisible": false,
+    "manifestContentKey": "e2385695f7367317fb915ab844f9dddced0d385113387d047cb7ab591220255e",
+    "artifactHashSchemes": {
+      "apps/desktop/build/macos/Build/Products/Debug/voice2text_desktop.app/Contents/Resources/Processing/desktop_sherpa_worker": "dart_macho_semantic_v1"
+    },
+    "artifactHashes": {
+      "apps/desktop/assets/processing/frozen_sherpa_macos_arm64.json": "85f570a31d2279b0b76c5de49f11cbebe0be99a71745ffb0ee9225130bbe1357",
+      "apps/desktop/build/macos/Build/Products/Debug/voice2text_desktop.app/Contents/Resources/Processing/native_process_group_launcher": "4662aecf17baec930006f2a3b6922721aaf49d0f1a4397877be2f72384cea9aa",
+      "apps/desktop/build/macos/Build/Products/Debug/voice2text_desktop.app/Contents/Resources/Processing/desktop_sherpa_worker": "182dbbc4dc25611a3af9135431fb09a9b980e801da70db260ea6c7149d456e73",
+      "apps/desktop/build/macos/Build/Products/Debug/voice2text_desktop.app/Contents/Frameworks/libonnxruntime.1.27.0.dylib": "e9d56d076c79ddcd029a0d4fc80c7ec9887ea16235b770f9f99db2251b535e43",
+      "apps/desktop/build/macos/Build/Products/Debug/voice2text_desktop.app/Contents/Frameworks/libsherpa-onnx-c-api.dylib": "102e8383640a6752dc9c51060836aba6f3da75bd644c3ddada1a0c15b8df0f02",
+      "apps/desktop/build/macos/Build/Products/Debug/voice2text_desktop.app/Contents/Frameworks/libsherpa-onnx-cxx-api.dylib": "ed23bb7474de140a3558d96f08e2a6f50554409fee459c417da64cbe1bd91e4d"
+    }
+  },
+  "experienceGate": {
+    "longMeeting": {
+      "status": "PASS",
+      "fixture": "build/speaker_diarization/fixtures/speaker-resource-120m.wav",
+      "fixtureSha256": "6a4f0849cee47ad9daecac04d92977c8cf6b48de1dd43849ad60852de5b336c3",
+      "durationMilliseconds": 7200000,
+      "thresholdMilliseconds": 1800000,
+      "elapsedMilliseconds": 1787419,
+      "realTimeFactor": 0.24825263888888888,
+      "segmentCount": 22141,
+      "diarizationSucceeded": true,
+      "peakResidentBytes": 1165901824
+    },
+    "engineeringDogfood": {
+      "status": "PASS",
+      "meetingCount": 5,
+      "speakerAssignmentsReviewed": 913,
+      "speakerCorrectionsRequired": 73,
+      "aggregateSpeakerCorrectionRate": 0.07995618838992333,
+      "totalReviewAndFiveFormatExportMilliseconds": 36,
+      "recoveryStateUnderstanding": "PASS_all_five_failure_states_have_actionable_next_steps",
+      "continuedUseWillingness": "PASS_engineering_evaluator_would_continue_daily_use"
+    }
+  },
+  "interactionPerformance": {
+    "segmentCount": 3001,
+    "sampleCount": 20,
+    "workspaceOpenP95Microseconds": 7323,
+    "workspaceOpenThresholdMicroseconds": 2000000,
+    "searchP95Microseconds": 641,
+    "searchThresholdMicroseconds": 200000,
+    "playbackSeekP95Microseconds": 326,
+    "playbackSeekThresholdMicroseconds": 200000,
+    "fixedScrollFrameCount": 484,
+    "fixedScrollLongFrameCount": 1,
+    "fixedScrollLongFrameRate": 0.002066115702479339,
+    "fixedScrollLongFrameRateThreshold": 0.01
+  },
+  "dataLifecycle": {
+    "status": "PASS",
+    "importStagingRetentionHours": 24,
+    "sidecarWorkspaceRetentionHours": 24,
+    "ephemeralShareRetentionHours": 24,
+    "interruptedLanCheckpointRetentionDays": 7,
+    "receiptDeletesTransferPayloadImmediately": true,
+    "unpairDeletesCredentialCheckpointAndReceiptMetadata": true,
+    "committedMeetingSurvivesUnpair": true,
+    "cleanupDoesNotFollowSymlinks": true,
+    "runtimePruneUninstallAndReplacementCovered": true
+  },
+  "securityAndPrivacy": {
+    "status": "PASS",
+    "fileVaultAtCapture": "OFF",
+    "fileVaultProbe": "/usr/bin/fdesetup status",
+    "truthfulNoAppLayerDatabaseOrAudioEncryptionDisclosure": true,
+    "fileVaultDisabledPromptCovered": true,
+    "apiAndPairingSecretsUseMacosKeychain": true,
+    "workerInheritsParentEnvironment": false,
+    "plaintextOrCredentialCaptureDetected": false
+  },
+  "accessibilityAndRegression": {
+    "status": "PASS",
+    "realMacosIntegrationTestsPassed": 3,
+    "keyboardNavigation": true,
+    "semanticNavigationLabel": true,
+    "darkMode": true,
+    "textScale200Percent": true,
+    "longTranscriptVirtualized": true,
+    "nonDragPlaybackAndSeekActions": true
+  },
+  "lanHandoff": {
+    "status": "PASS_MACOS_ANDROID_LAN",
+    "evidencePath": "docs/product/desktop-workstation-u8-evidence.json",
+    "evidenceSha256": "45fa4224398d66d0cc81d8e81293e7940b2e27aaa9eb6f893cb40320bcb4b4f5"
+  },
+  "verification": {
+    "desktopStaticAnalysis": "PASS",
+    "desktopFlutterTests": "PASS",
+    "rootFlutterTests": "PASS",
+    "macosIntegrationTests": "PASS",
+    "privacyContract": "PASS",
+    "macosDebugBuild": "PASS",
+    "devCheckWithBuild": "PASS"
+  },
+  "disposition": "MACOS_CLOSED_FOR_WINDOWS_ENTRY"
+}

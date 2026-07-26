@@ -1,0 +1,132 @@
+{
+  "schemaVersion": 2,
+  "contractId": "speaker-diarization-admission/sherpa-int8-fallback-v2",
+  "updatedAt": "2026-07-26",
+  "candidate": {
+    "id": "sherpa-v1.13.3-pyannote-int8-3dspeaker",
+    "runtime": {
+      "name": "sherpa-onnx.aar",
+      "version": "1.13.3",
+      "sha256": "243ad797a3b6e75ebbeaf7a2ab4aec0777e7d71b730685abb762a120940b07b6",
+      "bytes": 57044841,
+      "abis": [
+        "arm64-v8a",
+        "armeabi-v7a",
+        "x86",
+        "x86_64"
+      ],
+      "api": "OfflineSpeakerDiarization(AssetManager, OfflineSpeakerDiarizationConfig).process(float[])"
+    },
+    "configurationCandidates": [
+      {
+        "id": "window-30s-overlap-5s-threads-2-threshold-0.8",
+        "windowSamples": 480000,
+        "overlapSamples": 80000,
+        "numThreads": 2,
+        "reconciliationThreshold": 0.8
+      }
+    ],
+    "frozenConfiguration": {
+      "id": "window-30s-overlap-5s-threads-2-threshold-0.8",
+      "windowSamples": 480000,
+      "overlapSamples": 80000,
+      "numThreads": 2,
+      "reconciliationThreshold": 0.8
+    },
+    "models": {
+      "segmentation": {
+        "id": "sherpa-onnx-pyannote-segmentation-3-0-int8",
+        "source": "https://github.com/k2-fsa/sherpa-onnx/releases/download/speaker-segmentation-models/sherpa-onnx-pyannote-segmentation-3-0.tar.bz2",
+        "sourceVersion": "speaker-segmentation-models@2024-10-08",
+        "releaseBytes": 6958444,
+        "releaseSha256": "24615ee884c897d9d2ba09bb4d30da6bb1b15e685065962db5b02e76e4996488",
+        "artifactSha256": "d582f4b4c6b48205de7e0643c57df0df5615a3c176189be3fc461e9d18827b5d",
+        "artifactBytes": 1540506,
+        "license": "MIT",
+        "licenseSource": "https://huggingface.co/pyannote/segmentation-3.0/blob/main/LICENSE",
+        "licenseReviewed": true
+      },
+      "embedding": {
+        "id": "3dspeaker_speech_eres2net_base_sv_zh-cn_3dspeaker_16k",
+        "source": "https://github.com/k2-fsa/sherpa-onnx/releases/download/speaker-recongition-models/3dspeaker_speech_eres2net_base_sv_zh-cn_3dspeaker_16k.onnx",
+        "sourceVersion": "speaker-recongition-models@2024-10-14",
+        "releaseBytes": 39593761,
+        "artifactSha256": "1a331345f04805badbb495c775a6ddffcdd1a732567d5ec8b3d5749e3c7a5e4b",
+        "artifactBytes": 39593761,
+        "license": "Apache-2.0",
+        "licenseSource": "https://modelscope.cn/models/iic/speech_eres2net_base_sv_zh-cn_3dspeaker_16k/summary",
+        "licenseReviewed": true
+      }
+    }
+  },
+  "fixtureSources": [
+    {
+      "id": "speaker1_a_cn_16k",
+      "speaker": "speaker_1",
+      "file": "speaker1_a_cn_16k.wav",
+      "sourceRevision": "7664c9e89ef33ecbcafce97a2634a6ae946b7d04",
+      "sha256": "5f20ce0ddc378ca3239d3ce864b1142726a46a1221ae553912e4e142045df58b",
+      "license": "Apache-2.0"
+    },
+    {
+      "id": "speaker1_b_cn_16k",
+      "speaker": "speaker_1",
+      "file": "speaker1_b_cn_16k.wav",
+      "sourceRevision": "7664c9e89ef33ecbcafce97a2634a6ae946b7d04",
+      "sha256": "20745dc08a4281894d146140b99b9ef7417ac681119b7f7202f553cdf1a85f65",
+      "license": "Apache-2.0"
+    },
+    {
+      "id": "speaker2_a_cn_16k",
+      "speaker": "speaker_2",
+      "file": "speaker2_a_cn_16k.wav",
+      "sourceRevision": "7664c9e89ef33ecbcafce97a2634a6ae946b7d04",
+      "sha256": "8a6cffa452df32ef10503f7992f22ffcdd7f16c4e0273d13311bc5cdcb13abf4",
+      "license": "Apache-2.0"
+    }
+  ],
+  "fixtures": {
+    "fiveMinute": {
+      "wavSha256": "7e2757eb30176edc36a2c14a6511bbf297caa5dbfa9541e119cd94fd23a6d4ec",
+      "rttmSha256": "a00bfae7495bf3e0aa4b3236f6225db936e61b1e4e213dd60ccd290791c5bb9d",
+      "durationSeconds": 300,
+      "sampleRate": 16000,
+      "silenceRegionsAreNotUnknownEvidence": true
+    },
+    "oneHundredTwentyMinute": {
+      "wavSha256": "6a4f0849cee47ad9daecac04d92977c8cf6b48de1dd43849ad60852de5b336c3",
+      "durationSeconds": 7200,
+      "sampleRate": 16000
+    }
+  },
+  "thresholds": {
+    "fiveMinute": {
+      "minimumAnnotatedSpeechCoverage": 0.8,
+      "maximumDer": 0.3,
+      "requiresOrderedInBoundsTurns": true,
+      "requiresOverlapRepresentation": true,
+      "requiresNoSpeakerInPreregisteredSilence": true,
+      "requiresTranscriptSnapshotHashMatch": true,
+      "requiresMeetingGlobalSpeakerKeys": true
+    },
+    "oneHundredTwentyMinute": {
+      "maximumRtf": 0.5,
+      "maximumIncrementalPeakRssMiB": 384,
+      "maximumThermalStatus": "moderate",
+      "requiresCompleteInputConsumption": true,
+      "requiresNoOom": true,
+      "requiresNoAnr": true
+    }
+  },
+  "deviceConstraints": {
+    "source": "physical_android_instrumentation",
+    "manufacturer": "Xiaomi",
+    "model": "M2102J2SC",
+    "minimumSdkInt": 33
+  },
+  "probeSchedule": {
+    "fiveMinute": "REQUIRED",
+    "thirtyMinute": "SKIPPED_BY_PLAN",
+    "oneHundredTwentyMinute": "REQUIRED"
+  }
+}

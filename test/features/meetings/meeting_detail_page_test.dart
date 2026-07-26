@@ -4,6 +4,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_components/flutter_components.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:voice2text_flutter/app/theme/app_theme.dart';
+import 'package:voice2text_flutter/features/meeting_intelligence/model/meeting_intelligence_job_entity.dart';
+import 'package:voice2text_flutter/features/meeting_intelligence/repository/meeting_intelligence_jobs_repository.dart';
 import 'package:voice2text_flutter/features/meeting_intelligence/repository/meeting_intelligence_repository.dart';
 import 'package:voice2text_flutter/features/meetings/controller/meeting_review_controller.dart';
 import 'package:voice2text_flutter/features/meetings/meeting_detail_page.dart';
@@ -39,6 +41,7 @@ void main() {
           recordingId: 1,
           controller: controller,
           intelligenceRepository: _EmptyIntelligenceRepository(),
+          intelligenceJobsRepository: _EmptyIntelligenceJobsRepository(),
         ),
       ),
     );
@@ -156,8 +159,14 @@ void main() {
 
     expect(find.text('会议时间线'), findsOneWidget);
     expect(find.text('重点标记'), findsOneWidget);
-    expect(find.text('跟进客户报价'), findsOneWidget);
     expect(find.textContaining('00:01'), findsOneWidget);
+    await tester.scrollUntilVisible(
+      find.text('跟进客户报价'),
+      120,
+      scrollable: find.byType(Scrollable).last,
+    );
+    await tester.pumpAndSettle();
+    expect(find.text('跟进客户报价'), findsOneWidget);
     expect(find.text('00:02 · 会中备注'), findsOneWidget);
   });
 
@@ -346,6 +355,16 @@ class _FakePlaybackService extends MeetingPlaybackService {
 class _EmptyIntelligenceRepository extends MeetingIntelligenceRepository {
   @override
   Future<MeetingIntelligenceBundle?> findLatestForRecording(
+    int recordingId,
+  ) async {
+    return null;
+  }
+}
+
+class _EmptyIntelligenceJobsRepository
+    extends MeetingIntelligenceJobsRepository {
+  @override
+  Future<MeetingIntelligenceJobEntity?> findLatestForRecording(
     int recordingId,
   ) async {
     return null;

@@ -1,5 +1,4 @@
 import 'dart:async';
-import 'dart:io' show Platform;
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
@@ -8,14 +7,10 @@ import 'package:permission_handler/permission_handler.dart';
 
 import '../settings/repository/app_settings_repository.dart';
 import '../transcription/repository/transcription_jobs_repository.dart';
-import '../transcription/service/android_transcription_service.dart';
-import '../transcription/service/fake_transcription_service.dart';
 import '../transcription/service/transcription_port.dart';
 import '../transcription/service/transcription_job_reconciler.dart';
 import '../transcription/service/transcription_queue_coordinator.dart';
 import 'controller/recording_controller.dart';
-import 'engine/android_recorder_engine.dart';
-import 'engine/fake_recorder_engine.dart';
 import 'engine/recorder_port.dart';
 import 'model/recording_annotation_entity.dart';
 import 'model/recording_phase.dart';
@@ -36,15 +31,21 @@ class RecordingPage extends StatefulWidget {
   const RecordingPage({
     super.key,
     this.controller,
+    this.recorder,
+    this.transcriptionPort,
     this.transcriptionQueueCoordinator,
     this.recordingAnnotationsRepository,
     this.initializeController = true,
+    this.notificationPermissionEnabled = false,
   });
 
   final RecordingController? controller;
+  final RecorderPort? recorder;
+  final TranscriptionPort? transcriptionPort;
   final TranscriptionQueueCoordinator? transcriptionQueueCoordinator;
   final RecordingAnnotationsRepository? recordingAnnotationsRepository;
   final bool initializeController;
+  final bool notificationPermissionEnabled;
 
   @override
   State<RecordingPage> createState() => _RecordingPageState();
@@ -86,13 +87,21 @@ class _RecordingPageState extends State<RecordingPage>
   }
 
   RecordingController _buildController() {
-    final RecorderPort recorder = _buildRecorder();
+    final RecorderPort recorder =
+        widget.recorder ??
+        (throw StateError(
+          'RecordingPage requires an injected recorder outside tests.',
+        ));
     final RecordingSessionsRepository recordingSessionsRepository =
         RecordingSessionsRepository();
     final TranscriptionJobsRepository jobsRepository =
         TranscriptionJobsRepository();
     final AppSettingsRepository settingsRepository = AppSettingsRepository();
-    final TranscriptionPort transcriptionPort = _buildTranscriptionService();
+    final TranscriptionPort transcriptionPort =
+        widget.transcriptionPort ??
+        (throw StateError(
+          'RecordingPage requires an injected transcription port.',
+        ));
     final TranscriptionQueueCoordinator queueCoordinator =
         widget.transcriptionQueueCoordinator ??
         TranscriptionQueueCoordinator(
@@ -124,20 +133,6 @@ class _RecordingPageState extends State<RecordingPage>
     await _controller.initialize();
     if (!mounted) return;
     await _showRecoveryPanelIfNeeded();
-  }
-
-  TranscriptionPort _buildTranscriptionService() {
-    if (Platform.isAndroid) {
-      return AndroidTranscriptionService();
-    }
-    return FakeTranscriptionService();
-  }
-
-  RecorderPort _buildRecorder() {
-    if (Platform.isAndroid) {
-      return AndroidRecorderEngine();
-    }
-    return FakeRecorderEngine();
   }
 
   @override
@@ -438,7 +433,7 @@ class _RecordingPageState extends State<RecordingPage>
   Future<void> _refreshNotificationPermissionState({
     required bool requestIfNeeded,
   }) async {
-    if (!Platform.isAndroid) return;
+    if (!widget.notificationPermissionEnabled) return;
     PermissionStatus status = await Permission.notification.status;
     if (requestIfNeeded && status.isDenied) {
       status = await Permission.notification.request();

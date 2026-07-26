@@ -1,0 +1,166 @@
+{
+  "schemaVersion": 1,
+  "decisionId": "DESKTOP-FIRST-MEETING-WORKSTATION-2026-07-26",
+  "updatedAt": "2026-07-26",
+  "productDirection": {
+    "workstation": "desktop",
+    "mobileRole": "capture_and_independent_mobile_core",
+    "firstDesktopTarget": "macos",
+    "platformExecution": "SERIAL_MACOS_THEN_WINDOWS",
+    "repositoryStrategy": "MONOREPO_KEEP_ROOT_MOBILE"
+  },
+  "mobileDiarizationFinalDiagnostic": {
+    "status": "FAIL_NO_ADMISSIBLE_CANDIDATE",
+    "singleRunOnly": true,
+    "autoContinueCandidates": false,
+    "contractPath": "benchmark/speaker_diarization_final_diagnostic_contract.json",
+    "summaryPath": "benchmark/evidence/speaker_diarization/final-diagnostic/summary.json",
+    "summarySha256": "8553e80aee8fb3f221c94e76ce47ac77c2ec89a6d0ed8bbbc635bf120156ec6b",
+    "terminalStatuses": [
+      "PASS_ADMISSIBLE",
+      "FAIL_NO_ADMISSIBLE_CANDIDATE"
+    ]
+  },
+  "targets": {
+    "android": {
+      "status": "MOBILE_CORE_AVAILABLE",
+      "evidencePolicy": "TARGET_SPECIFIC",
+      "evidence": [
+        {
+          "path": "benchmark/evidence/speaker_diarization/final-diagnostic/summary.json",
+          "sha256": "8553e80aee8fb3f221c94e76ce47ac77c2ec89a6d0ed8bbbc635bf120156ec6b"
+        }
+      ]
+    },
+    "macos": {
+      "status": "PASS",
+      "closureStatus": "PASS",
+      "evidencePolicy": "TARGET_SPECIFIC",
+      "evidence": [
+        {
+          "path": "docs/product/desktop-workstation-u4-evidence.json",
+          "sha256": "1e500e4e5251c3facd8399f048a117a80d08fd19e6b955c22cb7565e4a6277bf"
+        },
+        {
+          "path": "docs/product/desktop-workstation-u5-evidence.json",
+          "sha256": "272416a6fe4cdf027087d2ade10fef16ef95dfb76642e5759c1d8a2c0f88fef4"
+        },
+        {
+          "path": "docs/product/desktop-workstation-u6-evidence.json",
+          "sha256": "1a958db003898151fcb7f64ff9af3e00cd553e4f66cd83f34294cb43a4aec697"
+        },
+        {
+          "path": "docs/product/desktop-workstation-u7-evidence.json",
+          "sha256": "61a148984a10aba41d81b8aa0f46080e96f174c870ad88245428f0af6983753a"
+        },
+        {
+          "path": "docs/product/desktop-workstation-u8-evidence.json",
+          "sha256": "45fa4224398d66d0cc81d8e81293e7940b2e27aaa9eb6f893cb40320bcb4b4f5"
+        },
+        {
+          "path": "docs/product/desktop-workstation-u9-evidence.json",
+          "sha256": "c7d0477ddbb787abb4bcc54cd692ffcd9c279b371698d0cd41ed261381699439"
+        }
+      ],
+      "firstRoundEngines": {
+        "asr": [
+          "sherpa",
+          "funasr"
+        ],
+        "diarization": [
+          "sherpa",
+          "pyannote.audio"
+        ],
+        "excluded": [
+          "whisper",
+          "faster-whisper",
+          "whisper.cpp"
+        ]
+      },
+      "frozenEngines": {
+        "asr": "sherpa-streaming-zipformer-zh-14m-2023-02-23",
+        "diarization": "sherpa-pyannote-3.0-3dspeaker",
+        "runtime": "sherpa-onnx-c-api@1.13.4",
+        "boundary": "native_worker_process_group",
+        "machineDecision": "benchmark/desktop/desktop_model_candidates.json"
+      }
+    },
+    "windows": {
+      "status": "PLANNED",
+      "dependsOn": "macos.closureStatus=PASS",
+      "retestOnlyMacosFinalists": true,
+      "inheritsPassFromMacos": false,
+      "evidencePolicy": "TARGET_SPECIFIC",
+      "evidence": []
+    }
+  },
+  "modelEvidenceContract": {
+    "targetSpecific": true,
+    "crossTargetPassInheritance": false,
+    "requiredFingerprintFields": [
+      "os",
+      "cpu",
+      "memory",
+      "runtimeSha256",
+      "modelSha256",
+      "threads",
+      "fixtureSha256"
+    ]
+  },
+  "lanHandoff": {
+    "status": "PASS_MACOS_ANDROID_LAN",
+    "protocolSchema": "companion-media-transfer/v1",
+    "evidence": {
+      "path": "docs/product/desktop-workstation-u8-evidence.json",
+      "sha256": "45fa4224398d66d0cc81d8e81293e7940b2e27aaa9eb6f893cb40320bcb4b4f5"
+    },
+    "requiresAuthentication": true,
+    "requiresEncryption": true,
+    "requiresResumableTransfer": true,
+    "requiresReceiptBeforeSourceDeletion": true
+  },
+  "asr005": {
+    "status": "USER_PRE_RELEASE_ACCEPTANCE_ONLY",
+    "owner": "user",
+    "developmentBlocker": false,
+    "automatedReminder": false
+  },
+  "s3Transition": {
+    "status": "SUPERSEDED_BY_DESKTOP_WORKSTATION_DIRECTION",
+    "scopePath": "docs/product/s3-productization-scope.json"
+  },
+  "authoritativeDocuments": [
+    {
+      "path": "docs/product/meeting-voice-recognition-prd-v1.0.md",
+      "requiredMarkers": [
+        "DESKTOP-FIRST-MEETING-WORKSTATION-2026-07-26",
+        "PLANNED",
+        "USER_PRE_RELEASE_ACCEPTANCE_ONLY"
+      ]
+    },
+    {
+      "path": "docs/product/mobile-capability-matrix.md",
+      "requiredMarkers": [
+        "DESKTOP-FIRST-MEETING-WORKSTATION-2026-07-26",
+        "桌面主工作站",
+        "USER_PRE_RELEASE_ACCEPTANCE_ONLY"
+      ]
+    },
+    {
+      "path": "docs/product/s3-productization-status.md",
+      "requiredMarkers": [
+        "DESKTOP-FIRST-MEETING-WORKSTATION-2026-07-26",
+        "桌面主工作站",
+        "PLANNED"
+      ]
+    },
+    {
+      "path": "docs/product/desktop-workstation-status.md",
+      "requiredMarkers": [
+        "DESKTOP-FIRST-MEETING-WORKSTATION-2026-07-26",
+        "PLANNED",
+        "TARGET_SPECIFIC"
+      ]
+    }
+  ]
+}

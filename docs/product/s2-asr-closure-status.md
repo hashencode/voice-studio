@@ -14,15 +14,18 @@ S2 收敛为 **S2 Mobile Core**：保留 Paraformer 基础离线转写、真实�
 RELEASE-READY，所有原始失败指标都保留。当前 18 个 Mobile Core
 mandatory gates 为 17 PASS、1 BLOCKED；唯一 blocker 是
 `ASR-005-TIMESTAMP-INDEPENDENT`，所以 **S2 Mobile Core 仍为 BLOCKED**。
-整体还受 S1 高端参考设备、EXP-005 和发布交付约束，继续 **NOT
-RELEASE-READY**。没有执行发布、签名、提交、推送、PR、部署或商店交付。
+该人工门禁当前标记为 `SKIPPED_PENDING_USER_TEST`，等待用户后续完成；
+执行跳过不等于 PASS，也不改变 `releaseEligible=false`。
+S1 非发布功能闭环已由低端和中端参考机通过。整体还受发布候选包的高端
+设备兼容性、EXP-005 和发布交付约束，继续 **NOT RELEASE-READY**。
+没有执行发布、签名、提交、推送、PR、部署或商店交付。
 
 ## S2 Mobile Core ASR gate
 
 | 能力 | Mobile Core 结论 | 高级部分 |
 | --- | --- | --- |
 | ASR-004 | PASS：真实 CT-Transformer 标点和确定性分段 | ITN `DEFERRED_TO_PC` / `DEFERRED_NOT_PASSED`，许可证与黄金样例门禁不变 |
-| ASR-005 | **BLOCKED**：工程分段 5/4、provisional P95=182 ms；独立 reviewer 缺失，`releaseEligible=false` | 无；独立听审是 Core 强制门禁 |
+| ASR-005 | **BLOCKED / `SKIPPED_PENDING_USER_TEST`**：工程分段 5/4、provisional P95=182 ms；独立 reviewer 缺失，`releaseEligible=false` | 无；独立听审是 Core 强制门禁，等待用户后续测试 |
 | ASR-006 | PASS：人工未复核/待复核/已复核三态 | 自动 confidence `DEFERRED_TO_PC` / `DEFERRED_NOT_PASSED` |
 | ASR-007 | 不属于 Mobile Core | 热词 `DEFERRED_TO_PC` / `DEFERRED_NOT_PASSED` |
 | ASR-008 | 不属于 Mobile Core | GTCRN/AEC `DEFERRED_NOT_PASSED` 到高级音频，历史 FAIL 不变 |

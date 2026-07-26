@@ -1,0 +1,159 @@
+{
+  "schemaVersion": 2,
+  "decisionId": "desktop-processing/macos-first-engine-set-v1",
+  "decisionPlatform": "macos",
+  "targetFingerprint": {
+    "operatingSystemVersion": "15.7.5",
+    "architecture": "arm64",
+    "cpuModel": "Apple M2",
+    "logicalCpuCount": 8,
+    "memoryBytes": 17179869184
+  },
+  "benchmarkContract": "benchmark/desktop/desktop_benchmark_contract.json",
+  "candidates": [
+    {
+      "id": "sherpa-streaming-zipformer-zh-14m-2023-02-23",
+      "capability": "asr.zh",
+      "runtime": "sherpa-onnx-c-api@1.13.4",
+      "modelSha256": "dbc43dfe2e490fae801a6619f558730a721e8f8a674003f14ad020a6b5f205cc",
+      "modelBytes": 25354851,
+      "licenseDisposition": "PRODUCT_ELIGIBLE_APACHE_2_0",
+      "absoluteGates": {
+        "cer": "PASS",
+        "rtf": "PASS",
+        "offlineProcessing": "PASS",
+        "cancellation": "PASS"
+      },
+      "metrics": {
+        "cer": 0.03550295857988166,
+        "rtf": 0.020461995572582273
+      },
+      "evidence": {
+        "path": "benchmark/desktop/evidence/macos-sherpa-1.13.4/asr.json",
+        "sha256": "01bcdad940b51a3b38f9c5fb0b7cb8ea5b545a7e22a07299ce7e1e926c1aec4a"
+      },
+      "status": "SELECTED"
+    },
+    {
+      "id": "funasr-paraformer-vad-punctuation",
+      "capability": "asr.zh",
+      "runtime": "funasr-1.3.22-python-3.12.13",
+      "environmentLockSha256": "e6e03f114b44d5aa51511e36c9edbacbb2806b11142ebab769be8465701c1ec7",
+      "modelSha256": {
+        "asr": "9e0e7740292ed73dd7100c6ad84297f4625a455958543fc4904351c2d931075b",
+        "vad": "60fb109b7aff385e5739787ae0aabfdcfea6894505e5b816ff1fe194f1127c16",
+        "punctuation": "0ef2be6bb3f93efb7fe711c53f7ed62e37a83597c9076f4bcbbac08d90f58560"
+      },
+      "modelBytes": 1209984868,
+      "measuredEnvironmentBytes": 930474501,
+      "licenseDisposition": "PRODUCT_REVIEW_ELIGIBLE_APACHE_2_0",
+      "absoluteGates": {
+        "paraformer": "PASS",
+        "vad": "PASS",
+        "punctuation": "PASS",
+        "itnRequested": "PASS",
+        "timestamps": "PASS",
+        "cer": "PASS",
+        "rtf": "PASS"
+      },
+      "metrics": {
+        "cer": 0.11637080867850098,
+        "rtf": 0.20282482887881173,
+        "coldStartupSeconds": 3.969134667015169,
+        "incrementalPeakRssBytes": 3130687488
+      },
+      "relativeToSherpa": {
+        "cerMultiple": 3.2777777777777777,
+        "rtfMultiple": 9.912270196685197,
+        "qualityBenefit": false,
+        "costBenefit": false
+      },
+      "failedSelectionGates": [
+        "QUALITY_REGRESSION_VS_SHERPA",
+        "RTF_REGRESSION_VS_SHERPA",
+        "DELIVERY_FOOTPRINT_COST_NOT_JUSTIFIED",
+        "PEAK_RSS_COST_NOT_JUSTIFIED"
+      ],
+      "evidence": {
+        "path": "benchmark/desktop/evidence/macos/funasr-paraformer.json",
+        "sha256": "4487356548af645c8737e4684725374d0981d9a8935de675bf706d76c008622d"
+      },
+      "status": "NOT_SELECTED_COST_EXCEEDS_BENEFIT"
+    },
+    {
+      "id": "sherpa-pyannote-3.0-3dspeaker",
+      "capability": "diarization",
+      "runtime": "sherpa-onnx-c-api@1.13.4",
+      "modelSha256": {
+        "segmentation": "220ad67ca923bef2fa91f2390c786097bf305bceb5e261d4af67b38e938e1079",
+        "embedding": "1a331345f04805badbb495c775a6ddffcdd1a732567d5ec8b3d5749e3c7a5e4b"
+      },
+      "modelBytes": 45586674,
+      "licenseDisposition": "PRODUCT_ELIGIBLE_WITH_PINNED_NOTICES",
+      "absoluteGates": {
+        "functional": "PASS",
+        "twoHourResource": "PASS",
+        "offlineProcessing": "PASS",
+        "cancellation": "PASS",
+        "anonymousSpeakersOnly": "PASS",
+        "voiceprintPersistence": "PASS"
+      },
+      "metrics": {
+        "functionalRtf": 0.25739333333333336,
+        "twoHourRtf": 0.27456708333333335,
+        "incrementalPeakRssBytes": 216252416
+      },
+      "evidence": [
+        {
+          "path": "benchmark/desktop/evidence/macos-sherpa-1.13.4/diarization-functional.json",
+          "sha256": "6f025044317d3a8a4f9ac20f40f89d672d71cf6c7a19452812de260c782eaf6f"
+        },
+        {
+          "path": "benchmark/desktop/evidence/macos-sherpa-1.13.4/diarization-resource.json",
+          "sha256": "88b0b0de27a6b706ad0cac1730447e14f3147dfbfa86a98eaa4c3e1e077bfb20"
+        },
+        {
+          "path": "benchmark/desktop/evidence/macos/sherpa-diarization-license.json",
+          "sha256": "f984a5f6436d64508a99777bbd6e09c327a0d567b48abf9abc87123db5f75153"
+        }
+      ],
+      "status": "SELECTED"
+    },
+    {
+      "id": "pyannote-community-1",
+      "capability": "diarization",
+      "runtime": "pyannote-audio-4.0.4-python-3.12.13",
+      "environmentLockSha256": "d99371f2b225347ad69140f7eb9adb11c311eea34797ffb116c3ee2f9d2492a9",
+      "modelRevision": "3533c8cf8e369892e6b79ff1bf80f7b0286a54ee",
+      "licenseDisposition": "LAB_ONLY_USER_CONDITIONS_NOT_ACCEPTED",
+      "hardFailures": [
+        "USER_CONDITIONS_NOT_ACCEPTED",
+        "MODEL_CONTENT_NOT_PROVISIONED",
+        "FFMPEG_DELIVERY_NOT_FROZEN"
+      ],
+      "metrics": null,
+      "evidence": {
+        "path": "benchmark/desktop/evidence/macos/pyannote-community-1.json",
+        "sha256": "edb05ab331c4628bc6dd486519034720836e2d5a88321805a4c4ffe16140bdb5"
+      },
+      "status": "LAB_ONLY"
+    }
+  ],
+  "machineDecision": {
+    "status": "FINALISTS_FROZEN",
+    "hardFailuresAppliedBeforeBenefits": true,
+    "winners": {
+      "asr": "sherpa-streaming-zipformer-zh-14m-2023-02-23",
+      "diarization": "sherpa-pyannote-3.0-3dspeaker"
+    },
+    "selectedRuntime": "sherpa-onnx-c-api@1.13.4",
+    "selectedBoundary": "native_worker_process_group",
+    "sidecarWinner": null,
+    "productSidecarDeliveryRequired": false,
+    "noticesRequired": [
+      "Apache-2.0 sherpa-onnx runtime and ASR model",
+      "MIT pyannote segmentation model",
+      "Apache-2.0 3D-Speaker ERes2Net model"
+    ]
+  }
+}

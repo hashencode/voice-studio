@@ -1022,9 +1022,11 @@ class _HomePageState extends State<HomePage> {
       actions: <GooAppBarIconAction>[
         GooAppBarIconAction(
           iconName: GooIcons.upload,
-          semanticLabel: '导入',
-          tooltip: '导入',
-          onPressed: _importMeetingMedia,
+          semanticLabel: _meetingImportService.isAvailable ? '导入' : '导入能力尚未配置',
+          tooltip: _meetingImportService.isAvailable ? '导入' : '当前平台尚未配置真实导入能力',
+          onPressed: _meetingImportService.isAvailable
+              ? _importMeetingMedia
+              : null,
         ),
         GooAppBarIconAction(
           iconName: themeController?.isDarkMode == true

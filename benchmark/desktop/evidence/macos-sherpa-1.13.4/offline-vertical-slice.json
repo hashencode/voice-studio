@@ -1,0 +1,67 @@
+{
+  "schemaVersion": 1,
+  "source": "local_private_file",
+  "sourceSha256": "9345f80fc835ae2afc9bb58ccdbd5047797d7de3afc4cb3a2c6ef44444a2a562",
+  "engineId": "sherpa-onnx-1.13.4/zipformer14m-pyannote3",
+  "cloudProvidersInvoked": [],
+  "aiFeaturesInvoked": [],
+  "reviewState": "manual_correction_available",
+  "reviewRevisionCount": 0,
+  "exportFormat": "webvtt",
+  "exportSha256": "0be0c0427adf3aea0d0fd6c02f8c2bb9c046116d7f6419935d3430934c403200",
+  "elapsedMilliseconds": 71461,
+  "residentBytesAfterProbe": 541523968,
+  "segmentCount": 978,
+  "speakerAssignments": [
+    "anonymous",
+    "overlap",
+    "unknown"
+  ],
+  "progress": [
+    {
+      "phase": "asr",
+      "fraction": 0.00014967324459788723
+    },
+    {
+      "phase": "asr",
+      "fraction": 0.10028107388058445
+    },
+    {
+      "phase": "asr",
+      "fraction": 0.20041247451657102
+    },
+    {
+      "phase": "asr",
+      "fraction": 0.3005438751525576
+    },
+    {
+      "phase": "asr",
+      "fraction": 0.4006752757885441
+    },
+    {
+      "phase": "diarization",
+      "fraction": 0.45085616438356163
+    },
+    {
+      "phase": "diarization",
+      "fraction": 0.5510273972602739
+    },
+    {
+      "phase": "diarization",
+      "fraction": 0.6511986301369863
+    },
+    {
+      "phase": "diarization",
+      "fraction": 0.7513698630136987
+    },
+    {
+      "phase": "diarization",
+      "fraction": 0.851541095890411
+    },
+    {
+      "phase": "complete",
+      "fraction": 1.0
+    }
+  ],
+  "complete": true
+}

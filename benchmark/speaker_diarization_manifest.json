@@ -1,0 +1,95 @@
+{
+  "schemaVersion": 2,
+  "updatedAt": "2026-07-26",
+  "contractId": "speaker-diarization-admission/sherpa-int8-fallback-v2",
+  "contractPath": "benchmark/speaker_diarization_admission_contract.json",
+  "contractSha256": "1e6d8f6ec965b68be724235db6c277677b29902aedf27f146c6281d17dbfdd4b",
+  "candidateId": "sherpa-v1.13.3-pyannote-int8-3dspeaker",
+  "status": "DEFERRED_NO_ADMISSIBLE_CANDIDATE",
+  "verified": false,
+  "eligibleForProductization": false,
+  "productAvailable": false,
+  "failedGates": [
+    "FUNCTIONAL",
+    "RESOURCE",
+    "NO_ADMISSIBLE_CANDIDATE"
+  ],
+  "reason": "当前 Sherpa FP32 有界候选与量表选出的唯一 Pyannote INT8 fallback 均在 Xiaomi 真机 5 分钟筛选中出现功能语义与 projected RTF 硬失败；按计划不推进第三个候选，也不启动注定不满足 RTF 阈值的 120 分钟探针。",
+  "productState": {
+    "modelsPackaged": false,
+    "productEntrance": false,
+    "persistsVoiceprints": false
+  },
+  "evaluationEvidenceSha256": "8d281f1e77927f3342a8cab848601d65ecd4cd508773648c311f19e2fb521504",
+  "evidenceFiles": [
+    {
+      "role": "CURRENT_FUNCTIONAL_SCREEN",
+      "path": "benchmark/evidence/speaker_diarization/current-functional-screen.json",
+      "sha256": "54b5cd9da76fff3868aa4a8325f44485d7c89043f73a8dc8633088145aad10e8"
+    },
+    {
+      "role": "CURRENT_SCREENING_EVALUATION",
+      "path": "benchmark/evidence/speaker_diarization/current-screening-evaluation.json",
+      "sha256": "ec59c26a5ba4b24f59aa5967a46ed40fce855ca90688aed3dba1c915fc532f7b"
+    },
+    {
+      "role": "FALLBACK_FUNCTIONAL_SCREEN",
+      "path": "benchmark/evidence/speaker_diarization/functional.json",
+      "sha256": "f3b3454a56e3aa2514ac068c046d648d94e543324b32defd12f1546267400df4"
+    },
+    {
+      "role": "FALLBACK_SCREENING_EVALUATION",
+      "path": "benchmark/evidence/speaker_diarization/evaluation.json",
+      "sha256": "8d281f1e77927f3342a8cab848601d65ecd4cd508773648c311f19e2fb521504"
+    },
+    {
+      "role": "RESOURCE_EXECUTION_DISPOSITION",
+      "path": "benchmark/evidence/speaker_diarization/resource.json",
+      "sha256": "02e4f5d50f5f904d978c8b588a4a5c60cfec6c6acaeec3df2424fb07e2df7f1d"
+    }
+  ],
+  "probes": {
+    "fiveMinute": {
+      "status": "FAIL",
+      "reason": "INT8 fallback 覆盖率 93.645% 和 DER 12.192% 通过并表达 overlap，但在预注册静音区间仍产生 speaker 归属，且 projected 120 分钟 RTF 为 2.4020，候选筛选失败。",
+      "device": "Xiaomi M2102J2SC",
+      "build": "Android 13 / V816.0.4.0.TGACNXM / debug",
+      "fixtureSha256": "7e2757eb30176edc36a2c14a6511bbf297caa5dbfa9541e119cd94fd23a6d4ec",
+      "evidenceSha256": "f3b3454a56e3aa2514ac068c046d648d94e543324b32defd12f1546267400df4",
+      "annotatedSpeechCoverage": 0.936446081904492,
+      "der": 0.12191975229002709,
+      "orderedInBoundsTurns": true,
+      "overlapRepresented": true,
+      "noSpeakerInPreregisteredSilence": false,
+      "meetingGlobalSpeakerKeys": true,
+      "transcriptSnapshotBeforeSha256": "aed340cf0c0a78e6aa729314846992a1c4e85995251608c6abc02d705bead306",
+      "transcriptSnapshotAfterSha256": "aed340cf0c0a78e6aa729314846992a1c4e85995251608c6abc02d705bead306",
+      "transcriptEvidenceDisposition": "HASH_MATCH",
+      "elapsedMs": 721034.101288,
+      "rtf": 2.4034470042933333,
+      "projectedOneHundredTwentyMinuteRtf": 2.402002671510833,
+      "maximumThermalStatus": "none"
+    },
+    "thirtyMinute": {
+      "status": "SKIPPED_BY_PLAN",
+      "reason": "开发期按计划跳过；发布稳定阶段再执行完整 5/30/120 矩阵。"
+    },
+    "oneHundredTwentyMinute": {
+      "status": "FAIL",
+      "reason": "冻结的 5 分钟 screening evidence 推导 120 分钟 RTF 为 2.4020，高于不变的 0.5 阈值；依计划 fail-closed 跳过昂贵长探针，不伪造 RTF、RSS 或完成状态。",
+      "device": "Xiaomi M2102J2SC",
+      "build": "Android 13 / V816.0.4.0.TGACNXM / debug",
+      "fixtureSha256": "6a4f0849cee47ad9daecac04d92977c8cf6b48de1dd43849ad60852de5b336c3",
+      "evidenceSha256": "02e4f5d50f5f904d978c8b588a4a5c60cfec6c6acaeec3df2424fb07e2df7f1d",
+      "completed": false,
+      "oom": false,
+      "anr": false,
+      "rtf": null,
+      "incrementalPeakRssMiB": null,
+      "maximumThermalStatus": "none",
+      "projectedRtf": 2.402002671510833,
+      "executionDisposition": "SKIPPED_PROJECTED_RTF_HARD_FAILURE"
+    }
+  },
+  "alternativesReview": "benchmark/S3_SPEAKER_ALTERNATIVES.md"
+}

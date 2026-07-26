@@ -39,6 +39,7 @@ class S2MobileCoreScopeValidatorTest(unittest.TestCase):
         *,
         omit_marker_for: str | None = None,
         omit_prd_item: str | None = None,
+        asr005_development_blocker: bool = False,
     ) -> Path:
         for document in manifest["authoritativeDocuments"]:
             path = root / document["path"]
@@ -56,7 +57,14 @@ class S2MobileCoreScopeValidatorTest(unittest.TestCase):
                         continue
                     status_markers = []
                     if item["mobileCoreStatus"] == "BLOCKED":
-                        status_markers.append("BLOCKED")
+                        if item["id"] == "ASR-005":
+                            status_markers.append(
+                                "BLOCKED"
+                                if asr005_development_blocker
+                                else "USER_PRE_RELEASE_ACCEPTANCE_ONLY"
+                            )
+                        else:
+                            status_markers.append("BLOCKED")
                     if item["deferredParts"]:
                         status_markers.append("DEFERRED_NOT_PASSED")
                     lines.append(
@@ -116,6 +124,23 @@ class S2MobileCoreScopeValidatorTest(unittest.TestCase):
             "remainingBlockers|derived Mobile Core status",
         ):
             self._validate_fixture(manifest)
+
+    def test_timestamp_review_skip_cannot_be_misreported_as_pass(self) -> None:
+        manifest = copy.deepcopy(self.manifest)
+        manifest["timestampGate"]["executionDisposition"] = "PASS"
+
+        with self.assertRaisesRegex(
+            ValueError,
+            "execution must remain skipped pending user testing",
+        ):
+            self._validate_fixture(manifest)
+
+    def test_prd_cannot_restore_asr005_as_development_blocker(self) -> None:
+        with self.assertRaisesRegex(ValueError, "user-owned pre-release"):
+            self._validate_fixture(
+                copy.deepcopy(self.manifest),
+                asr005_development_blocker=True,
+            )
 
     def test_current_baseline_cannot_add_a_second_blocked_gate(self) -> None:
         manifest = copy.deepcopy(self.manifest)

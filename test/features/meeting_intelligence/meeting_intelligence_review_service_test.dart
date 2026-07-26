@@ -139,4 +139,120 @@ void main() {
       MeetingInsightStatus.rejected,
     );
   });
+
+  test(
+    'editing a published action returns it to draft with metadata revision',
+    () async {
+      final fixture = await createMeetingIntelligenceFixture();
+      addTearDown(fixture.database.close);
+      final repository = MeetingIntelligenceRepository(
+        database: fixture.appDatabase,
+      );
+      final service = MeetingIntelligenceReviewService(repository: repository);
+      final provider = FixtureMeetingIntelligenceProvider(
+        output: MeetingIntelligenceOutput(
+          items: <MeetingInsightCandidate>[
+            MeetingInsightCandidate(
+              kind: MeetingInsightKind.action,
+              body: 'Prepare rollout.',
+              actionOwner: 'Alice',
+              actionDueAtMs: 100,
+              evidence: <MeetingEvidenceCandidate>[
+                MeetingEvidenceCandidate(
+                  segmentId: fixture.segment.id,
+                  startMs: 1000,
+                  endMs: 2000,
+                ),
+              ],
+            ),
+          ],
+        ),
+      );
+      final bundle = await service.generateDraft(
+        boundary: MeetingIntelligenceProviderBoundary(provider: provider),
+        request: fixture.request,
+      );
+      final id = bundle.insights.single.id;
+      await service.markReviewed(id);
+      await service.publish(id);
+
+      await service.edit(
+        insightId: id,
+        body: 'Prepare staged rollout.',
+        clearActionOwner: true,
+        clearActionDueAt: true,
+      );
+
+      final edited = (await repository.findInsight(id))!;
+      expect(edited.status, MeetingInsightStatus.draft);
+      expect(edited.body, 'Prepare staged rollout.');
+      expect(edited.actionOwner, isNull);
+      expect(edited.actionDueAtMs, isNull);
+      expect(edited.unresolvedOwner, isTrue);
+      expect(edited.unresolvedDueDate, isTrue);
+      expect(
+        (await repository.listRevisions(
+          bundle.note.id,
+        )).map((revision) => revision.action),
+        contains('edit'),
+      );
+    },
+  );
+
+  test(
+    'risk resolution and explicit title application are revisioned',
+    () async {
+      final fixture = await createMeetingIntelligenceFixture();
+      addTearDown(fixture.database.close);
+      final repository = MeetingIntelligenceRepository(
+        database: fixture.appDatabase,
+      );
+      final service = MeetingIntelligenceReviewService(repository: repository);
+      final provider = FixtureMeetingIntelligenceProvider(
+        output: MeetingIntelligenceOutput(
+          suggestedTitle: 'S3 周会',
+          items: <MeetingInsightCandidate>[
+            MeetingInsightCandidate(
+              kind: MeetingInsightKind.risk,
+              body: 'Model contract may change.',
+              evidence: <MeetingEvidenceCandidate>[
+                MeetingEvidenceCandidate(
+                  segmentId: fixture.segment.id,
+                  startMs: 1000,
+                  endMs: 2000,
+                ),
+              ],
+            ),
+          ],
+        ),
+      );
+      final bundle = await service.generateDraft(
+        boundary: MeetingIntelligenceProviderBoundary(provider: provider),
+        request: fixture.request,
+      );
+
+      await service.setResolved(bundle.insights.single.id, resolved: true);
+      await service.applySuggestedTitle(noteId: bundle.note.id, title: 'S3 周会');
+
+      expect(
+        (await repository.findInsight(
+          bundle.insights.single.id,
+        ))!.resolutionState,
+        MeetingInsightResolutionState.resolved,
+      );
+      final recording = await fixture.database.query(
+        'recordings',
+        columns: <String>['display_name'],
+        where: 'id = ?',
+        whereArgs: <Object>[fixture.recordingId],
+      );
+      expect(recording.single['display_name'], 'S3 周会');
+      expect(
+        (await repository.listRevisions(
+          bundle.note.id,
+        )).map((revision) => revision.action),
+        containsAll(<String>['resolve', 'apply_title']),
+      );
+    },
+  );
 }

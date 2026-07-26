@@ -87,4 +87,6 @@ The production segmentation mismatch is resolved. ASR-005 remains BLOCKED
 solely on the independent blind-listening review and the subsequent normal
 physical-device evaluation. The implementing agent cannot act as the
 independent reviewer, and the manifest must remain provisional until that
-review is completed.
+review is completed. Execution is currently marked
+`SKIPPED_PENDING_USER_TEST`; the user will resume this procedure later. This
+execution disposition does not make the gate PASS or release-eligible.

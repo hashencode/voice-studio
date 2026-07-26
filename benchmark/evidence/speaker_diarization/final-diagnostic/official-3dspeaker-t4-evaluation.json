@@ -1,0 +1,20 @@
+{
+  "armId": "official-3dspeaker-t4",
+  "status": "FAIL",
+  "failedGates": [
+    "OVERLAP",
+    "SILENCE",
+    "RTF"
+  ],
+  "annotatedSpeechCoverage": 0.9252515233101885,
+  "der": 0.15746355308992388,
+  "overlapRepresented": false,
+  "noSpeakerInPreregisteredSilence": false,
+  "rtf": 1.2732889278133335,
+  "elapsedMs": 381986.678344,
+  "incrementalPeakPssKiB": 230620,
+  "maximumThermalStatus": "none",
+  "completeInputConsumption": true,
+  "transcriptSnapshotHashMatch": true,
+  "evidenceSha256": "aac2ca70c0952b57354a32c22becf702668075ca7aee03eb64b3cb5456ce402d"
+}

@@ -1,0 +1,182 @@
+{
+  "schemaVersion": 1,
+  "contractId": "speaker-diarization-final-diagnostic/v1",
+  "updatedAt": "2026-07-26",
+  "target": {
+    "platform": "android",
+    "manufacturer": "Xiaomi",
+    "model": "M2102J2SC",
+    "minimumSdkInt": 33
+  },
+  "fixture": {
+    "wavSha256": "7e2757eb30176edc36a2c14a6511bbf297caa5dbfa9541e119cd94fd23a6d4ec",
+    "rttmSha256": "a00bfae7495bf3e0aa4b3236f6225db936e61b1e4e213dd60ccd290791c5bb9d",
+    "sampleRate": 16000,
+    "durationSeconds": 300
+  },
+  "thresholds": {
+    "minimumAnnotatedSpeechCoverage": 0.8,
+    "maximumDer": 0.3,
+    "maximumRtf": 0.5,
+    "requiresOverlapRepresentation": true,
+    "requiresNoSpeakerInPreregisteredSilence": true,
+    "requiresTranscriptSnapshotHashMatch": true,
+    "requiresCompleteInputConsumption": true
+  },
+  "controlArm": {
+    "id": "product-integration-control",
+    "status": "FAIL",
+    "frozenWindowSamples": 480000,
+    "frozenOverlapSamples": 80000,
+    "frozenReconciliationThreshold": 0.8,
+    "candidateId": "sherpa-v1.13.3-pyannote-int8-3dspeaker",
+    "functionalEvidenceSha256": "f3b3454a56e3aa2514ac068c046d648d94e543324b32defd12f1546267400df4",
+    "evaluationEvidenceSha256": "8d281f1e77927f3342a8cab848601d65ecd4cd508773648c311f19e2fb521504"
+  },
+  "parityArms": [
+    {
+      "id": "official-3dspeaker-t1",
+      "mode": "OFFICIAL_PARITY",
+      "status": "FAIL",
+      "numThreads": 1,
+      "directFullFixtureProcess": true,
+      "usesWindowing": false,
+      "usesExternalEmbedding": false,
+      "usesReconciliation": false,
+      "segmentation": {
+        "id": "sherpa-onnx-pyannote-segmentation-3-0",
+        "sha256": "220ad67ca923bef2fa91f2390c786097bf305bceb5e261d4af67b38e938e1079",
+        "bytes": 5992913,
+        "license": "MIT",
+        "licenseReviewed": true
+      },
+      "embedding": {
+        "id": "3dspeaker_speech_eres2net_base_sv_zh-cn_3dspeaker_16k",
+        "sha256": "1a331345f04805badbb495c775a6ddffcdd1a732567d5ec8b3d5749e3c7a5e4b",
+        "bytes": 39593761,
+        "license": "Apache-2.0",
+        "licenseReviewed": true
+      },
+      "clustering": {
+        "algorithm": "fast_clustering",
+        "numSpeakers": 2,
+        "threshold": 0.5
+      },
+      "minDurationOn": 0.3,
+      "minDurationOff": 0.5,
+      "evidencePath": "benchmark/evidence/speaker_diarization/final-diagnostic/official-3dspeaker-t1.json",
+      "evidenceSha256": "c769cc7ae91f906c376706becd2772496309b47dafb329efcf61db330bef3c4c",
+      "evaluationPath": "benchmark/evidence/speaker_diarization/final-diagnostic/official-3dspeaker-t1-evaluation.json",
+      "evaluationSha256": "a1103e5c1220667837465c569fca0ae949bfd56520280eb9564db71acac2e615"
+    },
+    {
+      "id": "official-3dspeaker-t2",
+      "mode": "OFFICIAL_PARITY",
+      "status": "FAIL",
+      "numThreads": 2,
+      "directFullFixtureProcess": true,
+      "usesWindowing": false,
+      "usesExternalEmbedding": false,
+      "usesReconciliation": false,
+      "segmentation": {
+        "id": "sherpa-onnx-pyannote-segmentation-3-0",
+        "sha256": "220ad67ca923bef2fa91f2390c786097bf305bceb5e261d4af67b38e938e1079",
+        "bytes": 5992913,
+        "license": "MIT",
+        "licenseReviewed": true
+      },
+      "embedding": {
+        "id": "3dspeaker_speech_eres2net_base_sv_zh-cn_3dspeaker_16k",
+        "sha256": "1a331345f04805badbb495c775a6ddffcdd1a732567d5ec8b3d5749e3c7a5e4b",
+        "bytes": 39593761,
+        "license": "Apache-2.0",
+        "licenseReviewed": true
+      },
+      "clustering": {
+        "algorithm": "fast_clustering",
+        "numSpeakers": 2,
+        "threshold": 0.5
+      },
+      "minDurationOn": 0.3,
+      "minDurationOff": 0.5,
+      "evidencePath": "benchmark/evidence/speaker_diarization/final-diagnostic/official-3dspeaker-t2.json",
+      "evidenceSha256": "493f67bfa863dbce5185fa76560de2d248d42b670af03c6f9abb531207165cee",
+      "evaluationPath": "benchmark/evidence/speaker_diarization/final-diagnostic/official-3dspeaker-t2-evaluation.json",
+      "evaluationSha256": "fd8562d2d18e246b34448053236008bd3e429239e1d0bbe74005c2340f810c1d"
+    },
+    {
+      "id": "official-3dspeaker-t4",
+      "mode": "OFFICIAL_PARITY",
+      "status": "FAIL",
+      "numThreads": 4,
+      "directFullFixtureProcess": true,
+      "usesWindowing": false,
+      "usesExternalEmbedding": false,
+      "usesReconciliation": false,
+      "segmentation": {
+        "id": "sherpa-onnx-pyannote-segmentation-3-0",
+        "sha256": "220ad67ca923bef2fa91f2390c786097bf305bceb5e261d4af67b38e938e1079",
+        "bytes": 5992913,
+        "license": "MIT",
+        "licenseReviewed": true
+      },
+      "embedding": {
+        "id": "3dspeaker_speech_eres2net_base_sv_zh-cn_3dspeaker_16k",
+        "sha256": "1a331345f04805badbb495c775a6ddffcdd1a732567d5ec8b3d5749e3c7a5e4b",
+        "bytes": 39593761,
+        "license": "Apache-2.0",
+        "licenseReviewed": true
+      },
+      "clustering": {
+        "algorithm": "fast_clustering",
+        "numSpeakers": 2,
+        "threshold": 0.5
+      },
+      "minDurationOn": 0.3,
+      "minDurationOff": 0.5,
+      "evidencePath": "benchmark/evidence/speaker_diarization/final-diagnostic/official-3dspeaker-t4.json",
+      "evidenceSha256": "aac2ca70c0952b57354a32c22becf702668075ca7aee03eb64b3cb5456ce402d",
+      "evaluationPath": "benchmark/evidence/speaker_diarization/final-diagnostic/official-3dspeaker-t4-evaluation.json",
+      "evaluationSha256": "0dd5defd78ad5b14b88db18eb168a0120699e48f147f2d9ad93eac396afd117c"
+    },
+    {
+      "id": "official-titanet-t2",
+      "mode": "OFFICIAL_PARITY",
+      "status": "FAIL",
+      "numThreads": 2,
+      "directFullFixtureProcess": true,
+      "usesWindowing": false,
+      "usesExternalEmbedding": false,
+      "usesReconciliation": false,
+      "segmentation": {
+        "id": "sherpa-onnx-pyannote-segmentation-3-0",
+        "sha256": "220ad67ca923bef2fa91f2390c786097bf305bceb5e261d4af67b38e938e1079",
+        "bytes": 5992913,
+        "license": "MIT",
+        "licenseReviewed": true
+      },
+      "embedding": {
+        "id": "nemo_en_titanet_small",
+        "sha256": "ad4a1802485d8b34c722d2a9d04249662f2ece5d28a7a039063ca22f515a789e",
+        "bytes": 40257283,
+        "license": "Apache-2.0",
+        "licenseReviewed": true
+      },
+      "clustering": {
+        "algorithm": "fast_clustering",
+        "numSpeakers": 2,
+        "threshold": 0.5
+      },
+      "minDurationOn": 0.3,
+      "minDurationOff": 0.5,
+      "evidencePath": "benchmark/evidence/speaker_diarization/final-diagnostic/official-titanet-t2.json",
+      "evidenceSha256": "3ce99a3fc5be37d50b21053a2aa917bbf60cb4e5bfebbaa05debad93dc1c011d",
+      "evaluationPath": "benchmark/evidence/speaker_diarization/final-diagnostic/official-titanet-t2-evaluation.json",
+      "evaluationSha256": "a509907c02f93a32cbfc90085cb93c6483ed43d8a6fb421d1cbc5ebe61a2c58e"
+    }
+  ],
+  "summaryPath": "benchmark/evidence/speaker_diarization/final-diagnostic/summary.json",
+  "summarySha256": "8553e80aee8fb3f221c94e76ce47ac77c2ec89a6d0ed8bbbc635bf120156ec6b",
+  "terminalDisposition": "MOBILE_DIARIZATION_CLOSED_NO_ADMISSIBLE_CANDIDATE",
+  "nextCandidate": null
+}

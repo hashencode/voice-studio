@@ -1,0 +1,111 @@
+{
+  "schemaVersion": 1,
+  "unit": "U6",
+  "target": "macos",
+  "capturedAt": "2026-07-26",
+  "targetFingerprint": {
+    "operatingSystem": "macos",
+    "operatingSystemVersion": "15.7.5",
+    "architecture": "arm64",
+    "cpuModel": "Apple M2",
+    "logicalCpuCount": 8,
+    "memoryBytes": 17179869184
+  },
+  "decision": {
+    "status": "FINALISTS_FROZEN",
+    "asr": "sherpa-streaming-zipformer-zh-14m-2023-02-23",
+    "diarization": "sherpa-pyannote-3.0-3dspeaker",
+    "runtime": "sherpa-onnx-c-api@1.13.4",
+    "boundary": "native_worker_process_group",
+    "sidecarWinner": null,
+    "machineDecisionPath": "benchmark/desktop/desktop_model_candidates.json",
+    "machineDecisionSha256": "70c5ad01fbf8cd7840818234e0e1bcc6699499ad30595954d079a90ae411dd47",
+    "selectionPath": "benchmark/desktop/MACOS_ENGINE_SELECTION.md",
+    "selectionSha256": "bf593f65520d4b14aeb55833395a9b1a33480add5570b7d40c6437a72137de23"
+  },
+  "funasrComparison": {
+    "status": "NOT_SELECTED_COST_EXCEEDS_BENEFIT",
+    "componentsExercised": [
+      "paraformer",
+      "vad",
+      "punctuation",
+      "itnRequested",
+      "timestamps"
+    ],
+    "cer": 0.11637080867850098,
+    "rtf": 0.20282482887881173,
+    "coldStartupSeconds": 3.969134667015169,
+    "incrementalPeakRssBytes": 3130687488,
+    "modelBytes": 1209984868,
+    "measuredEnvironmentBytes": 930474501,
+    "failedSelectionGates": [
+      "QUALITY_REGRESSION_VS_SHERPA",
+      "RTF_REGRESSION_VS_SHERPA",
+      "DELIVERY_FOOTPRINT_COST_NOT_JUSTIFIED",
+      "PEAK_RSS_COST_NOT_JUSTIFIED"
+    ],
+    "environmentManifestSha256": "236e09d8744b8cc95329caac55da33a7a5708adc7ccf62520d1908f144456915",
+    "environmentLockSha256": "e6e03f114b44d5aa51511e36c9edbacbb2806b11142ebab769be8465701c1ec7",
+    "evidencePath": "benchmark/desktop/evidence/macos/funasr-paraformer.json",
+    "evidenceSha256": "4487356548af645c8737e4684725374d0981d9a8935de675bf706d76c008622d"
+  },
+  "pyannoteComparison": {
+    "status": "LAB_ONLY_USER_CONDITIONS_NOT_ACCEPTED",
+    "benchmarkExecuted": false,
+    "modelRevision": "3533c8cf8e369892e6b79ff1bf80f7b0286a54ee",
+    "hardFailures": [
+      "USER_CONDITIONS_NOT_ACCEPTED",
+      "MODEL_CONTENT_NOT_PROVISIONED",
+      "FFMPEG_DELIVERY_NOT_FROZEN"
+    ],
+    "environmentManifestSha256": "f5fd353073459fb2ef87a9344fa457251484382d42dc928a714ee0139bae0b76",
+    "environmentLockSha256": "d99371f2b225347ad69140f7eb9adb11c311eea34797ffb116c3ee2f9d2492a9",
+    "evidencePath": "benchmark/desktop/evidence/macos/pyannote-community-1.json",
+    "evidenceSha256": "edb05ab331c4628bc6dd486519034720836e2d5a88321805a4c4ffe16140bdb5"
+  },
+  "selectedDiarizationLicense": {
+    "status": "PRODUCT_ELIGIBLE_WITH_PINNED_NOTICES",
+    "segmentationLicenseSpdx": "MIT",
+    "embeddingLicenseSpdx": "Apache-2.0",
+    "evidencePath": "benchmark/desktop/evidence/macos/sherpa-diarization-license.json",
+    "evidenceSha256": "f984a5f6436d64508a99777bbd6e09c327a0d567b48abf9abc87123db5f75153"
+  },
+  "sidecarContract": {
+    "status": "PASS_REUSABLE_BENCHMARK_BOUNDARY_NO_PRODUCT_WINNER",
+    "protocolVersion": 1,
+    "protocolSha256": "17a5ea93a8b3415ed8d1336d74f6ca7f6fba8e60749f2121716a34e529785eff",
+    "runtimeManagerSha256": "f29d3a3747a1e49aa48dc340ab595d7b49b9d8587d65f9a1a7080a8b57ae640f",
+    "processClientSha256": "a886f50b92bbe32119f81f66e392ceb548dae135a82a6867ec6761c3292a4020",
+    "globalPythonAllowed": false,
+    "processingNetwork": "MACOS_SANDBOX_DENY_ALL",
+    "testedFailures": [
+      "VERSION_OR_CAPABILITY_MISMATCH",
+      "CRASH",
+      "OUTPUT_LIMIT",
+      "PATH_ESCAPE",
+      "STALE_RESULT",
+      "SECRET_INHERITANCE",
+      "NETWORK_ACCESS",
+      "TIMEOUT",
+      "CANCELLATION",
+      "MEMORY_LIMIT"
+    ],
+    "runtimeLifecycle": [
+      "INSTALL",
+      "VERIFY",
+      "RESUME",
+      "UPGRADE",
+      "ROLLBACK",
+      "REPAIR",
+      "PRUNE",
+      "UNINSTALL"
+    ]
+  },
+  "verification": {
+    "pythonBenchmarkTests": 24,
+    "processingContractTests": 15,
+    "sidecarFlutterTests": 17,
+    "staticAnalysis": "PASS"
+  },
+  "disposition": "PASS_FINALISTS_FROZEN"
+}

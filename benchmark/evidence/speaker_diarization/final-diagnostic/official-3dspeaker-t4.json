@@ -1,0 +1,298 @@
+{
+  "schemaVersion": 1,
+  "source": "physical_android_instrumentation",
+  "contractId": "speaker-diarization-final-diagnostic\/v1",
+  "armId": "official-3dspeaker-t4",
+  "complete": true,
+  "device": {
+    "manufacturer": "Xiaomi",
+    "model": "M2102J2SC",
+    "sdkInt": 33,
+    "buildFingerprint": "Xiaomi\/thyme\/thyme:13\/TKQ1.221114.001\/V816.0.4.0.TGACNXM:user\/release-keys",
+    "maximumThermalStatusRaw": 0,
+    "maximumThermalStatusName": "none"
+  },
+  "fixture": {
+    "sha256": "7e2757eb30176edc36a2c14a6511bbf297caa5dbfa9541e119cd94fd23a6d4ec",
+    "sha256After": "7e2757eb30176edc36a2c14a6511bbf297caa5dbfa9541e119cd94fd23a6d4ec",
+    "sampleRate": 16000,
+    "totalSamples": 4800000,
+    "consumedSamples": 4800000
+  },
+  "configuration": {
+    "mode": "OFFICIAL_PARITY",
+    "numThreads": 4,
+    "directFullFixtureProcess": true,
+    "usesWindowing": false,
+    "usesExternalEmbedding": false,
+    "usesReconciliation": false,
+    "segmentationSha256": "220ad67ca923bef2fa91f2390c786097bf305bceb5e261d4af67b38e938e1079",
+    "embeddingSha256": "1a331345f04805badbb495c775a6ddffcdd1a732567d5ec8b3d5749e3c7a5e4b",
+    "clusteringAlgorithm": "fast_clustering",
+    "numSpeakers": 2,
+    "clusteringThreshold": 0.5,
+    "minDurationOn": 0.3,
+    "minDurationOff": 0.5
+  },
+  "transcriptSnapshot": {
+    "beforeSha256": "90cfa1b016524daeecd51823e75c0b6528fe240d8117e2efdcb8323960383132",
+    "afterSha256": "90cfa1b016524daeecd51823e75c0b6528fe240d8117e2efdcb8323960383132"
+  },
+  "timings": {
+    "elapsedMs": 381986.678344,
+    "rtf": 1.2732889278133335
+  },
+  "resources": {
+    "baselinePssKiB": 101742,
+    "peakPssKiB": 332362,
+    "peakJavaBytes": 44781192,
+    "peakNativeBytes": 303237024
+  },
+  "turns": [
+    {
+      "startSeconds": 0.4697187542915344,
+      "endSeconds": 8.772218704223633,
+      "speakerIndex": 0
+    },
+    {
+      "startSeconds": 9.632843971252441,
+      "endSeconds": 13.91909408569336,
+      "speakerIndex": 1
+    },
+    {
+      "startSeconds": 12.63659381866455,
+      "endSeconds": 25.09034538269043,
+      "speakerIndex": 0
+    },
+    {
+      "startSeconds": 25.950969696044922,
+      "endSeconds": 30.69284439086914,
+      "speakerIndex": 1
+    },
+    {
+      "startSeconds": 31.755970001220703,
+      "endSeconds": 38.53971862792969,
+      "speakerIndex": 1
+    },
+    {
+      "startSeconds": 33.79784393310547,
+      "endSeconds": 35.502220153808594,
+      "speakerIndex": 0
+    },
+    {
+      "startSeconds": 39.23159408569336,
+      "endSeconds": 43.72034454345703,
+      "speakerIndex": 0
+    },
+    {
+      "startSeconds": 44.580970764160156,
+      "endSeconds": 49.322845458984375,
+      "speakerIndex": 1
+    },
+    {
+      "startSeconds": 50.38597106933594,
+      "endSeconds": 56.444095611572266,
+      "speakerIndex": 0
+    },
+    {
+      "startSeconds": 57.000972747802734,
+      "endSeconds": 61.81034469604492,
+      "speakerIndex": 1
+    },
+    {
+      "startSeconds": 62.67097091674805,
+      "endSeconds": 67.46347045898438,
+      "speakerIndex": 1
+    },
+    {
+      "startSeconds": 68.4759750366211,
+      "endSeconds": 74.55097198486328,
+      "speakerIndex": 0
+    },
+    {
+      "startSeconds": 75.05722045898438,
+      "endSeconds": 76.77847290039062,
+      "speakerIndex": 0
+    },
+    {
+      "startSeconds": 77.63909912109375,
+      "endSeconds": 82.22909545898438,
+      "speakerIndex": 1
+    },
+    {
+      "startSeconds": 80.65972137451172,
+      "endSeconds": 93.09659576416016,
+      "speakerIndex": 0
+    },
+    {
+      "startSeconds": 93.95722198486328,
+      "endSeconds": 98.6990966796875,
+      "speakerIndex": 1
+    },
+    {
+      "startSeconds": 99.76222229003906,
+      "endSeconds": 106.51222229003906,
+      "speakerIndex": 1
+    },
+    {
+      "startSeconds": 101.78722381591797,
+      "endSeconds": 103.4916000366211,
+      "speakerIndex": 0
+    },
+    {
+      "startSeconds": 107.23784637451172,
+      "endSeconds": 111.72660064697266,
+      "speakerIndex": 0
+    },
+    {
+      "startSeconds": 112.58722686767578,
+      "endSeconds": 117.36284637451172,
+      "speakerIndex": 1
+    },
+    {
+      "startSeconds": 118.39222717285156,
+      "endSeconds": 124.45034790039062,
+      "speakerIndex": 0
+    },
+    {
+      "startSeconds": 125.0072250366211,
+      "endSeconds": 129.7997283935547,
+      "speakerIndex": 1
+    },
+    {
+      "startSeconds": 130.67723083496094,
+      "endSeconds": 135.43597412109375,
+      "speakerIndex": 1
+    },
+    {
+      "startSeconds": 136.4822235107422,
+      "endSeconds": 144.78472900390625,
+      "speakerIndex": 0
+    },
+    {
+      "startSeconds": 145.64535522460938,
+      "endSeconds": 150.20159912109375,
+      "speakerIndex": 1
+    },
+    {
+      "startSeconds": 148.6659698486328,
+      "endSeconds": 161.08596801757812,
+      "speakerIndex": 0
+    },
+    {
+      "startSeconds": 161.96347045898438,
+      "endSeconds": 166.70535278320312,
+      "speakerIndex": 1
+    },
+    {
+      "startSeconds": 167.75160217285156,
+      "endSeconds": 174.5353546142578,
+      "speakerIndex": 1
+    },
+    {
+      "startSeconds": 169.79347229003906,
+      "endSeconds": 171.48097229003906,
+      "speakerIndex": 0
+    },
+    {
+      "startSeconds": 175.2440948486328,
+      "endSeconds": 179.71597290039062,
+      "speakerIndex": 0
+    },
+    {
+      "startSeconds": 180.59347534179688,
+      "endSeconds": 185.3690948486328,
+      "speakerIndex": 1
+    },
+    {
+      "startSeconds": 186.3984832763672,
+      "endSeconds": 192.45660400390625,
+      "speakerIndex": 0
+    },
+    {
+      "startSeconds": 193.0134735107422,
+      "endSeconds": 197.77223205566406,
+      "speakerIndex": 1
+    },
+    {
+      "startSeconds": 198.6834716796875,
+      "endSeconds": 203.47598266601562,
+      "speakerIndex": 1
+    },
+    {
+      "startSeconds": 204.4884796142578,
+      "endSeconds": 212.7909698486328,
+      "speakerIndex": 0
+    },
+    {
+      "startSeconds": 213.65159606933594,
+      "endSeconds": 217.95472717285156,
+      "speakerIndex": 1
+    },
+    {
+      "startSeconds": 216.6553497314453,
+      "endSeconds": 229.09222412109375,
+      "speakerIndex": 0
+    },
+    {
+      "startSeconds": 229.9697265625,
+      "endSeconds": 234.71160888671875,
+      "speakerIndex": 1
+    },
+    {
+      "startSeconds": 235.7747344970703,
+      "endSeconds": 242.5584716796875,
+      "speakerIndex": 1
+    },
+    {
+      "startSeconds": 237.7997283935547,
+      "endSeconds": 239.52098083496094,
+      "speakerIndex": 0
+    },
+    {
+      "startSeconds": 243.25035095214844,
+      "endSeconds": 247.72222900390625,
+      "speakerIndex": 0
+    },
+    {
+      "startSeconds": 248.5997314453125,
+      "endSeconds": 253.37535095214844,
+      "speakerIndex": 1
+    },
+    {
+      "startSeconds": 254.40472412109375,
+      "endSeconds": 260.44598388671875,
+      "speakerIndex": 0
+    },
+    {
+      "startSeconds": 261.00286865234375,
+      "endSeconds": 265.7784729003906,
+      "speakerIndex": 1
+    },
+    {
+      "startSeconds": 266.6897277832031,
+      "endSeconds": 271.4653625488281,
+      "speakerIndex": 1
+    },
+    {
+      "startSeconds": 272.47784423828125,
+      "endSeconds": 280.7972412109375,
+      "speakerIndex": 0
+    },
+    {
+      "startSeconds": 281.6578674316406,
+      "endSeconds": 286.2309875488281,
+      "speakerIndex": 1
+    },
+    {
+      "startSeconds": 284.6615905761719,
+      "endSeconds": 297.0984802246094,
+      "speakerIndex": 0
+    },
+    {
+      "startSeconds": 297.92535400390625,
+      "endSeconds": 299.96722412109375,
+      "speakerIndex": 1
+    }
+  ]
+}

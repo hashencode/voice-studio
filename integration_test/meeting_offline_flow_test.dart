@@ -236,7 +236,7 @@ void main() {
           request: MeetingIntelligenceRequest(
             recordingId: recordingId,
             generationId: generationId,
-            processingLocation: MeetingProcessingLocation.local,
+            processingLocation: MeetingProcessingLocation.onDevice,
             consentDecision: MeetingConsentDecision.granted,
             inputStartMs: 0,
             inputEndMs: 5000,
@@ -276,7 +276,7 @@ void main() {
             'merged_text': '',
             'created_at_ms': 1,
             'updated_at_ms': 1,
-      });
+          });
       final batch = db.batch();
       for (var index = 0; index < 3000; index += 1) {
         batch.insert('transcript_segments', <String, Object?>{

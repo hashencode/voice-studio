@@ -1,0 +1,34 @@
+{
+  "schemaVersion": 1,
+  "unit": "U6",
+  "candidate": "sherpa-pyannote-3.0-3dspeaker",
+  "runtime": {
+    "id": "sherpa-onnx-c-api",
+    "version": "1.13.4",
+    "licenseSpdx": "Apache-2.0"
+  },
+  "segmentationModel": {
+    "id": "sherpa-onnx-pyannote-segmentation-3-0",
+    "artifactSha256": "220ad67ca923bef2fa91f2390c786097bf305bceb5e261d4af67b38e938e1079",
+    "sourceArchiveSha256": "24615ee884c897d9d2ba09bb4d30da6bb1b15e685065962db5b02e76e4996488",
+    "licenseSpdx": "MIT",
+    "licenseFileSha256": "14d7016ad68e7394d6e6b78d96cc2ae431c905287b89674cfdf021e79e62b8ba",
+    "archiveReadmeSha256": "0380ed76a50efcc421dc62f251ed06e8349688466beac3177bee6e00dc336bfc",
+    "source": "https://github.com/k2-fsa/sherpa-onnx/releases/download/speaker-segmentation-models/sherpa-onnx-pyannote-segmentation-3-0.tar.bz2",
+    "redistributionNoticeRequired": true
+  },
+  "embeddingModel": {
+    "id": "iic/speech_eres2net_base_sv_zh-cn_3dspeaker_16k",
+    "revision": "v1.0.1",
+    "artifactSha256": "1a331345f04805badbb495c775a6ddffcdd1a732567d5ec8b3d5749e3c7a5e4b",
+    "licenseSpdx": "Apache-2.0",
+    "metadataSource": "https://modelscope.cn/api/v1/models/iic/speech_eres2net_base_sv_zh-cn_3dspeaker_16k",
+    "redistributionNoticeRequired": true
+  },
+  "conditions": {
+    "userAcceptanceRequired": false,
+    "persistVoiceprints": false,
+    "anonymousSpeakerLabelsOnly": true
+  },
+  "licenseDisposition": "PRODUCT_ELIGIBLE_WITH_PINNED_NOTICES"
+}
