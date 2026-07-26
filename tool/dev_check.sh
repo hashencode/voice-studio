@@ -4,6 +4,8 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$ROOT"
 
+python3 tool/build_cache_guard.py
+
 WITH_BUILD=false
 if [[ "${1:-}" == "--with-build" ]]; then
   WITH_BUILD=true

@@ -16,6 +16,9 @@ Flutter 版本重构工程（Android 优先）。
 在本目录执行：
 
 ```bash
+# 构建缓存容量检查（默认 20 GiB，可用 --dry-run 只查看）
+python3 tool/build_cache_guard.py
+
 # 轻量自检：契约 + analyze + test
 ./tool/dev_check.sh
 

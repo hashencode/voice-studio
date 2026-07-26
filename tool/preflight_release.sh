@@ -4,6 +4,8 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$ROOT"
 
+python3 tool/build_cache_guard.py
+
 failures=0
 warns=0
 TODOS=()
