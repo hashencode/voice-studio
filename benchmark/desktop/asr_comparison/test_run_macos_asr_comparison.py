@@ -1,0 +1,249 @@
+from __future__ import annotations
+
+import json
+import os
+import sys
+import tempfile
+import unittest
+from pathlib import Path
+
+from native_funasr_adapter import adapt_native_result
+from run_macos_asr_comparison import (
+    OrchestrationError,
+    deterministic_run_id,
+    deterministic_schedule,
+    execute_run,
+)
+
+
+ROOT = Path(__file__).resolve().parent
+FAKE = ROOT / "test_support/fake_candidate_worker.py"
+SHA = "a" * 64
+
+
+def binding(**changes: str) -> dict[str, str]:
+    value = {
+        "contractSha256": SHA,
+        "candidateRegistrySha256": "b" * 64,
+        "scoringContractSha256": "c" * 64,
+        "runtimeSha256": "d" * 64,
+        "workerSha256": "e" * 64,
+        "fixtureSha256": "f" * 64,
+        "referenceSha256": "1" * 64,
+        "profileSha256": "2" * 64,
+    }
+    value.update(changes)
+    return value
+
+
+def matrix_item(candidate: str = "fake-a") -> dict:
+    return {
+        "candidateId": candidate,
+        "profileId": "fixed-resource",
+        "fixtureId": "fixture-a",
+        "laneId": "fake-lane",
+        "scorecard": "core_asr",
+        "scenario": "clean_near_field_mandarin",
+        "reference": "测试一二三",
+        "rankEligible": False,
+        "observationSource": "fake_worker_contract_smoke",
+    }
+
+
+def request(candidate: str = "fake-a") -> dict:
+    return {
+        "candidateId": candidate,
+        "profileId": "fixed-resource",
+        "sourceSha256": "f" * 64,
+        "durationSeconds": 1.0,
+        "hypothesis": "测试一二三",
+        "memoryBytes": 24 * 1024 * 1024,
+        "effectiveConfig": {
+            "modelFamily": "fake",
+            "provider": "cpu",
+            "numThreads": 2,
+        },
+        "capabilities": {
+            "streaming": False,
+            "timestamps": False,
+            "partialResults": False,
+        },
+    }
+
+
+class ScheduleTest(unittest.TestCase):
+    def test_two_candidate_short_schedule_rotates_and_is_deterministic(self) -> None:
+        matrix = [matrix_item("fake-a"), matrix_item("fake-b")]
+        first = deterministic_schedule(
+            matrix, seed=20260726, warmup_runs=1, measured_runs=5
+        )
+        second = deterministic_schedule(
+            list(reversed(matrix)), seed=20260726, warmup_runs=1, measured_runs=5
+        )
+        self.assertEqual(first, second)
+        self.assertEqual(len(first), 12)
+        self.assertEqual(sum(item["warmup"] for item in first), 2)
+        for candidate in ("fake-a", "fake-b"):
+            candidate_runs = [
+                item for item in first if item["candidateId"] == candidate
+            ]
+            self.assertEqual(len(candidate_runs), 6)
+            self.assertEqual(sum(not item["warmup"] for item in candidate_runs), 5)
+        round_orders = [
+            tuple(
+                item["candidateId"]
+                for item in first
+                if item["runIndex"] == run_index
+            )
+            for run_index in range(6)
+        ]
+        self.assertGreater(len(set(round_orders)), 1)
+
+
+class ExecuteRunTest(unittest.TestCase):
+    def setUp(self) -> None:
+        self.temporary = tempfile.TemporaryDirectory()
+        self.root = Path(self.temporary.name)
+        self.run_root = self.root / "runs"
+        self.raw_root = self.root / "raw"
+
+    def tearDown(self) -> None:
+        self.temporary.cleanup()
+
+    def execute(
+        self,
+        *,
+        mode: str = "success",
+        item: dict | None = None,
+        run_binding: dict[str, str] | None = None,
+        timeout: float = 3,
+    ) -> dict:
+        specification = {
+            **(item or matrix_item()),
+            "sourceSha256": "f" * 64,
+            "runIndex": 0,
+            "warmup": False,
+            "scheduleOrder": 0,
+        }
+        return execute_run(
+            command=[sys.executable, str(FAKE), "--mode", mode],
+            request=request(specification["candidateId"]),
+            specification=specification,
+            binding=run_binding or binding(),
+            run_root=self.run_root,
+            raw_root=self.raw_root,
+            timeout_seconds=timeout,
+            sampler_interval_seconds=0.01,
+        )
+
+    def test_success_is_scored_atomic_and_resumable_without_transcript(self) -> None:
+        first = self.execute()
+        second = self.execute()
+        self.assertTrue(first["complete"])
+        self.assertEqual(first["metrics"]["cer"], 0)
+        self.assertGreaterEqual(first["metrics"]["incrementalPeakRssBytes"], 0)
+        self.assertTrue(first["temporaryArtifactsReleased"])
+        self.assertFalse(first["rankEligible"])
+        self.assertTrue(second["resumed"])
+        published = json.loads(
+            (self.run_root / f"{first['runId']}.json").read_text()
+        )
+        self.assertNotIn("text", json.dumps(published))
+        self.assertTrue((self.raw_root / f"{first['runId']}.json").is_file())
+
+    def test_streaming_keeps_audio_clock_observation_separate_from_rtf(self) -> None:
+        item = {
+            **matrix_item(),
+            "pacingPolicy": "realtime_audio_clock",
+        }
+        result = self.execute(mode="streaming", item=item)
+        self.assertEqual(result["streamingObservation"]["partialCount"], 1)
+        self.assertEqual(
+            result["streamingObservation"]["firstPartialAudioSeconds"], 0.5
+        )
+        self.assertEqual(
+            result["streamingObservation"]["firstPartialWallMilliseconds"], 500
+        )
+        self.assertEqual(result["metrics"]["rtf"], 0.002)
+
+    def test_binding_change_cannot_reuse_prior_run_identity(self) -> None:
+        first = self.execute()
+        changed = self.execute(
+            run_binding=binding(workerSha256="3" * 64)
+        )
+        self.assertNotEqual(first["runId"], changed["runId"])
+        self.assertFalse(changed["resumed"])
+
+    def test_partial_staging_is_quarantined_before_rerun(self) -> None:
+        specification = {
+            **matrix_item(),
+            "sourceSha256": "f" * 64,
+            "runIndex": 0,
+            "warmup": False,
+            "scheduleOrder": 0,
+        }
+        run_id = deterministic_run_id(specification, binding())
+        staging = self.run_root / ".staging" / f"{run_id}.json"
+        staging.parent.mkdir(parents=True)
+        staging.write_text('{"complete":false}\n')
+        result = self.execute()
+        self.assertTrue(result["complete"])
+        quarantined = list((self.run_root / "quarantine").iterdir())
+        self.assertEqual(len(quarantined), 1)
+        self.assertIn(".partial.", quarantined[0].name)
+
+    def test_timeout_kills_term_resistant_process_group_and_no_run_publishes(
+        self,
+    ) -> None:
+        with self.assertRaises(OrchestrationError) as caught:
+            self.execute(mode="term_resistant", timeout=0.15)
+        self.assertEqual(caught.exception.code, "TIMEOUT")
+        self.assertEqual(list(self.run_root.glob("asr2-*.json")), [])
+        disposition = json.loads(
+            next((self.run_root / ".staging").iterdir()).read_text()
+        )
+        self.assertTrue(disposition["termination"]["termSent"])
+        self.assertTrue(disposition["termination"]["killSent"])
+        self.assertTrue(disposition["termination"]["processGroupGone"])
+        self.assertGreaterEqual(
+            disposition["termination"]["observedDescendantCount"], 1
+        )
+        self.assertTrue(
+            disposition["termination"]["descendantProcessesGone"]
+        )
+        self.assertTrue(disposition["temporaryArtifactsReleased"])
+
+    def test_malformed_output_is_typed_and_not_aggregatable(self) -> None:
+        with self.assertRaises(OrchestrationError) as caught:
+            self.execute(mode="malformed")
+        self.assertEqual(caught.exception.code, "MALFORMED_OUTPUT")
+        self.assertEqual(list(self.run_root.glob("asr2-*.json")), [])
+
+
+class NativeAdapterTest(unittest.TestCase):
+    def test_native_control_uses_separate_non_ranked_lane(self) -> None:
+        envelope = adapt_native_result(
+            {"metrics": {"cer": 0.1, "rtf": 0.2}},
+            stage_id="STAGE_1_SHORT",
+            candidate_id="native-funasr",
+            fixture_id="fixture-a",
+            profile_id="recommended",
+        )
+        self.assertFalse(envelope["rankEligible"])
+        self.assertTrue(envelope["crossRuntimeControl"])
+        self.assertNotIn("sherpa", envelope["laneId"])
+
+    def test_native_control_is_rejected_after_short_stage(self) -> None:
+        with self.assertRaises(OrchestrationError) as caught:
+            adapt_native_result(
+                {"metrics": {}},
+                stage_id="STAGE_2_HELD_OUT",
+                candidate_id="native-funasr",
+                fixture_id="fixture-a",
+                profile_id="recommended",
+            )
+        self.assertEqual(caught.exception.code, "NATIVE_STAGE_FORBIDDEN")
+
+
+if __name__ == "__main__":
+    unittest.main()

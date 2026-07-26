@@ -1,0 +1,215 @@
+import 'dart:async';
+import 'dart:convert';
+import 'dart:io';
+
+import 'package:voice2text_desktop/features/processing/sidecar/sidecar_sandbox.dart';
+
+const sandboxExecutable = '/usr/bin/sandbox-exec';
+
+class SandboxProbeEvidence {
+  const SandboxProbeEvidence({
+    required this.networkPermissionDenied,
+    required this.userHomePermissionDenied,
+    required this.networkExitCode,
+    required this.userHomeExitCode,
+  });
+
+  final bool networkPermissionDenied;
+  final bool userHomePermissionDenied;
+  final int networkExitCode;
+  final int userHomeExitCode;
+
+  bool get admitted => networkPermissionDenied && userHomePermissionDenied;
+
+  Map<String, Object?> toJson() => <String, Object?>{
+    'schemaVersion': 2,
+    'networkPermissionDenied': networkPermissionDenied,
+    'userHomePermissionDenied': userHomePermissionDenied,
+    'networkExitCode': networkExitCode,
+    'userHomeExitCode': userHomeExitCode,
+    'connectionRefusalAcceptedAsDenial': false,
+    'admitted': admitted,
+  };
+}
+
+class SandboxedCandidateLauncher {
+  SandboxedCandidateLauncher({
+    required this.roots,
+    required this.nativeProcessGroupLauncher,
+    required this.worker,
+    this.sandboxPath = sandboxExecutable,
+  });
+
+  final SidecarRoots roots;
+  final File nativeProcessGroupLauncher;
+  final File worker;
+  final String sandboxPath;
+
+  Future<void> validate() async {
+    if (!Platform.isMacOS || !File(sandboxPath).existsSync()) {
+      throw StateError('BENCHMARK_SANDBOX_UNAVAILABLE');
+    }
+    for (final executable in <File>[nativeProcessGroupLauncher, worker]) {
+      final resolved = await executable.resolveSymbolicLinks();
+      if (FileSystemEntity.typeSync(resolved, followLinks: false) !=
+          FileSystemEntityType.file) {
+        throw StateError('BENCHMARK_EXECUTABLE_UNAVAILABLE');
+      }
+    }
+  }
+
+  List<String> get launchCommand => <String>[
+    nativeProcessGroupLauncher.path,
+    sandboxPath,
+    '-p',
+    SidecarSandboxProfile.macos(roots),
+    worker.path,
+  ];
+
+  Map<String, String> minimalEnvironment() => <String, String>{
+    'PATH': '/usr/bin:/bin:/usr/sbin:/sbin',
+    'LANG': 'C.UTF-8',
+    'LC_ALL': 'C.UTF-8',
+    'TMPDIR': roots.jobRoot,
+    'HF_HUB_OFFLINE': '1',
+    'HF_HUB_DISABLE_TELEMETRY': '1',
+    'MODELSCOPE_OFFLINE': '1',
+  };
+
+  Future<SandboxProbeEvidence> activeDenialProbe() async {
+    await validate();
+    final profile = SidecarSandboxProfile.macos(roots);
+    final home = Platform.environment['HOME'];
+    if (home == null || home.isEmpty) {
+      throw StateError('BENCHMARK_HOME_UNAVAILABLE');
+    }
+    final network = await _probe(
+      profile,
+      const <String>[
+        'import socket',
+        's=socket.socket()',
+        's.settimeout(1)',
+        's.connect(("127.0.0.1",9))',
+      ].join(';'),
+    );
+    final userHome = await _probe(
+      profile,
+      'import os; os.listdir(${jsonEncode(home)})',
+    );
+    final evidence = SandboxProbeEvidence(
+      networkPermissionDenied: _isPermissionDenial(network),
+      userHomePermissionDenied: _isPermissionDenial(userHome),
+      networkExitCode: network.exitCode,
+      userHomeExitCode: userHome.exitCode,
+    );
+    if (!evidence.admitted) {
+      throw StateError('BENCHMARK_SANDBOX_PROBE_FAILED');
+    }
+    return evidence;
+  }
+
+  Future<Process> start({bool requireProbe = true}) async {
+    if (requireProbe) {
+      await activeDenialProbe();
+    } else {
+      await validate();
+    }
+    final command = launchCommand;
+    return Process.start(
+      command.first,
+      command.skip(1).toList(growable: false),
+      workingDirectory: roots.jobRoot,
+      environment: minimalEnvironment(),
+      includeParentEnvironment: false,
+      mode: ProcessStartMode.normal,
+    );
+  }
+
+  Future<ProcessResult> _probe(String profile, String source) {
+    return Process.run(
+      sandboxPath,
+      <String>['-p', profile, '/usr/bin/python3', '-c', source],
+      workingDirectory: roots.jobRoot,
+      environment: minimalEnvironment(),
+      includeParentEnvironment: false,
+    ).timeout(const Duration(seconds: 5));
+  }
+
+  static bool _isPermissionDenial(ProcessResult result) {
+    final output = '${result.stdout}\n${result.stderr}'.toLowerCase();
+    return result.exitCode != 0 &&
+        !output.contains('connection refused') &&
+        (output.contains('operation not permitted') ||
+            output.contains('permission denied') ||
+            output.contains('errno 1') ||
+            output.contains('errno 13'));
+  }
+}
+
+Future<int> runLauncherCli(List<String> arguments) async {
+  if (arguments.isNotEmpty) {
+    stderr.writeln('sandboxed-candidate-launcher: unexpected arguments');
+    return 64;
+  }
+  final line = await stdin
+      .transform(utf8.decoder)
+      .transform(const LineSplitter())
+      .first
+      .timeout(const Duration(seconds: 5));
+  final value = jsonDecode(line);
+  if (value is! Map<String, dynamic>) {
+    throw const FormatException('launcher request must be an object');
+  }
+  final rootsValue = value['roots'];
+  final workerRequest = value['workerRequest'];
+  if (rootsValue is! Map<String, dynamic> ||
+      workerRequest is! Map<String, dynamic>) {
+    throw const FormatException(
+      'launcher roots and worker request are required',
+    );
+  }
+  Directory directory(String key) {
+    final path = rootsValue[key];
+    if (path is! String || path.isEmpty) {
+      throw FormatException('launcher root $key is invalid');
+    }
+    return Directory(path);
+  }
+
+  final roots = await SidecarRoots.resolve(
+    jobRoot: directory('jobRoot'),
+    runtimeRoot: directory('runtimeRoot'),
+    modelRoot: directory('modelRoot'),
+    toolRoot: directory('toolRoot'),
+  );
+  final launcherPath = value['nativeProcessGroupLauncher'];
+  final workerPath = value['worker'];
+  if (launcherPath is! String || workerPath is! String) {
+    throw const FormatException('launcher executable paths are invalid');
+  }
+  final launcher = SandboxedCandidateLauncher(
+    roots: roots,
+    nativeProcessGroupLauncher: File(launcherPath),
+    worker: File(workerPath),
+  );
+  final probe = await launcher.activeDenialProbe();
+  stderr.writeln(
+    jsonEncode(<String, Object?>{
+      'schemaVersion': 2,
+      'type': 'sandboxProbe',
+      ...probe.toJson(),
+    }),
+  );
+  final process = await launcher.start(requireProbe: false);
+  process.stdin.writeln(jsonEncode(workerRequest));
+  await process.stdin.close();
+  final stdoutForward = stdout.addStream(process.stdout);
+  final stderrForward = stderr.addStream(process.stderr);
+  final exitCode = await process.exitCode;
+  await Future.wait(<Future<void>>[stdoutForward, stderrForward]);
+  return exitCode;
+}
+
+Future<void> main(List<String> arguments) async {
+  exitCode = await runLauncherCli(arguments);
+}
