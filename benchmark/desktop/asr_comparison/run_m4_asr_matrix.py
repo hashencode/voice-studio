@@ -188,6 +188,25 @@ def _model_files(
     return result
 
 
+def _job_model_files(
+    model_files: dict[str, dict[str, str]],
+    *,
+    job_root: Path,
+) -> dict[str, dict[str, str]]:
+    alias_root = job_root / "models"
+    aliases: dict[str, dict[str, str]] = {}
+    for role, model in model_files.items():
+        source = Path(model["path"])
+        if source.is_dir() or role in {"tokens", "tokenizer"}:
+            aliases[role] = dict(model)
+            continue
+        alias_root.mkdir(parents=True, exist_ok=True)
+        alias = alias_root / f"{role}.onnx"
+        alias.symlink_to(source)
+        aliases[role] = {"path": str(alias), "sha256": model["sha256"]}
+    return aliases
+
+
 def run_matrix(args: argparse.Namespace) -> dict[str, Any]:
     comparison_root = Path(__file__).resolve().parent
     base, expansion = load_registries(comparison_root)
@@ -283,6 +302,10 @@ def run_matrix(args: argparse.Namespace) -> dict[str, Any]:
         input_root.mkdir(parents=True)
         source = input_root / "audio.wav"
         shutil.copyfile(source_fixture, source)
+        job_model_files = _job_model_files(
+            model_files[candidate_id],
+            job_root=job_root,
+        )
         profile = profiles[candidate_id]
         candidate = resolved_candidates[candidate_id]
         request = {
@@ -301,7 +324,7 @@ def run_matrix(args: argparse.Namespace) -> dict[str, Any]:
                 "profileId": profile_id,
                 "sourcePath": str(source),
                 "sourceSha256": sha256_file(source),
-                "modelFiles": model_files[candidate_id],
+                "modelFiles": job_model_files,
                 "effectiveConfig": profile,
                 "capabilities": _capabilities(candidate["family"]),
                 "expectSpeech": True,

@@ -1,11 +1,13 @@
 from __future__ import annotations
 
 import json
+import tempfile
 import unittest
 from pathlib import Path
 
 from run_m4_asr_matrix import (
     LANGUAGE_CANDIDATES,
+    _job_model_files,
     language_candidates,
     load_registries,
     profile_for,
@@ -21,6 +23,30 @@ class RunM4AsrMatrixTest(unittest.TestCase):
     @classmethod
     def setUpClass(cls) -> None:
         cls.base, cls.expansion = load_registries(ROOT)
+
+    def test_job_model_files_add_onnx_aliases_without_copying_assets(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            model = root / "model"
+            model.write_bytes(b"onnx")
+            tokens = root / "tokens"
+            tokens.write_text("a 0\n")
+            tokenizer = root / "tokenizer"
+            tokenizer.mkdir()
+            aliases = _job_model_files(
+                {
+                    "model": {"path": str(model), "sha256": "a" * 64},
+                    "tokens": {"path": str(tokens), "sha256": "b" * 64},
+                    "tokenizer": {"path": str(tokenizer), "sha256": "c" * 64},
+                },
+                job_root=root / "job",
+            )
+            model_alias = Path(aliases["model"]["path"])
+            self.assertTrue(model_alias.is_symlink())
+            self.assertEqual(model_alias.suffix, ".onnx")
+            self.assertEqual(model_alias.resolve(), model.resolve())
+            self.assertEqual(aliases["tokens"]["path"], str(tokens))
+            self.assertEqual(aliases["tokenizer"]["path"], str(tokenizer))
 
     def test_frozen_language_lanes_are_independent(self) -> None:
         self.assertIn(
