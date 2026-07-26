@@ -363,10 +363,20 @@ Future<void> _validateFiles(CandidateWorkerRequest request) async {
   if (!await source.exists() || await _sha256(source) != request.sourceSha256) {
     throw const FormatException('source identity mismatch');
   }
-  for (final model in request.modelFiles.values) {
-    final file = File(model.path);
-    if (!await file.exists() || await _sha256(file) != model.sha256) {
-      throw const FormatException('model identity mismatch');
+  for (final entry in request.modelFiles.entries) {
+    final model = entry.value;
+    if (request.family == BenchmarkCandidateFamily.funasrNano &&
+        entry.key == 'tokenizer') {
+      final directory = Directory(model.path);
+      if (!await directory.exists() ||
+          await _sha256Directory(directory) != model.sha256) {
+        throw const FormatException('model identity mismatch');
+      }
+    } else {
+      final file = File(model.path);
+      if (!await file.exists() || await _sha256(file) != model.sha256) {
+        throw const FormatException('model identity mismatch');
+      }
     }
   }
 }
@@ -440,6 +450,28 @@ String _required(Map<String, String> options, String key) {
 
 Future<String> _sha256(File file) async =>
     (await sha256.bind(file.openRead()).first).toString();
+
+Future<String> _sha256Directory(Directory directory) async {
+  final files = await directory
+      .list(followLinks: false)
+      .where((entity) => entity is File)
+      .cast<File>()
+      .toList();
+  if (files.isEmpty || files.length > 16) {
+    throw const FormatException('tokenizer directory is invalid');
+  }
+  files.sort((left, right) => left.path.compareTo(right.path));
+  final identity = StringBuffer();
+  for (final file in files) {
+    final relative = file.uri.pathSegments.last;
+    identity
+      ..write(relative)
+      ..write('\u0000')
+      ..write(await _sha256(file))
+      ..write('\n');
+  }
+  return sha256.convert(utf8.encode(identity.toString())).toString();
+}
 
 Future<void> _emit(Map<String, Object?> event) async {
   stdout.writeln(jsonEncode(event));

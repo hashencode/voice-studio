@@ -19,6 +19,21 @@ identities. Native FunASR is never inserted into a sherpa-onnx ranking lane.
 Every rankable sherpa runtime lane must contain a freshly executed Zipformer 14M
 baseline for that exact runtime build and macOS target.
 
+The separately versioned Apple M4 language expansion is defined by
+`expanded_candidates_m4.json`. It does not mutate the frozen seven-candidate
+first round. It adds English Zipformer, Moonshine v2, Whisper base.en, NeMo
+Parakeet TDT, and SenseVoice, and re-reviews Streaming Zipformer 2025, FunASR
+Nano, and FireRed for the language lanes they actually support. Mandarin and
+English are independent rankings: Mandarin uses CER, English uses WER, and
+code-switch audio is not required. A single cross-language winner is not
+assumed.
+
+The real M4 Stage 0 expansion result is published in
+`expanded_stage0_results_m4.json`. Ten smoke runs were attempted, eight passed,
+and two failed runtime admission. These short, local smoke fixtures prove
+identity, offline execution, API/runtime compatibility, scoring, and resource
+sampling only. They are not development or held-out ranking evidence.
+
 ## Contract validation
 
 Run the fail-closed bundle validator:
@@ -152,9 +167,9 @@ recognition edits separate from punctuation and ITN rendering, and exposes
 terminology, numeric, code-switch, and non-speech hallucination measures.
 `aggregate_results.py` first aggregates fixtures within scenarios and then
 computes an equal-weight scenario macro. It preserves individual repetitions,
-excludes warm-ups from aggregates, applies CER/RTF/RSS hard gates before
-material-benefit evaluation, and emits Pareto inputs rather than a weighted
-winner score.
+excludes warm-ups from aggregates, keeps CER and WER separate, applies the
+language lane's lexical/RTF/RSS hard gates before material-benefit evaluation,
+and emits Pareto inputs rather than a weighted winner score.
 
 ## Runtime and model assets
 
@@ -165,13 +180,37 @@ configuration types, so this implementation does not create an upgraded lane.
 Any future runtime upgrade still requires a fresh Zipformer baseline in that
 new lane.
 
+The expansion characterizes four additional adapters exposed by the same
+installed API: Whisper, Moonshine v2, NeMo offline Transducer, and SenseVoice.
+Moonshine v2's `.ort` encoder and Streaming Zipformer 2025's graph metadata
+failed against the currently bound native runtime and therefore remain Stage 0
+failures. Accepting model terms does not override a runtime incompatibility.
+
 `prepare_assets.py` reports which frozen candidates have complete hashes and
 license admission, then verifies locally provisioned components into an atomic
 build-cache tree. It never treats a pending hash or license review as admitted.
 `desktop_asr_candidate_worker.dart` is benchmark-only; it validates candidate,
 source, model-role, hash, and effective-profile identities before loading the
 native runtime and emits bounded JSONL observations with explicit unload
-events.
+events. FunASR Nano's tokenizer directory is tree-hashed and sandbox-contained;
+the directory is never accepted as an unverified path.
+
+Validate the expansion and its worker contracts with:
+
+```bash
+python3 benchmark/desktop/asr_comparison/expanded_round.py
+cd benchmark/desktop/asr_comparison
+environment/.venv/bin/python -m unittest \
+  test_expanded_round.py \
+  test_run_expanded_stage0.py \
+  test_aggregate_results.py
+```
+
+`run_expanded_stage0.py` executes one candidate/language pair at a time and
+requires explicit local model, runtime, tool, audio, reference, and output
+roots. Model archives, tokenizer files, audio, references, raw events, and
+absolute paths remain under the ignored build root. The committed result
+contains bounded metrics and terminal failure codes only.
 
 ## Orchestration and bounded evidence
 

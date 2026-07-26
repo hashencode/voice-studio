@@ -1,0 +1,201 @@
+{
+  "schemaVersion": 1,
+  "expansionId": "desktop-processing/macos-asr-m4-zh-en-expansion-v1",
+  "baseRegistryId": "desktop-processing/macos-asr-first-round-v2",
+  "comparisonContractId": "desktop-processing/macos-asr-comparison-v2",
+  "targetCpuModel": "Apple M4",
+  "runtimeLaneId": "sherpa-onnx-dart-1.13.4-macos-arm64",
+  "languagePolicy": {
+    "rankings": [
+      {
+        "languageLane": "zh",
+        "lexicalMetric": "cer",
+        "baselineCandidateId": "sherpa-streaming-zipformer-zh-14m-2023-02-23"
+      },
+      {
+        "languageLane": "en",
+        "lexicalMetric": "wer",
+        "baselineCandidateId": "sherpa-onnx-streaming-zipformer-en-20m-2023-02-17"
+      }
+    ],
+    "codeSwitchRequired": false,
+    "singleCrossLanguageWinnerRequired": false
+  },
+  "hardGates": {
+    "maxCer": 0.35,
+    "maxWer": 0.35,
+    "maxRtf": 0.5,
+    "maxFinalistIncrementalPeakRssBytes": 2147483648
+  },
+  "candidateOverrides": [
+    {
+      "candidateId": "sherpa-onnx-streaming-zipformer-zh-int8-2025-06-30",
+      "languageLanes": [
+        "zh"
+      ],
+      "licenseDisposition": "ACCEPTED_FOR_BENCHMARK",
+      "accessState": "ACCOUNT_TERMS_ACCEPTED",
+      "artifacts": {
+        "encoder": "5ac51e27981bb4dab01bb9be4958453ba50c3b61c063ddda0eab23fd3671aa4f",
+        "decoder": "06522ad63cec0fdf6809f4e1db9bb4f7d710c34582e3b35db62ac60eccafac7e",
+        "joiner": "b34584dc6f561089e1d747fedebb3765f2caa72c927ef54d7ca55e5ae40a814b",
+        "tokens": "6193c7ea1c96d0d9a1e9652789b40d13a8a913b434a5451e93158f5a09fd6652"
+      },
+      "stage0State": "FAIL",
+      "note": "The user accepted the gated contact-sharing terms and authenticated access was verified on 2026-07-27; model artifacts remain local-only and are not redistributed."
+    },
+    {
+      "candidateId": "sherpa-onnx-funasr-nano-int8-2025-12-30",
+      "languageLanes": [
+        "zh",
+        "en"
+      ],
+      "licenseDisposition": "ACCEPTED_FOR_BENCHMARK",
+      "accessState": "PUBLIC_ARCHIVE_AVAILABLE",
+      "artifacts": {
+        "encoderAdaptor": "d0246c823f2c34133ae0efee395d8a189c8f92643e3432f866939ee34d34492c",
+        "llm": "7f0c5a508b41474b1b1ec1cdbdefafd2cf8b3642c6915a0a425265b7b7d2c960",
+        "embedding": "a05d2816e284fcca29a5dccb2c14b9edeb638fd983a84cd4a447248889b6a408",
+        "tokenizer": "eb3ba91e162798927310b8771e6282ba08a9c4071b66ef9a6ce78fedf184ca32"
+      },
+      "stage0State": "PASS",
+      "note": "The upstream FunASR Nano model card is Apache-2.0; converted artifacts remain hash-pinned and are not redistributed."
+    },
+    {
+      "candidateId": "sherpa-onnx-fire-red-asr2-ctc-zh_en-int8-2026-02-25",
+      "languageLanes": [
+        "zh",
+        "en"
+      ],
+      "licenseDisposition": "ACCEPTED_FOR_BENCHMARK",
+      "accessState": "PUBLIC_ARCHIVE_AVAILABLE",
+      "artifacts": {
+        "model": "ca3dbabd82170110cc0b343c2890866d449984bc9cd92b9a18371ff80a81bb99",
+        "tokens": "1bc613de2112d257e61a349c3e72d1b1a9cf19c33d3ca954197ad2171e5ea07b"
+      },
+      "stage0State": "PASS",
+      "note": "The existing bilingual first-round candidate is added to the independent English smoke lane; this does not change its product status."
+    }
+  ],
+  "newCandidates": [
+    {
+      "candidateId": "sherpa-onnx-streaming-zipformer-en-20m-2023-02-17",
+      "displayName": "Sherpa streaming Zipformer English 20M int8",
+      "family": "streaming_zipformer_transducer",
+      "languageLanes": [
+        "en"
+      ],
+      "role": "english_baseline",
+      "sourceUrl": "https://github.com/k2-fsa/sherpa-onnx/releases/download/asr-models/sherpa-onnx-streaming-zipformer-en-20M-2023-02-17.tar.bz2",
+      "archiveSha256": "9c559283e8498d3fe95913c79ca1cb454bb26281ac2b102b41306c7d752765d9",
+      "license": {
+        "spdx": "Apache-2.0",
+        "disposition": "ACCEPTED_FOR_BENCHMARK",
+        "noticeSource": "archive_README_model_card"
+      },
+      "artifacts": {
+        "encoder": "3810755ce7c3ab26b42a8bcf39d191308fa27fb0f53358823ba46141d03b7eb3",
+        "decoder": "21e2a2acd961b3ac72f55be2f10f1a285e1b0b0ba010d7c0b6eab141411b163c",
+        "joiner": "e085d73b593cf9b0707f370dbd656d58327d3fe36d80d849202ef81df02cb01e",
+        "tokens": "49e3c2646595fd907228b3c6787069658f67b17377c60aeb8619c4551b2316fb"
+      },
+      "stage0State": "PASS"
+    },
+    {
+      "candidateId": "sherpa-onnx-moonshine-base-en-quantized-2026-02-27",
+      "displayName": "Sherpa Moonshine base English quantized v2",
+      "family": "moonshine",
+      "languageLanes": [
+        "en"
+      ],
+      "role": "english_low_latency",
+      "sourceUrl": "https://github.com/k2-fsa/sherpa-onnx/releases/download/asr-models/sherpa-onnx-moonshine-base-en-quantized-2026-02-27.tar.bz2",
+      "archiveSha256": "43232c1d13013d37317163baec3135bd771a186a4356f28c889bab453bb0e891",
+      "license": {
+        "spdx": "MIT",
+        "disposition": "ACCEPTED_FOR_BENCHMARK",
+        "noticeSource": "archive_LICENSE_english_models"
+      },
+      "artifacts": {
+        "encoder": "7c66495948d0d08ec1af454cd4b5514862ae6511e94712a60e6d83eaec8dc8cf",
+        "mergedDecoder": "d9d7b333af34bc552580576ddcf248a1c6c839e0d3b43b09afb9376ed009899d",
+        "tokens": "2870d843e14c1e187bf1913a521562a63b53933814bd7f2145120468f494a049"
+      },
+      "stage0State": "FAIL"
+    },
+    {
+      "candidateId": "sherpa-onnx-whisper-base-en-int8-2023-01-31",
+      "displayName": "Sherpa Whisper base.en int8",
+      "family": "offline_whisper",
+      "languageLanes": [
+        "en"
+      ],
+      "role": "english_general",
+      "sourceUrl": "https://github.com/k2-fsa/sherpa-onnx/releases/download/asr-models/sherpa-onnx-whisper-base.en.tar.bz2",
+      "archiveSha256": "475bc7052ce299c007f6d5d5407ba8601f819a2867f6eecee510ed17df581542",
+      "license": {
+        "spdx": "Apache-2.0",
+        "disposition": "ACCEPTED_FOR_BENCHMARK",
+        "noticeSource": "upstream_openai_whisper_model_card"
+      },
+      "artifacts": {
+        "encoder": "ef6b936f4c9b1d90a3b68634b60c4ed8576b26172b33c2535ec0e933c9edb823",
+        "decoder": "f7162ad6db2dbef16cfaeaa7f945b9d7dd9c1b8d472f6aca82f2273d185e4d41",
+        "tokens": "306cd27f03c1a714eca7108e03d66b7dc042abe8c258b44c199a7ed9838dd930"
+      },
+      "stage0State": "PASS"
+    },
+    {
+      "candidateId": "sherpa-onnx-nemo-parakeet-tdt-0.6b-v2-int8-2025-05-01",
+      "displayName": "Sherpa NeMo Parakeet TDT 0.6B v2 int8",
+      "family": "nemo_transducer",
+      "languageLanes": [
+        "en"
+      ],
+      "role": "english_accuracy",
+      "sourceUrl": "https://github.com/k2-fsa/sherpa-onnx/releases/download/asr-models/sherpa-onnx-nemo-parakeet-tdt-0.6b-v2-int8.tar.bz2",
+      "archiveSha256": "157c157bc51155e03e37d2466522a3a737dd9c72bb25f36eb18912964161e1ad",
+      "license": {
+        "spdx": "CC-BY-4.0",
+        "disposition": "ACCEPTED_FOR_BENCHMARK",
+        "noticeSource": "upstream_nvidia_model_card"
+      },
+      "artifacts": {
+        "encoder": "a32b12d17bbbc309d0686fbbcc2987b5e9b8333a7da83fa6b089f0a2acd651ab",
+        "decoder": "b6bb64963457237b900e496ee9994b59294526439fbcc1fecf705b31a15c6b4e",
+        "joiner": "7946164367946e7f9f29a122407c3252b680dbae9a51343eb2488d057c3c43d2",
+        "tokens": "ec182b70dd42113aff6c5372c75cac58c952443eb22322f57bbd7f53977d497d"
+      },
+      "stage0State": "PASS"
+    },
+    {
+      "candidateId": "sherpa-onnx-sense-voice-zh-en-ja-ko-yue-int8-2024-07-17",
+      "displayName": "Sherpa SenseVoiceSmall zh/en int8",
+      "family": "sense_voice",
+      "languageLanes": [
+        "zh",
+        "en"
+      ],
+      "role": "bilingual_control",
+      "sourceUrl": "https://github.com/k2-fsa/sherpa-onnx/releases/download/asr-models/sherpa-onnx-sense-voice-zh-en-ja-ko-yue-2024-07-17.tar.bz2",
+      "archiveSha256": "f6b2a72ebcb1ac7a764d4cfccd886e6bcb2a95c4657c2199d0ba95ed4b9ea71a",
+      "license": {
+        "spdx": null,
+        "disposition": "ACCEPTED_FOR_BENCHMARK",
+        "noticeSource": "FunASR_Model_License_1.1_with_attribution"
+      },
+      "artifacts": {
+        "model": "c71f0ce00bec95b07744e116345e33d8cbbe08cef896382cf907bf4b51a2cd51",
+        "tokens": "f449eb28dc567533d7fa59be34e2abca8784f771850c78a47fb731a31429a1dc"
+      },
+      "stage0State": "PASS"
+    }
+  ],
+  "evaluationPolicy": {
+    "developmentAndHeldOutRankingsDeferred": true,
+    "twoHourFinalistDeferred": true,
+    "committedOrGeneratedSmokeRequired": true,
+    "modelFilesCommitted": false,
+    "audioCommitted": false
+  }
+}

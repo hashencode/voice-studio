@@ -67,6 +67,21 @@ class EffectiveProfile {
             'hotwordScore',
           },
         },
+        BenchmarkCandidateFamily.offlineWhisper => <String>{
+          'decodingMethod',
+          'language',
+          'task',
+          'tailPaddings',
+          'enableTokenTimestamps',
+          'enableSegmentTimestamps',
+        },
+        BenchmarkCandidateFamily.moonshine => <String>{'decodingMethod'},
+        BenchmarkCandidateFamily.nemoTransducer => <String>{'decodingMethod'},
+        BenchmarkCandidateFamily.senseVoice => <String>{
+          'decodingMethod',
+          'language',
+          'useInverseTextNormalization',
+        },
         BenchmarkCandidateFamily.funasrNano => <String>{
           'language',
           'itn',
@@ -173,6 +188,84 @@ class EffectiveProfile {
         effectiveConfig: config,
         capabilities: request.capabilities,
       ),
+      BenchmarkCandidateFamily.offlineWhisper => OfflineSherpaProfile(
+        config: sherpa.OfflineRecognizerConfig(
+          model: sherpa.OfflineModelConfig(
+            whisper: sherpa.OfflineWhisperModelConfig(
+              encoder: _file('encoder'),
+              decoder: _file('decoder'),
+              language: config['language']! as String,
+              task: config['task']! as String,
+              tailPaddings: config['tailPaddings']! as int,
+              enableTokenTimestamps: config['enableTokenTimestamps']! as bool,
+              enableSegmentTimestamps:
+                  config['enableSegmentTimestamps']! as bool,
+            ),
+            tokens: _file('tokens'),
+            numThreads: threads,
+            provider: provider,
+            debug: false,
+          ),
+          decodingMethod: config['decodingMethod']! as String,
+        ),
+        effectiveConfig: config,
+        capabilities: request.capabilities,
+      ),
+      BenchmarkCandidateFamily.moonshine => OfflineSherpaProfile(
+        config: sherpa.OfflineRecognizerConfig(
+          model: sherpa.OfflineModelConfig(
+            moonshine: sherpa.OfflineMoonshineModelConfig(
+              encoder: _file('encoder'),
+              mergedDecoder: _file('mergedDecoder'),
+            ),
+            tokens: _file('tokens'),
+            numThreads: threads,
+            provider: provider,
+            debug: false,
+          ),
+          decodingMethod: config['decodingMethod']! as String,
+        ),
+        effectiveConfig: config,
+        capabilities: request.capabilities,
+      ),
+      BenchmarkCandidateFamily.nemoTransducer => OfflineSherpaProfile(
+        config: sherpa.OfflineRecognizerConfig(
+          model: sherpa.OfflineModelConfig(
+            transducer: sherpa.OfflineTransducerModelConfig(
+              encoder: _file('encoder'),
+              decoder: _file('decoder'),
+              joiner: _file('joiner'),
+            ),
+            tokens: _file('tokens'),
+            numThreads: threads,
+            provider: provider,
+            debug: false,
+            modelType: 'nemo_transducer',
+          ),
+          decodingMethod: config['decodingMethod']! as String,
+        ),
+        effectiveConfig: config,
+        capabilities: request.capabilities,
+      ),
+      BenchmarkCandidateFamily.senseVoice => OfflineSherpaProfile(
+        config: sherpa.OfflineRecognizerConfig(
+          model: sherpa.OfflineModelConfig(
+            senseVoice: sherpa.OfflineSenseVoiceModelConfig(
+              model: _file('model'),
+              language: config['language']! as String,
+              useInverseTextNormalization:
+                  config['useInverseTextNormalization']! as bool,
+            ),
+            tokens: _file('tokens'),
+            numThreads: threads,
+            provider: provider,
+            debug: false,
+          ),
+          decodingMethod: config['decodingMethod']! as String,
+        ),
+        effectiveConfig: config,
+        capabilities: request.capabilities,
+      ),
       BenchmarkCandidateFamily.funasrNano => OfflineSherpaProfile(
         config: sherpa.OfflineRecognizerConfig(
           model: sherpa.OfflineModelConfig(
@@ -266,6 +359,22 @@ void _validateFamilyConfig(
         if (score is! num || !score.toDouble().isFinite) {
           throw const FormatException('hotwordScore is invalid');
         }
+      }
+    case BenchmarkCandidateFamily.offlineWhisper:
+      if (!const <String>{'en'}.contains(config['language']) ||
+          config['task'] != 'transcribe' ||
+          config['tailPaddings'] is! int ||
+          config['enableTokenTimestamps'] is! bool ||
+          config['enableSegmentTimestamps'] is! bool) {
+        throw const FormatException('Whisper controls are invalid');
+      }
+    case BenchmarkCandidateFamily.moonshine:
+    case BenchmarkCandidateFamily.nemoTransducer:
+      break;
+    case BenchmarkCandidateFamily.senseVoice:
+      if (!const <String>{'auto', 'zh', 'en'}.contains(config['language']) ||
+          config['useInverseTextNormalization'] is! bool) {
+        throw const FormatException('SenseVoice controls are invalid');
       }
     case BenchmarkCandidateFamily.funasrNano:
       if (config['language'] is! String ||

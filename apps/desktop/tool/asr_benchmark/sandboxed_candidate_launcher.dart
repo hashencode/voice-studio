@@ -136,14 +136,21 @@ class SandboxedCandidateLauncher {
       throw const FormatException('candidate worker paths are missing');
     }
     await roots.requireContainedSource(File(sourcePath));
-    for (final value in modelFiles.values) {
+    final family = request['family'];
+    for (final entry in modelFiles.entries) {
+      final value = entry.value;
       if (value is! Map<String, Object?> || value['path'] is! String) {
         throw const FormatException('candidate model path is invalid');
       }
-      await _requireContainedRegularFile(
-        roots.modelRoot,
-        File(value['path']! as String),
-      );
+      final modelPath = value['path']! as String;
+      if (family == 'funasr_nano' && entry.key == 'tokenizer') {
+        await _requireContainedTokenizerDirectory(
+          roots.modelRoot,
+          Directory(modelPath),
+        );
+      } else {
+        await _requireContainedRegularFile(roots.modelRoot, File(modelPath));
+      }
     }
   }
 
@@ -271,6 +278,28 @@ Future<void> _requireContainedRegularFile(String root, File file) async {
       FileSystemEntity.typeSync(resolved, followLinks: false) !=
           FileSystemEntityType.file) {
     throw const FileSystemException('BENCHMARK_PATH_ESCAPE');
+  }
+}
+
+Future<void> _requireContainedTokenizerDirectory(
+  String root,
+  Directory directory,
+) async {
+  final resolved = path.normalize(await directory.resolveSymbolicLinks());
+  if (!_isContained(root, resolved) ||
+      FileSystemEntity.typeSync(resolved, followLinks: false) !=
+          FileSystemEntityType.directory) {
+    throw const FileSystemException('BENCHMARK_PATH_ESCAPE');
+  }
+  final entities = await directory.list(followLinks: false).toList();
+  if (entities.isEmpty || entities.length > 16) {
+    throw const FileSystemException('BENCHMARK_TOKENIZER_DIRECTORY_INVALID');
+  }
+  for (final entity in entities) {
+    if (entity is! File) {
+      throw const FileSystemException('BENCHMARK_TOKENIZER_DIRECTORY_INVALID');
+    }
+    await _requireContainedRegularFile(root, entity);
   }
 }
 

@@ -96,6 +96,7 @@ def aggregate_candidate(runs: list[dict[str, Any]]) -> dict[str, Any]:
             _finite_number(metrics.get(metric), f"{run['runId']}.{metric}")
         for metric in (
             "cer",
+            "wer",
             "terminologyRecall",
             "numericEventAccuracy",
         ):
@@ -115,7 +116,7 @@ def aggregate_candidate(runs: list[dict[str, Any]]) -> dict[str, Any]:
     macro_inputs: dict[str, list[float]] = defaultdict(list)
     for scenario, scenario_runs in sorted(by_scenario.items()):
         metrics: dict[str, Any] = {"measuredRuns": len(scenario_runs)}
-        for metric in ("cer", "terminologyRecall", "numericEventAccuracy"):
+        for metric in ("cer", "wer", "terminologyRecall", "numericEventAccuracy"):
             values = [
                 float(run["metrics"][metric])
                 for run in scenario_runs
@@ -130,7 +131,7 @@ def aggregate_candidate(runs: list[dict[str, Any]]) -> dict[str, Any]:
         metric: _mean(values)
         for metric, values in sorted(macro_inputs.items())
     }
-    for metric in ("cer", "terminologyRecall", "numericEventAccuracy"):
+    for metric in ("cer", "wer", "terminologyRecall", "numericEventAccuracy"):
         macro.setdefault(metric, None)
     rtf_values = [float(run["metrics"]["rtf"]) for run in measured]
     rss_values = [
@@ -190,7 +191,12 @@ def compare_to_baseline(
     *,
     hard_gates: dict[str, Any],
     materiality: dict[str, Any],
+    lexical_metric: str = "cer",
 ) -> dict[str, Any]:
+    require(
+        lexical_metric in {"cer", "wer"},
+        "lexical metric must remain CER or WER",
+    )
     require(
         candidate["laneId"] == baseline["laneId"],
         "candidate and baseline must be in the same runtime lane",
@@ -200,12 +206,20 @@ def compare_to_baseline(
         and candidate["scorecard"] == baseline["scorecard"],
         "candidate and baseline profile/scorecard mismatch",
     )
-    candidate_cer = candidate["macroMetrics"].get("cer")
-    require(candidate_cer is not None, "candidate macro CER is required")
+    candidate_lexical_error = candidate["macroMetrics"].get(lexical_metric)
+    require(
+        candidate_lexical_error is not None,
+        f"candidate macro {lexical_metric.upper()} is required",
+    )
     median_rtf = candidate["performance"]["rtf"]["median"]
     peak_rss = candidate["resources"]["incrementalPeakRssBytes"]["maximum"]
     gate_results = {
-        "cer": "PASS" if candidate_cer <= hard_gates["maxCer"] else "FAIL",
+        lexical_metric: (
+            "PASS"
+            if candidate_lexical_error
+            <= hard_gates["maxCer" if lexical_metric == "cer" else "maxWer"]
+            else "FAIL"
+        ),
         "rtf": "PASS" if median_rtf <= hard_gates["maxRtf"] else "FAIL",
         "incrementalPeakRssBytes": (
             "PASS"
@@ -230,12 +244,13 @@ def compare_to_baseline(
         baseline_metrics = baseline["scenarioMetrics"].get(scenario)
         if (
             baseline_metrics is None
-            or candidate_metrics.get("cer") is None
-            or baseline_metrics.get("cer") is None
+            or candidate_metrics.get(lexical_metric) is None
+            or baseline_metrics.get(lexical_metric) is None
         ):
             continue
         scenario_reductions[scenario] = _relative_reduction(
-            baseline_metrics["cer"], candidate_metrics["cer"]
+            baseline_metrics[lexical_metric],
+            candidate_metrics[lexical_metric],
         )
     improved_hard_scenarios = sum(
         reduction
@@ -243,7 +258,12 @@ def compare_to_baseline(
         for scenario, reduction in scenario_reductions.items()
         if scenario != "clean_near_field_mandarin"
     )
-    clean_reduction = scenario_reductions.get("clean_near_field_mandarin", 0.0)
+    clean_scenario = (
+        "clean_near_field_mandarin"
+        if lexical_metric == "cer"
+        else "clean_near_field_english"
+    )
+    clean_reduction = scenario_reductions.get(clean_scenario, 0.0)
     clean_regression_ok = (
         clean_reduction
         >= -materiality["maximumRelativeCleanMandarinRegression"]
@@ -262,7 +282,7 @@ def compare_to_baseline(
     ]
     best_event_gain = max(gains, default=0.0)
     macro_reduction = _relative_reduction(
-        baseline["macroMetrics"]["cer"], candidate_cer
+        baseline["macroMetrics"][lexical_metric], candidate_lexical_error
     )
     scenario_path = (
         macro_reduction
@@ -280,6 +300,7 @@ def compare_to_baseline(
         "hardFailures": [],
         "materialBenefit": {
             "qualified": material_benefit,
+            "lexicalMetric": lexical_metric,
             "macroRelativeLexicalErrorReduction": macro_reduction,
             "hardScenariosMeetingReduction": improved_hard_scenarios,
             "bestTerminologyNumericPointGain": best_event_gain,

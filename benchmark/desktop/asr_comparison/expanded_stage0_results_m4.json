@@ -1,0 +1,161 @@
+{
+  "schemaVersion": 1,
+  "kind": "m4_expanded_stage0_smoke_results",
+  "expansionId": "desktop-processing/macos-asr-m4-zh-en-expansion-v1",
+  "createdAt": "2026-07-27",
+  "rankEligible": false,
+  "purpose": "real runnable Stage 0 characterization only",
+  "targetFingerprint": {
+    "operatingSystem": "macos",
+    "operatingSystemVersion": "15.7.5",
+    "architecture": "arm64",
+    "cpuModel": "Apple M4",
+    "logicalCpuCount": 10,
+    "memoryBytes": 17179869184,
+    "runtimeId": "sherpa-onnx-dart-1.13.4-macos-arm64",
+    "runtimeSha256": "102e8383640a6752dc9c51060836aba6f3da75bd644c3ddada1a0c15b8df0f02",
+    "workerSha256": "f1682aa8f1cd559875c36b314a6f2258384b31654e541d4730829471595295e5"
+  },
+  "fixturePolicy": {
+    "zh": {
+      "durationSeconds": 15.0,
+      "lexicalMetric": "cer",
+      "sourceDisposition": "generated_from_committed_repository_smoke_prefix"
+    },
+    "en": {
+      "durationSeconds": 6.625,
+      "lexicalMetric": "wer",
+      "sourceDisposition": "upstream_model_archive_test_wav_local_only"
+    },
+    "codeSwitchTested": false
+  },
+  "results": [
+    {
+      "candidateId": "sherpa-onnx-streaming-zipformer-en-20m-2023-02-17",
+      "languageLane": "en",
+      "stage0State": "PASS",
+      "runId": "asr2-897e17b7e60d3bdef853d556b8f7d1a7",
+      "wer": 0.2222222222222222,
+      "rtf": 0.02286279245283019,
+      "loadMilliseconds": 94.153,
+      "decodeMilliseconds": 151.466,
+      "incrementalPeakRssBytes": 111362048,
+      "retainedRssBytesAfterUnload": 134873088
+    },
+    {
+      "candidateId": "sherpa-onnx-moonshine-base-en-quantized-2026-02-27",
+      "languageLane": "en",
+      "stage0State": "FAIL",
+      "terminalDisposition": "REJECTED_RUNTIME_MODEL_FORMAT",
+      "failureCode": "ORT_PROTOBUF_PARSE_FAILED"
+    },
+    {
+      "candidateId": "sherpa-onnx-whisper-base-en-int8-2023-01-31",
+      "languageLane": "en",
+      "stage0State": "PASS",
+      "runId": "asr2-a784c66bd3e3bdf175ebf1e240f17f85",
+      "wer": 0.0,
+      "rtf": 0.06086822641509434,
+      "loadMilliseconds": 202.798,
+      "decodeMilliseconds": 403.252,
+      "incrementalPeakRssBytes": 482459648,
+      "retainedRssBytesAfterUnload": 511983616
+    },
+    {
+      "candidateId": "sherpa-onnx-nemo-parakeet-tdt-0.6b-v2-int8-2025-05-01",
+      "languageLane": "en",
+      "stage0State": "PASS",
+      "runId": "asr2-5333e4a09b7f4a9518dcde2d7f2f5d17",
+      "wer": 0.0,
+      "rtf": 0.11398460377358491,
+      "loadMilliseconds": 621.911,
+      "decodeMilliseconds": 755.148,
+      "incrementalPeakRssBytes": 1194082304,
+      "retainedRssBytesAfterUnload": 819707904
+    },
+    {
+      "candidateId": "sherpa-onnx-sense-voice-zh-en-ja-ko-yue-int8-2024-07-17",
+      "languageLane": "en",
+      "stage0State": "PASS",
+      "runId": "asr2-6ee2b9b9b959eafff15c104600ba05ca",
+      "wer": 0.0,
+      "rtf": 0.05471230188679245,
+      "loadMilliseconds": 325.397,
+      "decodeMilliseconds": 362.469,
+      "incrementalPeakRssBytes": 676331520,
+      "retainedRssBytesAfterUnload": 573259776
+    },
+    {
+      "candidateId": "sherpa-onnx-sense-voice-zh-en-ja-ko-yue-int8-2024-07-17",
+      "languageLane": "zh",
+      "stage0State": "PASS",
+      "runId": "asr2-f8cec0d11f3ae209d06d2b569011458b",
+      "cer": 0.0,
+      "rtf": 0.054638733333333335,
+      "loadMilliseconds": 322.327,
+      "decodeMilliseconds": 819.581,
+      "incrementalPeakRssBytes": 625246208,
+      "retainedRssBytesAfterUnload": 651624448
+    },
+    {
+      "candidateId": "sherpa-onnx-streaming-zipformer-zh-int8-2025-06-30",
+      "languageLane": "zh",
+      "stage0State": "FAIL",
+      "terminalDisposition": "REJECTED_RUNTIME_MODEL_METADATA",
+      "failureCode": "ZIPFORMER_ATTENTION_DIMS_METADATA_MISSING"
+    },
+    {
+      "candidateId": "sherpa-onnx-funasr-nano-int8-2025-12-30",
+      "languageLane": "en",
+      "stage0State": "PASS",
+      "runId": "asr2-c0cbee2623e1f5452db067ee3c68bac9",
+      "wer": 0.0,
+      "rtf": 0.23888800000000002,
+      "loadMilliseconds": 1579.679,
+      "decodeMilliseconds": 1582.633,
+      "incrementalPeakRssBytes": 2174173184,
+      "retainedRssBytesAfterUnload": 1104035840,
+      "hardGateObservation": "incremental peak RSS exceeds the current 2 GiB finalist gate"
+    },
+    {
+      "candidateId": "sherpa-onnx-funasr-nano-int8-2025-12-30",
+      "languageLane": "zh",
+      "stage0State": "PASS",
+      "runId": "asr2-78f66567b7fa32a33eae0a9e7d4b6ee5",
+      "cer": 0.0,
+      "rtf": 0.20434686666666665,
+      "loadMilliseconds": 1451.105,
+      "decodeMilliseconds": 3065.203,
+      "incrementalPeakRssBytes": 2104344576,
+      "retainedRssBytesAfterUnload": 944406528
+    },
+    {
+      "candidateId": "sherpa-onnx-fire-red-asr2-ctc-zh_en-int8-2026-02-25",
+      "languageLane": "en",
+      "stage0State": "PASS",
+      "runId": "asr2-25813619dc8bcac2d785056ed0d80f94",
+      "wer": 0.1111111111111111,
+      "rtf": 0.31920845283018867,
+      "loadMilliseconds": 446.599,
+      "decodeMilliseconds": 2114.756,
+      "incrementalPeakRssBytes": 1354940416,
+      "retainedRssBytesAfterUnload": 983334912
+    }
+  ],
+  "summary": {
+    "scheduledRunCount": 10,
+    "successfulRunCount": 8,
+    "failedRunCount": 2,
+    "formalDevelopmentRankingComplete": false,
+    "heldOutRankingComplete": false,
+    "twoHourFinalistComplete": false
+  },
+  "privacy": {
+    "rawAudioPublished": false,
+    "transcriptPublished": false,
+    "modelFilesPublished": false,
+    "absolutePathsPublished": false,
+    "processingNetwork": "denied",
+    "userHomeAccess": "denied"
+  }
+}

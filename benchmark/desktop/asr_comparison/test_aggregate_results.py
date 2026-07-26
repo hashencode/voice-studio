@@ -11,6 +11,7 @@ def run(
     cer: float,
     *,
     index: int,
+    wer: float | None = None,
     warmup: bool = False,
     rtf: float = 0.2,
     rss: int = 100,
@@ -29,6 +30,7 @@ def run(
         "scheduleOrder": index,
         "metrics": {
             "cer": cer,
+            "wer": wer,
             "rtf": rtf,
             "incrementalPeakRssBytes": rss,
             "terminologyRecall": 0.5,
@@ -57,6 +59,54 @@ class AggregateResultsTest(unittest.TestCase):
         self.assertEqual(aggregate["measuredRunCount"], 5)
         self.assertEqual(aggregate["performance"]["rtf"]["median"], 0.2)
         self.assertIn("dispersion", aggregate["performance"]["rtf"])
+
+    def test_english_lane_aggregates_and_gates_on_wer(self) -> None:
+        baseline = aggregate_candidate(
+            [
+                run(
+                    "clean_near_field_english",
+                    0.08,
+                    wer=0.2,
+                    index=1,
+                )
+            ]
+        )
+        candidate = aggregate_candidate(
+            [
+                run(
+                    "clean_near_field_english",
+                    0.4,
+                    wer=0.1,
+                    index=1,
+                )
+            ]
+        )
+
+        decision = compare_to_baseline(
+            candidate,
+            baseline,
+            lexical_metric="wer",
+            hard_gates={
+                "maxCer": 0.35,
+                "maxWer": 0.35,
+                "maxRtf": 0.5,
+                "maxFinalistIncrementalPeakRssBytes": 2 * 1024**3,
+            },
+            materiality={
+                "minimumRelativeMacroLexicalErrorReduction": 0.15,
+                "minimumHardScenariosImproved": 2,
+                "alternativeMinimumTerminologyNumericPointGain": 0.1,
+                "maximumRelativeCleanMandarinRegression": 0.05,
+            },
+        )
+
+        self.assertEqual(candidate["macroMetrics"]["wer"], 0.1)
+        self.assertEqual(decision["hardGateResults"]["wer"], "PASS")
+        self.assertNotIn("cer", decision["hardGateResults"])
+        self.assertEqual(
+            decision["materialBenefit"]["lexicalMetric"],
+            "wer",
+        )
 
     def test_cross_lane_runs_cannot_be_pooled(self) -> None:
         runs = [run("clean", 0.1, index=1), run("hard", 0.2, index=2)]

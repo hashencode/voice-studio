@@ -10,6 +10,23 @@ enum BenchmarkCandidateFamily {
     'model',
     'tokens',
   }),
+  offlineWhisper('offline_whisper', 'whisper', <String>{
+    'encoder',
+    'decoder',
+    'tokens',
+  }),
+  moonshine('moonshine', 'moonshine', <String>{
+    'encoder',
+    'mergedDecoder',
+    'tokens',
+  }),
+  nemoTransducer('nemo_transducer', 'nemo_transducer', <String>{
+    'encoder',
+    'decoder',
+    'joiner',
+    'tokens',
+  }),
+  senseVoice('sense_voice', 'sense_voice', <String>{'model', 'tokens'}),
   funasrNano('funasr_nano', 'funasr_nano', <String>{
     'encoderAdaptor',
     'llm',

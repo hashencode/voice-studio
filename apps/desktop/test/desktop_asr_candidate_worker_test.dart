@@ -87,6 +87,96 @@ void main() {
       expect(model.itn, 1);
       expect(model.temperature, 0.0);
       expect(model.hotwords, '');
+      expect(model.tokenizer, '/models/tokenizer.json');
+    });
+
+    test('constructs English Whisper configuration', () {
+      final request = requestFor(
+        family: 'offline_whisper',
+        modelFiles: <String, Object?>{
+          'encoder': modelFile('/models/encoder.int8.onnx'),
+          'decoder': modelFile('/models/decoder.int8.onnx'),
+          'tokens': modelFile('/models/tokens.txt'),
+        },
+        config: <String, Object?>{
+          'modelFamily': 'whisper',
+          'provider': 'cpu',
+          'numThreads': 2,
+          'modelPrecision': 'int8',
+          'decodingMethod': 'greedy_search',
+          'language': 'en',
+          'task': 'transcribe',
+          'tailPaddings': -1,
+          'enableTokenTimestamps': false,
+          'enableSegmentTimestamps': false,
+        },
+      );
+      final built = EffectiveProfile.fromRequest(request).build();
+      final model = (built as OfflineSherpaProfile).config.model.whisper;
+
+      expect(model.encoder, '/models/encoder.int8.onnx');
+      expect(model.language, 'en');
+      expect(model.task, 'transcribe');
+    });
+
+    test('constructs Moonshine v2 configuration', () {
+      final request = requestFor(
+        family: 'moonshine',
+        modelFiles: <String, Object?>{
+          'encoder': modelFile('/models/encoder.ort'),
+          'mergedDecoder': modelFile('/models/decoder.ort'),
+          'tokens': modelFile('/models/tokens.txt'),
+        },
+        config: fixedConfig('moonshine'),
+      );
+      final built = EffectiveProfile.fromRequest(request).build();
+      final model = (built as OfflineSherpaProfile).config.model.moonshine;
+
+      expect(model.encoder, '/models/encoder.ort');
+      expect(model.mergedDecoder, '/models/decoder.ort');
+    });
+
+    test('constructs NeMo Parakeet transducer configuration', () {
+      final request = requestFor(
+        family: 'nemo_transducer',
+        modelFiles: <String, Object?>{
+          'encoder': modelFile('/models/encoder.int8.onnx'),
+          'decoder': modelFile('/models/decoder.int8.onnx'),
+          'joiner': modelFile('/models/joiner.int8.onnx'),
+          'tokens': modelFile('/models/tokens.txt'),
+        },
+        config: fixedConfig('nemo_transducer'),
+      );
+      final built = EffectiveProfile.fromRequest(request).build();
+      final modelConfig = (built as OfflineSherpaProfile).config.model;
+
+      expect(modelConfig.transducer.encoder, '/models/encoder.int8.onnx');
+      expect(modelConfig.modelType, 'nemo_transducer');
+    });
+
+    test('constructs bilingual SenseVoice configuration', () {
+      final request = requestFor(
+        family: 'sense_voice',
+        modelFiles: <String, Object?>{
+          'model': modelFile('/models/model.int8.onnx'),
+          'tokens': modelFile('/models/tokens.txt'),
+        },
+        config: <String, Object?>{
+          'modelFamily': 'sense_voice',
+          'provider': 'cpu',
+          'numThreads': 2,
+          'modelPrecision': 'int8',
+          'decodingMethod': 'greedy_search',
+          'language': 'auto',
+          'useInverseTextNormalization': false,
+        },
+      );
+      final built = EffectiveProfile.fromRequest(request).build();
+      final model = (built as OfflineSherpaProfile).config.model.senseVoice;
+
+      expect(model.model, '/models/model.int8.onnx');
+      expect(model.language, 'auto');
+      expect(model.useInverseTextNormalization, isFalse);
     });
 
     test('constructs FireRedASR2 CTC configuration', () {
@@ -112,11 +202,19 @@ void main() {
         containsAll(<String>[
           'streaming_zipformer_transducer',
           'offline_paraformer',
+          'offline_whisper',
+          'moonshine',
+          'nemo_transducer',
+          'sense_voice',
           'funasr_nano',
           'firered_asr_ctc',
         ]),
       );
       expect(const sherpa.OfflineParaformerModelConfig(), isNotNull);
+      expect(const sherpa.OfflineWhisperModelConfig(), isNotNull);
+      expect(const sherpa.OfflineMoonshineModelConfig(), isNotNull);
+      expect(const sherpa.OfflineTransducerModelConfig(), isNotNull);
+      expect(const sherpa.OfflineSenseVoiceModelConfig(), isNotNull);
       expect(const sherpa.OfflineFunAsrNanoModelConfig(), isNotNull);
       expect(const sherpa.OfflineFireRedAsrCtcModelConfig(), isNotNull);
     });
