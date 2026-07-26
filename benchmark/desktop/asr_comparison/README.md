@@ -81,6 +81,14 @@ After the four reviewed development entries are frozen, prepare and preflight
 the real M4 matrix with:
 
 ```bash
+python3 benchmark/desktop/asr_comparison/freeze_development_fixtures.py \
+  --write-template
+# Complete the local review receipt only after authorization, consent,
+# reference, variety, and role-isolation review.
+python3 benchmark/desktop/asr_comparison/freeze_development_fixtures.py \
+  --freeze
+# Review and activate the generated development-freeze/fixtures.json as the
+# tracked fixtures.json revision before any candidate output is decoded.
 python3 benchmark/desktop/asr_comparison/prepare_fixtures.py \
   --development \
   --output build/desktop_asr_comparison/fixtures/development-active
@@ -142,6 +150,13 @@ Apple M4 fingerprint, shared sherpa runtime, worker, candidate registry,
 profiles, fixture/reference hashes, scorer, and prepared model components
 before decoding. Native FunASR and license-rejected candidates cannot enter its
 schedule.
+
+`freeze_development_fixtures.py` creates the private review template and, only
+after every fixed assertion is completed, verifies the four local PCM/reference
+pairs and atomically creates a candidate frozen manifest. Its bounded freeze
+record contains hashes and review-record hashes but no audio, transcript text,
+speaker identity, or absolute path. It never edits the tracked manifest
+automatically; activation remains an explicit reviewed contract revision.
 
 The benchmark Dart launcher in
 `apps/desktop/tool/asr_benchmark/sandboxed_candidate_launcher.dart` reuses the

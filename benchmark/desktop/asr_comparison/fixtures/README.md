@@ -39,6 +39,34 @@ must:
 8. run `prepare_fixtures.py --development` for U7; run `--ranked` only after
    the development freeze and all U8 prerequisites are satisfied.
 
+For U7, generate the local review receipt without overwriting an existing
+receipt:
+
+```bash
+python3 benchmark/desktop/asr_comparison/freeze_development_fixtures.py \
+  --write-template
+```
+
+Fill only the fixed fields in
+`build/desktop_asr_comparison/fixtures/development-review.json`. Hash the
+retained source-provenance, authorization/consent, and independent-review
+records, and record the provenance and authorization review dates; do not
+paste their contents, reviewer identities, source paths, transcript text, or
+audio into the receipt. Then run:
+
+```bash
+python3 benchmark/desktop/asr_comparison/freeze_development_fixtures.py \
+  --freeze
+```
+
+The command verifies 16-kHz mono signed PCM, non-empty UTF-8 references,
+authorization or signed-consent review, dialect variety review, development
+role assignment, local-only handling, and `never_commit` redistribution. It
+atomically writes only `fixtures.json` and
+`development-fixture-freeze.json` under the ignored
+`development-freeze/` directory. Review that candidate manifest before
+activating it as a tracked comparison-contract revision.
+
 Common Voice clips are selected through a deterministic local subset manifest
 and are not rehosted. AISHELL-4 audio is local-only. Consented recordings and
 references are never committed. Published evidence contains content hashes and
