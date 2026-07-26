@@ -81,5 +81,6 @@ openRecordingTestDatabase() async {
   await AppDatabase.migrateTranscriptReviewClosure(database);
   await AppDatabase.migrateRecordingAnnotations(database);
   await AppDatabase.migrateS2Closure(database);
+  await AppDatabase.migrateS3Productization(database);
   return (database: database, appDatabase: AppDatabase.forTesting(database));
 }

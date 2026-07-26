@@ -27,7 +27,7 @@ void main() {
     final denied = MeetingIntelligenceRequest(
       recordingId: fixture.request.recordingId,
       generationId: fixture.request.generationId,
-      processingLocation: MeetingProcessingLocation.local,
+      processingLocation: MeetingProcessingLocation.onDevice,
       consentDecision: MeetingConsentDecision.denied,
       inputStartMs: 0,
       inputEndMs: 10000,
@@ -58,7 +58,7 @@ void main() {
     final remote = MeetingIntelligenceRequest(
       recordingId: fixture.request.recordingId,
       generationId: fixture.request.generationId,
-      processingLocation: MeetingProcessingLocation.remote,
+      processingLocation: MeetingProcessingLocation.cloudDirect,
       consentDecision: MeetingConsentDecision.granted,
       inputStartMs: 0,
       inputEndMs: 10000,

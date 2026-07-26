@@ -14,6 +14,7 @@ Usage:
 
 What it removes:
   - <flutter-project>/build
+  - <flutter-project>/.dart_tool/flutter_build
   - <flutter-project>/android/.gradle
   - <flutter-project>/android/build
   - <flutter-project>/android/.kotlin
@@ -93,6 +94,7 @@ collect_targets() {
     project_dir="$(dirname "$pubspec")"
 
     add_target "$project_dir/build"
+    add_target "$project_dir/.dart_tool/flutter_build"
     add_target "$project_dir/android/.gradle"
     add_target "$project_dir/android/build"
     add_target "$project_dir/android/.kotlin"

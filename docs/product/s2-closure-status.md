@@ -8,13 +8,16 @@
 Core**。机器范围契约中的 18 个强制门禁目前 17 PASS、1 BLOCKED；
 唯一未通过的 Mobile Core 功能门禁是
 `ASR-005-TIMESTAMP-INDEPENDENT`。因此 **S2 Mobile Core 仍为 BLOCKED**。
+该人工门禁的当前执行状态是 `SKIPPED_PENDING_USER_TEST`，由用户后续完成
+独立听审与真机正常模式评估；执行跳过不等于验收通过。
 
 原 S2 范围没有被追溯改写为通过。自动 confidence、热词、高级 ITN、
 GTCRN/AEC 和 REC-009 外接麦克风真机验收保留历史 BLOCKED/FAIL，
 状态为 `DEFERRED_NOT_PASSED`，分别进入 PC 或高级能力阶段。
 
-整体产品继续 **NOT RELEASE-READY**：除了 Mobile Core 尚缺独立听审，
-S1 高端参考设备、EXP-005 Android 生产发布和正式发布交付也仍未完成。
+S1 非发布功能闭环已在低端和中端参考机完成。整体产品继续
+**NOT RELEASE-READY**：除了 Mobile Core 尚缺独立听审，发布候选包的
+高端设备兼容性、EXP-005 Android 生产发布和正式发布交付也仍未完成。
 本结论不包含发布、签名、提交、推送、PR、部署或商店交付。
 
 ## S2 Mobile Core gate summary
@@ -22,10 +25,12 @@ S1 高端参考设备、EXP-005 Android 生产发布和正式发布交付也仍�
 | 范围 | 当前结论 | 依据 |
 | --- | --- | --- |
 | Mobile Core 已通过门禁 | 17 PASS | 可靠录音/导入、Paraformer 离线转写、真实标点/分段、人工三态复核、播放器、编辑、搜索、五格式导出、删除/保留、平台数据保护、帮助和无障碍 |
-| ASR-005 独立时间戳 | **BLOCKED** | 工程分段 5/4 和 provisional P95=182 ms 已有；独立 reviewer 缺失，`releaseEligible=false` |
+| ASR-005 独立时间戳 | **BLOCKED / `SKIPPED_PENDING_USER_TEST`** | 工程分段 5/4 和 provisional P95=182 ms 已有；独立 reviewer 缺失，`releaseEligible=false`，等待用户后续测试 |
 | Mobile Core 总体 | **BLOCKED** | 总体状态由机器契约计算；任一 mandatory gate 非 PASS 即 BLOCKED |
 | 原 S2 高级能力 | `DEFERRED_NOT_PASSED` | 历史 blocker/失败值保留，迁移不等于 PASS |
-| 整体产品 | **NOT RELEASE-READY** | Mobile Core、S1 高端设备、EXP-005 和发布交付未全部完成 |
+| S1 非发布功能闭环 | **PASS** | 低端和中端主链、资源与生命周期门禁通过 |
+| 发布设备兼容性 | **PENDING** | 最终候选包仍缺高端参考设备 smoke；不回退已通过的功能状态 |
+| 整体产品 | **NOT RELEASE-READY** | Mobile Core、发布高端兼容性、EXP-005 和发布交付未全部完成 |
 
 机器权威：`docs/product/s2-mobile-core-scope.json`；校验入口：
 `python3 tool/validate_s2_mobile_core_scope.py`。

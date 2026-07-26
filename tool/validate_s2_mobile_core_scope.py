@@ -36,7 +36,7 @@ EXPECTED_ORIGINAL_S2_BASELINE_IDS = {
     "TIM-003",
 }
 EXPECTED_OVERALL_BLOCKERS = {
-    "S1-HIGH-END-REFERENCE-DEVICE",
+    "RELEASE-HIGH-END-COMPATIBILITY",
     "EXP-005-ANDROID-PRODUCTION-RELEASE",
     "S2-MOBILE-CORE",
     "RELEASE-DELIVERY",
@@ -380,8 +380,21 @@ def _validate_statuses(
     )
     if overall_blockers != EXPECTED_OVERALL_BLOCKERS:
         raise ValueError(
-            "overallProduct.blockers must preserve Mobile Core, S1 high-end, "
-            "EXP-005 and release-delivery boundaries"
+            "overallProduct.blockers must preserve Mobile Core, release "
+            "high-end compatibility, EXP-005 and release-delivery boundaries"
+        )
+    if overall.get("featureClosure") != "PASS_LOW_AND_MID_DEVICE":
+        raise ValueError(
+            "overallProduct.featureClosure must preserve the accepted low/mid "
+            "device feature PASS"
+        )
+    if (
+        overall.get("releaseDeviceMatrix")
+        != "PENDING_HIGH_END_REFERENCE_DEVICE"
+    ):
+        raise ValueError(
+            "overallProduct.releaseDeviceMatrix must keep high-end coverage "
+            "as a pending release compatibility gate"
         )
 
 
@@ -398,6 +411,13 @@ def _validate_special_contracts(manifest: dict[str, Any]) -> None:
     timestamp = _require_mapping(manifest.get("timestampGate"), "timestampGate")
     if timestamp.get("gateId") != "ASR-005-TIMESTAMP-INDEPENDENT":
         raise ValueError("timestampGate must bind ASR-005 mandatory gate")
+    if (
+        timestamp.get("executionDisposition")
+        != "SKIPPED_PENDING_USER_TEST"
+    ):
+        raise ValueError(
+            "ASR-005 execution must remain skipped pending user testing"
+        )
     if timestamp.get("independentReviewRequired") is not True:
         raise ValueError("ASR-005 must require an independent reviewer")
     if timestamp.get("releaseEligible") is not False:

@@ -13,6 +13,8 @@ import com.voice2text.app.importing.DocumentImportCoordinator
 import com.voice2text.app.importing.ImportedMediaException
 import com.voice2text.app.importing.SharedMediaRequestQueue
 import com.voice2text.app.privacy.PrivacySafeLog
+import com.voice2text.app.privacy.MeetingApiSecretStore
+import com.voice2text.app.privacy.MeetingApiSecretUnavailableException
 import com.voice2text.app.recording.RecordingForegroundService
 import com.voice2text.app.recording.RecordingInputDeviceCatalog
 import com.voice2text.app.recording.RecordingRecoveryManager
@@ -48,6 +50,7 @@ class MainActivity : FlutterActivity() {
     private val shareCoordinator by lazy { MeetingShareCoordinator(this) }
     private val ephemeralShareCoordinator by lazy { EphemeralShareCoordinator(this) }
     private val inputDeviceCatalog by lazy { RecordingInputDeviceCatalog(this) }
+    private val meetingApiSecretStore by lazy { MeetingApiSecretStore(this) }
     private val sharedMediaRequests = SharedMediaRequestQueue()
     private val importExecutor = Executors.newSingleThreadExecutor()
     private val importActive = AtomicBoolean(false)
@@ -127,6 +130,10 @@ class MainActivity : FlutterActivity() {
                     "discardEphemeralArtifact" -> handleDiscardEphemeralArtifact(call, result)
                     "getDeviceProtection" -> handleGetDeviceProtection(result)
                     "getBuildInfo" -> handleGetBuildInfo(result)
+                    "setMeetingApiSecret" -> handleSetMeetingApiSecret(call, result)
+                    "getMeetingApiSecret" -> handleGetMeetingApiSecret(call, result)
+                    "hasMeetingApiSecret" -> handleHasMeetingApiSecret(call, result)
+                    "deleteMeetingApiSecret" -> handleDeleteMeetingApiSecret(call, result)
                     "transcribe" -> handleTranscribe(call, result)
                     "cancelTranscriptionJob" -> handleCancelTranscriptionJob(call, result)
                     "getActiveTranscriptionJobIds" ->
@@ -536,6 +543,70 @@ class MainActivity : FlutterActivity() {
             result.success(buildInfoProvider.getBuildInfo())
         } catch (e: Exception) {
             result.error("BUILD_INFO_FAILED", e.message ?: "读取构建信息失败", null)
+        }
+    }
+
+    private fun handleSetMeetingApiSecret(
+        call: MethodCall,
+        result: MethodChannel.Result,
+    ) {
+        val providerId = call.argument<String>("providerId").orEmpty()
+        val secret = call.argument<String>("secret").orEmpty()
+        try {
+            meetingApiSecretStore.set(providerId, secret)
+            result.success(null)
+        } catch (_: IllegalArgumentException) {
+            result.error("INVALID_MEETING_API_SECRET", "密钥格式无效", null)
+        } catch (_: Exception) {
+            PrivacySafeLog.error(tag, "meeting_api_secret_write_failed")
+            result.error("MEETING_API_SECRET_WRITE_FAILED", "密钥无法安全保存", null)
+        }
+    }
+
+    private fun handleGetMeetingApiSecret(
+        call: MethodCall,
+        result: MethodChannel.Result,
+    ) {
+        val providerId = call.argument<String>("providerId").orEmpty()
+        try {
+            result.success(meetingApiSecretStore.get(providerId))
+        } catch (_: MeetingApiSecretUnavailableException) {
+            result.error("MEETING_API_SECRET_UNAVAILABLE", "密钥已失效，请重新输入", null)
+        } catch (_: IllegalArgumentException) {
+            result.error("INVALID_MEETING_API_PROVIDER", "提供商标识无效", null)
+        } catch (_: Exception) {
+            PrivacySafeLog.error(tag, "meeting_api_secret_read_failed")
+            result.error("MEETING_API_SECRET_READ_FAILED", "密钥无法读取", null)
+        }
+    }
+
+    private fun handleHasMeetingApiSecret(
+        call: MethodCall,
+        result: MethodChannel.Result,
+    ) {
+        val providerId = call.argument<String>("providerId").orEmpty()
+        try {
+            result.success(meetingApiSecretStore.has(providerId))
+        } catch (_: IllegalArgumentException) {
+            result.error("INVALID_MEETING_API_PROVIDER", "提供商标识无效", null)
+        } catch (_: Exception) {
+            result.success(false)
+        }
+    }
+
+    private fun handleDeleteMeetingApiSecret(
+        call: MethodCall,
+        result: MethodChannel.Result,
+    ) {
+        val providerId = call.argument<String>("providerId").orEmpty()
+        try {
+            meetingApiSecretStore.delete(providerId)
+            result.success(null)
+        } catch (_: IllegalArgumentException) {
+            result.error("INVALID_MEETING_API_PROVIDER", "提供商标识无效", null)
+        } catch (_: Exception) {
+            PrivacySafeLog.error(tag, "meeting_api_secret_delete_failed")
+            result.error("MEETING_API_SECRET_DELETE_FAILED", "密钥无法删除", null)
         }
     }
 

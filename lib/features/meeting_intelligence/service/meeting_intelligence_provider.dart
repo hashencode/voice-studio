@@ -1,9 +1,82 @@
 import '../../transcription/model/transcript_segment_entity.dart';
 import '../model/meeting_insight_entity.dart';
+import '../model/meeting_template.dart';
 
-enum MeetingProcessingLocation { local, remote }
+enum MeetingProcessingLocation {
+  onDevice,
+  cloudDirect,
+  pairedPc;
+
+  static MeetingProcessingLocation fromStorage(Object? value) {
+    return switch (value) {
+      'local' => MeetingProcessingLocation.onDevice,
+      'remote' => MeetingProcessingLocation.cloudDirect,
+      _ => MeetingProcessingLocation.values.firstWhere(
+        (location) => location.name == value,
+        orElse: () => MeetingProcessingLocation.onDevice,
+      ),
+    };
+  }
+}
 
 enum MeetingConsentDecision { notRequested, denied, granted }
+
+enum MeetingIntelligenceFailureCode {
+  unauthorized,
+  paymentRequired,
+  rateLimited,
+  serviceUnavailable,
+  responseInvalid,
+  responseTooLarge,
+  canceled,
+  networkUnavailable,
+  secretUnavailable,
+}
+
+class MeetingIntelligenceProviderException implements Exception {
+  const MeetingIntelligenceProviderException(this.code, this.userMessage);
+
+  final MeetingIntelligenceFailureCode code;
+  final String userMessage;
+
+  @override
+  String toString() => 'MeetingIntelligenceProviderException($code)';
+}
+
+class MeetingIntelligenceCancellationToken {
+  bool _canceled = false;
+  final List<void Function()> _listeners = <void Function()>[];
+
+  bool get isCanceled => _canceled;
+
+  void cancel() {
+    if (_canceled) return;
+    _canceled = true;
+    final listeners = List<void Function()>.of(_listeners);
+    _listeners.clear();
+    for (final listener in listeners) {
+      listener();
+    }
+  }
+
+  void throwIfCanceled() {
+    if (_canceled) {
+      throw const MeetingIntelligenceProviderException(
+        MeetingIntelligenceFailureCode.canceled,
+        '生成已取消',
+      );
+    }
+  }
+
+  void Function() addListener(void Function() listener) {
+    if (_canceled) {
+      listener();
+      return () {};
+    }
+    _listeners.add(listener);
+    return () => _listeners.remove(listener);
+  }
+}
 
 class MeetingIntelligenceCapabilities {
   const MeetingIntelligenceCapabilities({
@@ -34,6 +107,10 @@ class MeetingInsightCandidate {
     this.evidence = const <MeetingEvidenceCandidate>[],
     this.actionOwner,
     this.actionDueAtMs,
+    this.resolutionState = MeetingInsightResolutionState.notApplicable,
+    this.topicStartMs,
+    this.topicEndMs,
+    this.sortOrder = 0,
   });
 
   final MeetingInsightKind kind;
@@ -41,12 +118,24 @@ class MeetingInsightCandidate {
   final List<MeetingEvidenceCandidate> evidence;
   final String? actionOwner;
   final int? actionDueAtMs;
+  final MeetingInsightResolutionState resolutionState;
+  final int? topicStartMs;
+  final int? topicEndMs;
+  final int sortOrder;
 }
 
 class MeetingIntelligenceOutput {
-  const MeetingIntelligenceOutput({required this.items});
+  const MeetingIntelligenceOutput({
+    required this.items,
+    this.schemaVersion = 'meeting_intelligence_output/v1',
+    this.meetingType,
+    this.suggestedTitle,
+  });
 
   final List<MeetingInsightCandidate> items;
+  final String schemaVersion;
+  final String? meetingType;
+  final String? suggestedTitle;
 }
 
 class MeetingIntelligenceRequest {
@@ -58,6 +147,13 @@ class MeetingIntelligenceRequest {
     required this.inputStartMs,
     required this.inputEndMs,
     required this.segments,
+    this.templateId = MeetingTemplateId.general,
+    this.consentVersion = 1,
+    this.consentAtMs,
+    this.payloadSummary,
+    this.estimatedRequestCount = 1,
+    this.speakerLabelsIncluded = false,
+    this.reductionCandidates = const <MeetingInsightCandidate>[],
   });
 
   final int recordingId;
@@ -67,6 +163,13 @@ class MeetingIntelligenceRequest {
   final int inputStartMs;
   final int inputEndMs;
   final List<TranscriptSegmentEntity> segments;
+  final MeetingTemplateId templateId;
+  final int consentVersion;
+  final int? consentAtMs;
+  final String? payloadSummary;
+  final int estimatedRequestCount;
+  final bool speakerLabelsIncluded;
+  final List<MeetingInsightCandidate> reductionCandidates;
 }
 
 abstract interface class MeetingIntelligenceProvider {
@@ -75,8 +178,9 @@ abstract interface class MeetingIntelligenceProvider {
   MeetingIntelligenceCapabilities get capabilities;
 
   Future<MeetingIntelligenceOutput> generate(
-    MeetingIntelligenceRequest request,
-  );
+    MeetingIntelligenceRequest request, {
+    MeetingIntelligenceCancellationToken? cancellationToken,
+  });
 }
 
 class MeetingIntelligenceProviderBoundary {
@@ -89,8 +193,9 @@ class MeetingIntelligenceProviderBoundary {
   final bool localOnly;
 
   Future<MeetingIntelligenceOutput> generate(
-    MeetingIntelligenceRequest request,
-  ) async {
+    MeetingIntelligenceRequest request, {
+    MeetingIntelligenceCancellationToken? cancellationToken,
+  }) async {
     final selected = provider;
     if (selected == null) {
       throw StateError('未配置会议智能提供商');
@@ -99,7 +204,7 @@ class MeetingIntelligenceProviderBoundary {
       throw StateError('未获得会议智能处理同意');
     }
     if (localOnly &&
-        request.processingLocation == MeetingProcessingLocation.remote) {
+        request.processingLocation != MeetingProcessingLocation.onDevice) {
       throw StateError('本地模式禁止远程处理');
     }
     if (!selected.capabilities.processingLocations.contains(
@@ -107,7 +212,10 @@ class MeetingIntelligenceProviderBoundary {
     )) {
       throw StateError('提供商不支持请求的处理位置');
     }
-    final output = await selected.generate(request);
+    final output = await selected.generate(
+      request,
+      cancellationToken: cancellationToken,
+    );
     if (output.items.any(
       (item) => !selected.capabilities.supportedKinds.contains(item.kind),
     )) {

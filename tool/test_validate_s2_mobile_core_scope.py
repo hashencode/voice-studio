@@ -117,6 +117,16 @@ class S2MobileCoreScopeValidatorTest(unittest.TestCase):
         ):
             self._validate_fixture(manifest)
 
+    def test_timestamp_review_skip_cannot_be_misreported_as_pass(self) -> None:
+        manifest = copy.deepcopy(self.manifest)
+        manifest["timestampGate"]["executionDisposition"] = "PASS"
+
+        with self.assertRaisesRegex(
+            ValueError,
+            "execution must remain skipped pending user testing",
+        ):
+            self._validate_fixture(manifest)
+
     def test_current_baseline_cannot_add_a_second_blocked_gate(self) -> None:
         manifest = copy.deepcopy(self.manifest)
         item = next(

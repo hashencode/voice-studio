@@ -1,3 +1,5 @@
+import '../../meeting_intelligence/service/meeting_intelligence_provider.dart';
+
 class AppSettings {
   AppSettings({
     required this.modelId,
@@ -8,6 +10,10 @@ class AppSettings {
     this.recordingConsentAcceptedAtMs,
     this.recentlyDeletedRetentionDays,
     this.retentionLastSuccessfulScanAtMs,
+    this.meetingProcessingLocation = MeetingProcessingLocation.onDevice,
+    this.meetingAiProviderId,
+    this.meetingAiModelId,
+    this.meetingAiSecretConfigured = false,
   });
 
   final String modelId;
@@ -18,6 +24,10 @@ class AppSettings {
   final int? recordingConsentAcceptedAtMs;
   final int? recentlyDeletedRetentionDays;
   final int? retentionLastSuccessfulScanAtMs;
+  final MeetingProcessingLocation meetingProcessingLocation;
+  final String? meetingAiProviderId;
+  final String? meetingAiModelId;
+  final bool meetingAiSecretConfigured;
 
   static const String supportedModelId = 'paraformer-zh';
   static const String supportedRecordingMode = 'standard';
@@ -30,6 +40,7 @@ class AppSettings {
       enablePunctuation: true,
       isDarkMode: false,
       recordingConsentVersion: 0,
+      meetingProcessingLocation: MeetingProcessingLocation.onDevice,
     );
   }
 
@@ -42,6 +53,10 @@ class AppSettings {
     int? recordingConsentAcceptedAtMs,
     int? recentlyDeletedRetentionDays,
     int? retentionLastSuccessfulScanAtMs,
+    Object? meetingProcessingLocation,
+    String? meetingAiProviderId,
+    String? meetingAiModelId,
+    bool meetingAiSecretConfigured = false,
   }) {
     return AppSettings(
       modelId: modelId == supportedModelId ? modelId! : supportedModelId,
@@ -55,6 +70,12 @@ class AppSettings {
           ? recentlyDeletedRetentionDays
           : null,
       retentionLastSuccessfulScanAtMs: retentionLastSuccessfulScanAtMs,
+      meetingProcessingLocation: MeetingProcessingLocation.fromStorage(
+        meetingProcessingLocation,
+      ),
+      meetingAiProviderId: _nonEmpty(meetingAiProviderId),
+      meetingAiModelId: _nonEmpty(meetingAiModelId),
+      meetingAiSecretConfigured: meetingAiSecretConfigured,
     );
   }
 
@@ -70,6 +91,12 @@ class AppSettings {
     int? recentlyDeletedRetentionDays,
     bool clearRecentlyDeletedRetention = false,
     int? retentionLastSuccessfulScanAtMs,
+    MeetingProcessingLocation? meetingProcessingLocation,
+    String? meetingAiProviderId,
+    bool clearMeetingAiProvider = false,
+    String? meetingAiModelId,
+    bool clearMeetingAiModel = false,
+    bool? meetingAiSecretConfigured,
   }) {
     return AppSettings(
       modelId: modelId ?? this.modelId,
@@ -86,6 +113,21 @@ class AppSettings {
       retentionLastSuccessfulScanAtMs:
           retentionLastSuccessfulScanAtMs ??
           this.retentionLastSuccessfulScanAtMs,
+      meetingProcessingLocation:
+          meetingProcessingLocation ?? this.meetingProcessingLocation,
+      meetingAiProviderId: clearMeetingAiProvider
+          ? null
+          : meetingAiProviderId ?? this.meetingAiProviderId,
+      meetingAiModelId: clearMeetingAiModel
+          ? null
+          : meetingAiModelId ?? this.meetingAiModelId,
+      meetingAiSecretConfigured:
+          meetingAiSecretConfigured ?? this.meetingAiSecretConfigured,
     );
+  }
+
+  static String? _nonEmpty(String? value) {
+    final normalized = value?.trim();
+    return normalized?.isEmpty == true ? null : normalized;
   }
 }

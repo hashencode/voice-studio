@@ -58,14 +58,17 @@
   "overallProduct": {
     "status": "NOT_RELEASE_READY",
     "blockers": [
-      "S1-HIGH-END-REFERENCE-DEVICE",
+      "RELEASE-HIGH-END-COMPATIBILITY",
       "EXP-005-ANDROID-PRODUCTION-RELEASE",
       "S2-MOBILE-CORE",
       "RELEASE-DELIVERY"
-    ]
+    ],
+    "featureClosure": "PASS_LOW_AND_MID_DEVICE",
+    "releaseDeviceMatrix": "PENDING_HIGH_END_REFERENCE_DEVICE"
   },
   "timestampGate": {
     "gateId": "ASR-005-TIMESTAMP-INDEPENDENT",
+    "executionDisposition": "SKIPPED_PENDING_USER_TEST",
     "independentReviewRequired": true,
     "releaseEligible": false,
     "p95ThresholdMs": 1500,
@@ -215,7 +218,7 @@
       "mobileCoreRequirement": "标题和转写片段人工编辑与撤销",
       "deferredParts": [
         {
-          "capability": "说话人、完整纪要、结论和待办编辑",
+          "capability": "说话人编辑",
           "target": "S3",
           "status": "DEFERRED_NOT_PASSED",
           "historicalStatus": "PARTIAL"

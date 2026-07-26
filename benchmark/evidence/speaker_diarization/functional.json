@@ -1,0 +1,908 @@
+{
+  "schemaVersion": 2,
+  "source": "physical_android_instrumentation",
+  "probe": "fiveMinute",
+  "contractId": "speaker-diarization-admission\/sherpa-int8-fallback-v2",
+  "contractSha256": "1e6d8f6ec965b68be724235db6c277677b29902aedf27f146c6281d17dbfdd4b",
+  "candidateId": "sherpa-v1.13.3-pyannote-int8-3dspeaker",
+  "configuration": {
+    "windowSamples": 480000,
+    "overlapSamples": 80000,
+    "numThreads": 2,
+    "reconciliationThreshold": 0.8
+  },
+  "complete": true,
+  "device": {
+    "manufacturer": "Xiaomi",
+    "model": "M2102J2SC",
+    "sdkInt": 33,
+    "buildFingerprint": "Xiaomi\/thyme\/thyme:13\/TKQ1.221114.001\/V816.0.4.0.TGACNXM:user\/release-keys",
+    "maximumThermalStatusRaw": 0,
+    "maximumThermalStatusName": "none"
+  },
+  "fixture": {
+    "sha256": "7e2757eb30176edc36a2c14a6511bbf297caa5dbfa9541e119cd94fd23a6d4ec",
+    "sha256After": "7e2757eb30176edc36a2c14a6511bbf297caa5dbfa9541e119cd94fd23a6d4ec",
+    "sampleRate": 16000,
+    "totalSamples": 4800000,
+    "consumedSamples": 4800000
+  },
+  "transcriptSnapshot": {
+    "beforeSha256": "aed340cf0c0a78e6aa729314846992a1c4e85995251608c6abc02d705bead306",
+    "afterSha256": "aed340cf0c0a78e6aa729314846992a1c4e85995251608c6abc02d705bead306"
+  },
+  "windows": {
+    "planned": 12,
+    "processed": 12,
+    "finalWindowEndSample": 4800000
+  },
+  "timings": {
+    "initializationMs": 452.138958,
+    "pcmAndWindowingMs": 891.548177,
+    "diarizationMs": 668909.694432,
+    "embeddingMs": 50736.251282,
+    "reconciliationMs": 28.359897,
+    "stitchingMs": 16.108542,
+    "totalMs": 721034.101288
+  },
+  "semanticIntervals": [
+    {
+      "startSample": 0,
+      "endSampleExclusive": 495,
+      "kind": "SILENCE",
+      "meetingSpeakerKeys": [],
+      "unknownSpeakerCount": 0
+    },
+    {
+      "startSample": 495,
+      "endSampleExclusive": 8055,
+      "kind": "ASSIGNED",
+      "meetingSpeakerKeys": [
+        "speaker_2"
+      ],
+      "unknownSpeakerCount": 0
+    },
+    {
+      "startSample": 8055,
+      "endSampleExclusive": 25606,
+      "kind": "OVERLAP",
+      "meetingSpeakerKeys": [
+        "speaker_1",
+        "speaker_2"
+      ],
+      "unknownSpeakerCount": 0
+    },
+    {
+      "startSample": 25606,
+      "endSampleExclusive": 140356,
+      "kind": "ASSIGNED",
+      "meetingSpeakerKeys": [
+        "speaker_2"
+      ],
+      "unknownSpeakerCount": 0
+    },
+    {
+      "startSample": 140356,
+      "endSampleExclusive": 154125,
+      "kind": "SILENCE",
+      "meetingSpeakerKeys": [],
+      "unknownSpeakerCount": 0
+    },
+    {
+      "startSample": 154125,
+      "endSampleExclusive": 211905,
+      "kind": "ASSIGNED",
+      "meetingSpeakerKeys": [
+        "speaker_1"
+      ],
+      "unknownSpeakerCount": 0
+    },
+    {
+      "startSample": 211905,
+      "endSampleExclusive": 232696,
+      "kind": "OVERLAP",
+      "meetingSpeakerKeys": [
+        "speaker_1",
+        "speaker_2"
+      ],
+      "unknownSpeakerCount": 0
+    },
+    {
+      "startSample": 232696,
+      "endSampleExclusive": 401176,
+      "kind": "ASSIGNED",
+      "meetingSpeakerKeys": [
+        "speaker_2"
+      ],
+      "unknownSpeakerCount": 0
+    },
+    {
+      "startSample": 401176,
+      "endSampleExclusive": 414945,
+      "kind": "SILENCE",
+      "meetingSpeakerKeys": [],
+      "unknownSpeakerCount": 0
+    },
+    {
+      "startSample": 414945,
+      "endSampleExclusive": 493106,
+      "kind": "ASSIGNED",
+      "meetingSpeakerKeys": [
+        "speaker_1"
+      ],
+      "unknownSpeakerCount": 0
+    },
+    {
+      "startSample": 493106,
+      "endSampleExclusive": 507415,
+      "kind": "SILENCE",
+      "meetingSpeakerKeys": [],
+      "unknownSpeakerCount": 0
+    },
+    {
+      "startSample": 507415,
+      "endSampleExclusive": 509575,
+      "kind": "ASSIGNED",
+      "meetingSpeakerKeys": [
+        "speaker_2"
+      ],
+      "unknownSpeakerCount": 0
+    },
+    {
+      "startSample": 509575,
+      "endSampleExclusive": 518216,
+      "kind": "OVERLAP",
+      "meetingSpeakerKeys": [
+        "speaker_1",
+        "speaker_2"
+      ],
+      "unknownSpeakerCount": 0
+    },
+    {
+      "startSample": 518216,
+      "endSampleExclusive": 543055,
+      "kind": "ASSIGNED",
+      "meetingSpeakerKeys": [
+        "speaker_2"
+      ],
+      "unknownSpeakerCount": 0
+    },
+    {
+      "startSample": 543055,
+      "endSampleExclusive": 569516,
+      "kind": "OVERLAP",
+      "meetingSpeakerKeys": [
+        "speaker_1",
+        "speaker_2"
+      ],
+      "unknownSpeakerCount": 0
+    },
+    {
+      "startSample": 569516,
+      "endSampleExclusive": 616226,
+      "kind": "ASSIGNED",
+      "meetingSpeakerKeys": [
+        "speaker_1"
+      ],
+      "unknownSpeakerCount": 0
+    },
+    {
+      "startSample": 616226,
+      "endSampleExclusive": 628645,
+      "kind": "SILENCE",
+      "meetingSpeakerKeys": [],
+      "unknownSpeakerCount": 0
+    },
+    {
+      "startSample": 628645,
+      "endSampleExclusive": 699116,
+      "kind": "ASSIGNED",
+      "meetingSpeakerKeys": [
+        "speaker_2"
+      ],
+      "unknownSpeakerCount": 0
+    },
+    {
+      "startSample": 699116,
+      "endSampleExclusive": 713155,
+      "kind": "SILENCE",
+      "meetingSpeakerKeys": [],
+      "unknownSpeakerCount": 0
+    },
+    {
+      "startSample": 713155,
+      "endSampleExclusive": 788756,
+      "kind": "ASSIGNED",
+      "meetingSpeakerKeys": [
+        "speaker_1"
+      ],
+      "unknownSpeakerCount": 0
+    },
+    {
+      "startSample": 788756,
+      "endSampleExclusive": 806035,
+      "kind": "SILENCE",
+      "meetingSpeakerKeys": [],
+      "unknownSpeakerCount": 0
+    },
+    {
+      "startSample": 806035,
+      "endSampleExclusive": 912815,
+      "kind": "ASSIGNED",
+      "meetingSpeakerKeys": [
+        "speaker_2"
+      ],
+      "unknownSpeakerCount": 0
+    },
+    {
+      "startSample": 912815,
+      "endSampleExclusive": 935766,
+      "kind": "OVERLAP",
+      "meetingSpeakerKeys": [
+        "speaker_1",
+        "speaker_2"
+      ],
+      "unknownSpeakerCount": 0
+    },
+    {
+      "startSample": 935766,
+      "endSampleExclusive": 1077786,
+      "kind": "ASSIGNED",
+      "meetingSpeakerKeys": [
+        "speaker_1"
+      ],
+      "unknownSpeakerCount": 0
+    },
+    {
+      "startSample": 1077786,
+      "endSampleExclusive": 1095605,
+      "kind": "SILENCE",
+      "meetingSpeakerKeys": [],
+      "unknownSpeakerCount": 0
+    },
+    {
+      "startSample": 1095605,
+      "endSampleExclusive": 1190916,
+      "kind": "ASSIGNED",
+      "meetingSpeakerKeys": [
+        "speaker_2"
+      ],
+      "unknownSpeakerCount": 0
+    },
+    {
+      "startSample": 1190916,
+      "endSampleExclusive": 1200635,
+      "kind": "SILENCE",
+      "meetingSpeakerKeys": [],
+      "unknownSpeakerCount": 0
+    },
+    {
+      "startSample": 1200635,
+      "endSampleExclusive": 1227906,
+      "kind": "ASSIGNED",
+      "meetingSpeakerKeys": [
+        "speaker_2"
+      ],
+      "unknownSpeakerCount": 0
+    },
+    {
+      "startSample": 1227906,
+      "endSampleExclusive": 1242615,
+      "kind": "SILENCE",
+      "meetingSpeakerKeys": [],
+      "unknownSpeakerCount": 0
+    },
+    {
+      "startSample": 1242615,
+      "endSampleExclusive": 1297695,
+      "kind": "ASSIGNED",
+      "meetingSpeakerKeys": [
+        "speaker_1"
+      ],
+      "unknownSpeakerCount": 0
+    },
+    {
+      "startSample": 1297695,
+      "endSampleExclusive": 1318756,
+      "kind": "OVERLAP",
+      "meetingSpeakerKeys": [
+        "speaker_1",
+        "speaker_2"
+      ],
+      "unknownSpeakerCount": 0
+    },
+    {
+      "startSample": 1318756,
+      "endSampleExclusive": 1489126,
+      "kind": "ASSIGNED",
+      "meetingSpeakerKeys": [
+        "speaker_2"
+      ],
+      "unknownSpeakerCount": 0
+    },
+    {
+      "startSample": 1489126,
+      "endSampleExclusive": 1503705,
+      "kind": "SILENCE",
+      "meetingSpeakerKeys": [],
+      "unknownSpeakerCount": 0
+    },
+    {
+      "startSample": 1503705,
+      "endSampleExclusive": 1578766,
+      "kind": "ASSIGNED",
+      "meetingSpeakerKeys": [
+        "speaker_1"
+      ],
+      "unknownSpeakerCount": 0
+    },
+    {
+      "startSample": 1578766,
+      "endSampleExclusive": 1595775,
+      "kind": "SILENCE",
+      "meetingSpeakerKeys": [],
+      "unknownSpeakerCount": 0
+    },
+    {
+      "startSample": 1595775,
+      "endSampleExclusive": 1631415,
+      "kind": "ASSIGNED",
+      "meetingSpeakerKeys": [
+        "speaker_2"
+      ],
+      "unknownSpeakerCount": 0
+    },
+    {
+      "startSample": 1631415,
+      "endSampleExclusive": 1658006,
+      "kind": "OVERLAP",
+      "meetingSpeakerKeys": [
+        "speaker_1",
+        "speaker_2"
+      ],
+      "unknownSpeakerCount": 0
+    },
+    {
+      "startSample": 1658006,
+      "endSampleExclusive": 1703906,
+      "kind": "ASSIGNED",
+      "meetingSpeakerKeys": [
+        "speaker_1"
+      ],
+      "unknownSpeakerCount": 0
+    },
+    {
+      "startSample": 1703906,
+      "endSampleExclusive": 1716595,
+      "kind": "SILENCE",
+      "meetingSpeakerKeys": [],
+      "unknownSpeakerCount": 0
+    },
+    {
+      "startSample": 1716595,
+      "endSampleExclusive": 1787336,
+      "kind": "ASSIGNED",
+      "meetingSpeakerKeys": [
+        "speaker_2"
+      ],
+      "unknownSpeakerCount": 0
+    },
+    {
+      "startSample": 1787336,
+      "endSampleExclusive": 1801375,
+      "kind": "SILENCE",
+      "meetingSpeakerKeys": [],
+      "unknownSpeakerCount": 0
+    },
+    {
+      "startSample": 1801375,
+      "endSampleExclusive": 1876976,
+      "kind": "ASSIGNED",
+      "meetingSpeakerKeys": [
+        "speaker_1"
+      ],
+      "unknownSpeakerCount": 0
+    },
+    {
+      "startSample": 1876976,
+      "endSampleExclusive": 1894255,
+      "kind": "SILENCE",
+      "meetingSpeakerKeys": [],
+      "unknownSpeakerCount": 0
+    },
+    {
+      "startSample": 1894255,
+      "endSampleExclusive": 2000095,
+      "kind": "ASSIGNED",
+      "meetingSpeakerKeys": [
+        "speaker_2"
+      ],
+      "unknownSpeakerCount": 0
+    },
+    {
+      "startSample": 2000095,
+      "endSampleExclusive": 2024666,
+      "kind": "OVERLAP",
+      "meetingSpeakerKeys": [
+        "speaker_1",
+        "speaker_2"
+      ],
+      "unknownSpeakerCount": 0
+    },
+    {
+      "startSample": 2024666,
+      "endSampleExclusive": 2076636,
+      "kind": "ASSIGNED",
+      "meetingSpeakerKeys": [
+        "speaker_1"
+      ],
+      "unknownSpeakerCount": 0
+    },
+    {
+      "startSample": 2076636,
+      "endSampleExclusive": 2090945,
+      "kind": "SILENCE",
+      "meetingSpeakerKeys": [],
+      "unknownSpeakerCount": 0
+    },
+    {
+      "startSample": 2090945,
+      "endSampleExclusive": 2166276,
+      "kind": "ASSIGNED",
+      "meetingSpeakerKeys": [
+        "speaker_1"
+      ],
+      "unknownSpeakerCount": 0
+    },
+    {
+      "startSample": 2166276,
+      "endSampleExclusive": 2183555,
+      "kind": "SILENCE",
+      "meetingSpeakerKeys": [],
+      "unknownSpeakerCount": 0
+    },
+    {
+      "startSample": 2183555,
+      "endSampleExclusive": 2316666,
+      "kind": "ASSIGNED",
+      "meetingSpeakerKeys": [
+        "speaker_2"
+      ],
+      "unknownSpeakerCount": 0
+    },
+    {
+      "startSample": 2316666,
+      "endSampleExclusive": 2330435,
+      "kind": "SILENCE",
+      "meetingSpeakerKeys": [],
+      "unknownSpeakerCount": 0
+    },
+    {
+      "startSample": 2330435,
+      "endSampleExclusive": 2387945,
+      "kind": "ASSIGNED",
+      "meetingSpeakerKeys": [
+        "speaker_1"
+      ],
+      "unknownSpeakerCount": 0
+    },
+    {
+      "startSample": 2387945,
+      "endSampleExclusive": 2406306,
+      "kind": "OVERLAP",
+      "meetingSpeakerKeys": [
+        "speaker_1",
+        "speaker_2"
+      ],
+      "unknownSpeakerCount": 0
+    },
+    {
+      "startSample": 2406306,
+      "endSampleExclusive": 2577616,
+      "kind": "ASSIGNED",
+      "meetingSpeakerKeys": [
+        "speaker_2"
+      ],
+      "unknownSpeakerCount": 0
+    },
+    {
+      "startSample": 2577616,
+      "endSampleExclusive": 2591655,
+      "kind": "SILENCE",
+      "meetingSpeakerKeys": [],
+      "unknownSpeakerCount": 0
+    },
+    {
+      "startSample": 2591655,
+      "endSampleExclusive": 2667256,
+      "kind": "ASSIGNED",
+      "meetingSpeakerKeys": [
+        "speaker_1"
+      ],
+      "unknownSpeakerCount": 0
+    },
+    {
+      "startSample": 2667256,
+      "endSampleExclusive": 2683995,
+      "kind": "SILENCE",
+      "meetingSpeakerKeys": [],
+      "unknownSpeakerCount": 0
+    },
+    {
+      "startSample": 2683995,
+      "endSampleExclusive": 2686965,
+      "kind": "ASSIGNED",
+      "meetingSpeakerKeys": [
+        "speaker_2"
+      ],
+      "unknownSpeakerCount": 0
+    },
+    {
+      "startSample": 2686965,
+      "endSampleExclusive": 2692906,
+      "kind": "OVERLAP",
+      "meetingSpeakerKeys": [
+        "speaker_1",
+        "speaker_2"
+      ],
+      "unknownSpeakerCount": 0
+    },
+    {
+      "startSample": 2692906,
+      "endSampleExclusive": 2719365,
+      "kind": "ASSIGNED",
+      "meetingSpeakerKeys": [
+        "speaker_2"
+      ],
+      "unknownSpeakerCount": 0
+    },
+    {
+      "startSample": 2719365,
+      "endSampleExclusive": 2745826,
+      "kind": "OVERLAP",
+      "meetingSpeakerKeys": [
+        "speaker_1",
+        "speaker_2"
+      ],
+      "unknownSpeakerCount": 0
+    },
+    {
+      "startSample": 2745826,
+      "endSampleExclusive": 2791726,
+      "kind": "ASSIGNED",
+      "meetingSpeakerKeys": [
+        "speaker_1"
+      ],
+      "unknownSpeakerCount": 0
+    },
+    {
+      "startSample": 2791726,
+      "endSampleExclusive": 2804685,
+      "kind": "SILENCE",
+      "meetingSpeakerKeys": [],
+      "unknownSpeakerCount": 0
+    },
+    {
+      "startSample": 2804685,
+      "endSampleExclusive": 2875286,
+      "kind": "ASSIGNED",
+      "meetingSpeakerKeys": [
+        "speaker_2"
+      ],
+      "unknownSpeakerCount": 0
+    },
+    {
+      "startSample": 2875286,
+      "endSampleExclusive": 2889595,
+      "kind": "SILENCE",
+      "meetingSpeakerKeys": [],
+      "unknownSpeakerCount": 0
+    },
+    {
+      "startSample": 2889595,
+      "endSampleExclusive": 2965196,
+      "kind": "ASSIGNED",
+      "meetingSpeakerKeys": [
+        "speaker_1"
+      ],
+      "unknownSpeakerCount": 0
+    },
+    {
+      "startSample": 2965196,
+      "endSampleExclusive": 2982475,
+      "kind": "SILENCE",
+      "meetingSpeakerKeys": [],
+      "unknownSpeakerCount": 0
+    },
+    {
+      "startSample": 2982475,
+      "endSampleExclusive": 3088585,
+      "kind": "ASSIGNED",
+      "meetingSpeakerKeys": [
+        "speaker_2"
+      ],
+      "unknownSpeakerCount": 0
+    },
+    {
+      "startSample": 3088585,
+      "endSampleExclusive": 3111266,
+      "kind": "OVERLAP",
+      "meetingSpeakerKeys": [
+        "speaker_1",
+        "speaker_2"
+      ],
+      "unknownSpeakerCount": 0
+    },
+    {
+      "startSample": 3111266,
+      "endSampleExclusive": 3254766,
+      "kind": "ASSIGNED",
+      "meetingSpeakerKeys": [
+        "speaker_1"
+      ],
+      "unknownSpeakerCount": 0
+    },
+    {
+      "startSample": 3254766,
+      "endSampleExclusive": 3272045,
+      "kind": "SILENCE",
+      "meetingSpeakerKeys": [],
+      "unknownSpeakerCount": 0
+    },
+    {
+      "startSample": 3272045,
+      "endSampleExclusive": 3404616,
+      "kind": "ASSIGNED",
+      "meetingSpeakerKeys": [
+        "speaker_2"
+      ],
+      "unknownSpeakerCount": 0
+    },
+    {
+      "startSample": 3404616,
+      "endSampleExclusive": 3418385,
+      "kind": "SILENCE",
+      "meetingSpeakerKeys": [],
+      "unknownSpeakerCount": 0
+    },
+    {
+      "startSample": 3418385,
+      "endSampleExclusive": 3472655,
+      "kind": "ASSIGNED",
+      "meetingSpeakerKeys": [
+        "speaker_1"
+      ],
+      "unknownSpeakerCount": 0
+    },
+    {
+      "startSample": 3472655,
+      "endSampleExclusive": 3495876,
+      "kind": "OVERLAP",
+      "meetingSpeakerKeys": [
+        "speaker_1",
+        "speaker_2"
+      ],
+      "unknownSpeakerCount": 0
+    },
+    {
+      "startSample": 3495876,
+      "endSampleExclusive": 3665566,
+      "kind": "ASSIGNED",
+      "meetingSpeakerKeys": [
+        "speaker_2"
+      ],
+      "unknownSpeakerCount": 0
+    },
+    {
+      "startSample": 3665566,
+      "endSampleExclusive": 3679875,
+      "kind": "SILENCE",
+      "meetingSpeakerKeys": [],
+      "unknownSpeakerCount": 0
+    },
+    {
+      "startSample": 3679875,
+      "endSampleExclusive": 3756286,
+      "kind": "ASSIGNED",
+      "meetingSpeakerKeys": [
+        "speaker_1"
+      ],
+      "unknownSpeakerCount": 0
+    },
+    {
+      "startSample": 3756286,
+      "endSampleExclusive": 3771945,
+      "kind": "SILENCE",
+      "meetingSpeakerKeys": [],
+      "unknownSpeakerCount": 0
+    },
+    {
+      "startSample": 3771945,
+      "endSampleExclusive": 3773835,
+      "kind": "ASSIGNED",
+      "meetingSpeakerKeys": [
+        "speaker_2"
+      ],
+      "unknownSpeakerCount": 0
+    },
+    {
+      "startSample": 3773835,
+      "endSampleExclusive": 3782476,
+      "kind": "OVERLAP",
+      "meetingSpeakerKeys": [
+        "speaker_1",
+        "speaker_2"
+      ],
+      "unknownSpeakerCount": 0
+    },
+    {
+      "startSample": 3782476,
+      "endSampleExclusive": 3807315,
+      "kind": "ASSIGNED",
+      "meetingSpeakerKeys": [
+        "speaker_2"
+      ],
+      "unknownSpeakerCount": 0
+    },
+    {
+      "startSample": 3807315,
+      "endSampleExclusive": 3834046,
+      "kind": "OVERLAP",
+      "meetingSpeakerKeys": [
+        "speaker_1",
+        "speaker_2"
+      ],
+      "unknownSpeakerCount": 0
+    },
+    {
+      "startSample": 3834046,
+      "endSampleExclusive": 3880216,
+      "kind": "ASSIGNED",
+      "meetingSpeakerKeys": [
+        "speaker_1"
+      ],
+      "unknownSpeakerCount": 0
+    },
+    {
+      "startSample": 3880216,
+      "endSampleExclusive": 3892635,
+      "kind": "SILENCE",
+      "meetingSpeakerKeys": [],
+      "unknownSpeakerCount": 0
+    },
+    {
+      "startSample": 3892635,
+      "endSampleExclusive": 3963646,
+      "kind": "ASSIGNED",
+      "meetingSpeakerKeys": [
+        "speaker_2"
+      ],
+      "unknownSpeakerCount": 0
+    },
+    {
+      "startSample": 3963646,
+      "endSampleExclusive": 3977415,
+      "kind": "SILENCE",
+      "meetingSpeakerKeys": [],
+      "unknownSpeakerCount": 0
+    },
+    {
+      "startSample": 3977415,
+      "endSampleExclusive": 4053416,
+      "kind": "ASSIGNED",
+      "meetingSpeakerKeys": [
+        "speaker_1"
+      ],
+      "unknownSpeakerCount": 0
+    },
+    {
+      "startSample": 4053416,
+      "endSampleExclusive": 4070155,
+      "kind": "SILENCE",
+      "meetingSpeakerKeys": [],
+      "unknownSpeakerCount": 0
+    },
+    {
+      "startSample": 4070155,
+      "endSampleExclusive": 4176805,
+      "kind": "ASSIGNED",
+      "meetingSpeakerKeys": [
+        "speaker_2"
+      ],
+      "unknownSpeakerCount": 0
+    },
+    {
+      "startSample": 4176805,
+      "endSampleExclusive": 4200296,
+      "kind": "OVERLAP",
+      "meetingSpeakerKeys": [
+        "speaker_1",
+        "speaker_2"
+      ],
+      "unknownSpeakerCount": 0
+    },
+    {
+      "startSample": 4200296,
+      "endSampleExclusive": 4342046,
+      "kind": "ASSIGNED",
+      "meetingSpeakerKeys": [
+        "speaker_1"
+      ],
+      "unknownSpeakerCount": 0
+    },
+    {
+      "startSample": 4342046,
+      "endSampleExclusive": 4359865,
+      "kind": "SILENCE",
+      "meetingSpeakerKeys": [],
+      "unknownSpeakerCount": 0
+    },
+    {
+      "startSample": 4359865,
+      "endSampleExclusive": 4492836,
+      "kind": "ASSIGNED",
+      "meetingSpeakerKeys": [
+        "speaker_2"
+      ],
+      "unknownSpeakerCount": 0
+    },
+    {
+      "startSample": 4492836,
+      "endSampleExclusive": 4506605,
+      "kind": "SILENCE",
+      "meetingSpeakerKeys": [],
+      "unknownSpeakerCount": 0
+    },
+    {
+      "startSample": 4506605,
+      "endSampleExclusive": 4563035,
+      "kind": "ASSIGNED",
+      "meetingSpeakerKeys": [
+        "speaker_1"
+      ],
+      "unknownSpeakerCount": 0
+    },
+    {
+      "startSample": 4563035,
+      "endSampleExclusive": 4583556,
+      "kind": "OVERLAP",
+      "meetingSpeakerKeys": [
+        "speaker_1",
+        "speaker_2"
+      ],
+      "unknownSpeakerCount": 0
+    },
+    {
+      "startSample": 4583556,
+      "endSampleExclusive": 4753116,
+      "kind": "ASSIGNED",
+      "meetingSpeakerKeys": [
+        "speaker_2"
+      ],
+      "unknownSpeakerCount": 0
+    },
+    {
+      "startSample": 4753116,
+      "endSampleExclusive": 4766885,
+      "kind": "SILENCE",
+      "meetingSpeakerKeys": [],
+      "unknownSpeakerCount": 0
+    },
+    {
+      "startSample": 4766885,
+      "endSampleExclusive": 4799556,
+      "kind": "ASSIGNED",
+      "meetingSpeakerKeys": [
+        "speaker_1"
+      ],
+      "unknownSpeakerCount": 0
+    },
+    {
+      "startSample": 4799556,
+      "endSampleExclusive": 4800000,
+      "kind": "SILENCE",
+      "meetingSpeakerKeys": [],
+      "unknownSpeakerCount": 0
+    }
+  ]
+}

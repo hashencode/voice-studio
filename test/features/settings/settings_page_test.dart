@@ -5,6 +5,8 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:flutter_components/flutter_components.dart';
 import 'package:voice2text_flutter/app/theme/app_theme.dart';
 import 'package:voice2text_flutter/app/theme/theme_mode_controller.dart';
+import 'package:voice2text_flutter/features/meeting_intelligence/service/meeting_api_secret_store.dart';
+import 'package:voice2text_flutter/features/meeting_intelligence/service/meeting_intelligence_provider.dart';
 import 'package:voice2text_flutter/features/settings/model/app_settings.dart';
 import 'package:voice2text_flutter/features/settings/repository/app_settings_repository.dart';
 import 'package:voice2text_flutter/features/settings/settings_page.dart';
@@ -71,6 +73,59 @@ void main() {
     expect(find.text('设置已保存'), findsOneWidget);
     expect(tester.takeException(), isNull);
   });
+
+  testWidgets('cloud direct settings store the secret outside AppSettings', (
+    WidgetTester tester,
+  ) async {
+    await tester.binding.setSurfaceSize(const Size(430, 900));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+    final repository = _MemorySettingsRepository();
+    final secretStore = _MemorySecretStore();
+    final themeController = AppThemeModeController(repository: repository);
+    addTearDown(themeController.dispose);
+
+    await tester.pumpWidget(
+      AppThemeModeScope(
+        notifier: themeController,
+        child: MaterialApp(
+          theme: AppTheme.light(),
+          builder: (BuildContext context, Widget? child) {
+            return GooToastScope(
+              child: GooSnackbarScope(child: child ?? const SizedBox.shrink()),
+            );
+          },
+          home: SettingsPage(repository: repository, secretStore: secretStore),
+        ),
+      ),
+    );
+    repository.completeLoad();
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('处理位置'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('云端直连'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('API 密钥'), findsOneWidget);
+    await tester.enterText(find.byType(TextField).last, 'transient-secret');
+    await tester.scrollUntilVisible(
+      find.text('保存设置'),
+      240,
+      scrollable: find.byType(Scrollable).first,
+    );
+    await tester.tap(find.text('保存设置'));
+    await tester.pumpAndSettle();
+
+    expect(secretStore.secrets['deepseek'], 'transient-secret');
+    final saved = repository.savedSettings.last;
+    expect(
+      saved.meetingProcessingLocation,
+      MeetingProcessingLocation.cloudDirect,
+    );
+    expect(saved.meetingAiProviderId, 'deepseek');
+    expect(saved.meetingAiSecretConfigured, isTrue);
+    expect(saved.meetingAiModelId, 'deepseek-v4-flash');
+  });
 }
 
 class _MemorySettingsRepository extends AppSettingsRepository {
@@ -89,5 +144,29 @@ class _MemorySettingsRepository extends AppSettingsRepository {
   @override
   Future<void> save(AppSettings settings) async {
     savedSettings.add(settings);
+  }
+}
+
+class _MemorySecretStore extends MeetingApiSecretStore {
+  final Map<String, String> secrets = <String, String>{};
+
+  @override
+  Future<void> save({
+    required String providerId,
+    required String secret,
+  }) async {
+    secrets[providerId] = secret;
+  }
+
+  @override
+  Future<String?> read(String providerId) async => secrets[providerId];
+
+  @override
+  Future<bool> hasSecret(String providerId) async =>
+      secrets.containsKey(providerId);
+
+  @override
+  Future<void> delete(String providerId) async {
+    secrets.remove(providerId);
   }
 }

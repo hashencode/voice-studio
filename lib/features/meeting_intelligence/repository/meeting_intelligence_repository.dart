@@ -30,6 +30,7 @@ class MeetingIntelligenceRepository {
     required MeetingIntelligenceProvider provider,
     required MeetingIntelligenceRequest request,
     required ValidatedMeetingIntelligence validated,
+    int? jobId,
   }) async {
     final db = await _database.database;
     return db.transaction<MeetingIntelligenceBundle>((transaction) async {
@@ -39,14 +40,22 @@ class MeetingIntelligenceRepository {
         <String, Object?>{
           'recording_id': request.recordingId,
           'generation_id': request.generationId,
+          'job_id': jobId,
           'status': MeetingNoteStatus.draft.name,
           'provider_id': provider.providerId,
           'model_id': provider.modelId,
           'processing_location': request.processingLocation.name,
           'consent_granted':
               request.consentDecision == MeetingConsentDecision.granted ? 1 : 0,
+          'consent_version': request.consentVersion,
+          'consent_at_ms': request.consentAtMs,
+          'payload_summary': request.payloadSummary,
           'input_start_ms': request.inputStartMs,
           'input_end_ms': request.inputEndMs,
+          'output_schema_version': validated.schemaVersion,
+          'template_id': request.templateId.name,
+          'meeting_type': validated.meetingType,
+          'suggested_title': validated.suggestedTitle,
           'created_at_ms': now,
           'updated_at_ms': now,
         },
@@ -66,6 +75,16 @@ class MeetingIntelligenceRepository {
               'unresolved_due_date': item.unresolvedDueDate ? 1 : 0,
               'status': MeetingInsightStatus.draft.name,
               'unsupported': item.unsupported ? 1 : 0,
+              'resolution_state':
+                  candidate.resolutionState ==
+                          MeetingInsightResolutionState.notApplicable &&
+                      (candidate.kind == MeetingInsightKind.risk ||
+                          candidate.kind == MeetingInsightKind.unresolved)
+                  ? MeetingInsightResolutionState.open.name
+                  : candidate.resolutionState.name,
+              'topic_start_ms': candidate.topicStartMs,
+              'topic_end_ms': candidate.topicEndMs,
+              'sort_order': candidate.sortOrder,
               'created_at_ms': now,
               'updated_at_ms': now,
             });
@@ -86,6 +105,23 @@ class MeetingIntelligenceRepository {
           where: 'id = ?',
           whereArgs: <Object>[request.generationId],
         );
+      }
+      if (jobId != null) {
+        final completed = await transaction.update(
+          'meeting_intelligence_jobs',
+          <String, Object?>{
+            'status': 'completed',
+            'progress': 1.0,
+            'completed_at_ms': now,
+            'heartbeat_at_ms': now,
+            'updated_at_ms': now,
+          },
+          where: 'id = ? AND status = ?',
+          whereArgs: <Object>[jobId, 'processing'],
+        );
+        if (completed != 1) {
+          throw StateError('会议智能任务无法原子完成');
+        }
       }
       return _loadBundle(transaction, noteId);
     });
@@ -118,6 +154,19 @@ class MeetingIntelligenceRepository {
     return rows.isEmpty ? null : _loadBundle(db, noteId);
   }
 
+  Future<MeetingIntelligenceBundle?> findByJobId(int jobId) async {
+    final db = await _database.database;
+    final rows = await db.query(
+      'meeting_notes',
+      columns: <String>['id'],
+      where: 'job_id = ?',
+      whereArgs: <Object>[jobId],
+      orderBy: 'created_at_ms DESC, id DESC',
+      limit: 1,
+    );
+    return rows.isEmpty ? null : _loadBundle(db, rows.single['id'] as int);
+  }
+
   Future<MeetingInsightEntity?> findInsight(int insightId) async {
     final db = await _database.database;
     final rows = await db.query(
@@ -141,6 +190,10 @@ class MeetingIntelligenceRepository {
   Future<void> editInsight({
     required int insightId,
     required String body,
+    String? actionOwner,
+    int? actionDueAtMs,
+    bool clearActionOwner = false,
+    bool clearActionDueAt = false,
   }) async {
     final normalized = body.trim();
     if (normalized.isEmpty) {
@@ -157,7 +210,19 @@ class MeetingIntelligenceRepository {
       if (rows.isEmpty) throw StateError('智能条目不存在');
       final row = rows.single;
       final previous = row['body'] as String;
-      if (previous == normalized) return;
+      final nextOwner = clearActionOwner
+          ? null
+          : actionOwner?.trim().isEmpty == true
+          ? null
+          : actionOwner?.trim() ?? row['action_owner'] as String?;
+      final nextDueAt = clearActionDueAt
+          ? null
+          : actionDueAtMs ?? row['action_due_at_ms'] as int?;
+      if (previous == normalized &&
+          row['action_owner'] == nextOwner &&
+          row['action_due_at_ms'] == nextDueAt) {
+        return;
+      }
       final noteId = row['note_id'] as int;
       final now = DateTime.now().millisecondsSinceEpoch;
       await transaction.insert('meeting_note_revisions', <String, Object?>{
@@ -172,6 +237,16 @@ class MeetingIntelligenceRepository {
         'meeting_insights',
         <String, Object?>{
           'body': normalized,
+          'action_owner': nextOwner,
+          'action_due_at_ms': nextDueAt,
+          'unresolved_owner':
+              row['kind'] == MeetingInsightKind.action.name && nextOwner == null
+              ? 1
+              : 0,
+          'unresolved_due_date':
+              row['kind'] == MeetingInsightKind.action.name && nextDueAt == null
+              ? 1
+              : 0,
           'status': MeetingInsightStatus.draft.name,
           'reviewed_at_ms': null,
           'rejected_at_ms': null,
@@ -182,6 +257,98 @@ class MeetingIntelligenceRepository {
         whereArgs: <Object>[insightId],
       );
       await _refreshNoteStatus(transaction, noteId, now);
+    });
+  }
+
+  Future<void> updateResolutionState({
+    required int insightId,
+    required MeetingInsightResolutionState state,
+  }) async {
+    if (state == MeetingInsightResolutionState.notApplicable) {
+      throw ArgumentError.value(state, 'state', '必须选择明确的解决状态');
+    }
+    final db = await _database.database;
+    await db.transaction<void>((transaction) async {
+      final rows = await transaction.query(
+        'meeting_insights',
+        where: 'id = ?',
+        whereArgs: <Object>[insightId],
+        limit: 1,
+      );
+      if (rows.isEmpty) throw StateError('会议智能条目不存在');
+      final row = rows.single;
+      if (row['kind'] != MeetingInsightKind.risk.name &&
+          row['kind'] != MeetingInsightKind.unresolved.name) {
+        throw StateError('只有风险和待确认事项可以更新解决状态');
+      }
+      if (row['resolution_state'] == state.name) return;
+      final now = DateTime.now().millisecondsSinceEpoch;
+      await transaction.insert('meeting_note_revisions', <String, Object?>{
+        'note_id': row['note_id'],
+        'insight_id': insightId,
+        'previous_body': row['body'],
+        'next_body': row['body'],
+        'action': state == MeetingInsightResolutionState.resolved
+            ? 'resolve'
+            : 'reopen',
+        'created_at_ms': now,
+      });
+      await transaction.update(
+        'meeting_insights',
+        <String, Object?>{'resolution_state': state.name, 'updated_at_ms': now},
+        where: 'id = ?',
+        whereArgs: <Object>[insightId],
+      );
+    });
+  }
+
+  Future<void> applySuggestedTitle({
+    required int noteId,
+    required String title,
+  }) async {
+    final normalized = title.trim();
+    if (normalized.isEmpty || normalized.length > 200) {
+      throw ArgumentError.value(title, 'title', '会议标题长度无效');
+    }
+    final db = await _database.database;
+    await db.transaction<void>((transaction) async {
+      final notes = await transaction.query(
+        'meeting_notes',
+        columns: <String>['recording_id', 'suggested_title'],
+        where: 'id = ?',
+        whereArgs: <Object>[noteId],
+        limit: 1,
+      );
+      if (notes.isEmpty) throw StateError('会议智能记录不存在');
+      if ((notes.single['suggested_title'] as String?)?.trim() != normalized) {
+        throw StateError('只能应用当前纪要的标题建议');
+      }
+      final recordingId = notes.single['recording_id'] as int;
+      final recordings = await transaction.query(
+        'recordings',
+        columns: <String>['display_name'],
+        where: 'id = ?',
+        whereArgs: <Object>[recordingId],
+        limit: 1,
+      );
+      if (recordings.isEmpty) throw StateError('会议不存在');
+      final previous = recordings.single['display_name'] as String? ?? '';
+      if (previous == normalized) return;
+      final now = DateTime.now().millisecondsSinceEpoch;
+      await transaction.insert('meeting_note_revisions', <String, Object?>{
+        'note_id': noteId,
+        'insight_id': null,
+        'previous_body': previous,
+        'next_body': normalized,
+        'action': 'apply_title',
+        'created_at_ms': now,
+      });
+      await transaction.update(
+        'recordings',
+        <String, Object?>{'display_name': normalized},
+        where: 'id = ?',
+        whereArgs: <Object>[recordingId],
+      );
     });
   }
 
@@ -257,7 +424,7 @@ class MeetingIntelligenceRepository {
       'meeting_insights',
       where: 'note_id = ?',
       whereArgs: <Object>[noteId],
-      orderBy: 'kind ASC, id ASC',
+      orderBy: 'sort_order ASC, kind ASC, id ASC',
     );
     final insights = insightRows
         .map(MeetingInsightEntity.fromMap)

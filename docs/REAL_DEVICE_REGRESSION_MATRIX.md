@@ -36,17 +36,20 @@
 | M8 | 时间戳播放、编辑、搜索、导出 | 3000 片段、边界跳转、修订、四种导出、布局/主题/字体/语义自动化与两条 Android 集成流通过；Xiaomi 真实 5 分钟工作区通过。EVA-AL10 进一步验证真实播放、编辑、正向搜索与撤销，TXT/Markdown/JSON/SRT 经 Huawei 分享面板被接收器读取 `1,919/2,104/2,566/2,183` bytes，各自保留 SHA-256 回执 | PASS | 中/低端功能同步通过；独立听审的时间戳 P95 准确率仍是单独发布门禁 |
 | M9 | 两小时有界转写 | WAV 分块/取消与流式转码原生单测通过；上述 7,266.56 s M4A 在中端 Xiaomi 10S 上一次完成，job 13 从 04:18:36.030 到 04:21:30.385，共 174,355 ms，RTF≈0.024、attempt=1、5 个持久片段；decode 后半段采样总 RSS 峰值 655,024 KB，无任务重启基线 599,648 KB，差值约 55,376 KB，满足中端 RTF≤1.0、增量 RSS≤512 MB。2026-07-24 同一 M4A 通过低端 EVA-AL10 系统选择器导入后一次完成，耗时 434,035 ms、RTF=0.060、attempt=1、3 个持久片段；30 秒采样峰值 RSS/PSS 为 787,200/737,648 KB，pre-run PSS 为 447,902 KB，温度 38.0-39.0°C，PID 全程不变，无 OOM/LMK/重试/重复任务，处理期间 UI 可导航；移除 picker 源后私有文件哈希仍一致且播放推进至 00:05。长录音以安静段为主，仍完整覆盖两小时流式转码、VAD、识别、持久化和缓冲释放 | PASS | 中端性能门槛与低端无 OOM 门槛均通过。证据：`build/device-evidence/2026-07-24-m3-7edb7c06/summary.md`、`build/device-evidence/2026-07-24-low-eva-al10-2h/summary.md` |
 | M10 | 删除失败可重试且无残留 | Xiaomi session 删除失败/重试已通过；EVA-AL10 对 recording/job `4` 将 import canonical 目录从 `0700` 改为 `0500`，首次彻底删除明确保留 recording=`pending`、`9,747,436`-byte WAV、job、1 generation 与 10 segments；恢复 `0700` 后从生产 UI 重试，最近删除变空，recording/job/generation/segment/revision/asset/note/insight/note revision/evidence link 均为 0，canonical 不存在 | PASS | 中/低端幂等删除重试与全图零残留均通过 |
-| M11 | AI 证据审核基础且无生产提供商 | fixture 证据回跳、审核/驳回/发布、同意与位置门禁自动化通过 | PASS (FOUNDATION) | 不得描述为生产 AI 生成功能 |
+| M11 | AI 证据审核基础 | fixture 证据回跳、审核/驳回/发布、同意与位置门禁自动化通过 | PASS (FOUNDATION) | 这是历史基础证据；生产化增量另见 M22，不能单独用于声明完整 S3 |
 | M12 | 中/低端设备覆盖 | 中端 Xiaomi 10S 已通过两小时锁屏录音、10 次连续会话、导入/去重/分享、队列强停恢复、真实播放/编辑/搜索/四格式导出、删除失败重试及两小时 RTF/RSS；低端 EVA-AL10 已通过 API 26 安装/启动、两条 Android 集成流、旧 toybox 数据恢复、系统 picker、生产模型短探针、7,266.56 s 两小时无 OOM、源移除后播放，以及 M2、M6-M10 完整物理场景 | PASS | 中/低端参考设备覆盖完成。证据：`build/device-evidence/2026-07-24-m3-7edb7c06/summary.md`、`build/device-evidence/2026-07-24-low-eva-al10/summary.md`、`build/device-evidence/2026-07-24-low-eva-al10-2h/summary.md`、`build/device-evidence/2026-07-24-low-eva-al10-scenarios/summary.md` |
 | M13 | 标点、人工复核、redo、组合搜索、VTT/范围导出与无障碍增量 | Xiaomi M2102J2SC 真实加载 75,519,198-byte CT-Transformer，对 272.398 秒仓库 WAV 完成关闭/开启标点对照；19 个片段序号、时间戳和正文字符不变量一致。TalkBack 实际绑定且 touch exploration 开启时，200% 字体、深色横屏通过编辑、undo/redo、三态复核、组合搜索、五格式/范围 VTT 集成流；3000 片段远跳、状态更新、搜索和 VTT 导出同机完成；独立接收器按 `text/vtt` 读取范围 VTT 75 bytes，SHA-256=`ba19dc6ce30c0364bac99cb2a8718c74a1546033b112e3b3d5d86e7ed819fe6f` | PASS | 增量门禁只要求至少一台物理 Android；热词、ITN、自动低置信度和 title/speaker 搜索保持未实现。发布继续暂停 |
 | M14 | S1 非发布质量收口 | Xiaomi M2102J2SC 上 `LowStorageGateSmokeTest` 2/2 通过：真实 `MediaRecorder` 返回 0–32,767 有界幅度和已识别实际路由；注入 0 bytes 的启动场景返回 `LOW_STORAGE` 且无 staging/canonical/journal 产物；录音中将同一生产 guard 降为 0 bytes 后以 `low_storage` 完成非空 canonical 并清理测试产物。录音遥测/存储 JVM 测试、analyzer、当前 183 个 Flutter 测试、隐私与运行时契约通过；首页持久化生命周期、失败阶段/重试入口、核心 Goo 迁移和设置页 200% 字体均有 widget 覆盖 | PASS | 低存储证据是物理设备上的安全注入，不是真实填盘；本门禁的路由证据只覆盖 REC-003 只读观察，后续 REC-009 自动化不替代蓝牙/有线真机插拔证据；高端设备与发布均未覆盖 |
 | M15 | 系统分享导入（REC-008） | 自动化基础闭环通过；2026-07-24 在 Xiaomi 上由独立 UID 的 `com.voice2text.app.test` 冷启动分享只读 `content://` WAV。源与 app-private 副本均为 `64,044` bytes，SHA-256 均为 `073091647e4f2f098c4051c149919e941d513150966d7c2271e30f1a83ed14aa`；落库为 `imported`/`2000 ms` 并创建唯一持久任务 | PASS | 已覆盖“其他 App 分享进 Voice2Text”的真实设备路径；文件管理器/相册和热启动仍可作为扩展兼容性覆盖。证据：`benchmark/S2_PHYSICAL_EVIDENCE.md` |
 | M16 | 输入设备主动切换（REC-009） | Android 6/API 23+ 输入枚举、待机/录音/暂停选择、实际路由名、断开降级/停止和 Flutter 幂等重新附着已有自动化。2026-07-24 Xiaomi 未发现外接输入描述符 | DEFERRED_NOT_PASSED（历史 PENDING） | 转入移动高级硬件兼容，不阻塞 S2 Mobile Core。当前没有真实蓝牙/有线/USB 麦克风，不能用内置麦克风替代；后续仍须补连接、主动选择、实际路由和断开证据 |
 | M17 | 会中重点与文字备注（REC-010） | 自动化基础闭环通过；2026-07-24 Xiaomi 真机完成 42,880 ms 录音，写入 12,006 ms 重点标记和 28,006 ms 备注；任务以 `VAD_FAILED` 结束后强停/冷启动，会议时间线仍显示两项。点击标记使播放器跳至 `00:12`，点击备注跳至 `00:28` | PASS | 写入、正常停止、失败保留、进程重启、重开和时间线回跳均已覆盖。证据：`benchmark/S2_PHYSICAL_EVIDENCE.md` |
-| M18 | ASR-005 时间戳准确率（`ASR-005-TIMESTAMP-INDEPENDENT`） | Silero 参数 sweep 均为 1 段且 Paraformer token timestamps 为空后，生产链路增加自适应持续静音分段；Xiaomi 两条固定 clip 预测为 5/4 段，证据 SHA-256=`01b77e52dd6eadd048a6a2cd91952e7502ad9f6e856010b08d32923a4be1c0d7`；provisional 工程 P95=182 ms/18 边界，报告 SHA-256=`d94940888f4786e212c3b468a633af84241ad27bee34b3bda22b91e3109d9459` 且 `releaseEligible=false` | BLOCKED (ENGINEERING PASS) | 唯一 Mobile Core blocker。仍须由独立 reviewer 完成盲听 worksheet 和元数据，再用正常模式得到 release-eligible P95 ≤1.5 秒；实现代理不能充当 reviewer |
+| M18 | ASR-005 时间戳准确率（`ASR-005-TIMESTAMP-INDEPENDENT`） | Silero 参数 sweep 均为 1 段且 Paraformer token timestamps 为空后，生产链路增加自适应持续静音分段；Xiaomi 两条固定 clip 预测为 5/4 段，证据 SHA-256=`01b77e52dd6eadd048a6a2cd91952e7502ad9f6e856010b08d32923a4be1c0d7`；provisional 工程 P95=182 ms/18 边界，报告 SHA-256=`d94940888f4786e212c3b468a633af84241ad27bee34b3bda22b91e3109d9459` 且 `releaseEligible=false` | BLOCKED (ENGINEERING PASS) / `SKIPPED_PENDING_USER_TEST` | 唯一 Mobile Core blocker。人工执行暂时跳过，等待用户后续由独立 reviewer 完成盲听 worksheet 和元数据，再用正常模式得到 release-eligible P95 ≤1.5 秒；执行跳过不等于 PASS，实现代理不能充当 reviewer |
 | M19 | S2 Mobile Core 自动化总回归 | 2026-07-25 当前源码通过 analyzer、183 个 Flutter tests、40 个既有 ASR/ITN/timestamp/enhancement Python gate tests、应用 Kotlin 单测、debug APK、AndroidTest 构建及各合同。模拟器会议闭环 4/4 通过 | PASS (AUTOMATED) | 自动化通过不替代 M18 独立听审。M16/M20/M21 作为 `DEFERRED_NOT_PASSED` 保留历史，不再阻塞 Mobile Core |
 | M20 | ASR-006/007 在线候选能力筛选 | Xiaomi 隔离运行 Apache-2.0 14M Zipformer。固定集：无热词 CER 4.931%/RTF 0.078，热词 CER 4.734%/RTF 0.099；错误全为漏字，不能校准；目标词命中 52→52 | DEFERRED_NOT_PASSED（历史 BLOCKED / LAB ONLY） | 自动 confidence 与热词转入 PC ASR，不阻塞 S2 Mobile Core。原始报告 SHA-256=`7b6c9f0f723d90d37b5de0bf01a9c03e9e3332694f80c54e0fc272a912c7b0c9`；历史缺口继续作为 PC 准入条件 |
 | M21 | ASR-008 GTCRN 固定噪声集成对门禁 | Xiaomi 完成五组各 300.655 秒 raw/enhanced 路径；安静 CER、噪声改善、增强 RTF、原生内存和边界门禁未达到阈值 | DEFERRED_NOT_PASSED（历史 FAIL） | 转入高级音频，不阻塞 S2 Mobile Core。原始报告 SHA-256=`05749363f647b30cf337bf61c0a843cd288937aa7f3ff416835120b231f23362`，评估 SHA-256=`b7ae589b0c8494a06c1b5952c462a2a20319a83859d845da9b42474dffa3a14a`；仍无 AEC |
+| M22 | S3 DeepSeek 设置与 synthetic 纪要证据流 | 决策 `S3-PRODUCTIZATION-2026-07-25`；AndroidKeyStore instrumented smoke 在 emulator 与物理连接通过；`meeting_intelligence_flow_test.dart` 在设备 `a186e452` 通过，虚构结构化纪要可打开证据并触发 seek | PASS（FIRST INCREMENT） | 使用 fake transport/虚构内容，不消耗用户 token，不构成 live provider SLA 或发布证据；云端直连位置名为 `cloudDirect` |
+| M23 | 端侧 speaker diarization 开发准入 | Xiaomi M2102J2SC（Android 13/debug）对 FP32 有界候选与唯一 INT8 fallback 完成固定 5 分钟筛选；两者各处理 12 个窗口，coverage/DER 分别为 92.235%/13.689% 与 93.645%/12.192%，thermal none，但语义门禁均失败 | `DEFERRED_NO_ADMISSIBLE_CANDIDATE` | projected RTF 分别为 2.3348 与 2.4020，均超过 0.5；按计划跳过 120 分钟、不推进第三候选；30 分钟 `SKIPPED_BY_PLAN`，无产品入口 |
+| M24 | S3 可访问性与布局自动化 | AI 设置、生成面板和云端确认在 200% 字体自动化下可达；组件使用 Goo semantic label/live region，dark theme 和横屏由全量 Flutter/widget gate 覆盖 | PASS（AUTOMATED） | TalkBack 人工专项仍属于发布候选 review；自动化 PASS 不替代发布设备矩阵 |
 
 ### M13 转写质量增量证据
 
@@ -82,9 +85,11 @@
 FAIL 证据继续有效，但已迁移到后续阶段，不能用 `DEFERRED_NOT_PASSED`
 替代阈值 PASS，也不再阻塞 Mobile Core。
 
-整体版本仍为 **NOT RELEASE-READY**：S1 高端参考设备、EXP-005 和发布
-交付仍是独立前置条件。不得把 Mobile Core 子能力或范围迁移表述为原 S2
-历史整体通过。
+S1 非发布功能闭环已在中/低端参考机通过。整体版本仍为
+**NOT RELEASE-READY**：发布候选包的高端设备兼容性、EXP-005 和发布交付
+仍是独立前置条件。高端证据缺失标记为
+`RELEASE_COMPATIBILITY_PENDING`，不回退中/低端已验证功能；也不得把
+Mobile Core 子能力或范围迁移表述为原 S2 历史整体通过。
 
 验收总标准：
 - 无闪退

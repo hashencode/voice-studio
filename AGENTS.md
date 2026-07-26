@@ -21,6 +21,16 @@ Run the normal project checks after relevant changes:
 ./tool/dev_check.sh
 ```
 
+## Build cache budget
+
+- Before running local Flutter or Gradle builds, tests, benchmarks, or code
+  generation, run `python3 tool/build_cache_guard.py`.
+- The guard preserves incremental artifacts below 20 GiB and runs the standard
+  project cleaners only after the managed cache exceeds that budget.
+- Override the budget with `VOICE2TEXT_BUILD_CACHE_LIMIT_GIB` only for a
+  documented benchmark. Use `python3 tool/build_cache_guard.py --force` after a
+  one-off full build matrix.
+
 ## UI device watcher
 
 After generating or changing code in this `voice2text-flutter` project, run this best-effort watcher check before finishing:

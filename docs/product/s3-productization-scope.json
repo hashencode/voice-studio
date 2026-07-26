@@ -1,0 +1,147 @@
+{
+  "schemaVersion": 2,
+  "decisionId": "S3-PRODUCTIZATION-2026-07-25",
+  "updatedAt": "2026-07-26",
+  "cloudDirect": {
+    "status": "PASS",
+    "providerId": "deepseek",
+    "processingLocation": "cloudDirect",
+    "secureSecretStore": true,
+    "explicitPerMeetingConsent": true,
+    "boundedPersistentJobs": true,
+    "liveSmoke": "OPTIONAL_NOT_RUN",
+    "evidence": [
+      {
+        "path": "lib/features/meeting_intelligence/service/deepseek_meeting_intelligence_provider.dart",
+        "sha256": "7ae3242b40962efa79d4379f585e0d373b27ce0158c2df1d8de15ed9ccd8573b"
+      }
+    ]
+  },
+  "structuredNotes": {
+    "status": "PASS",
+    "outputSchema": "meeting_intelligence_output/v1",
+    "templates": [
+      "general",
+      "weekly",
+      "review",
+      "interview",
+      "sales",
+      "retrospective",
+      "oneOnOne"
+    ],
+    "evidenceRequiredForPublication": true,
+    "titleSuggestionRequiresExplicitApply": true,
+    "persistentRecovery": true
+  },
+  "speakerAdmission": {
+    "status": "DEFERRED_NO_ADMISSIBLE_CANDIDATE",
+    "verified": false,
+    "eligibleForProductization": false,
+    "productAvailable": false,
+    "productEntrance": false,
+    "persistsVoiceprints": false,
+    "failedGates": [
+      "FUNCTIONAL",
+      "RESOURCE",
+      "NO_ADMISSIBLE_CANDIDATE"
+    ],
+    "contractPath": "benchmark/speaker_diarization_admission_contract.json",
+    "contractSha256": "1e6d8f6ec965b68be724235db6c277677b29902aedf27f146c6281d17dbfdd4b",
+    "manifestPath": "benchmark/speaker_diarization_manifest.json",
+    "manifestSha256": "125566fce5f34d1096f862bc6b0d67b69dfb2ce14908fa5e1531d740788138f2",
+    "reason": "当前 FP32 候选和唯一 INT8 fallback 均在固定真机筛选中出现功能与 projected RTF 硬失败；候选梯队已关闭，无产品入口。"
+  },
+  "pairedPc": {
+    "status": "DEFERRED_PC_RUNTIME_MISSING",
+    "protocolVersion": 1,
+    "processingLocation": "pairedPc",
+    "runtimePresent": false,
+    "mobileAdapterPresent": false,
+    "productEntrance": false,
+    "schemaPath": "docs/contracts/meeting-intelligence-provider-v1.schema.json",
+    "schemaSha256": "3d4048ae56bc4a4a9ac12e592348d0d7401b17d52a04e896386bfd8e6dc9920d"
+  },
+  "multilingual": {
+    "status": "DEFERRED_NOT_IMPLEMENTED"
+  },
+  "firstIncrement": {
+    "status": "PARTIAL_PASS",
+    "passed": [
+      "cloudDirect",
+      "structuredNotes"
+    ],
+    "deferred": [
+      "speakerAdmission",
+      "pairedPc"
+    ]
+  },
+  "fullS3": {
+    "status": "BLOCKED",
+    "blockers": [
+      "speakerAdmission",
+      "pairedPc",
+      "multilingual"
+    ]
+  },
+  "releaseReadiness": {
+    "status": "NOT_RELEASE_READY",
+    "blockers": [
+      "ASR-005-TIMESTAMP-INDEPENDENT",
+      "S3-FULL",
+      "RELEASE-HIGH-END-COMPATIBILITY",
+      "EXP-005-ANDROID-PRODUCTION-RELEASE",
+      "RELEASE-DELIVERY"
+    ]
+  },
+  "asr005": {
+    "status": "BLOCKED",
+    "executionDisposition": "SKIPPED_PENDING_USER_TEST"
+  },
+  "authoritativeDocuments": [
+    {
+      "path": "README.md",
+      "requiredMarkers": [
+        "S3-PRODUCTIZATION-2026-07-25",
+        "PARTIAL_PASS",
+        "NOT RELEASE-READY"
+      ]
+    },
+    {
+      "path": "docs/product/meeting-voice-recognition-prd-v1.0.md",
+      "requiredMarkers": [
+        "S3-PRODUCTIZATION-2026-07-25",
+        "DEFERRED_NO_ADMISSIBLE_CANDIDATE",
+        "DEFERRED_PC_RUNTIME_MISSING",
+        "SKIPPED_PENDING_USER_TEST"
+      ]
+    },
+    {
+      "path": "docs/product/mobile-capability-matrix.md",
+      "requiredMarkers": [
+        "S3-PRODUCTIZATION-2026-07-25",
+        "cloudDirect",
+        "DEFERRED_NO_ADMISSIBLE_CANDIDATE",
+        "DEFERRED_PC_RUNTIME_MISSING"
+      ]
+    },
+    {
+      "path": "docs/REAL_DEVICE_REGRESSION_MATRIX.md",
+      "requiredMarkers": [
+        "S3-PRODUCTIZATION-2026-07-25",
+        "DEFERRED_NO_ADMISSIBLE_CANDIDATE",
+        "SKIPPED_BY_PLAN",
+        "NOT RELEASE-READY"
+      ]
+    },
+    {
+      "path": "docs/product/s3-productization-status.md",
+      "requiredMarkers": [
+        "S3-PRODUCTIZATION-2026-07-25",
+        "PARTIAL_PASS",
+        "DEFERRED_NO_ADMISSIBLE_CANDIDATE",
+        "DEFERRED_PC_RUNTIME_MISSING",
+        "NOT RELEASE-READY"
+      ]
+    }
+  ]
+}

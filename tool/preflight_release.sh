@@ -4,6 +4,8 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$ROOT"
 
+python3 tool/build_cache_guard.py
+
 failures=0
 warns=0
 TODOS=()
@@ -181,6 +183,43 @@ if ./tool/check_privacy_contract.sh >/dev/null 2>&1; then
 else
   err "隐私、备份、分享边界或日志契约检查失败"
   add_todo "执行 ./tool/check_privacy_contract.sh 并修复输出"
+fi
+
+if python3 tool/validate_s3_productization_scope.py >/dev/null 2>&1; then
+  ok "S3 产品状态契约一致"
+else
+  err "S3 产品状态契约不一致"
+  add_todo "执行 python3 tool/validate_s3_productization_scope.py 并修复状态或证据漂移"
+fi
+
+s3_status="$(
+  python3 - <<'PY'
+import json
+from pathlib import Path
+scope = json.loads(Path("docs/product/s3-productization-scope.json").read_text(encoding="utf-8"))
+print(scope["fullS3"]["status"])
+PY
+)"
+if [[ "$s3_status" == "PASS" ]]; then
+  ok "完整 S3 门禁通过"
+else
+  err "完整 S3 仍为 $s3_status"
+  add_todo "另立说话人候选/分块架构准入计划，完成 PC runtime/adapter 和多语言门禁；不得用第一增量替代完整 S3"
+fi
+
+asr005_status="$(
+  python3 - <<'PY'
+import json
+from pathlib import Path
+scope = json.loads(Path("docs/product/s3-productization-scope.json").read_text(encoding="utf-8"))
+print(scope["asr005"]["status"] + "/" + scope["asr005"]["executionDisposition"])
+PY
+)"
+if [[ "$asr005_status" == "PASS/PASS" ]]; then
+  ok "ASR-005 独立时间戳门禁通过"
+else
+  err "ASR-005 仍为 $asr005_status"
+  add_todo "由独立 reviewer 完成 ASR-005 正常模式听审；人工执行跳过不等于 PASS"
 fi
 
 timestamp_result="$(

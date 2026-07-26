@@ -20,7 +20,7 @@ class AppDatabase {
 
     return openDatabase(
       path,
-      version: 18,
+      version: 19,
       onConfigure: (Database db) async {
         await db.execute('PRAGMA foreign_keys = ON');
       },
@@ -151,6 +151,9 @@ class AppDatabase {
         if (oldVersion < 18) {
           await migrateS2Closure(db);
         }
+        if (oldVersion < 19) {
+          await migrateS3Productization(db);
+        }
       },
     );
   }
@@ -219,7 +222,16 @@ class AppDatabase {
             recently_deleted_retention_days IS NULL OR
             recently_deleted_retention_days IN (7, 30, 90)
           ),
-        retention_last_successful_scan_at_ms INTEGER
+        retention_last_successful_scan_at_ms INTEGER,
+        meeting_processing_location TEXT NOT NULL DEFAULT 'onDevice'
+          CHECK (
+            meeting_processing_location IN (
+              'onDevice', 'cloudDirect', 'pairedPc'
+            )
+          ),
+        meeting_ai_provider_id TEXT,
+        meeting_ai_model_id TEXT,
+        meeting_ai_secret_configured INTEGER NOT NULL DEFAULT 0
       )
     ''');
     await db.execute('''
@@ -235,6 +247,7 @@ class AppDatabase {
     await _createTranscriptGenerationSchema(db);
     await _createTranscriptRevisionsSchema(db);
     await _createMeetingIntelligenceSchema(db);
+    await _createSpeakerSchema(db);
     await _createTranscriptReviewClosureIndexes(db);
     await _createRecordingAnnotationsSchema(db);
   }
@@ -698,6 +711,125 @@ class AppDatabase {
     await _createMeetingIntelligenceSchema(db);
   }
 
+  static Future<void> migrateS3Productization(Database db) async {
+    await _addColumnIfMissing(
+      db,
+      table: 'app_settings',
+      column: 'meeting_processing_location',
+      definition:
+          "TEXT NOT NULL DEFAULT 'onDevice' "
+          "CHECK (meeting_processing_location IN "
+          "('onDevice', 'cloudDirect', 'pairedPc'))",
+    );
+    await _addColumnIfMissing(
+      db,
+      table: 'app_settings',
+      column: 'meeting_ai_provider_id',
+      definition: 'TEXT',
+    );
+    await _addColumnIfMissing(
+      db,
+      table: 'app_settings',
+      column: 'meeting_ai_model_id',
+      definition: 'TEXT',
+    );
+    await _addColumnIfMissing(
+      db,
+      table: 'app_settings',
+      column: 'meeting_ai_secret_configured',
+      definition: 'INTEGER NOT NULL DEFAULT 0',
+    );
+
+    await _createMeetingIntelligenceJobsSchema(db);
+    await _addColumnIfMissing(
+      db,
+      table: 'meeting_notes',
+      column: 'job_id',
+      definition:
+          'INTEGER REFERENCES meeting_intelligence_jobs(id) '
+          'ON DELETE SET NULL',
+    );
+    await _addColumnIfMissing(
+      db,
+      table: 'meeting_notes',
+      column: 'output_schema_version',
+      definition: "TEXT NOT NULL DEFAULT 'meeting_intelligence_output/v1'",
+    );
+    await _addColumnIfMissing(
+      db,
+      table: 'meeting_notes',
+      column: 'template_id',
+      definition: "TEXT NOT NULL DEFAULT 'general'",
+    );
+    await _addColumnIfMissing(
+      db,
+      table: 'meeting_notes',
+      column: 'meeting_type',
+      definition: 'TEXT',
+    );
+    await _addColumnIfMissing(
+      db,
+      table: 'meeting_notes',
+      column: 'suggested_title',
+      definition: 'TEXT',
+    );
+    await _addColumnIfMissing(
+      db,
+      table: 'meeting_notes',
+      column: 'consent_version',
+      definition: 'INTEGER NOT NULL DEFAULT 1',
+    );
+    await _addColumnIfMissing(
+      db,
+      table: 'meeting_notes',
+      column: 'consent_at_ms',
+      definition: 'INTEGER',
+    );
+    await _addColumnIfMissing(
+      db,
+      table: 'meeting_notes',
+      column: 'payload_summary',
+      definition: 'TEXT',
+    );
+    await _addColumnIfMissing(
+      db,
+      table: 'meeting_insights',
+      column: 'resolution_state',
+      definition:
+          "TEXT NOT NULL DEFAULT 'notApplicable' "
+          "CHECK (resolution_state IN "
+          "('notApplicable', 'open', 'resolved'))",
+    );
+    await _addColumnIfMissing(
+      db,
+      table: 'meeting_insights',
+      column: 'topic_start_ms',
+      definition: 'INTEGER',
+    );
+    await _addColumnIfMissing(
+      db,
+      table: 'meeting_insights',
+      column: 'topic_end_ms',
+      definition: 'INTEGER',
+    );
+    await _addColumnIfMissing(
+      db,
+      table: 'meeting_insights',
+      column: 'sort_order',
+      definition: 'INTEGER NOT NULL DEFAULT 0',
+    );
+    await db.execute(
+      "UPDATE meeting_notes SET processing_location = 'onDevice' "
+      "WHERE processing_location = 'local'",
+    );
+    await db.execute(
+      "UPDATE meeting_notes SET processing_location = 'cloudDirect' "
+      "WHERE processing_location = 'remote'",
+    );
+    await _createMeetingIntelligenceIndexes(db);
+    await _createSpeakerSchema(db);
+  }
+
   static Future<void> migrateTranscriptReviewClosure(Database db) async {
     final settingsColumns = await db.rawQuery(
       'PRAGMA table_info(app_settings)',
@@ -753,24 +885,35 @@ class AppDatabase {
   }
 
   static Future<void> _createMeetingIntelligenceSchema(Database db) async {
+    await _createMeetingIntelligenceJobsSchema(db);
     await db.execute('''
       CREATE TABLE IF NOT EXISTS meeting_notes (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         recording_id INTEGER NOT NULL,
         generation_id INTEGER NOT NULL,
+        job_id INTEGER,
         status TEXT NOT NULL DEFAULT 'draft',
         provider_id TEXT NOT NULL,
         model_id TEXT NOT NULL,
         processing_location TEXT NOT NULL,
         consent_granted INTEGER NOT NULL,
+        consent_version INTEGER NOT NULL DEFAULT 1,
+        consent_at_ms INTEGER,
+        payload_summary TEXT,
         input_start_ms INTEGER NOT NULL,
         input_end_ms INTEGER NOT NULL,
+        output_schema_version TEXT NOT NULL
+          DEFAULT 'meeting_intelligence_output/v1',
+        template_id TEXT NOT NULL DEFAULT 'general',
+        meeting_type TEXT,
+        suggested_title TEXT,
         created_at_ms INTEGER NOT NULL,
         updated_at_ms INTEGER NOT NULL,
         reviewed_at_ms INTEGER,
         published_at_ms INTEGER,
         FOREIGN KEY(recording_id) REFERENCES recordings(id) ON DELETE CASCADE,
-        FOREIGN KEY(generation_id) REFERENCES transcript_generations(id) ON DELETE CASCADE
+        FOREIGN KEY(generation_id) REFERENCES transcript_generations(id) ON DELETE CASCADE,
+        FOREIGN KEY(job_id) REFERENCES meeting_intelligence_jobs(id) ON DELETE SET NULL
       )
     ''');
     await db.execute('''
@@ -785,6 +928,13 @@ class AppDatabase {
         unresolved_due_date INTEGER NOT NULL DEFAULT 0,
         status TEXT NOT NULL DEFAULT 'draft',
         unsupported INTEGER NOT NULL DEFAULT 0,
+        resolution_state TEXT NOT NULL DEFAULT 'notApplicable'
+          CHECK (
+            resolution_state IN ('notApplicable', 'open', 'resolved')
+          ),
+        topic_start_ms INTEGER,
+        topic_end_ms INTEGER,
+        sort_order INTEGER NOT NULL DEFAULT 0,
         created_at_ms INTEGER NOT NULL,
         updated_at_ms INTEGER NOT NULL,
         reviewed_at_ms INTEGER,
@@ -819,6 +969,66 @@ class AppDatabase {
         FOREIGN KEY(insight_id) REFERENCES meeting_insights(id) ON DELETE SET NULL
       )
     ''');
+    await _createMeetingIntelligenceIndexes(db);
+  }
+
+  static Future<void> _createMeetingIntelligenceJobsSchema(Database db) async {
+    await db.execute('''
+      CREATE TABLE IF NOT EXISTS meeting_intelligence_jobs (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        recording_id INTEGER NOT NULL,
+        generation_id INTEGER NOT NULL,
+        provider_id TEXT NOT NULL,
+        model_id TEXT NOT NULL,
+        processing_location TEXT NOT NULL
+          CHECK (
+            processing_location IN (
+              'onDevice', 'cloudDirect', 'pairedPc'
+            )
+          ),
+        template_id TEXT NOT NULL DEFAULT 'general',
+        status TEXT NOT NULL DEFAULT 'queued'
+          CHECK (
+            status IN (
+              'queued', 'processing', 'completed', 'failed',
+              'canceled', 'recoveryUnknown'
+            )
+          ),
+        progress REAL NOT NULL DEFAULT 0
+          CHECK (progress >= 0 AND progress <= 1),
+        attempt_count INTEGER NOT NULL DEFAULT 0,
+        cancel_requested INTEGER NOT NULL DEFAULT 0,
+        error_code TEXT,
+        dedupe_key TEXT NOT NULL,
+        input_start_ms INTEGER NOT NULL,
+        input_end_ms INTEGER NOT NULL,
+        segment_count INTEGER NOT NULL DEFAULT 0,
+        estimated_request_count INTEGER NOT NULL DEFAULT 1,
+        speaker_labels_included INTEGER NOT NULL DEFAULT 0,
+        consent_version INTEGER NOT NULL DEFAULT 1,
+        consent_at_ms INTEGER,
+        payload_summary TEXT,
+        started_at_ms INTEGER,
+        completed_at_ms INTEGER,
+        heartbeat_at_ms INTEGER,
+        created_at_ms INTEGER NOT NULL,
+        updated_at_ms INTEGER NOT NULL,
+        FOREIGN KEY(recording_id) REFERENCES recordings(id) ON DELETE CASCADE,
+        FOREIGN KEY(generation_id) REFERENCES transcript_generations(id) ON DELETE CASCADE,
+        UNIQUE(dedupe_key)
+      )
+    ''');
+    await db.execute(
+      'CREATE INDEX IF NOT EXISTS meeting_intelligence_jobs_recording_status '
+      'ON meeting_intelligence_jobs(recording_id, status, created_at_ms, id)',
+    );
+    await db.execute(
+      'CREATE INDEX IF NOT EXISTS meeting_intelligence_jobs_generation_status '
+      'ON meeting_intelligence_jobs(generation_id, status, id)',
+    );
+  }
+
+  static Future<void> _createMeetingIntelligenceIndexes(Database db) async {
     await db.execute(
       'CREATE INDEX IF NOT EXISTS meeting_notes_recording_order '
       'ON meeting_notes(recording_id, created_at_ms DESC, id DESC)',
@@ -839,5 +1049,109 @@ class AppDatabase {
       'CREATE INDEX IF NOT EXISTS meeting_note_revisions_note_order '
       'ON meeting_note_revisions(note_id, created_at_ms DESC, id DESC)',
     );
+  }
+
+  static Future<void> _createSpeakerSchema(Database db) async {
+    await db.execute('''
+      CREATE TABLE IF NOT EXISTS meeting_speakers (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        recording_id INTEGER NOT NULL,
+        generation_id INTEGER NOT NULL,
+        stable_key TEXT NOT NULL,
+        display_name TEXT NOT NULL,
+        source TEXT NOT NULL DEFAULT 'automatic',
+        merged_into_speaker_id INTEGER,
+        created_at_ms INTEGER NOT NULL,
+        updated_at_ms INTEGER NOT NULL,
+        UNIQUE(generation_id, stable_key),
+        FOREIGN KEY(recording_id) REFERENCES recordings(id) ON DELETE CASCADE,
+        FOREIGN KEY(generation_id) REFERENCES transcript_generations(id) ON DELETE CASCADE,
+        FOREIGN KEY(merged_into_speaker_id)
+          REFERENCES meeting_speakers(id) ON DELETE SET NULL
+      )
+    ''');
+    await db.execute('''
+      CREATE TABLE IF NOT EXISTS speaker_turns (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        recording_id INTEGER NOT NULL,
+        generation_id INTEGER NOT NULL,
+        speaker_id INTEGER NOT NULL,
+        start_ms INTEGER NOT NULL,
+        end_ms INTEGER NOT NULL,
+        source TEXT NOT NULL DEFAULT 'automatic',
+        confidence REAL,
+        created_at_ms INTEGER NOT NULL,
+        updated_at_ms INTEGER NOT NULL,
+        CHECK (start_ms >= 0 AND end_ms > start_ms),
+        FOREIGN KEY(recording_id) REFERENCES recordings(id) ON DELETE CASCADE,
+        FOREIGN KEY(generation_id) REFERENCES transcript_generations(id) ON DELETE CASCADE,
+        FOREIGN KEY(speaker_id) REFERENCES meeting_speakers(id) ON DELETE CASCADE
+      )
+    ''');
+    await db.execute('''
+      CREATE TABLE IF NOT EXISTS transcript_speaker_assignments (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        recording_id INTEGER NOT NULL,
+        generation_id INTEGER NOT NULL,
+        segment_id INTEGER NOT NULL,
+        speaker_id INTEGER,
+        start_ms INTEGER NOT NULL,
+        end_ms INTEGER NOT NULL,
+        state TEXT NOT NULL
+          CHECK (state IN ('assigned', 'overlap', 'unknown')),
+        source TEXT NOT NULL DEFAULT 'automatic',
+        created_at_ms INTEGER NOT NULL,
+        updated_at_ms INTEGER NOT NULL,
+        CHECK (start_ms >= 0 AND end_ms > start_ms),
+        FOREIGN KEY(recording_id) REFERENCES recordings(id) ON DELETE CASCADE,
+        FOREIGN KEY(generation_id) REFERENCES transcript_generations(id) ON DELETE CASCADE,
+        FOREIGN KEY(segment_id) REFERENCES transcript_segments(id) ON DELETE CASCADE,
+        FOREIGN KEY(speaker_id) REFERENCES meeting_speakers(id) ON DELETE SET NULL
+      )
+    ''');
+    await db.execute('''
+      CREATE TABLE IF NOT EXISTS speaker_revisions (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        recording_id INTEGER NOT NULL,
+        generation_id INTEGER NOT NULL,
+        action TEXT NOT NULL,
+        previous_payload_json TEXT NOT NULL,
+        next_payload_json TEXT NOT NULL,
+        created_at_ms INTEGER NOT NULL,
+        reverted_at_ms INTEGER,
+        FOREIGN KEY(recording_id) REFERENCES recordings(id) ON DELETE CASCADE,
+        FOREIGN KEY(generation_id) REFERENCES transcript_generations(id) ON DELETE CASCADE
+      )
+    ''');
+    await db.execute(
+      'CREATE INDEX IF NOT EXISTS meeting_speakers_generation_order '
+      'ON meeting_speakers(generation_id, merged_into_speaker_id, id)',
+    );
+    await db.execute(
+      'CREATE INDEX IF NOT EXISTS speaker_turns_generation_time '
+      'ON speaker_turns(generation_id, start_ms, end_ms, id)',
+    );
+    await db.execute(
+      'CREATE INDEX IF NOT EXISTS transcript_speaker_assignments_segment_time '
+      'ON transcript_speaker_assignments('
+      'segment_id, start_ms, end_ms, id'
+      ')',
+    );
+    await db.execute(
+      'CREATE INDEX IF NOT EXISTS speaker_revisions_generation_order '
+      'ON speaker_revisions(generation_id, created_at_ms DESC, id DESC)',
+    );
+  }
+
+  static Future<void> _addColumnIfMissing(
+    Database db, {
+    required String table,
+    required String column,
+    required String definition,
+  }) async {
+    final columns = await db.rawQuery('PRAGMA table_info($table)');
+    if (!columns.any((row) => row['name'] == column)) {
+      await db.execute('ALTER TABLE $table ADD COLUMN $column $definition');
+    }
   }
 }

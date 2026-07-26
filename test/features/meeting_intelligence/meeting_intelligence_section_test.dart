@@ -25,8 +25,34 @@ void main() {
       ),
     );
     expect(find.text('AI 会议洞察尚未生成'), findsOneWidget);
-    expect(find.textContaining('未配置生产提供商'), findsOneWidget);
+    expect(find.textContaining('默认不会上传会议内容'), findsOneWidget);
   });
+
+  testWidgets(
+    'generation states are explicit and recovery retry is confirmed',
+    (tester) async {
+      var confirmedRetry = false;
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: MeetingIntelligenceSection(
+              recordingId: 1,
+              onEvidenceSelected: (_) {},
+              skipInitialLoad: true,
+              onGenerate: (confirmed) async => confirmedRetry = confirmed,
+              generating: true,
+            ),
+          ),
+        ),
+      );
+
+      expect(find.text('正在生成'), findsOneWidget);
+      expect(find.textContaining('可随时取消'), findsOneWidget);
+      expect(find.text('生成会议纪要'), findsOneWidget);
+      await tester.tap(find.text('生成会议纪要'));
+      expect(confirmedRetry, isFalse);
+    },
+  );
 
   testWidgets('fixture insight opens evidence review panel', (tester) async {
     final fixture = await tester.runAsync(createMeetingIntelligenceFixture);

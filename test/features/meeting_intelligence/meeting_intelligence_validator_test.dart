@@ -78,47 +78,46 @@ void main() {
     expect(validated.items.single.unresolvedDueDate, isTrue);
   });
 
-  test('rejects nonexistent and out-of-range evidence', () async {
+  test('marks nonexistent and out-of-range evidence unsupported', () async {
     final fixture = await createMeetingIntelligenceFixture();
     addTearDown(fixture.database.close);
     const validator = MeetingIntelligenceValidator();
-    expect(
-      () => validator.validate(
-        request: fixture.request,
-        output: const MeetingIntelligenceOutput(
-          items: <MeetingInsightCandidate>[
-            MeetingInsightCandidate(
-              kind: MeetingInsightKind.risk,
-              body: 'Risk.',
-              evidence: <MeetingEvidenceCandidate>[
-                MeetingEvidenceCandidate(segmentId: 9999, startMs: 1, endMs: 2),
-              ],
-            ),
-          ],
-        ),
+    final nonexistent = validator.validate(
+      request: fixture.request,
+      output: const MeetingIntelligenceOutput(
+        items: <MeetingInsightCandidate>[
+          MeetingInsightCandidate(
+            kind: MeetingInsightKind.risk,
+            body: 'Risk.',
+            evidence: <MeetingEvidenceCandidate>[
+              MeetingEvidenceCandidate(segmentId: 9999, startMs: 1, endMs: 2),
+            ],
+          ),
+        ],
       ),
-      throwsFormatException,
     );
-    expect(
-      () => validator.validate(
-        request: fixture.request,
-        output: MeetingIntelligenceOutput(
-          items: <MeetingInsightCandidate>[
-            MeetingInsightCandidate(
-              kind: MeetingInsightKind.risk,
-              body: 'Risk.',
-              evidence: <MeetingEvidenceCandidate>[
-                MeetingEvidenceCandidate(
-                  segmentId: fixture.segment.id,
-                  startMs: 500,
-                  endMs: 4500,
-                ),
-              ],
-            ),
-          ],
-        ),
+    expect(nonexistent.items.single.unsupported, isTrue);
+    expect(nonexistent.items.single.candidate.evidence, isEmpty);
+
+    final outOfRange = validator.validate(
+      request: fixture.request,
+      output: MeetingIntelligenceOutput(
+        items: <MeetingInsightCandidate>[
+          MeetingInsightCandidate(
+            kind: MeetingInsightKind.risk,
+            body: 'Risk.',
+            evidence: <MeetingEvidenceCandidate>[
+              MeetingEvidenceCandidate(
+                segmentId: fixture.segment.id,
+                startMs: 500,
+                endMs: 4500,
+              ),
+            ],
+          ),
+        ],
       ),
-      throwsFormatException,
     );
+    expect(outOfRange.items.single.unsupported, isTrue);
+    expect(outOfRange.items.single.candidate.evidence, isEmpty);
   });
 }

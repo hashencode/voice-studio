@@ -4,7 +4,15 @@ import 'package:flutter_components/flutter_components.dart';
 import '../model/evidence_link_entity.dart';
 import '../model/meeting_insight_entity.dart';
 
-enum EvidenceReviewAction { reviewed, rejected, published }
+enum EvidenceReviewAction {
+  edit,
+  applyTitle,
+  reviewed,
+  rejected,
+  published,
+  resolve,
+  reopen,
+}
 
 Future<EvidenceReviewAction?> showEvidenceReviewPanel({
   required BuildContext context,
@@ -68,6 +76,37 @@ Future<EvidenceReviewAction?> showEvidenceReviewPanel({
             runSpacing: 8,
             children: <Widget>[
               GooButton(
+                variant: GooButtonVariant.secondary,
+                onPressed: () =>
+                    controller.closeWithResult(EvidenceReviewAction.edit),
+                child: const Text('编辑'),
+              ),
+              if (insight.kind == MeetingInsightKind.title)
+                GooButton(
+                  variant: GooButtonVariant.secondary,
+                  onPressed: () => controller.closeWithResult(
+                    EvidenceReviewAction.applyTitle,
+                  ),
+                  child: const Text('应用为会议标题'),
+                ),
+              if (insight.kind == MeetingInsightKind.risk ||
+                  insight.kind == MeetingInsightKind.unresolved)
+                GooButton(
+                  variant: GooButtonVariant.secondary,
+                  onPressed: () => controller.closeWithResult(
+                    insight.resolutionState ==
+                            MeetingInsightResolutionState.resolved
+                        ? EvidenceReviewAction.reopen
+                        : EvidenceReviewAction.resolve,
+                  ),
+                  child: Text(
+                    insight.resolutionState ==
+                            MeetingInsightResolutionState.resolved
+                        ? '重新打开'
+                        : '标记已解决',
+                  ),
+                ),
+              GooButton(
                 onPressed: insight.status == MeetingInsightStatus.draft
                     ? () => controller.closeWithResult(
                         EvidenceReviewAction.reviewed,
@@ -107,10 +146,15 @@ Future<EvidenceReviewAction?> showEvidenceReviewPanel({
 }
 
 String _kindLabel(MeetingInsightKind kind) => switch (kind) {
+  MeetingInsightKind.title => '标题建议',
   MeetingInsightKind.summary => '摘要',
+  MeetingInsightKind.summaryKeyPoint => '要点摘要',
+  MeetingInsightKind.summaryDetailed => '详细纪要',
+  MeetingInsightKind.topic => '议题',
   MeetingInsightKind.decision => '决策',
   MeetingInsightKind.action => '行动项',
   MeetingInsightKind.risk => '风险',
+  MeetingInsightKind.unresolved => '待确认',
 };
 
 String _clock(int milliseconds) {

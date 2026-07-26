@@ -12,13 +12,18 @@ class FixtureMeetingIntelligenceProvider
   MeetingIntelligenceCapabilities get capabilities =>
       const MeetingIntelligenceCapabilities(
         processingLocations: <MeetingProcessingLocation>{
-          MeetingProcessingLocation.local,
+          MeetingProcessingLocation.onDevice,
         },
         supportedKinds: <MeetingInsightKind>{
+          MeetingInsightKind.title,
           MeetingInsightKind.summary,
+          MeetingInsightKind.summaryKeyPoint,
+          MeetingInsightKind.summaryDetailed,
+          MeetingInsightKind.topic,
           MeetingInsightKind.decision,
           MeetingInsightKind.action,
           MeetingInsightKind.risk,
+          MeetingInsightKind.unresolved,
         },
       );
 
@@ -30,8 +35,10 @@ class FixtureMeetingIntelligenceProvider
 
   @override
   Future<MeetingIntelligenceOutput> generate(
-    MeetingIntelligenceRequest request,
-  ) async {
+    MeetingIntelligenceRequest request, {
+    MeetingIntelligenceCancellationToken? cancellationToken,
+  }) async {
+    cancellationToken?.throwIfCanceled();
     invocationCount++;
     return output;
   }

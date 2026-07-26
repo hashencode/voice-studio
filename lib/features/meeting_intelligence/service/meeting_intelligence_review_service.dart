@@ -30,12 +30,23 @@ class MeetingIntelligenceReviewService {
     );
   }
 
-  Future<void> edit({required int insightId, required String body}) async {
-    final insight = await _requireInsight(insightId);
-    if (insight.status == MeetingInsightStatus.published) {
-      throw StateError('已发布条目不可直接编辑');
-    }
-    await _repository.editInsight(insightId: insightId, body: body);
+  Future<void> edit({
+    required int insightId,
+    required String body,
+    String? actionOwner,
+    int? actionDueAtMs,
+    bool clearActionOwner = false,
+    bool clearActionDueAt = false,
+  }) async {
+    await _requireInsight(insightId);
+    await _repository.editInsight(
+      insightId: insightId,
+      body: body,
+      actionOwner: actionOwner,
+      actionDueAtMs: actionDueAtMs,
+      clearActionOwner: clearActionOwner,
+      clearActionDueAt: clearActionDueAt,
+    );
   }
 
   Future<void> markReviewed(int insightId) async {
@@ -77,6 +88,23 @@ class MeetingIntelligenceReviewService {
       status: MeetingInsightStatus.published,
       action: 'publish',
     );
+  }
+
+  Future<void> setResolved(int insightId, {required bool resolved}) async {
+    await _requireInsight(insightId);
+    await _repository.updateResolutionState(
+      insightId: insightId,
+      state: resolved
+          ? MeetingInsightResolutionState.resolved
+          : MeetingInsightResolutionState.open,
+    );
+  }
+
+  Future<void> applySuggestedTitle({
+    required int noteId,
+    required String title,
+  }) {
+    return _repository.applySuggestedTitle(noteId: noteId, title: title);
   }
 
   Future<MeetingInsightEntity> _requireInsight(int insightId) async {

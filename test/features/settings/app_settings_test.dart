@@ -1,4 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
+import 'package:voice2text_flutter/features/meeting_intelligence/service/meeting_intelligence_provider.dart';
 import 'package:voice2text_flutter/features/settings/model/app_settings.dart';
 
 void main() {
@@ -10,6 +11,40 @@ void main() {
     expect(settings.enablePunctuation, isTrue);
     expect(settings.recentlyDeletedRetentionDays, isNull);
     expect(settings.retentionLastSuccessfulScanAtMs, isNull);
+    expect(
+      settings.meetingProcessingLocation,
+      MeetingProcessingLocation.onDevice,
+    );
+    expect(settings.meetingAiProviderId, isNull);
+    expect(settings.meetingAiModelId, isNull);
+    expect(settings.meetingAiSecretConfigured, isFalse);
+  });
+
+  test('cloud AI preferences normalize and remain non-secret', () {
+    final settings = AppSettings.fromStorage(
+      modelId: 'paraformer-zh',
+      autoTranscribe: true,
+      isDarkMode: false,
+      meetingProcessingLocation: 'cloudDirect',
+      meetingAiProviderId: ' deepseek ',
+      meetingAiModelId: ' deepseek-v4-flash ',
+      meetingAiSecretConfigured: true,
+    );
+
+    expect(
+      settings.meetingProcessingLocation,
+      MeetingProcessingLocation.cloudDirect,
+    );
+    expect(settings.meetingAiProviderId, 'deepseek');
+    expect(settings.meetingAiModelId, 'deepseek-v4-flash');
+    expect(settings.meetingAiSecretConfigured, isTrue);
+
+    final local = settings.copyWith(
+      meetingProcessingLocation: MeetingProcessingLocation.onDevice,
+      meetingAiSecretConfigured: false,
+    );
+    expect(local.meetingProcessingLocation, MeetingProcessingLocation.onDevice);
+    expect(local.meetingAiSecretConfigured, isFalse);
   });
 
   test('legacy product selections normalize to the single runtime', () {

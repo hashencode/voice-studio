@@ -16,6 +16,9 @@ Flutter 版本重构工程（Android 优先）。
 在本目录执行：
 
 ```bash
+# 构建缓存容量检查（默认 20 GiB，可用 --dry-run 只查看）
+python3 tool/build_cache_guard.py
+
 # 轻量自检：契约 + analyze + test
 ./tool/dev_check.sh
 
@@ -59,7 +62,7 @@ MODEL_IDS="paraformer-zh-2025-10-07 paraformer-en-2024-03-09" PROFILE_IDS="stand
 - `lib/features/recording/`：录音流程与状态机
 - `lib/features/transcription/`：转写任务列表与重试
 - `lib/features/meetings/`：会议播放、时间轴、编辑、搜索与导出工作区
-- `lib/features/meeting_intelligence/`：证据、审核和提供商中立边界（无生产提供商）
+- `lib/features/meeting_intelligence/`：证据、审核、持久任务与 DeepSeek 云端直连
 - `lib/features/records/`：录音记录列表、详情、删除
 - `lib/features/settings/`：模型选择与自动转写配置
 - `lib/data/sqlite/`：本地数据库
@@ -76,22 +79,44 @@ MODEL_IDS="paraformer-zh-2025-10-07 paraformer-en-2024-03-09" PROFILE_IDS="stand
 - 转写链路：`m4a` 录音 -> 原生转码 `wav(16k mono)` -> Silero VAD 切片 -> Sherpa JNI 离线识别
 - 数据闭环：录音/导入 -> 持久转写队列 -> 结构化时间戳 -> 播放复核、编辑、搜索与 TXT/Markdown/JSON/SRT 导出
 - 转写结果按 generation 保存；用户编辑或证据关联的当前版本不会被重试结果静默覆盖
-- AI 仅交付结构化证据和审核基础：生产没有默认提供商、凭据、端点或隐式上传
+- AI 默认仍关闭且不隐式上传；用户可配置自己的 DeepSeek 密钥，逐场同意后使用
+  `cloudDirect` 生成可追溯纪要
 - App 底部显示当前安装包信息（包名/版本/安装时间），便于确认是否为最新构建
 - 移动端不提供 Live VAD、实时转写或 stub 降级；缺少模型资产时会明确失败
-- 时间戳 benchmark 仍需独立听审批准；`releaseEligible=false` 的自测报告不是发布证据
+- 时间戳 benchmark 的独立听审当前标记为
+  `SKIPPED_PENDING_USER_TEST`；`releaseEligible=false` 的自测报告不是发布证据
 - 范围决策 `S2-MOBILE-CORE-2026-07-25` 将移动端 S2 收敛为 **S2 Mobile Core**：保留 Paraformer 会后离线转写、真实标点、结构化时间戳、人工
   三态复核、播放编辑搜索导出、隐私和设备可靠性；移动端不因自动
   confidence 或热词更换模型
 - Mobile Core 的 18 个强制门禁目前 17 PASS、1 BLOCKED；唯一 blocker 是
   ASR-005 独立听审。当前工程分段 5/4、provisional P95=182 ms，但
-  `releaseEligible=false`
+  `releaseEligible=false`；该人工门禁暂时跳过，等待用户后续测试
 - 自动 confidence、热词、高级 ITN、GTCRN/AEC 和 REC-009 外接麦克风验收
   均为 `DEFERRED_NOT_PASSED`，历史 BLOCKED/FAIL 证据保留，不等于通过
-- 整体仍为 **NOT RELEASE-READY**：除 Mobile Core 外，S1 高端参考设备、
+- S1 非发布功能闭环已在低端和中端参考机通过；高端参考设备作为最终候选包
+  的发布兼容性门禁，不回退已通过的功能状态
+- 整体仍为 **NOT RELEASE-READY**：除 Mobile Core 外，发布高端兼容性、
   EXP-005 与正式发布交付也须单独完成。机器范围契约见
   `docs/product/s2-mobile-core-scope.json`，统一结论见
   `docs/product/s2-closure-status.md`
+
+### S3 第一产品化增量
+
+决策 `S3-PRODUCTIZATION-2026-07-25` 当前为 `PARTIAL_PASS`：
+
+- DeepSeek `cloudDirect` 和结构化纪要闭环已实现。用户自己的密钥保存在
+  Android Keystore 边界内；只有逐场确认后，所显示范围的会议文本才会离开
+  设备。纪要可编辑、复核、发布并回到原文/音频证据。
+- 端侧说话人分离为 `DEFERRED_NO_ADMISSIBLE_CANDIDATE`：FP32 有界候选和
+  唯一 INT8 fallback 已完成 Xiaomi 固定 5 分钟筛选，但语义均失败，projected
+  RTF 分别为 2.3348 与 2.4020；因此不启动 120 分钟、不推进第三候选，也没有
+  产品入口。
+- PC provider 安全协议 v1 已冻结，但没有 PC runtime、移动 adapter、相机权限
+  或扫码入口，保持 `DEFERRED_PC_RUNTIME_MISSING`。
+- 完整 S3 仍为 BLOCKED；产品继续 **NOT RELEASE-READY**。
+
+机器权威状态见 `docs/product/s3-productization-scope.json`，说明见
+`docs/product/s3-productization-status.md`。
 
 
 ## Release 配置
