@@ -102,6 +102,26 @@ cache, schedules one warm-up plus five measured repetitions per
 candidate/profile/fixture, and writes aggregates only after every sandboxed run
 completes. Development output is explicitly not held-out ranking evidence.
 
+Use the first complete development matrix only to confirm or revise the
+material-benefit rule. Before held-out access, set the contract/materiality
+states together to `M4_DEVELOPMENT_FROZEN_HELD_OUT_SEALED` and `FROZEN`, rerun
+the development verification matrix under that exact contract, then seal it:
+
+```bash
+python3 benchmark/desktop/asr_comparison/development_freeze.py \
+  --check \
+  --frozen-at 2026-07-26T16:00:00Z
+python3 benchmark/desktop/asr_comparison/development_freeze.py \
+  --publish \
+  --frozen-at 2026-07-26T16:00:00Z
+```
+
+Use the actual UTC transition timestamp. The validator recomputes every
+aggregate and material-benefit comparison, binds all eight candidate/profile
+aggregates plus every rank-affecting source hash, preserves all terminal
+candidate dispositions, and authorizes held-out decoding only when the final
+verification matrix exactly matches the sealed M4 contract.
+
 The local-only acquisition and review checklist is in
 `benchmark/desktop/asr_comparison/fixtures/README.md`.
 

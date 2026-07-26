@@ -79,5 +79,11 @@ remain unmet:
    under both profiles, then freeze target, lane, profile, scorer, fixture,
    reference, seed, and materiality hashes.
 
+`development_matrix.py` now executes that matrix, while
+`development_freeze.py` requires a final verification run under the paired
+`M4_DEVELOPMENT_FROZEN_HELD_OUT_SEALED` / `FROZEN` states and recomputes every
+aggregate and comparison before it can publish the freeze. These tools do not
+waive either missing prerequisite above.
+
 Held-out transcripts remain inaccessible, and no U8 held-out ranking or
 7,200-second finalist run has been performed.

@@ -327,10 +327,45 @@ def validate_contract(contract: dict[str, Any]) -> None:
         },
         "materialBenefitRule",
     )
+    state_pair = (
+        contract["contractState"],
+        materiality["state"],
+    )
     require(
-        materiality["state"] == "PROPOSED_UNFROZEN"
-        and materiality["developmentPilotRequired"] is True,
-        "material benefit must remain unfrozen before U7",
+        state_pair
+        in {
+            (
+                "M4_STAGE_0_ADMITTED_DEVELOPMENT_ASSETS_REQUIRED",
+                "PROPOSED_UNFROZEN",
+            ),
+            (
+                "M4_DEVELOPMENT_FROZEN_HELD_OUT_SEALED",
+                "FROZEN",
+            ),
+        },
+        "contract/materiality state transition mismatch",
+    )
+    require(
+        materiality["developmentPilotRequired"] is True
+        and 0
+        < materiality["minimumRelativeMacroLexicalErrorReduction"]
+        <= 1
+        and isinstance(
+            materiality["minimumHardScenariosImproved"],
+            int,
+        )
+        and not isinstance(
+            materiality["minimumHardScenariosImproved"],
+            bool,
+        )
+        and materiality["minimumHardScenariosImproved"] >= 1
+        and 0
+        < materiality["alternativeMinimumTerminologyNumericPointGain"]
+        <= 1
+        and 0
+        <= materiality["maximumRelativeCleanMandarinRegression"]
+        <= 1,
+        "material benefit rule values are invalid",
     )
 
     scheduling = contract["scheduling"]

@@ -104,6 +104,22 @@ class ContractBundleTest(unittest.TestCase):
         with self.assertRaisesRegex(ContractError, "hardGates fields"):
             self.validate()
 
+    def test_accepts_sealed_post_development_contract_state(self) -> None:
+        self.contract["contractState"] = (
+            "M4_DEVELOPMENT_FROZEN_HELD_OUT_SEALED"
+        )
+        self.contract["materialBenefitRule"]["state"] = "FROZEN"
+
+        self.validate()
+
+    def test_contract_and_materiality_states_must_transition_together(
+        self,
+    ) -> None:
+        self.contract["materialBenefitRule"]["state"] = "FROZEN"
+
+        with self.assertRaisesRegex(ContractError, "transition mismatch"):
+            self.validate()
+
     def test_profile_frozen_after_held_out_inspection_is_invalid(self) -> None:
         state = self._round_state()
         state["heldOutInspectionStartedAt"] = "2026-07-26T02:00:00Z"
