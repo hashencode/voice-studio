@@ -16,13 +16,13 @@ Flutter 版本重构工程（Android 优先）。
 在本目录执行：
 
 ```bash
-# 构建缓存容量检查（默认 20 GiB，可用 --dry-run 只查看）
+# 多工程构建缓存容量检查（默认 8 GiB，可用 --dry-run 只查看）
 python3 tool/build_cache_guard.py
 
-# 轻量自检：契约 + analyze + test
+# 开发自检：增量重建 macOS desktop 产物 + 契约 + analyze + test
 ./tool/dev_check.sh
 
-# 全量自检：含 debug APK 构建
+# 全量自检：重建 macOS 桌面产物并包含 debug APK 构建
 ./tool/dev_check.sh --with-build
 
 # 真机会议闭环：时间戳播放/编辑/搜索/导出 + 队列恢复/删除重试
@@ -56,6 +56,13 @@ MODEL_IDS="paraformer-zh-2025-10-07 paraformer-en-2024-03-09" PROFILE_IDS="stand
 # 发布前检查（会给出 warning/error）
 ./tool/preflight_release.sh
 ```
+
+缓存上限来自一次冷清理后的跨工程工作流：依赖恢复、macOS desktop debug
+构建、共享 workspace/Flutter 测试、analyze、契约与 benchmark 检查，以及
+Android debug APK 构建。该流程占用 6.30 GiB，按 25%（至少 0.5 GiB）余量
+向上取整到 8 GiB；根工程和 desktop 的独立上限分别为 7 GiB 与 1.5 GiB。
+守卫只识别仓库白名单中的 7 个 pubspec 根，仓库忙碌时默认延期清理，可用
+`--wait-for-idle` 等待。
 
 ## 目录说明（当前阶段）
 

@@ -25,8 +25,12 @@ Run the normal project checks after relevant changes:
 
 - Before running local Flutter or Gradle builds, tests, benchmarks, or code
   generation, run `python3 tool/build_cache_guard.py`.
-- The guard preserves incremental artifacts below 20 GiB and runs the standard
-  project cleaners only after the managed cache exceeds that budget.
+- The guard covers the root app, `apps/desktop`, and every workspace package.
+  It preserves incremental artifacts below the measured 8 GiB repository
+  budget and also enforces per-project budgets.
+- If this repository has an active Dart, Flutter, Gradle, or Xcode process,
+  cleanup is deferred without failing the caller. Use `--wait-for-idle` when
+  cleanup should wait for the repository to become idle.
 - Override the budget with `VOICE2TEXT_BUILD_CACHE_LIMIT_GIB` only for a
   documented benchmark. Use `python3 tool/build_cache_guard.py --force` after a
   one-off full build matrix.
