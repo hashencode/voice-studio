@@ -77,6 +77,23 @@ Prepare the smoke fixture pack with:
 python3 benchmark/desktop/asr_comparison/prepare_fixtures.py
 ```
 
+After the four reviewed development entries are frozen, prepare and preflight
+the real M4 matrix with:
+
+```bash
+python3 benchmark/desktop/asr_comparison/prepare_fixtures.py \
+  --development \
+  --output build/desktop_asr_comparison/fixtures/development-active
+python3 benchmark/desktop/asr_comparison/development_matrix.py --preflight
+```
+
+Before the real matrix, run `python3 tool/build_cache_guard.py`, then replace
+`--preflight` with `--execute`. The executor admits only the four current
+sherpa candidates, resolves model components from the atomic ignored asset
+cache, schedules one warm-up plus five measured repetitions per
+candidate/profile/fixture, and writes aggregates only after every sandboxed run
+completes. Development output is explicitly not held-out ranking evidence.
+
 The local-only acquisition and review checklist is in
 `benchmark/desktop/asr_comparison/fixtures/README.md`.
 
@@ -119,6 +136,12 @@ hash-bound run identities, fresh process execution, process-tree resource
 sampling, timeout/cancellation, partial-run quarantine, and resume. Its
 `--fake-smoke` mode is intentionally non-ranked and executes one warm-up plus
 five measured runs against the committed smoke fixture.
+
+`development_matrix.py` is the fail-closed U7 execution entry. It binds the
+Apple M4 fingerprint, shared sherpa runtime, worker, candidate registry,
+profiles, fixture/reference hashes, scorer, and prepared model components
+before decoding. Native FunASR and license-rejected candidates cannot enter its
+schedule.
 
 The benchmark Dart launcher in
 `apps/desktop/tool/asr_benchmark/sandboxed_candidate_launcher.dart` reuses the
