@@ -110,6 +110,13 @@ complete development/held-out/7,200-second fixture manifest without decoding
 held-out audio, then seal it:
 
 ```bash
+python3 benchmark/desktop/asr_comparison/freeze_ranked_fixtures.py \
+  --write-template
+# A corpus maintainer completes the fixed review fields while held-out content
+# remains sealed from the benchmark operator.
+python3 benchmark/desktop/asr_comparison/freeze_ranked_fixtures.py \
+  --freeze
+# Review and activate ranked-freeze/fixtures.json as the tracked manifest.
 python3 benchmark/desktop/asr_comparison/development_freeze.py \
   --check \
   --frozen-at 2026-07-26T16:00:00Z
@@ -123,6 +130,13 @@ aggregate and material-benefit comparison, binds all eight candidate/profile
 aggregates plus every rank-affecting source hash, preserves all terminal
 candidate dispositions, and authorizes held-out decoding only when the final
 verification matrix exactly matches the sealed M4 contract.
+
+`freeze_ranked_fixtures.py` covers all 12 non-smoke entries and verifies their
+PCM payloads, UTF-8 references, source and authorization records, role
+assignment, development/held-out speaker-session separation, and exact
+7,200-second finalist duration. Empty lexical references are allowed only for
+the declared non-speech scenario. Its output contains hashes and fixed review
+dispositions only; it never copies audio or reference text.
 
 The local-only acquisition and review checklist is in
 `benchmark/desktop/asr_comparison/fixtures/README.md`.
