@@ -83,6 +83,7 @@ class EffectiveProfile {
       if (request.profileId == 'fixed-resource') ...<String>{
         'concurrency',
         'inputMode',
+        'segmentDurationSeconds',
         'pacingPolicy',
         'warmupRuns',
         'measuredRuns',
@@ -92,7 +93,7 @@ class EffectiveProfile {
         expected.difference(config.keys.toSet()).isNotEmpty) {
       throw const FormatException('effective config fields mismatch');
     }
-    if (config['modelFamily'] != request.family.manifestValue ||
+    if (config['modelFamily'] != request.family.profileValue ||
         config['provider'] != 'cpu' ||
         config['numThreads'] is! int ||
         (config['numThreads']! as int) <= 0 ||
@@ -104,6 +105,7 @@ class EffectiveProfile {
         (config['numThreads'] != 2 ||
             config['concurrency'] != 1 ||
             config['inputMode'] != 'frozen_segments' ||
+            config['segmentDurationSeconds'] != 15 ||
             config['pacingPolicy'] != 'unpaced' ||
             config['warmupRuns'] != 1 ||
             config['measuredRuns'] != 5)) {

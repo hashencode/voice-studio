@@ -46,8 +46,11 @@ class PrepareFixturesTest(unittest.TestCase):
             ranked=False,
         )
         self.assertEqual(result["mode"], "smoke")
-        self.assertEqual(result["fixtureCount"], 5)
+        self.assertEqual(result["fixtureCount"], 6)
         self.assertTrue((self.output / "fixtures" / "committed-zh-300s.wav").is_file())
+        self.assertTrue(
+            (self.output / "fixtures" / "generated-zh-prefix-15s.wav").is_file()
+        )
         self.assertTrue((self.output / "fixtures" / "generated-silence-1s.wav").is_file())
         self.assertFalse(any(path.is_absolute() for path in map(Path, result["files"])))
 
@@ -87,6 +90,30 @@ class PrepareFixturesTest(unittest.TestCase):
                 ranked=True,
             )
         self.assertFalse(self.output.exists())
+
+    def test_development_mode_never_requires_held_out_or_long_assets(self) -> None:
+        with self.assertRaisesRegex(
+            FixtureError, "development fixture is not frozen"
+        ) as caught:
+            prepare(
+                self.manifest,
+                repository_root=REPOSITORY_ROOT,
+                output_root=self.output,
+                ranked=False,
+                development=True,
+            )
+        self.assertIn("development-", str(caught.exception))
+        self.assertNotIn("heldout-", str(caught.exception))
+        self.assertNotIn("finalist-", str(caught.exception))
+        self.assertFalse(self.output.exists())
+
+    def test_development_and_ranked_modes_are_mutually_exclusive(self) -> None:
+        with self.assertRaisesRegex(FixtureError, "mutually exclusive"):
+            validate_manifest(
+                self.manifest,
+                ranked=True,
+                development=True,
+            )
 
     def test_ranked_mode_rejects_unreviewed_dialect_metadata(self) -> None:
         manifest = copy.deepcopy(self.manifest)

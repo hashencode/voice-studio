@@ -51,6 +51,38 @@
       "normalizationNotes": "Existing smoke reference only; repetitive fixture is prohibited from ranked quality use."
     },
     {
+      "fixtureId": "generated-zh-prefix-15s",
+      "fixtureRole": "smoke",
+      "scenario": "clean_near_field_mandarin",
+      "distributionState": "generated",
+      "useDisposition": "compatibility_only",
+      "sessionGroupId": "smoke-derived-zh-prefix-session",
+      "speakerGroupId": "smoke-derived-zh-prefix-speaker",
+      "sourceKind": "deterministic_generator",
+      "source": "prepare_fixtures.py/committed_zh_prefix_15s_v1",
+      "licenseOrConsent": "derived_from_existing_repository_fixture_smoke_only",
+      "redistribution": "generated_not_committed",
+      "referenceReview": "DERIVED_FROM_EXISTING_SMOKE_REFERENCE",
+      "varietyReview": "NOT_APPLICABLE",
+      "freezeState": "FROZEN",
+      "audio": {
+        "relativePath": "generated/generated-zh-prefix-15s.wav",
+        "sha256": "a8fc058e5058c5dddd5212fa78ed6b9e94f11bbed2a0155fa2a3105614b97b5a",
+        "bytes": 480044,
+        "durationSeconds": 15.0,
+        "sampleRateHz": 16000,
+        "channels": 1,
+        "sampleWidthBytes": 2,
+        "generator": "committed_zh_prefix_15s_v1"
+      },
+      "reference": {
+        "relativePath": "generated/generated-zh-prefix-15s.txt",
+        "sha256": "4ccb80b44baf33897b7311d9ca3d0db54393e940ed8256448e7872acd5ebe3d8",
+        "bytes": 150
+      },
+      "normalizationNotes": "Deterministic first 15 seconds of the committed repetitive fixture; smoke-only and prohibited from ranked quality use."
+    },
+    {
       "fixtureId": "generated-silence-1s",
       "fixtureRole": "smoke",
       "scenario": "non_speech",

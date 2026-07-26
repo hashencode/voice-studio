@@ -2,13 +2,13 @@
   "schemaVersion": 2,
   "contractId": "desktop-processing/macos-asr-comparison-v2",
   "decisionPlatform": "macos",
-  "contractState": "IMPLEMENTATION_SMOKE_ONLY",
+  "contractState": "M4_STAGE_0_ADMITTED_DEVELOPMENT_ASSETS_REQUIRED",
   "baselineCandidateId": "sherpa-streaming-zipformer-zh-14m-2023-02-23",
   "target": {
     "operatingSystem": "macos",
     "architecture": "arm64",
     "cpuFamily": "Apple Silicon",
-    "referenceCpuModel": "Apple M2",
+    "referenceCpuModel": "Apple M4",
     "referenceMemoryBytes": 17179869184,
     "targetFingerprintRequiredFields": [
       "operatingSystemVersion",
@@ -61,7 +61,7 @@
         "sherpa-onnx-fire-red-asr2-ctc-zh_en-int8-2026-02-25"
       ],
       "rankable": true,
-      "state": "CHARACTERIZED_PENDING_CANDIDATE_ADMISSION"
+      "state": "CHARACTERIZED_M4_STAGE_0_ADMITTED"
     }
   ],
   "profiles": {
@@ -74,6 +74,7 @@
       "numThreads": 2,
       "concurrency": 1,
       "inputMode": "frozen_segments",
+      "segmentDurationSeconds": 15,
       "pacingPolicy": "unpaced",
       "warmupRuns": 1,
       "measuredRuns": 5

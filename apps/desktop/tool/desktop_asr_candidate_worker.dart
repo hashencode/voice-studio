@@ -13,9 +13,11 @@ import 'asr_benchmark/effective_profile.dart';
 const int _maximumOutputTextBytes = 1024 * 1024;
 const int _maximumTokenCount = 100000;
 const int _maximumTimestampCount = 100000;
+const int _maximumPartialEvents = 240;
 const double _maximumDurationSeconds = 14400;
 
 Future<void> main(List<String> arguments) async {
+  CandidateWorkerRequest? request;
   try {
     final options = _parseArguments(arguments);
     final lines = StreamIterator<String>(
@@ -28,9 +30,9 @@ Future<void> main(List<String> arguments) async {
     if (utf8.encode(line).length > 4 * 1024 * 1024) {
       throw const FormatException('worker request exceeds the input bound');
     }
-    final request = CandidateWorkerRequest.decodeLine(line);
+    request = CandidateWorkerRequest.decodeLine(line);
     await _validateFiles(request);
-    _emit(<String, Object?>{
+    await _emit(<String, Object?>{
       'schemaVersion': 2,
       'type': 'handshake',
       'candidateId': request.candidateId,
@@ -55,7 +57,7 @@ Future<void> main(List<String> arguments) async {
     }
     final profile = EffectiveProfile.fromCandidateRequest(request);
     final built = profile.build();
-    _emit(<String, Object?>{
+    await _emit(<String, Object?>{
       'schemaVersion': 2,
       'type': 'effectiveConfig',
       'candidateId': request.candidateId,
@@ -75,14 +77,14 @@ Future<void> main(List<String> arguments) async {
         profile: built,
         wave: wave,
       ),
-      OfflineSherpaProfile() => _decodeOffline(
+      OfflineSherpaProfile() => await _decodeOffline(
         request: request,
         profile: built,
         wave: wave,
       ),
     };
     _validateResult(request, result);
-    _emit(<String, Object?>{
+    await _emit(<String, Object?>{
       'schemaVersion': 2,
       'type': 'result',
       'candidateId': request.candidateId,
@@ -90,12 +92,12 @@ Future<void> main(List<String> arguments) async {
       'sourceSha256': request.sourceSha256,
       ...result,
     });
-    _emit(<String, Object?>{
+    await _emit(<String, Object?>{
       'schemaVersion': 2,
       'type': 'unloadStart',
       'candidateId': request.candidateId,
     });
-    _emit(<String, Object?>{
+    await _emit(<String, Object?>{
       'schemaVersion': 2,
       'type': 'unloadComplete',
       'candidateId': request.candidateId,
@@ -106,7 +108,7 @@ Future<void> main(List<String> arguments) async {
         Duration(milliseconds: request.settleMilliseconds),
       );
     }
-    _emit(<String, Object?>{
+    await _emit(<String, Object?>{
       'schemaVersion': 2,
       'type': 'complete',
       'candidateId': request.candidateId,
@@ -115,9 +117,14 @@ Future<void> main(List<String> arguments) async {
       'residentBytesAfterSettle': ProcessInfo.currentRss,
     });
   } catch (error) {
-    _emit(<String, Object?>{
+    await _emit(<String, Object?>{
       'schemaVersion': 2,
       'type': 'error',
+      if (request != null) ...<String, Object?>{
+        'candidateId': request.candidateId,
+        'profileId': request.profileId,
+        'sourceSha256': request.sourceSha256,
+      },
       'code': switch (error) {
         FormatException() => 'INVALID_REQUEST_OR_IDENTITY',
         StateError() => 'DECODE_FAILED',
@@ -137,127 +144,218 @@ Future<Map<String, Object?>> _decodeOnline({
   final load = Stopwatch()..start();
   final recognizer = sherpa.OnlineRecognizer(profile.config);
   load.stop();
-  _emit(<String, Object?>{
+  await _emit(<String, Object?>{
     'schemaVersion': 2,
     'type': 'modelLoadComplete',
     'candidateId': request.candidateId,
     'loadMilliseconds': load.elapsedMicroseconds / 1000,
     'residentBytes': ProcessInfo.currentRss,
   });
-  final stream = recognizer.createStream();
   final liveClock = Stopwatch()..start();
   var decodeMicroseconds = 0;
   var partialCount = 0;
   var previousText = '';
+  final texts = <String>[];
+  final tokens = <String>[];
+  final timestamps = <double>[];
+  final segments = _decodeSegments(
+    wave: wave,
+    profileId: request.profileId,
+    effectiveConfig: profile.effectiveConfig,
+  );
   try {
     final chunkSamples = request.profileId == 'recommended'
         ? max(1, (wave.sampleRate * profile.chunkSeconds).round())
         : max(1, wave.sampleRate ~/ 10);
-    for (var offset = 0; offset < wave.samples.length; offset += chunkSamples) {
-      final end = min(offset + chunkSamples, wave.samples.length);
-      stream.acceptWaveform(
-        samples: Float32List.sublistView(wave.samples, offset, end),
-        sampleRate: wave.sampleRate,
-      );
-      while (recognizer.isReady(stream)) {
-        final decode = Stopwatch()..start();
-        recognizer.decode(stream);
-        decode.stop();
-        decodeMicroseconds += decode.elapsedMicroseconds;
-      }
-      if (request.capabilities.partialResults) {
-        final partial = recognizer.getResult(stream).text;
-        if (partial.isNotEmpty && partial != previousText) {
-          previousText = partial;
-          partialCount += 1;
-          if (partialCount <= 10000) {
-            _emit(<String, Object?>{
-              'schemaVersion': 2,
-              'type': 'partial',
-              'candidateId': request.candidateId,
-              'audioSeconds': end / wave.sampleRate,
-              'wallMilliseconds': liveClock.elapsedMicroseconds / 1000,
-              'textSha256': sha256.convert(utf8.encode(partial)).toString(),
-            });
+    for (final segment in segments) {
+      final stream = recognizer.createStream();
+      try {
+        for (
+          var offset = segment.startSample;
+          offset < segment.endSample;
+          offset += chunkSamples
+        ) {
+          final end = min(offset + chunkSamples, segment.endSample);
+          stream.acceptWaveform(
+            samples: Float32List.sublistView(wave.samples, offset, end),
+            sampleRate: wave.sampleRate,
+          );
+          while (recognizer.isReady(stream)) {
+            final decode = Stopwatch()..start();
+            recognizer.decode(stream);
+            decode.stop();
+            decodeMicroseconds += decode.elapsedMicroseconds;
+          }
+          if (request.profileId == 'recommended' &&
+              request.capabilities.partialResults) {
+            final partial = recognizer.getResult(stream).text;
+            if (partial.isNotEmpty && partial != previousText) {
+              previousText = partial;
+              partialCount += 1;
+              if (partialCount <= _maximumPartialEvents) {
+                await _emit(<String, Object?>{
+                  'schemaVersion': 2,
+                  'type': 'partial',
+                  'candidateId': request.candidateId,
+                  'audioSeconds': end / wave.sampleRate,
+                  'wallMilliseconds': liveClock.elapsedMicroseconds / 1000,
+                  'textSha256': sha256.convert(utf8.encode(partial)).toString(),
+                });
+              }
+            }
+          }
+          if (request.profileId == 'recommended' &&
+              profile.effectiveConfig['pacingPolicy'] ==
+                  'realtime_audio_clock') {
+            final target = Duration(
+              microseconds:
+                  (end * Duration.microsecondsPerSecond / wave.sampleRate)
+                      .round(),
+            );
+            final remaining = target - liveClock.elapsed;
+            if (remaining > Duration.zero) {
+              await Future<void>.delayed(remaining);
+            }
           }
         }
-      }
-      if (request.profileId == 'recommended' &&
-          profile.effectiveConfig['pacingPolicy'] == 'realtime_audio_clock') {
-        final target = Duration(
-          microseconds: (end * Duration.microsecondsPerSecond / wave.sampleRate)
-              .round(),
+        stream.inputFinished();
+        while (recognizer.isReady(stream)) {
+          final decode = Stopwatch()..start();
+          recognizer.decode(stream);
+          decode.stop();
+          decodeMicroseconds += decode.elapsedMicroseconds;
+        }
+        final result = recognizer.getResult(stream);
+        if (result.text.isNotEmpty) texts.add(result.text);
+        tokens.addAll(result.tokens);
+        final offsetSeconds = segment.startSample / wave.sampleRate;
+        timestamps.addAll(
+          result.timestamps.map((value) => value + offsetSeconds),
         );
-        final remaining = target - liveClock.elapsed;
-        if (remaining > Duration.zero) await Future<void>.delayed(remaining);
+      } finally {
+        stream.free();
       }
     }
-    stream.inputFinished();
-    while (recognizer.isReady(stream)) {
-      final decode = Stopwatch()..start();
-      recognizer.decode(stream);
-      decode.stop();
-      decodeMicroseconds += decode.elapsedMicroseconds;
-    }
-    final result = recognizer.getResult(stream);
     liveClock.stop();
     return <String, Object?>{
-      'text': result.text,
-      'tokens': result.tokens,
-      'timestamps': result.timestamps,
+      'text': texts.join(' '),
+      'tokens': tokens,
+      'timestamps': timestamps,
       'durationSeconds': wave.samples.length / wave.sampleRate,
       'loadMilliseconds': load.elapsedMicroseconds / 1000,
       'decodeMilliseconds': decodeMicroseconds / 1000,
       'liveElapsedMilliseconds': liveClock.elapsedMicroseconds / 1000,
+      'segmentCount': segments.length,
       'partialCount': partialCount,
       'droppedChunkCount': 0,
       'maximumQueuedChunkCount': 1,
       'residentBytes': ProcessInfo.currentRss,
     };
   } finally {
-    stream.free();
     recognizer.free();
   }
 }
 
-Map<String, Object?> _decodeOffline({
+Future<Map<String, Object?>> _decodeOffline({
   required CandidateWorkerRequest request,
   required OfflineSherpaProfile profile,
   required sherpa.WaveData wave,
-}) {
+}) async {
   final load = Stopwatch()..start();
   final recognizer = sherpa.OfflineRecognizer(profile.config);
   load.stop();
-  _emit(<String, Object?>{
+  await _emit(<String, Object?>{
     'schemaVersion': 2,
     'type': 'modelLoadComplete',
     'candidateId': request.candidateId,
     'loadMilliseconds': load.elapsedMicroseconds / 1000,
     'residentBytes': ProcessInfo.currentRss,
   });
-  final stream = recognizer.createStream();
   final decode = Stopwatch()..start();
+  final texts = <String>[];
+  final tokens = <String>[];
+  final timestamps = <double>[];
+  String? language;
+  String? event;
+  final segments = _decodeSegments(
+    wave: wave,
+    profileId: request.profileId,
+    effectiveConfig: profile.effectiveConfig,
+  );
   try {
-    stream.acceptWaveform(samples: wave.samples, sampleRate: wave.sampleRate);
-    recognizer.decode(stream);
-    final result = recognizer.getResult(stream);
+    for (final segment in segments) {
+      final stream = recognizer.createStream();
+      try {
+        stream.acceptWaveform(
+          samples: Float32List.sublistView(
+            wave.samples,
+            segment.startSample,
+            segment.endSample,
+          ),
+          sampleRate: wave.sampleRate,
+        );
+        recognizer.decode(stream);
+        final result = recognizer.getResult(stream);
+        if (result.text.isNotEmpty) texts.add(result.text);
+        tokens.addAll(result.tokens);
+        final offsetSeconds = segment.startSample / wave.sampleRate;
+        timestamps.addAll(
+          result.timestamps.map((value) => value + offsetSeconds),
+        );
+        if (language == null && result.lang.isNotEmpty) language = result.lang;
+        if (event == null && result.event.isNotEmpty) event = result.event;
+      } finally {
+        stream.free();
+      }
+    }
     decode.stop();
     return <String, Object?>{
-      'text': result.text,
-      'tokens': result.tokens,
-      'timestamps': result.timestamps,
-      'language': result.lang,
-      'event': result.event,
+      'text': texts.join(' '),
+      'tokens': tokens,
+      'timestamps': timestamps,
+      'language': language ?? '',
+      'event': event ?? '',
       'durationSeconds': wave.samples.length / wave.sampleRate,
       'loadMilliseconds': load.elapsedMicroseconds / 1000,
       'decodeMilliseconds': decode.elapsedMicroseconds / 1000,
+      'segmentCount': segments.length,
       'partialCount': 0,
       'residentBytes': ProcessInfo.currentRss,
     };
   } finally {
-    stream.free();
     recognizer.free();
   }
+}
+
+List<_DecodeSegment> _decodeSegments({
+  required sherpa.WaveData wave,
+  required String profileId,
+  required Map<String, Object?> effectiveConfig,
+}) {
+  if (profileId != 'fixed-resource') {
+    return <_DecodeSegment>[
+      _DecodeSegment(startSample: 0, endSample: wave.samples.length),
+    ];
+  }
+  final durationSeconds = effectiveConfig['segmentDurationSeconds'];
+  if (durationSeconds is! int || durationSeconds <= 0 || durationSeconds > 60) {
+    throw const FormatException('frozen segment duration is invalid');
+  }
+  final segmentSamples = wave.sampleRate * durationSeconds;
+  return <_DecodeSegment>[
+    for (var start = 0; start < wave.samples.length; start += segmentSamples)
+      _DecodeSegment(
+        startSample: start,
+        endSample: min(start + segmentSamples, wave.samples.length),
+      ),
+  ];
+}
+
+class _DecodeSegment {
+  const _DecodeSegment({required this.startSample, required this.endSample});
+
+  final int startSample;
+  final int endSample;
 }
 
 Future<void> _validateFiles(CandidateWorkerRequest request) async {
@@ -343,6 +441,9 @@ String _required(Map<String, String> options, String key) {
 Future<String> _sha256(File file) async =>
     (await sha256.bind(file.openRead()).first).toString();
 
-void _emit(Map<String, Object?> event) {
+Future<void> _emit(Map<String, Object?> event) async {
   stdout.writeln(jsonEncode(event));
+  // Resource measurement boundaries must reach the parent sampler while this
+  // process is still alive; otherwise unload RSS collapses to a false zero.
+  await stdout.flush();
 }

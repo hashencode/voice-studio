@@ -56,6 +56,9 @@ def asset_plan(registry: dict[str, Any]) -> dict[str, Any]:
             candidate.get("license", {}).get("disposition")
             == "ACCEPTED_FOR_BENCHMARK"
         )
+        terminal_disposition = candidate.get("admission", {}).get(
+            "terminalDisposition"
+        )
         plan.append(
             {
                 "candidateId": candidate["candidateId"],
@@ -63,7 +66,9 @@ def asset_plan(registry: dict[str, Any]) -> dict[str, Any]:
                 "hashPinned": pinned,
                 "licenseAccepted": accepted,
                 "status": (
-                    "READY_FOR_LOCAL_PROVISION"
+                    terminal_disposition
+                    if isinstance(terminal_disposition, str)
+                    else "READY_FOR_LOCAL_PROVISION"
                     if pinned and accepted
                     else "PENDING_EXTERNAL_ARTIFACTS"
                     if not pinned

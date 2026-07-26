@@ -137,8 +137,8 @@ def validate_contract(contract: dict[str, Any]) -> None:
     require(
         target["operatingSystem"] == "macos"
         and target["architecture"] == "arm64"
-        and target["referenceCpuModel"] == "Apple M2",
-        "target must bind the Apple M2 macos arm64 reference",
+        and target["referenceCpuModel"] == "Apple M4",
+        "target must bind the Apple M4 macos arm64 reference",
     )
     require(
         target["referenceMemoryBytes"] == 16 * 1024**3,
@@ -242,6 +242,7 @@ def validate_contract(contract: dict[str, Any]) -> None:
             "numThreads",
             "concurrency",
             "inputMode",
+            "segmentDurationSeconds",
             "pacingPolicy",
             "warmupRuns",
             "measuredRuns",
@@ -255,6 +256,7 @@ def validate_contract(contract: dict[str, Any]) -> None:
             "numThreads": 2,
             "concurrency": 1,
             "inputMode": "frozen_segments",
+            "segmentDurationSeconds": 15,
             "pacingPolicy": "unpaced",
             "warmupRuns": 1,
             "measuredRuns": 5,

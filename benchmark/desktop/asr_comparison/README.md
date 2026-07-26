@@ -51,9 +51,11 @@ The runner implements the staged funnel:
 3. Stage 2: frozen held-out quality ranking.
 4. Stage 3: product-finalist and 7,200-second operational gates.
 
-This Goal implements and smoke-validates the U1-U6 tooling only. It does not run
-the U7 development pilot, freeze a ranked development round, inspect held-out
-output, rank candidates, or execute the two-hour finalist gate.
+U1-U6 tooling is complete. U7 has real Apple M4 Stage 0 admission and common
+fixed-resource segmentation diagnostics recorded in `DEVELOPMENT_PILOT.md`.
+Authorized development fixtures remain unavailable. A ranked development
+freeze, held-out output, candidate ranking, and the two-hour finalist gate have
+not been run.
 
 ## Provisioning, processing, and local data
 

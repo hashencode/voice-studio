@@ -35,14 +35,17 @@ build/desktop_asr_comparison/orchestration-env/bin/python \
 
 ## Ranked execution prerequisites
 
-U7 and U8 were not executed. Before development or held-out ranking:
+U7 has non-ranked Apple M4 Stage 0 admission only; U8 was not executed. Before
+development or held-out ranking:
 
-1. Provision every candidate in the frozen seven-candidate registry, verify
-   every model/component hash, and complete the recorded license reviews.
+1. Keep the four admitted sherpa candidates hash-pinned. The two
+   license-rejected sherpa identities and historical native FunASR control
+   retain terminal dispositions and do not enter the ranked matrix.
 2. Prepare the local-only development and held-out packs from authorized
    sources, complete reference/variety review, and pass group-leakage checks.
-3. Pass Stage 0 admission and the development-only pilot on the frozen target.
-4. Freeze the target, runtime lane, profiles, fixture/reference hashes, scorer,
+3. Stage 0 is complete on the frozen Apple M4 target. Run and freeze the
+   development-only pilot before any held-out decode.
+4. Freeze the runtime lane, profiles, fixture/reference hashes, scorer,
    materiality rule, and worker hashes before any held-out decode.
 5. Run the two-hour finalist only in U8. Repeat it when any hard measured metric
    is within 10% of its limit; retain both runs.

@@ -93,6 +93,7 @@ class SidecarSandboxProfile {
 (version 1)
 (allow default)
 (deny network*)
+(allow file-read-metadata (subpath $userRoot))
 (deny file-read*
   (require-all
     (subpath $userRoot)

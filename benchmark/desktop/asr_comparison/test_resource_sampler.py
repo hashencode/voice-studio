@@ -92,6 +92,48 @@ class ResourceSamplerTest(unittest.TestCase):
         self.assertGreaterEqual(evidence["missedOrExitedProcessObservations"], 1)
         self.assertGreaterEqual(evidence["absolutePeakRssBytes"], 0)
 
+    def test_worker_self_report_prevents_false_zero_after_tree_detaches(
+        self,
+    ) -> None:
+        process = subprocess.Popen(
+            [sys.executable, "-c", "pass"],
+            start_new_session=True,
+        )
+        sampler = ProcessTreeSampler(process.pid, interval_seconds=0.01)
+        sampler.start()
+        process.wait(timeout=5)
+        retained = sampler.mark_unload_complete(
+            worker_reported_rss_bytes=64 * 1024 * 1024
+        )
+        evidence = sampler.stop()
+        self.assertEqual(retained, 64 * 1024 * 1024)
+        self.assertEqual(
+            evidence["retainedRssMeasurementSource"], "worker_self_report"
+        )
+
+    def test_explicitly_tracked_worker_survives_root_tree_detachment(self) -> None:
+        root = subprocess.Popen(
+            [sys.executable, "-c", "pass"],
+            start_new_session=True,
+        )
+        worker = subprocess.Popen(
+            [sys.executable, "-c", "import time; time.sleep(2)"],
+            start_new_session=True,
+        )
+        try:
+            sampler = ProcessTreeSampler(root.pid, interval_seconds=0.01)
+            sampler.start()
+            sampler.track_process(worker.pid)
+            root.wait(timeout=5)
+            retained = sampler.mark_unload_complete()
+            evidence = sampler.stop()
+            self.assertGreater(retained, 0)
+            self.assertEqual(evidence["retainedRssBytesAfterUnload"], retained)
+            self.assertIn(worker.pid, sampler._observed_pids)
+        finally:
+            worker.terminate()
+            worker.wait(timeout=5)
+
 
 if __name__ == "__main__":
     unittest.main()

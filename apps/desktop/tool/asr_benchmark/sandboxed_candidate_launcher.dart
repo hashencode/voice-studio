@@ -229,8 +229,8 @@ Future<int> runLauncherCli(List<String> arguments) async {
   );
   final process = await launcher.start(requireProbe: false);
   process.stdin.writeln(jsonEncode(workerRequest));
-  final stdoutForward = stdout.addStream(process.stdout);
-  final stderrForward = stderr.addStream(process.stderr);
+  final stdoutForward = forwardProcessStream(process.stdout, stdout);
+  final stderrForward = forwardProcessStream(process.stderr, stderr);
   try {
     if (!await input.moveNext().timeout(const Duration(seconds: 10))) {
       throw const FormatException('baseline acknowledgement is required');
@@ -248,6 +248,16 @@ Future<int> runLauncherCli(List<String> arguments) async {
     rethrow;
   } finally {
     await input.cancel();
+  }
+}
+
+Future<void> forwardProcessStream(
+  Stream<List<int>> source,
+  IOSink destination,
+) async {
+  await for (final chunk in source) {
+    destination.add(chunk);
+    await destination.flush();
   }
 }
 

@@ -34,6 +34,7 @@ void main() {
   test('sandbox profile denies network and writes outside job root', () async {
     final profile = SidecarSandboxProfile.macos(await _roots(temporary));
     expect(profile, contains('(deny network*)'));
+    expect(profile, contains('(allow file-read-metadata'));
     expect(profile, contains('(deny file-read*'));
     expect(profile, contains('(deny file-write*'));
   });

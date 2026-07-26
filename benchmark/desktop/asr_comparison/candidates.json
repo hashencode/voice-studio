@@ -126,6 +126,7 @@
             "numThreads": 2,
             "concurrency": 1,
             "inputMode": "frozen_segments",
+            "segmentDurationSeconds": 15,
             "pacingPolicy": "unpaced",
             "warmupRuns": 1,
             "measuredRuns": 5,
@@ -141,13 +142,13 @@
         }
       },
       "admission": {
-        "status": "PENDING_SMOKE",
+        "status": "ADMITTED",
         "apiSupport": "SUPPORTED",
-        "offlineVerified": "PENDING",
-        "smokeDecode": "PENDING",
+        "offlineVerified": "PASS",
+        "smokeDecode": "PASS",
         "terminalDisposition": null,
         "reasons": [
-          "sherpa_onnx 1.13.4 API is characterized; fresh offline smoke decode is pending"
+          "Apple M4 macOS arm64 sandboxed Stage 0 smoke passed with active denial probes on the frozen decision target"
         ]
       },
       "diagnosticExtensions": {}
@@ -169,17 +170,31 @@
       },
       "artifacts": [
         {
-          "componentId": "model-bundle",
-          "fileRole": "paraformer_int8_tokens",
-          "sourceUrl": "https://github.com/k2-fsa/sherpa-onnx/releases",
-          "sha256": null,
-          "hashState": "PENDING_PROVISIONING"
+          "componentId": "repository-bundle",
+          "fileRole": "source_archive",
+          "sourceUrl": "https://github.com/hashencode/voice2text-flutter/blob/main/assets/sherpa/asr/paraformer-zh.zip",
+          "sha256": "f30431419edcf2663e8fa487523376cb98500c64d17018bd2f1fbee0abcd93bc",
+          "hashState": "PINNED"
+        },
+        {
+          "componentId": "model",
+          "fileRole": "paraformer_int8",
+          "sourceUrl": "https://github.com/k2-fsa/sherpa-onnx/releases/download/asr-models/sherpa-onnx-paraformer-zh-int8-2025-10-07.tar.bz2#model.int8.onnx",
+          "sha256": "53813ee1d41722cc6370a571c887e6d0b391d25b8312cf714a31af85ea603812",
+          "hashState": "PINNED"
+        },
+        {
+          "componentId": "tokens",
+          "fileRole": "tokens",
+          "sourceUrl": "https://github.com/k2-fsa/sherpa-onnx/releases/download/asr-models/sherpa-onnx-paraformer-zh-int8-2025-10-07.tar.bz2#tokens.txt",
+          "sha256": "59aba8873a2ed1e122c25fee421e25f283b63290efbde85c1f01a853d83cb6e6",
+          "hashState": "PINNED"
         }
       ],
       "license": {
         "spdx": "Apache-2.0",
-        "disposition": "REVIEW_REQUIRED",
-        "noticeSource": "pending_archive"
+        "disposition": "ACCEPTED_FOR_BENCHMARK",
+        "noticeSource": "upstream_WSChuan_model_card_benchmark_only_no_redistribution_claim"
       },
       "capabilities": {
         "streaming": false,
@@ -210,7 +225,7 @@
             "numThreads": 2,
             "modelPrecision": "int8",
             "decodingMethod": "greedy_search",
-            "hotwords": "manifest_or_empty",
+            "hotwords": "",
             "hotwordScore": 1.5
           },
           "notApplicableControls": [
@@ -237,6 +252,7 @@
             "numThreads": 2,
             "concurrency": 1,
             "inputMode": "frozen_segments",
+            "segmentDurationSeconds": 15,
             "pacingPolicy": "unpaced",
             "warmupRuns": 1,
             "measuredRuns": 5,
@@ -252,13 +268,13 @@
         }
       },
       "admission": {
-        "status": "PENDING_ARTIFACTS",
+        "status": "ADMITTED",
         "apiSupport": "SUPPORTED",
-        "offlineVerified": "PENDING",
-        "smokeDecode": "PENDING",
+        "offlineVerified": "PASS",
+        "smokeDecode": "PASS",
         "terminalDisposition": null,
         "reasons": [
-          "Android evidence is screening context only; macOS artifacts and smoke are pending"
+          "exact mobile-parity graph passed Apple M4 macOS arm64 sandboxed Stage 0 smoke on the frozen decision target; Android evidence remains screening-only"
         ]
       },
       "diagnosticExtensions": {}
@@ -280,17 +296,31 @@
       },
       "artifacts": [
         {
-          "componentId": "model-bundle",
-          "fileRole": "paraformer_int8_tokens",
-          "sourceUrl": "https://github.com/k2-fsa/sherpa-onnx/releases",
-          "sha256": null,
-          "hashState": "PENDING_PROVISIONING"
+          "componentId": "archive",
+          "fileRole": "source_archive",
+          "sourceUrl": "https://github.com/k2-fsa/sherpa-onnx/releases/download/asr-models/sherpa-onnx-paraformer-zh-2024-03-09.tar.bz2",
+          "sha256": "8c6724d0a86bd867217d353db1eaa11f2f143bca446a1f2752e8c551a6f2bde0",
+          "hashState": "PINNED"
+        },
+        {
+          "componentId": "model",
+          "fileRole": "paraformer_int8",
+          "sourceUrl": "https://github.com/k2-fsa/sherpa-onnx/releases/download/asr-models/sherpa-onnx-paraformer-zh-2024-03-09.tar.bz2#model.int8.onnx",
+          "sha256": "90bc03034ae1bef9575f8cc798cd1519c8be8aa9e8b458a033e32017ff4d584c",
+          "hashState": "PINNED"
+        },
+        {
+          "componentId": "tokens",
+          "fileRole": "tokens",
+          "sourceUrl": "https://github.com/k2-fsa/sherpa-onnx/releases/download/asr-models/sherpa-onnx-paraformer-zh-2024-03-09.tar.bz2#tokens.txt",
+          "sha256": "6c0e3b35cece259829e6cb5b8d90d13db88f61ea3a2953d11898e4b2bfd7a2e2",
+          "hashState": "PINNED"
         }
       ],
       "license": {
         "spdx": "Apache-2.0",
-        "disposition": "REVIEW_REQUIRED",
-        "noticeSource": "pending_archive"
+        "disposition": "ACCEPTED_FOR_BENCHMARK",
+        "noticeSource": "upstream_ModelScope_model_card_benchmark_only"
       },
       "capabilities": {
         "streaming": false,
@@ -321,7 +351,7 @@
             "numThreads": 2,
             "modelPrecision": "int8",
             "decodingMethod": "greedy_search",
-            "hotwords": "manifest_or_empty",
+            "hotwords": "",
             "hotwordScore": 1.5
           },
           "notApplicableControls": [
@@ -348,6 +378,7 @@
             "numThreads": 2,
             "concurrency": 1,
             "inputMode": "frozen_segments",
+            "segmentDurationSeconds": 15,
             "pacingPolicy": "unpaced",
             "warmupRuns": 1,
             "measuredRuns": 5,
@@ -363,13 +394,13 @@
         }
       },
       "admission": {
-        "status": "PENDING_ARTIFACTS",
+        "status": "ADMITTED",
         "apiSupport": "SUPPORTED",
-        "offlineVerified": "PENDING",
-        "smokeDecode": "PENDING",
+        "offlineVerified": "PASS",
+        "smokeDecode": "PASS",
         "terminalDisposition": null,
         "reasons": [
-          "Exact archive/component hashes and license notice are pending U4 provisioning"
+          "Apple M4 macOS arm64 sandboxed Stage 0 smoke passed with the pinned int8 graph and tokens on the frozen decision target"
         ]
       },
       "diagnosticExtensions": {}
@@ -391,17 +422,45 @@
       },
       "artifacts": [
         {
-          "componentId": "model-bundle",
-          "fileRole": "encoder_decoder_joiner_int8_tokens",
-          "sourceUrl": "https://github.com/k2-fsa/sherpa-onnx/releases",
-          "sha256": null,
-          "hashState": "PENDING_PROVISIONING"
+          "componentId": "archive",
+          "fileRole": "source_archive",
+          "sourceUrl": "https://github.com/k2-fsa/sherpa-onnx/releases/download/asr-models/sherpa-onnx-streaming-zipformer-zh-int8-2025-06-30.tar.bz2",
+          "sha256": "5a2832047ea1f97dd0dc595b816c230c4bafad65cfc0341fa57517cadc50afd0",
+          "hashState": "PINNED"
+        },
+        {
+          "componentId": "encoder",
+          "fileRole": "encoder",
+          "sourceUrl": "https://github.com/k2-fsa/sherpa-onnx/releases/download/asr-models/sherpa-onnx-streaming-zipformer-zh-int8-2025-06-30.tar.bz2#encoder.int8.onnx",
+          "sha256": "5ac51e27981bb4dab01bb9be4958453ba50c3b61c063ddda0eab23fd3671aa4f",
+          "hashState": "PINNED"
+        },
+        {
+          "componentId": "decoder",
+          "fileRole": "decoder",
+          "sourceUrl": "https://github.com/k2-fsa/sherpa-onnx/releases/download/asr-models/sherpa-onnx-streaming-zipformer-zh-int8-2025-06-30.tar.bz2#decoder.onnx",
+          "sha256": "06522ad63cec0fdf6809f4e1db9bb4f7d710c34582e3b35db62ac60eccafac7e",
+          "hashState": "PINNED"
+        },
+        {
+          "componentId": "joiner",
+          "fileRole": "joiner",
+          "sourceUrl": "https://github.com/k2-fsa/sherpa-onnx/releases/download/asr-models/sherpa-onnx-streaming-zipformer-zh-int8-2025-06-30.tar.bz2#joiner.int8.onnx",
+          "sha256": "b34584dc6f561089e1d747fedebb3765f2caa72c927ef54d7ca55e5ae40a814b",
+          "hashState": "PINNED"
+        },
+        {
+          "componentId": "tokens",
+          "fileRole": "tokens",
+          "sourceUrl": "https://github.com/k2-fsa/sherpa-onnx/releases/download/asr-models/sherpa-onnx-streaming-zipformer-zh-int8-2025-06-30.tar.bz2#tokens.txt",
+          "sha256": "6193c7ea1c96d0d9a1e9652789b40d13a8a913b434a5451e93158f5a09fd6652",
+          "hashState": "PINNED"
         }
       ],
       "license": {
-        "spdx": "Apache-2.0",
-        "disposition": "REVIEW_REQUIRED",
-        "noticeSource": "pending_archive"
+        "spdx": null,
+        "disposition": "REJECTED",
+        "noticeSource": "upstream_HuggingFace_model_card_requires_explicit_terms_acceptance"
       },
       "capabilities": {
         "streaming": true,
@@ -460,6 +519,7 @@
             "numThreads": 2,
             "concurrency": 1,
             "inputMode": "frozen_segments",
+            "segmentDurationSeconds": 15,
             "pacingPolicy": "unpaced",
             "warmupRuns": 1,
             "measuredRuns": 5,
@@ -475,13 +535,13 @@
         }
       },
       "admission": {
-        "status": "PENDING_ARTIFACTS",
+        "status": "REJECTED",
         "apiSupport": "SUPPORTED",
         "offlineVerified": "PENDING",
         "smokeDecode": "PENDING",
-        "terminalDisposition": null,
+        "terminalDisposition": "REJECTED_LICENSE",
         "reasons": [
-          "Exact archive/component hashes and runtime API characterization are pending"
+          "the converted archive is hash-pinned, but the upstream model card is gated and its terms were not accepted on the user's behalf"
         ]
       },
       "diagnosticExtensions": {}
@@ -503,17 +563,59 @@
       },
       "artifacts": [
         {
-          "componentId": "model-bundle",
-          "fileRole": "encoder_llm_embedding_projector_tokens",
-          "sourceUrl": "https://github.com/k2-fsa/sherpa-onnx/releases",
-          "sha256": null,
-          "hashState": "PENDING_PROVISIONING"
+          "componentId": "archive",
+          "fileRole": "source_archive",
+          "sourceUrl": "https://github.com/k2-fsa/sherpa-onnx/releases/download/asr-models/sherpa-onnx-funasr-nano-int8-2025-12-30.tar.bz2",
+          "sha256": "eb43d7ccc2e86b243f6a03b7df361033dda66db9523d1a92bf6aca2b50c9476b",
+          "hashState": "PINNED"
+        },
+        {
+          "componentId": "encoder-adaptor",
+          "fileRole": "encoder_adaptor_int8",
+          "sourceUrl": "https://github.com/k2-fsa/sherpa-onnx/releases/download/asr-models/sherpa-onnx-funasr-nano-int8-2025-12-30.tar.bz2#encoder_adaptor.int8.onnx",
+          "sha256": "d0246c823f2c34133ae0efee395d8a189c8f92643e3432f866939ee34d34492c",
+          "hashState": "PINNED"
+        },
+        {
+          "componentId": "embedding",
+          "fileRole": "embedding_int8",
+          "sourceUrl": "https://github.com/k2-fsa/sherpa-onnx/releases/download/asr-models/sherpa-onnx-funasr-nano-int8-2025-12-30.tar.bz2#embedding.int8.onnx",
+          "sha256": "a05d2816e284fcca29a5dccb2c14b9edeb638fd983a84cd4a447248889b6a408",
+          "hashState": "PINNED"
+        },
+        {
+          "componentId": "llm",
+          "fileRole": "llm_int8",
+          "sourceUrl": "https://github.com/k2-fsa/sherpa-onnx/releases/download/asr-models/sherpa-onnx-funasr-nano-int8-2025-12-30.tar.bz2#llm.int8.onnx",
+          "sha256": "7f0c5a508b41474b1b1ec1cdbdefafd2cf8b3642c6915a0a425265b7b7d2c960",
+          "hashState": "PINNED"
+        },
+        {
+          "componentId": "tokenizer-json",
+          "fileRole": "tokenizer_json",
+          "sourceUrl": "https://github.com/k2-fsa/sherpa-onnx/releases/download/asr-models/sherpa-onnx-funasr-nano-int8-2025-12-30.tar.bz2#Qwen3-0.6B/tokenizer.json",
+          "sha256": "aeb13307927f0af31a01fba868e26e3990af746d72cdf390951ceade1021eae4",
+          "hashState": "PINNED"
+        },
+        {
+          "componentId": "tokenizer-merges",
+          "fileRole": "tokenizer_merges",
+          "sourceUrl": "https://github.com/k2-fsa/sherpa-onnx/releases/download/asr-models/sherpa-onnx-funasr-nano-int8-2025-12-30.tar.bz2#Qwen3-0.6B/merges.txt",
+          "sha256": "8831e4f1c2ad1ab09a1197d782f9e7ac912f46c2a8817205a3533e23167804d5",
+          "hashState": "PINNED"
+        },
+        {
+          "componentId": "tokenizer-vocab",
+          "fileRole": "tokenizer_vocab",
+          "sourceUrl": "https://github.com/k2-fsa/sherpa-onnx/releases/download/asr-models/sherpa-onnx-funasr-nano-int8-2025-12-30.tar.bz2#Qwen3-0.6B/vocab.json",
+          "sha256": "ca10d7e96f2da1925df81774d7a76811f06a8607537ab689f5e8593ebed5e910",
+          "hashState": "PINNED"
         }
       ],
       "license": {
-        "spdx": "Apache-2.0",
-        "disposition": "REVIEW_REQUIRED",
-        "noticeSource": "pending_archive"
+        "spdx": null,
+        "disposition": "REJECTED",
+        "noticeSource": "converted_archive_has_no_exact_model_license_notice"
       },
       "capabilities": {
         "streaming": false,
@@ -545,7 +647,7 @@
             "modelPrecision": "int8",
             "language": "zh",
             "itn": true,
-            "hotwords": "manifest_or_empty",
+            "hotwords": "",
             "systemPrompt": "You are a helpful assistant.",
             "userPrompt": "语音转写：",
             "seed": 20260726,
@@ -574,6 +676,7 @@
             "numThreads": 2,
             "concurrency": 1,
             "inputMode": "frozen_segments",
+            "segmentDurationSeconds": 15,
             "pacingPolicy": "unpaced",
             "warmupRuns": 1,
             "measuredRuns": 5,
@@ -594,13 +697,13 @@
         }
       },
       "admission": {
-        "status": "PENDING_ARTIFACTS",
+        "status": "REJECTED",
         "apiSupport": "SUPPORTED",
         "offlineVerified": "PENDING",
         "smokeDecode": "PENDING",
-        "terminalDisposition": null,
+        "terminalDisposition": "REJECTED_LICENSE",
         "reasons": [
-          "Exact artifacts and installed Dart API support are pending U4 characterization"
+          "all downloaded archive components are hash-pinned, but the converted FunASR Nano model has no exact license notice; the Qwen tokenizer license alone is insufficient"
         ]
       },
       "diagnosticExtensions": {}
@@ -622,17 +725,31 @@
       },
       "artifacts": [
         {
-          "componentId": "model-bundle",
-          "fileRole": "firered_ctc_int8_tokens",
-          "sourceUrl": "https://github.com/k2-fsa/sherpa-onnx/releases",
-          "sha256": null,
-          "hashState": "PENDING_PROVISIONING"
+          "componentId": "archive",
+          "fileRole": "source_archive",
+          "sourceUrl": "https://github.com/k2-fsa/sherpa-onnx/releases/download/asr-models/sherpa-onnx-fire-red-asr2-ctc-zh_en-int8-2026-02-25.tar.bz2",
+          "sha256": "1da8b737ecc5e29f36759a4460c754863e7c919a4ba325aea187331fbfc83274",
+          "hashState": "PINNED"
+        },
+        {
+          "componentId": "model",
+          "fileRole": "firered_ctc_int8",
+          "sourceUrl": "https://github.com/k2-fsa/sherpa-onnx/releases/download/asr-models/sherpa-onnx-fire-red-asr2-ctc-zh_en-int8-2026-02-25.tar.bz2#model.int8.onnx",
+          "sha256": "ca3dbabd82170110cc0b343c2890866d449984bc9cd92b9a18371ff80a81bb99",
+          "hashState": "PINNED"
+        },
+        {
+          "componentId": "tokens",
+          "fileRole": "tokens",
+          "sourceUrl": "https://github.com/k2-fsa/sherpa-onnx/releases/download/asr-models/sherpa-onnx-fire-red-asr2-ctc-zh_en-int8-2026-02-25.tar.bz2#tokens.txt",
+          "sha256": "1bc613de2112d257e61a349c3e72d1b1a9cf19c33d3ca954197ad2171e5ea07b",
+          "hashState": "PINNED"
         }
       ],
       "license": {
         "spdx": "Apache-2.0",
-        "disposition": "REVIEW_REQUIRED",
-        "noticeSource": "pending_archive"
+        "disposition": "ACCEPTED_FOR_BENCHMARK",
+        "noticeSource": "upstream_FireRedASR2_repository_benchmark_only"
       },
       "capabilities": {
         "streaming": false,
@@ -689,6 +806,7 @@
             "numThreads": 2,
             "concurrency": 1,
             "inputMode": "frozen_segments",
+            "segmentDurationSeconds": 15,
             "pacingPolicy": "unpaced",
             "warmupRuns": 1,
             "measuredRuns": 5,
@@ -705,13 +823,13 @@
         }
       },
       "admission": {
-        "status": "PENDING_ARTIFACTS",
+        "status": "ADMITTED",
         "apiSupport": "SUPPORTED",
-        "offlineVerified": "PENDING",
-        "smokeDecode": "PENDING",
+        "offlineVerified": "PASS",
+        "smokeDecode": "PASS",
         "terminalDisposition": null,
         "reasons": [
-          "Exact artifacts and installed Dart API support are pending U4 characterization"
+          "Apple M4 macOS arm64 sandboxed Stage 0 smoke passed on the frozen decision target; the common 15-second fixed-resource segmentation also completed the 300.65-second smoke without a crash"
         ]
       },
       "diagnosticExtensions": {}
@@ -731,17 +849,38 @@
       },
       "artifacts": [
         {
-          "componentId": "locked-environment-and-models",
-          "fileRole": "native_runtime_paraformer_vad_punctuation",
-          "sourceUrl": "https://github.com/modelscope/FunASR",
-          "sha256": null,
-          "hashState": "PENDING_PROVISIONING"
+          "componentId": "environment-lock",
+          "fileRole": "native_runtime_lock",
+          "sourceUrl": "https://github.com/hashencode/voice2text-flutter/blob/main/benchmark/desktop/environments/funasr/uv.lock",
+          "sha256": "e6e03f114b44d5aa51511e36c9edbacbb2806b11142ebab769be8465701c1ec7",
+          "hashState": "PINNED"
+        },
+        {
+          "componentId": "paraformer-model-tree",
+          "fileRole": "native_paraformer_model_tree",
+          "sourceUrl": "https://www.modelscope.cn/models/iic/speech_paraformer-large-vad-punc_asr_nat-zh-cn-16k-common-vocab8404-pytorch",
+          "sha256": "9e0e7740292ed73dd7100c6ad84297f4625a455958543fc4904351c2d931075b",
+          "hashState": "PINNED"
+        },
+        {
+          "componentId": "vad-model-tree",
+          "fileRole": "native_vad_model_tree",
+          "sourceUrl": "https://www.modelscope.cn/models/iic/speech_fsmn_vad_zh-cn-16k-common-pytorch",
+          "sha256": "60fb109b7aff385e5739787ae0aabfdcfea6894505e5b816ff1fe194f1127c16",
+          "hashState": "PINNED"
+        },
+        {
+          "componentId": "punctuation-model-tree",
+          "fileRole": "native_punctuation_model_tree",
+          "sourceUrl": "https://www.modelscope.cn/models/iic/punc_ct-transformer_zh-cn-common-vocab272727-pytorch",
+          "sha256": "0ef2be6bb3f93efb7fe711c53f7ed62e37a83597c9076f4bcbbac08d90f58560",
+          "hashState": "PINNED"
         }
       ],
       "license": {
         "spdx": "Apache-2.0",
-        "disposition": "REVIEW_REQUIRED",
-        "noticeSource": "locked_environment_and_model_archives"
+        "disposition": "ACCEPTED_FOR_BENCHMARK",
+        "noticeSource": "locked_environment_and_historical_model_manifests"
       },
       "capabilities": {
         "streaming": false,
@@ -784,13 +923,13 @@
         }
       },
       "admission": {
-        "status": "PENDING_ARTIFACTS",
-        "apiSupport": "PENDING",
-        "offlineVerified": "PENDING",
-        "smokeDecode": "PENDING",
-        "terminalDisposition": null,
+        "status": "REJECTED",
+        "apiSupport": "SUPPORTED",
+        "offlineVerified": "PASS",
+        "smokeDecode": "PASS",
+        "terminalDisposition": "CROSS_RUNTIME_CONTROL_COMPLETE",
         "reasons": [
-          "Historical evidence is not substituted for a fresh comparison-v2 smoke run"
+          "historical Stage 1 control is complete (CER 0.116371, RTF 0.202825); it remains outside sherpa same-runtime Stage 2 and Stage 3 ranking"
         ]
       },
       "diagnosticExtensions": {}

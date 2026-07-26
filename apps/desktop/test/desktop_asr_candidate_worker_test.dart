@@ -8,7 +8,7 @@ void main() {
   group('sherpa_onnx 1.13.4 API characterization', () {
     test('constructs streaming Zipformer configuration', () {
       final request = requestFor(
-        family: 'streaming_transducer',
+        family: 'streaming_zipformer_transducer',
         modelFiles: <String, Object?>{
           'encoder': modelFile('/models/encoder.onnx'),
           'decoder': modelFile('/models/decoder.onnx'),
@@ -110,7 +110,7 @@ void main() {
       expect(
         BenchmarkCandidateFamily.values.map((value) => value.manifestValue),
         containsAll(<String>[
-          'streaming_transducer',
+          'streaming_zipformer_transducer',
           'offline_paraformer',
           'funasr_nano',
           'firered_asr_ctc',
@@ -183,6 +183,23 @@ void main() {
     );
   });
 
+  test('fixed-resource segment duration cannot drift by candidate', () {
+    final config = fixedConfig('offline_paraformer')
+      ..['segmentDurationSeconds'] = 30;
+    final request = requestFor(
+      family: 'offline_paraformer',
+      modelFiles: <String, Object?>{
+        'model': modelFile('/models/model.onnx'),
+        'tokens': modelFile('/models/tokens.txt'),
+      },
+      config: config,
+    );
+    expect(
+      () => EffectiveProfile.fromRequest(request),
+      throwsA(isA<FormatException>()),
+    );
+  });
+
   test('baseline acknowledgement is identity-bound', () {
     final request = CandidateWorkerRequest.fromJson(
       requestFor(
@@ -231,10 +248,10 @@ Map<String, Object?> requestFor({
   'modelFiles': modelFiles,
   'effectiveConfig': config,
   'capabilities': <String, Object?>{
-    'streaming': family == 'streaming_transducer',
+    'streaming': family == 'streaming_zipformer_transducer',
     'timestamps': true,
-    'partialResults': family == 'streaming_transducer',
-    'endpointing': family == 'streaming_transducer',
+    'partialResults': family == 'streaming_zipformer_transducer',
+    'endpointing': family == 'streaming_zipformer_transducer',
     'hotwords': family == 'funasr_nano',
     'punctuation': family == 'funasr_nano',
     'itn': family == 'funasr_nano',
@@ -255,6 +272,7 @@ Map<String, Object?> fixedConfig(String family) => <String, Object?>{
   'numThreads': 2,
   'concurrency': 1,
   'inputMode': 'frozen_segments',
+  'segmentDurationSeconds': 15,
   'pacingPolicy': 'unpaced',
   'warmupRuns': 1,
   'measuredRuns': 5,

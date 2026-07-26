@@ -137,6 +137,7 @@ def build_smoke_evidence(repository_root: Path, output_root: Path) -> dict[str, 
         "numThreads": 2,
         "concurrency": 1,
         "inputMode": "frozen_segments",
+        "segmentDurationSeconds": 15,
         "pacingPolicy": "unpaced",
     }
     expected = {

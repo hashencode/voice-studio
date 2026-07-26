@@ -1,24 +1,34 @@
 import 'dart:convert';
 
 enum BenchmarkCandidateFamily {
-  streamingTransducer('streaming_transducer', <String>{
-    'encoder',
-    'decoder',
-    'joiner',
+  streamingTransducer(
+    'streaming_zipformer_transducer',
+    'streaming_transducer',
+    <String>{'encoder', 'decoder', 'joiner', 'tokens'},
+  ),
+  offlineParaformer('offline_paraformer', 'offline_paraformer', <String>{
+    'model',
     'tokens',
   }),
-  offlineParaformer('offline_paraformer', <String>{'model', 'tokens'}),
-  funasrNano('funasr_nano', <String>{
+  funasrNano('funasr_nano', 'funasr_nano', <String>{
     'encoderAdaptor',
     'llm',
     'embedding',
     'tokenizer',
   }),
-  fireRedAsrCtc('firered_asr_ctc', <String>{'model', 'tokens'});
+  fireRedAsrCtc('firered_asr_ctc', 'firered_asr_ctc', <String>{
+    'model',
+    'tokens',
+  });
 
-  const BenchmarkCandidateFamily(this.manifestValue, this.requiredModelRoles);
+  const BenchmarkCandidateFamily(
+    this.manifestValue,
+    this.profileValue,
+    this.requiredModelRoles,
+  );
 
   final String manifestValue;
+  final String profileValue;
   final Set<String> requiredModelRoles;
 
   static BenchmarkCandidateFamily parse(Object? value) {

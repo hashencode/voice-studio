@@ -111,7 +111,13 @@ def _reject_private_strings(value: Any, location: str = "$") -> None:
         )
 
 
-def validate_manifest(manifest: dict[str, Any], *, ranked: bool) -> None:
+def validate_manifest(
+    manifest: dict[str, Any],
+    *,
+    ranked: bool,
+    development: bool = False,
+) -> None:
+    require(not (ranked and development), "fixture modes are mutually exclusive")
     require(
         set(manifest)
         == {
@@ -222,6 +228,7 @@ def validate_manifest(manifest: dict[str, Any], *, ranked: bool) -> None:
                     "tone_noise_v1",
                     "short_silence_v1",
                     "malformed_v1",
+                    "committed_zh_prefix_15s_v1",
                 },
                 f"{fixture_id}: unknown generator",
             )
@@ -278,8 +285,15 @@ def validate_manifest(manifest: dict[str, Any], *, ranked: bool) -> None:
                 ),
                 "held-out dialect variety metadata must be independently reviewed",
             )
+    if ranked or development:
+        required_roles = (
+            {"development", "held_out", "long_7200s"}
+            if ranked
+            else {"development"}
+        )
+        mode_label = "ranked" if ranked else "development"
         for fixture in fixtures:
-            if fixture["fixtureRole"] == "smoke":
+            if fixture["fixtureRole"] not in required_roles:
                 continue
             require(
                 fixture["freezeState"] == "FROZEN"
@@ -287,7 +301,7 @@ def validate_manifest(manifest: dict[str, Any], *, ranked: bool) -> None:
                 and not fixture["licenseOrConsent"].startswith("PENDING")
                 and is_sha256(fixture["audio"]["sha256"])
                 and is_sha256(fixture["reference"]["sha256"]),
-                f"{fixture['fixtureId']}: ranked fixture is not frozen",
+                f"{fixture['fixtureId']}: {mode_label} fixture is not frozen",
             )
 
 
@@ -313,7 +327,7 @@ def _wav_bytes(samples: list[int]) -> bytes:
     return output.getvalue()
 
 
-def generated_payload(generator: str) -> bytes:
+def generated_payload(generator: str, *, repository_root: Path | None = None) -> bytes:
     if generator == "silence_v1":
         return _wav_bytes([0] * 16000)
     if generator == "short_silence_v1":
@@ -336,7 +350,31 @@ def generated_payload(generator: str) -> bytes:
         return _wav_bytes(samples)
     if generator == "malformed_v1":
         return b"not-a-wave\x00comparison-v2\n"
+    if generator == "committed_zh_prefix_15s_v1":
+        require(
+            repository_root is not None,
+            "committed-prefix generator requires the repository root",
+        )
+        source_path = repository_root / "benchmark/audio/zh.wav"
+        with wave.open(str(source_path), "rb") as source:
+            require(
+                source.getnchannels() == 1
+                and source.getsampwidth() == 2
+                and source.getframerate() == 16000,
+                "committed-prefix source format mismatch",
+            )
+            payload = source.readframes(15 * 16000)
+        samples = list(struct.unpack("<240000h", payload))
+        return _wav_bytes(samples)
     raise FixtureError(f"unknown fixture generator: {generator}")
+
+def generated_reference_payload(generator: str) -> bytes:
+    if generator == "committed_zh_prefix_15s_v1":
+        return (
+            "在教学楼内释放大量烟雾不过英特尔之后不会继续接受如此大的损失"
+            "替我播放相思风雨中在教学楼内释放大量烟雾"
+        ).encode()
+    return b""
 
 
 def _verify_payload(payload: bytes, metadata: dict[str, Any], fixture_id: str) -> None:
@@ -361,13 +399,17 @@ def _verify_payload(payload: bytes, metadata: dict[str, Any], fixture_id: str) -
         raise FixtureError(f"{fixture_id}: invalid PCM WAV") from error
 
 
-def _existing_result(output_root: Path) -> dict[str, Any] | None:
+def _existing_result(
+    output_root: Path, *, expected_mode: str
+) -> dict[str, Any] | None:
     index_path = output_root / "prepared_manifest.json"
     if not index_path.is_file():
         return None
     try:
         result = json.loads(index_path.read_text())
     except (OSError, json.JSONDecodeError):
+        return None
+    if result.get("mode") != expected_mode:
         return None
     files = result.get("files")
     hashes = result.get("fileSha256")
@@ -386,10 +428,12 @@ def prepare(
     repository_root: Path,
     output_root: Path,
     ranked: bool,
+    development: bool = False,
 ) -> dict[str, Any]:
-    validate_manifest(manifest, ranked=ranked)
+    validate_manifest(manifest, ranked=ranked, development=development)
+    mode = "ranked" if ranked else "development" if development else "smoke"
     if not ranked:
-        existing = _existing_result(output_root)
+        existing = _existing_result(output_root, expected_mode=mode)
         if existing is not None:
             return existing
     selected = (
@@ -398,7 +442,7 @@ def prepare(
         else [
             fixture
             for fixture in manifest["fixtures"]
-            if fixture["fixtureRole"] == "smoke"
+            if fixture["fixtureRole"] == ("development" if development else "smoke")
         ]
     )
     output_parent = output_root.parent
@@ -416,8 +460,13 @@ def prepare(
             audio_metadata = fixture["audio"]
             reference_metadata = fixture["reference"]
             if fixture["distributionState"] == "generated":
-                audio_payload = generated_payload(audio_metadata["generator"])
-                reference_payload = b""
+                audio_payload = generated_payload(
+                    audio_metadata["generator"],
+                    repository_root=repository_root,
+                )
+                reference_payload = generated_reference_payload(
+                    audio_metadata["generator"]
+                )
             else:
                 audio_source = repository_root / safe_relative(
                     audio_metadata["relativePath"], f"{fixture_id}.audio"
@@ -448,7 +497,7 @@ def prepare(
         result = {
             "schemaVersion": 2,
             "fixtureManifestId": manifest["fixtureManifestId"],
-            "mode": "ranked" if ranked else "smoke",
+            "mode": mode,
             "fixtureCount": len(selected),
             "files": sorted(files),
             "fileSha256": {key: hashes[key] for key in sorted(hashes)},
@@ -485,7 +534,9 @@ def main() -> int:
         type=Path,
         default=repository_root / "build/desktop_asr_comparison/fixtures/active",
     )
-    parser.add_argument("--ranked", action="store_true")
+    mode = parser.add_mutually_exclusive_group()
+    mode.add_argument("--development", action="store_true")
+    mode.add_argument("--ranked", action="store_true")
     args = parser.parse_args()
     try:
         manifest = json.loads(args.manifest.read_text())
@@ -494,6 +545,7 @@ def main() -> int:
             repository_root=repository_root,
             output_root=args.output,
             ranked=args.ranked,
+            development=args.development,
         )
     except (OSError, json.JSONDecodeError, FixtureError) as error:
         print(f"fixture preparation: FAIL: {error}")

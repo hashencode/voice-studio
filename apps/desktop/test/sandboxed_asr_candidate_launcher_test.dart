@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
@@ -129,6 +130,25 @@ void main() {
       throwsA(isA<FileSystemException>()),
     );
   });
+
+  test(
+    'worker output is flushed while the source stream remains open',
+    () async {
+      final output = File('${temporary.path}/forwarded.jsonl');
+      final sink = output.openWrite();
+      final controller = StreamController<List<int>>();
+      final forwarding = forwardProcessStream(controller.stream, sink);
+
+      controller.add('{"type":"unloadComplete"}\n'.codeUnits);
+      await Future<void>.delayed(const Duration(milliseconds: 20));
+
+      expect(output.readAsStringSync(), contains('"unloadComplete"'));
+
+      await controller.close();
+      await forwarding;
+      await sink.close();
+    },
+  );
 
   test(
     'active macOS probe proves network and user-home permission denial',

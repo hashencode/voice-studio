@@ -39,8 +39,10 @@ class ProcessTreeSampler:
         self._samples: list[dict[str, Any]] = []
         self._baseline_rss: int | None = None
         self._retained_rss: int | None = None
+        self._retained_rss_source: str | None = None
         self._missed_processes = 0
         self._observed_pids: set[int] = set()
+        self._tracked_processes: dict[int, float] = {}
 
     def start(self) -> None:
         self._sample()
@@ -55,13 +57,48 @@ class ProcessTreeSampler:
             self._baseline_rss = int(sample["rssBytes"])
         return self._baseline_rss
 
-    def mark_unload_complete(self, *, settle_intervals: int = 1) -> int:
+    def track_process(self, process_id: int) -> None:
+        if not isinstance(process_id, int) or isinstance(process_id, bool) or process_id <= 0:
+            raise ValueError("tracked process id is invalid")
+        try:
+            process = psutil.Process(process_id)
+            created_at = process.create_time()
+        except (psutil.NoSuchProcess, psutil.AccessDenied) as error:
+            raise ResourceSamplerError(
+                f"tracked process {process_id} is unavailable"
+            ) from error
+        with self._lock:
+            self._tracked_processes[process_id] = created_at
+
+    def mark_unload_complete(
+        self,
+        *,
+        settle_intervals: int = 1,
+        worker_reported_rss_bytes: int | None = None,
+    ) -> int:
         if settle_intervals < 1 or settle_intervals > 20:
             raise ValueError("unload settle interval count is invalid")
+        if (
+            worker_reported_rss_bytes is not None
+            and (
+                not isinstance(worker_reported_rss_bytes, int)
+                or isinstance(worker_reported_rss_bytes, bool)
+                or worker_reported_rss_bytes < 0
+            )
+        ):
+            raise ValueError("worker-reported retained RSS is invalid")
         time.sleep(self.interval_seconds * settle_intervals)
         sample = self._sample()
+        sampled_rss = int(sample["rssBytes"])
+        retained_rss = max(sampled_rss, worker_reported_rss_bytes or 0)
         with self._lock:
-            self._retained_rss = int(sample["rssBytes"])
+            self._retained_rss = retained_rss
+            self._retained_rss_source = (
+                "worker_self_report"
+                if worker_reported_rss_bytes is not None
+                and worker_reported_rss_bytes > sampled_rss
+                else "process_tree_sample"
+            )
         return self._retained_rss
 
     def stop(self) -> dict[str, Any]:
@@ -72,6 +109,7 @@ class ProcessTreeSampler:
             samples = list(self._samples)
             baseline = self._baseline_rss
             retained = self._retained_rss
+            retained_source = self._retained_rss_source
             missed = self._missed_processes
             observed = set(self._observed_pids)
         if not samples:
@@ -89,6 +127,7 @@ class ProcessTreeSampler:
                 max(0, absolute_peak - baseline) if baseline is not None else None
             ),
             "retainedRssBytesAfterUnload": retained,
+            "retainedRssMeasurementSource": retained_source,
             "cpuUserSeconds": cpu_user,
             "cpuSystemSeconds": cpu_system,
             "observedProcessCount": len(observed),
@@ -122,6 +161,23 @@ class ProcessTreeSampler:
             processes = []
             with self._lock:
                 self._missed_processes += 1
+        with self._lock:
+            tracked_processes = dict(self._tracked_processes)
+        known_process_ids = {process.pid for process in processes}
+        for process_id, created_at in tracked_processes.items():
+            if process_id in known_process_ids:
+                continue
+            try:
+                process = psutil.Process(process_id)
+                if process.create_time() != created_at:
+                    with self._lock:
+                        self._missed_processes += 1
+                    continue
+                processes.append(process)
+                known_process_ids.add(process_id)
+            except (psutil.NoSuchProcess, psutil.AccessDenied):
+                with self._lock:
+                    self._missed_processes += 1
         for process in processes:
             try:
                 with process.oneshot():

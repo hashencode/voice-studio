@@ -25,11 +25,14 @@ import psutil
 try:
     from aggregate_results import aggregate_candidate
     from asr_scoring import ScoringError, score_text
-    from resource_sampler import ProcessTreeSampler
+    from resource_sampler import ProcessTreeSampler, ResourceSamplerError
 except ModuleNotFoundError:
     from benchmark.desktop.asr_comparison.aggregate_results import aggregate_candidate
     from benchmark.desktop.asr_comparison.asr_scoring import ScoringError, score_text
-    from benchmark.desktop.asr_comparison.resource_sampler import ProcessTreeSampler
+    from benchmark.desktop.asr_comparison.resource_sampler import (
+        ProcessTreeSampler,
+        ResourceSamplerError,
+    )
 
 
 SCHEMA_VERSION = 2
@@ -426,11 +429,21 @@ def _finite_json_numbers(value: Any) -> bool:
 
 
 def _minimal_environment(temporary_root: Path) -> dict[str, str]:
+    user_home = os.environ.get("HOME")
+    if not user_home or not Path(user_home).is_absolute():
+        raise OrchestrationError(
+            "SANDBOX_PROBE_UNAVAILABLE",
+            "an absolute HOME is required by the active user-home denial probe",
+        )
     return {
         "PATH": "/usr/bin:/bin:/usr/sbin:/sbin",
         "LANG": "C.UTF-8",
         "LC_ALL": "C.UTF-8",
         "TMPDIR": str(temporary_root),
+        # The launcher needs the real home path only to prove that its sandbox
+        # denies access to it. The launcher replaces the environment before it
+        # starts the candidate worker, so HOME never reaches model execution.
+        "HOME": user_home,
         "HF_HUB_OFFLINE": "1",
         "HF_HUB_DISABLE_TELEMETRY": "1",
         "MODELSCOPE_OFFLINE": "1",
@@ -539,11 +552,39 @@ def _validate_event(
     for key in ("profileId", "sourceSha256"):
         if key in event and event[key] != specification[key]:
             raise OrchestrationError("IDENTITY_MISMATCH", f"worker {key} changed")
-    if event_type == "handshake" and event.get("runtimeBindingState") != "not_initialized":
-        raise OrchestrationError(
-            "BASELINE_CONTAMINATED",
-            "worker initialized runtime bindings before the baseline freeze",
-        )
+    if event_type == "error":
+        code = event.get("code")
+        message = event.get("message")
+        if (
+            not isinstance(code, str)
+            or code
+            not in {
+                "INVALID_REQUEST_OR_IDENTITY",
+                "DECODE_FAILED",
+                "WORKER_FAILED",
+            }
+            or not isinstance(message, str)
+            or len(message.encode()) > 1024
+        ):
+            raise OrchestrationError(
+                "MALFORMED_OUTPUT", "worker error event is invalid"
+            )
+        raise OrchestrationError(code, f"candidate worker reported {message}")
+    if event_type == "handshake":
+        process_id = event.get("processId")
+        if (
+            not isinstance(process_id, int)
+            or isinstance(process_id, bool)
+            or process_id <= 0
+        ):
+            raise OrchestrationError(
+                "MALFORMED_OUTPUT", "worker process identity is invalid"
+            )
+        if event.get("runtimeBindingState") != "not_initialized":
+            raise OrchestrationError(
+                "BASELINE_CONTAMINATED",
+                "worker initialized runtime bindings before the baseline freeze",
+            )
     if event_type == "result":
         text = event.get("text")
         tokens = event.get("tokens")
@@ -603,6 +644,17 @@ def _validate_event(
                     "MALFORMED_OUTPUT", f"partial {key} must be finite"
                 )
         return
+    if event_type == "unloadComplete":
+        resident_bytes = event.get("residentBytes")
+        if (
+            not isinstance(resident_bytes, int)
+            or isinstance(resident_bytes, bool)
+            or resident_bytes < 0
+        ):
+            raise OrchestrationError(
+                "MALFORMED_OUTPUT",
+                "worker unload resident bytes must be a non-negative integer",
+            )
     expected_index = len([value for value in observed_types if value != "partial"])
     if expected_index >= len(SUCCESS_SEQUENCE) or event_type != SUCCESS_SEQUENCE[
         expected_index
@@ -752,6 +804,13 @@ def execute_run(
             observed_types.append(event_type)
             events.append(event)
             if event_type == "handshake":
+                try:
+                    sampler.track_process(int(event["processId"]))
+                except ResourceSamplerError as error:
+                    raise OrchestrationError(
+                        "MALFORMED_OUTPUT",
+                        "worker process identity disappeared at handshake",
+                    ) from error
                 sampler.freeze_baseline()
                 acknowledgement = {
                     "schemaVersion": SCHEMA_VERSION,
@@ -770,7 +829,9 @@ def execute_run(
             elif event_type == "result":
                 timestamps["firstFinal"] = time.time()
             elif event_type == "unloadComplete":
-                sampler.mark_unload_complete()
+                sampler.mark_unload_complete(
+                    worker_reported_rss_bytes=int(event["residentBytes"])
+                )
             elif event_type == "complete":
                 timestamps["completion"] = time.time()
                 break
@@ -990,6 +1051,7 @@ def _fake_smoke(root: Path, timeout_seconds: float) -> dict[str, Any]:
         "numThreads": 2,
         "concurrency": 1,
         "inputMode": "frozen_segments",
+        "segmentDurationSeconds": 15,
         "pacingPolicy": "unpaced",
     }
     item = {

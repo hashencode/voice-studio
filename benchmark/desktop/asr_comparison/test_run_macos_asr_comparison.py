@@ -10,6 +10,7 @@ from pathlib import Path
 from native_funasr_adapter import adapt_native_result
 from run_macos_asr_comparison import (
     OrchestrationError,
+    _minimal_environment,
     _validate_event,
     build_stage_plan,
     deterministic_run_id,
@@ -75,6 +76,13 @@ def request(candidate: str = "fake-a") -> dict:
 
 
 class ScheduleTest(unittest.TestCase):
+    def test_launcher_environment_exposes_home_only_for_active_denial_probe(
+        self,
+    ) -> None:
+        environment = _minimal_environment(Path("/tmp/comparison"))
+        self.assertEqual(environment["HOME"], os.environ["HOME"])
+        self.assertTrue(Path(environment["HOME"]).is_absolute())
+
     def test_handshake_must_precede_runtime_initialization(self) -> None:
         with self.assertRaisesRegex(
             OrchestrationError, "before the baseline freeze"
@@ -86,6 +94,7 @@ class ScheduleTest(unittest.TestCase):
                     "candidateId": "fake-a",
                     "profileId": "fixed-resource",
                     "sourceSha256": "f" * 64,
+                    "processId": 123,
                     "runtimeBindingState": "initialized",
                 },
                 specification={
@@ -94,6 +103,26 @@ class ScheduleTest(unittest.TestCase):
                 },
                 observed_types=[],
             )
+
+    def test_handshake_requires_positive_process_identity(self) -> None:
+        with self.assertRaises(OrchestrationError) as caught:
+            _validate_event(
+                {
+                    "schemaVersion": 2,
+                    "type": "handshake",
+                    "candidateId": "fake-a",
+                    "profileId": "fixed-resource",
+                    "sourceSha256": "f" * 64,
+                    "processId": 0,
+                    "runtimeBindingState": "not_initialized",
+                },
+                specification={
+                    **matrix_item(),
+                    "sourceSha256": "f" * 64,
+                },
+                observed_types=[],
+            )
+        self.assertEqual(caught.exception.code, "MALFORMED_OUTPUT")
 
     def test_result_token_and_timestamp_counts_are_bounded(self) -> None:
         with self.assertRaisesRegex(OrchestrationError, "observation bounds"):
@@ -121,6 +150,52 @@ class ScheduleTest(unittest.TestCase):
                     "modelLoadComplete",
                 ],
             )
+
+    def test_unload_complete_requires_worker_resident_bytes(self) -> None:
+        with self.assertRaises(OrchestrationError) as caught:
+            _validate_event(
+                {
+                    "schemaVersion": 2,
+                    "type": "unloadComplete",
+                    "candidateId": "fake-a",
+                },
+                specification={
+                    **matrix_item(),
+                    "sourceSha256": "f" * 64,
+                },
+                observed_types=[
+                    "handshake",
+                    "effectiveConfig",
+                    "modelLoadComplete",
+                    "result",
+                    "unloadStart",
+                ],
+            )
+        self.assertEqual(caught.exception.code, "MALFORMED_OUTPUT")
+
+    def test_typed_worker_error_preserves_candidate_identity(self) -> None:
+        with self.assertRaises(OrchestrationError) as caught:
+            _validate_event(
+                {
+                    "schemaVersion": 2,
+                    "type": "error",
+                    "candidateId": "fake-a",
+                    "profileId": "fixed-resource",
+                    "sourceSha256": "f" * 64,
+                    "code": "DECODE_FAILED",
+                    "message": "StateError",
+                },
+                specification={
+                    **matrix_item(),
+                    "sourceSha256": "f" * 64,
+                },
+                observed_types=[
+                    "handshake",
+                    "effectiveConfig",
+                    "modelLoadComplete",
+                ],
+            )
+        self.assertEqual(caught.exception.code, "DECODE_FAILED")
 
     def test_two_candidate_short_schedule_rotates_and_is_deterministic(self) -> None:
         matrix = [matrix_item("fake-a"), matrix_item("fake-b")]

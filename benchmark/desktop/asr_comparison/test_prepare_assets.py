@@ -31,8 +31,20 @@ class PrepareAssetsTest(unittest.TestCase):
             {item["candidateId"] for item in plan["candidates"]},
             set(self.registry["frozenCandidateSet"]),
         )
-        self.assertTrue(
-            any(item["status"] == "PENDING_EXTERNAL_ARTIFACTS" for item in plan["candidates"])
+        statuses = {
+            item["candidateId"]: item["status"] for item in plan["candidates"]
+        }
+        self.assertEqual(
+            statuses["sherpa-onnx-streaming-zipformer-zh-int8-2025-06-30"],
+            "REJECTED_LICENSE",
+        )
+        self.assertEqual(
+            statuses["sherpa-onnx-funasr-nano-int8-2025-12-30"],
+            "REJECTED_LICENSE",
+        )
+        self.assertEqual(
+            statuses["native-funasr-1.3.22-paraformer-vad-punctuation"],
+            "CROSS_RUNTIME_CONTROL_COMPLETE",
         )
 
     def test_prepares_hash_pinned_local_components_atomically(self) -> None:
@@ -55,6 +67,8 @@ class PrepareAssetsTest(unittest.TestCase):
     def test_rejects_pending_hashes_before_copy(self) -> None:
         candidate = copy.deepcopy(self.registry["candidates"][1])
         candidate["license"]["disposition"] = "ACCEPTED_FOR_BENCHMARK"
+        candidate["artifacts"][0]["sha256"] = None
+        candidate["artifacts"][0]["hashState"] = "PENDING_PROVISIONING"
         with self.assertRaisesRegex(AssetError, "hash-pinned"):
             prepare_candidate(candidate, self.sources, self.output)
         self.assertFalse(self.output.exists())
