@@ -1,0 +1,167 @@
+{
+  "schemaVersion": 2,
+  "contractId": "desktop-processing/macos-asr-comparison-v2",
+  "decisionPlatform": "macos",
+  "contractState": "IMPLEMENTATION_SMOKE_ONLY",
+  "baselineCandidateId": "sherpa-streaming-zipformer-zh-14m-2023-02-23",
+  "target": {
+    "operatingSystem": "macos",
+    "architecture": "arm64",
+    "cpuFamily": "Apple Silicon",
+    "referenceCpuModel": "Apple M2",
+    "referenceMemoryBytes": 17179869184,
+    "targetFingerprintRequiredFields": [
+      "operatingSystemVersion",
+      "architecture",
+      "cpuModel",
+      "logicalCpuCount",
+      "memoryBytes",
+      "runtimeId",
+      "runtimeVersion",
+      "runtimeSha256"
+    ]
+  },
+  "bundleArtifacts": [
+    {
+      "path": "benchmark/desktop/asr_comparison/macos_contract.json",
+      "hashAlgorithm": "sha256",
+      "bindingTime": "run_start"
+    },
+    {
+      "path": "benchmark/desktop/asr_comparison/candidates.json",
+      "hashAlgorithm": "sha256",
+      "bindingTime": "run_start"
+    },
+    {
+      "path": "benchmark/desktop/asr_comparison/scoring_contract.json",
+      "hashAlgorithm": "sha256",
+      "bindingTime": "run_start"
+    }
+  ],
+  "runtimeLanes": [
+    {
+      "laneId": "sherpa-onnx-dart-1.13.4-macos-arm64",
+      "kind": "sherpa_onnx",
+      "runtime": {
+        "package": "sherpa_onnx",
+        "version": "1.13.4",
+        "buildSha256": null,
+        "apiCharacterization": "PENDING"
+      },
+      "target": {
+        "operatingSystem": "macos",
+        "architecture": "arm64"
+      },
+      "members": [
+        "sherpa-streaming-zipformer-zh-14m-2023-02-23",
+        "sherpa-onnx-paraformer-zh-int8-2025-10-07",
+        "sherpa-onnx-paraformer-zh-2024-03-09",
+        "sherpa-onnx-streaming-zipformer-zh-int8-2025-06-30",
+        "sherpa-onnx-funasr-nano-int8-2025-12-30",
+        "sherpa-onnx-fire-red-asr2-ctc-zh_en-int8-2026-02-25"
+      ],
+      "rankable": false,
+      "state": "PENDING_U4_CHARACTERIZATION"
+    }
+  ],
+  "profiles": {
+    "requiredSherpaProfiles": [
+      "recommended",
+      "fixed-resource"
+    ],
+    "fixedResourceInvariants": {
+      "provider": "cpu",
+      "numThreads": 2,
+      "concurrency": 1,
+      "inputMode": "frozen_segments",
+      "pacingPolicy": "unpaced",
+      "warmupRuns": 1,
+      "measuredRuns": 5
+    },
+    "productFinalist": {
+      "enabledAfterStage": "STAGE_2_HELD_OUT",
+      "developmentOnlyTuning": true,
+      "freezeBeforeHeldOut": true
+    }
+  },
+  "stages": [
+    {
+      "stageId": "STAGE_0_ADMISSION",
+      "purpose": "identity_license_api_offline_smoke",
+      "allowedFixtureRoles": [
+        "smoke"
+      ]
+    },
+    {
+      "stageId": "STAGE_1_SHORT",
+      "purpose": "recommended_and_fixed_resource_screening",
+      "allowedFixtureRoles": [
+        "smoke",
+        "development"
+      ]
+    },
+    {
+      "stageId": "STAGE_2_HELD_OUT",
+      "purpose": "frozen_held_out_quality",
+      "allowedFixtureRoles": [
+        "held_out"
+      ]
+    },
+    {
+      "stageId": "STAGE_3_FINALIST",
+      "purpose": "product_finalist_and_two_hour_operational_gates",
+      "allowedFixtureRoles": [
+        "development",
+        "held_out",
+        "long_7200s"
+      ]
+    }
+  ],
+  "hardGates": {
+    "maxCer": 0.35,
+    "maxRtf": 0.5,
+    "maxFinalistIncrementalPeakRssBytes": 2147483648,
+    "applyBeforeMaterialBenefit": true
+  },
+  "materialBenefitRule": {
+    "state": "PROPOSED_UNFROZEN",
+    "developmentPilotRequired": true,
+    "minimumRelativeMacroLexicalErrorReduction": 0.15,
+    "minimumHardScenariosImproved": 2,
+    "alternativeMinimumTerminologyNumericPointGain": 0.1,
+    "maximumRelativeCleanMandarinRegression": 0.05
+  },
+  "scheduling": {
+    "seed": 20260726,
+    "shortWarmupRuns": 1,
+    "shortMeasuredRuns": 5,
+    "rotateCandidateProfileOrder": true,
+    "maxConcurrentWorkers": 1,
+    "longFixtureSeconds": 7200,
+    "repeatLongRunWithinLimitFraction": 0.1
+  },
+  "evidencePolicy": {
+    "publishableFormat": "bounded_json",
+    "rawRoot": "build/desktop_asr_comparison/raw",
+    "runRoot": "build/desktop_asr_comparison/runs",
+    "forbiddenPayloads": [
+      "audio",
+      "pcm",
+      "transcript",
+      "embedding",
+      "voiceprint",
+      "secret",
+      "absolute_path",
+      "user_home_path"
+    ],
+    "processingNetwork": "denied",
+    "provisioningNetwork": "explicit_only"
+  },
+  "roundOutcomes": [
+    "RETAIN_BASELINE_NO_MATERIAL_BENEFIT",
+    "RETAIN_BASELINE_NO_OPERATIONAL_FINALIST",
+    "RECOMMEND_REPLACEMENT",
+    "ROUND_BLOCKED"
+  ],
+  "diagnosticExtensions": {}
+}

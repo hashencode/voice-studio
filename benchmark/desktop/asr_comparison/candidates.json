@@ -1,0 +1,782 @@
+{
+  "schemaVersion": 2,
+  "registryId": "desktop-processing/macos-asr-first-round-v2",
+  "comparisonContractId": "desktop-processing/macos-asr-comparison-v2",
+  "frozenCandidateSet": [
+    "sherpa-streaming-zipformer-zh-14m-2023-02-23",
+    "sherpa-onnx-paraformer-zh-int8-2025-10-07",
+    "sherpa-onnx-paraformer-zh-2024-03-09",
+    "sherpa-onnx-streaming-zipformer-zh-int8-2025-06-30",
+    "sherpa-onnx-funasr-nano-int8-2025-12-30",
+    "sherpa-onnx-fire-red-asr2-ctc-zh_en-int8-2026-02-25",
+    "native-funasr-1.3.22-paraformer-vad-punctuation"
+  ],
+  "candidates": [
+    {
+      "candidateId": "sherpa-streaming-zipformer-zh-14m-2023-02-23",
+      "displayName": "Sherpa streaming Zipformer Mandarin 14M (2023-02-23)",
+      "runtimeKind": "sherpa_onnx",
+      "family": "streaming_zipformer_transducer",
+      "modelDate": "2023-02-23",
+      "role": "baseline",
+      "runtimeLaneIds": [
+        "sherpa-onnx-dart-1.13.4-macos-arm64"
+      ],
+      "source": {
+        "officialUrl": "https://k2-fsa.github.io/sherpa/onnx/pretrained_models/online-transducer/zipformer-transducer-models.html",
+        "retrievedAt": "2026-07-26",
+        "screeningContextOnly": false
+      },
+      "artifacts": [
+        {
+          "componentId": "model-bundle",
+          "fileRole": "encoder_decoder_joiner_tokens",
+          "sourceUrl": "https://github.com/k2-fsa/sherpa-onnx/releases",
+          "sha256": "dbc43dfe2e490fae801a6619f558730a721e8f8a674003f14ad020a6b5f205cc",
+          "hashState": "PINNED"
+        }
+      ],
+      "license": {
+        "spdx": "Apache-2.0",
+        "disposition": "ACCEPTED_FOR_BENCHMARK",
+        "noticeSource": "model_archive"
+      },
+      "capabilities": {
+        "streaming": true,
+        "timestamps": true,
+        "partialResults": true,
+        "endpointing": true,
+        "hotwords": false,
+        "punctuation": false,
+        "itn": false,
+        "seededGeneration": false
+      },
+      "profiles": {
+        "recommended": {
+          "profileRevision": "recommended-v1",
+          "configurationSource": {
+            "url": "https://k2-fsa.github.io/sherpa/onnx/pretrained_models/online-transducer/zipformer-transducer-models.html",
+            "retrievedAt": "2026-07-26"
+          },
+          "allowedStages": [
+            "STAGE_0_ADMISSION",
+            "STAGE_1_SHORT",
+            "STAGE_2_HELD_OUT"
+          ],
+          "scorecard": "end_to_end",
+          "effectiveConfig": {
+            "modelFamily": "streaming_transducer",
+            "provider": "cpu",
+            "numThreads": 2,
+            "modelPrecision": "fp32",
+            "decodingMethod": "greedy_search",
+            "chunkSeconds": 0.32,
+            "pacingPolicy": "realtime_audio_clock",
+            "endpointPolicy": "official_default"
+          },
+          "notApplicableControls": [
+            "language",
+            "itn",
+            "hotwords",
+            "seed"
+          ]
+        },
+        "fixed-resource": {
+          "profileRevision": "fixed-resource-v1",
+          "configurationSource": {
+            "url": "https://k2-fsa.github.io/sherpa/onnx/pretrained_models/online-transducer/zipformer-transducer-models.html",
+            "retrievedAt": "2026-07-26"
+          },
+          "allowedStages": [
+            "STAGE_1_SHORT",
+            "STAGE_2_HELD_OUT"
+          ],
+          "scorecard": "core_asr",
+          "effectiveConfig": {
+            "modelFamily": "streaming_transducer",
+            "provider": "cpu",
+            "numThreads": 2,
+            "concurrency": 1,
+            "inputMode": "frozen_segments",
+            "pacingPolicy": "unpaced",
+            "warmupRuns": 1,
+            "measuredRuns": 5,
+            "modelPrecision": "fp32",
+            "decodingMethod": "greedy_search"
+          },
+          "notApplicableControls": [
+            "language",
+            "itn",
+            "hotwords",
+            "seed"
+          ]
+        }
+      },
+      "admission": {
+        "status": "PENDING_CHARACTERIZATION",
+        "apiSupport": "PENDING",
+        "offlineVerified": "PENDING",
+        "smokeDecode": "PENDING",
+        "terminalDisposition": null,
+        "reasons": [
+          "U4 runtime API and fresh smoke decode are not complete"
+        ]
+      },
+      "diagnosticExtensions": {}
+    },
+    {
+      "candidateId": "sherpa-onnx-paraformer-zh-int8-2025-10-07",
+      "displayName": "Sherpa Paraformer Mandarin mobile-parity int8 (2025-10-07)",
+      "runtimeKind": "sherpa_onnx",
+      "family": "offline_paraformer",
+      "modelDate": "2025-10-07",
+      "role": "mobile_parity_dialect",
+      "runtimeLaneIds": [
+        "sherpa-onnx-dart-1.13.4-macos-arm64"
+      ],
+      "source": {
+        "officialUrl": "https://k2-fsa.github.io/sherpa/onnx/pretrained_models/offline-paraformer/paraformer-models.html",
+        "retrievedAt": "2026-07-26",
+        "screeningContextOnly": true
+      },
+      "artifacts": [
+        {
+          "componentId": "model-bundle",
+          "fileRole": "paraformer_int8_tokens",
+          "sourceUrl": "https://github.com/k2-fsa/sherpa-onnx/releases",
+          "sha256": null,
+          "hashState": "PENDING_PROVISIONING"
+        }
+      ],
+      "license": {
+        "spdx": "Apache-2.0",
+        "disposition": "REVIEW_REQUIRED",
+        "noticeSource": "pending_archive"
+      },
+      "capabilities": {
+        "streaming": false,
+        "timestamps": false,
+        "partialResults": false,
+        "endpointing": false,
+        "hotwords": true,
+        "punctuation": false,
+        "itn": false,
+        "seededGeneration": false
+      },
+      "profiles": {
+        "recommended": {
+          "profileRevision": "recommended-v1",
+          "configurationSource": {
+            "url": "https://k2-fsa.github.io/sherpa/onnx/pretrained_models/offline-paraformer/paraformer-models.html",
+            "retrievedAt": "2026-07-26"
+          },
+          "allowedStages": [
+            "STAGE_0_ADMISSION",
+            "STAGE_1_SHORT",
+            "STAGE_2_HELD_OUT"
+          ],
+          "scorecard": "end_to_end",
+          "effectiveConfig": {
+            "modelFamily": "offline_paraformer",
+            "provider": "cpu",
+            "numThreads": 2,
+            "modelPrecision": "int8",
+            "decodingMethod": "greedy_search",
+            "hotwords": "manifest_or_empty",
+            "hotwordScore": 1.5
+          },
+          "notApplicableControls": [
+            "language",
+            "itn",
+            "seed",
+            "streamingEndpoint"
+          ]
+        },
+        "fixed-resource": {
+          "profileRevision": "fixed-resource-v1",
+          "configurationSource": {
+            "url": "https://k2-fsa.github.io/sherpa/onnx/pretrained_models/offline-paraformer/paraformer-models.html",
+            "retrievedAt": "2026-07-26"
+          },
+          "allowedStages": [
+            "STAGE_1_SHORT",
+            "STAGE_2_HELD_OUT"
+          ],
+          "scorecard": "core_asr",
+          "effectiveConfig": {
+            "modelFamily": "offline_paraformer",
+            "provider": "cpu",
+            "numThreads": 2,
+            "concurrency": 1,
+            "inputMode": "frozen_segments",
+            "pacingPolicy": "unpaced",
+            "warmupRuns": 1,
+            "measuredRuns": 5,
+            "modelPrecision": "int8",
+            "decodingMethod": "greedy_search"
+          },
+          "notApplicableControls": [
+            "language",
+            "itn",
+            "seed",
+            "streamingEndpoint"
+          ]
+        }
+      },
+      "admission": {
+        "status": "PENDING_ARTIFACTS",
+        "apiSupport": "PENDING",
+        "offlineVerified": "PENDING",
+        "smokeDecode": "PENDING",
+        "terminalDisposition": null,
+        "reasons": [
+          "Android evidence is screening context only; macOS artifacts and smoke are pending"
+        ]
+      },
+      "diagnosticExtensions": {}
+    },
+    {
+      "candidateId": "sherpa-onnx-paraformer-zh-2024-03-09",
+      "displayName": "Sherpa Paraformer general Mandarin int8 (2024-03-09)",
+      "runtimeKind": "sherpa_onnx",
+      "family": "offline_paraformer",
+      "modelDate": "2024-03-09",
+      "role": "general_mandarin",
+      "runtimeLaneIds": [
+        "sherpa-onnx-dart-1.13.4-macos-arm64"
+      ],
+      "source": {
+        "officialUrl": "https://k2-fsa.github.io/sherpa/onnx/pretrained_models/offline-paraformer/paraformer-models.html",
+        "retrievedAt": "2026-07-26",
+        "screeningContextOnly": false
+      },
+      "artifacts": [
+        {
+          "componentId": "model-bundle",
+          "fileRole": "paraformer_int8_tokens",
+          "sourceUrl": "https://github.com/k2-fsa/sherpa-onnx/releases",
+          "sha256": null,
+          "hashState": "PENDING_PROVISIONING"
+        }
+      ],
+      "license": {
+        "spdx": "Apache-2.0",
+        "disposition": "REVIEW_REQUIRED",
+        "noticeSource": "pending_archive"
+      },
+      "capabilities": {
+        "streaming": false,
+        "timestamps": false,
+        "partialResults": false,
+        "endpointing": false,
+        "hotwords": true,
+        "punctuation": false,
+        "itn": false,
+        "seededGeneration": false
+      },
+      "profiles": {
+        "recommended": {
+          "profileRevision": "recommended-v1",
+          "configurationSource": {
+            "url": "https://k2-fsa.github.io/sherpa/onnx/pretrained_models/offline-paraformer/paraformer-models.html",
+            "retrievedAt": "2026-07-26"
+          },
+          "allowedStages": [
+            "STAGE_0_ADMISSION",
+            "STAGE_1_SHORT",
+            "STAGE_2_HELD_OUT"
+          ],
+          "scorecard": "end_to_end",
+          "effectiveConfig": {
+            "modelFamily": "offline_paraformer",
+            "provider": "cpu",
+            "numThreads": 2,
+            "modelPrecision": "int8",
+            "decodingMethod": "greedy_search",
+            "hotwords": "manifest_or_empty",
+            "hotwordScore": 1.5
+          },
+          "notApplicableControls": [
+            "language",
+            "itn",
+            "seed",
+            "streamingEndpoint"
+          ]
+        },
+        "fixed-resource": {
+          "profileRevision": "fixed-resource-v1",
+          "configurationSource": {
+            "url": "https://k2-fsa.github.io/sherpa/onnx/pretrained_models/offline-paraformer/paraformer-models.html",
+            "retrievedAt": "2026-07-26"
+          },
+          "allowedStages": [
+            "STAGE_1_SHORT",
+            "STAGE_2_HELD_OUT"
+          ],
+          "scorecard": "core_asr",
+          "effectiveConfig": {
+            "modelFamily": "offline_paraformer",
+            "provider": "cpu",
+            "numThreads": 2,
+            "concurrency": 1,
+            "inputMode": "frozen_segments",
+            "pacingPolicy": "unpaced",
+            "warmupRuns": 1,
+            "measuredRuns": 5,
+            "modelPrecision": "int8",
+            "decodingMethod": "greedy_search"
+          },
+          "notApplicableControls": [
+            "language",
+            "itn",
+            "seed",
+            "streamingEndpoint"
+          ]
+        }
+      },
+      "admission": {
+        "status": "PENDING_ARTIFACTS",
+        "apiSupport": "PENDING",
+        "offlineVerified": "PENDING",
+        "smokeDecode": "PENDING",
+        "terminalDisposition": null,
+        "reasons": [
+          "Exact archive/component hashes and license notice are pending U4 provisioning"
+        ]
+      },
+      "diagnosticExtensions": {}
+    },
+    {
+      "candidateId": "sherpa-onnx-streaming-zipformer-zh-int8-2025-06-30",
+      "displayName": "Sherpa streaming Zipformer Mandarin int8 (2025-06-30)",
+      "runtimeKind": "sherpa_onnx",
+      "family": "streaming_zipformer_transducer",
+      "modelDate": "2025-06-30",
+      "role": "streaming_candidate",
+      "runtimeLaneIds": [
+        "sherpa-onnx-dart-1.13.4-macos-arm64"
+      ],
+      "source": {
+        "officialUrl": "https://k2-fsa.github.io/sherpa/onnx/pretrained_models/online-transducer/zipformer-transducer-models.html",
+        "retrievedAt": "2026-07-26",
+        "screeningContextOnly": false
+      },
+      "artifacts": [
+        {
+          "componentId": "model-bundle",
+          "fileRole": "encoder_decoder_joiner_int8_tokens",
+          "sourceUrl": "https://github.com/k2-fsa/sherpa-onnx/releases",
+          "sha256": null,
+          "hashState": "PENDING_PROVISIONING"
+        }
+      ],
+      "license": {
+        "spdx": "Apache-2.0",
+        "disposition": "REVIEW_REQUIRED",
+        "noticeSource": "pending_archive"
+      },
+      "capabilities": {
+        "streaming": true,
+        "timestamps": true,
+        "partialResults": true,
+        "endpointing": true,
+        "hotwords": false,
+        "punctuation": false,
+        "itn": false,
+        "seededGeneration": false
+      },
+      "profiles": {
+        "recommended": {
+          "profileRevision": "recommended-v1",
+          "configurationSource": {
+            "url": "https://k2-fsa.github.io/sherpa/onnx/pretrained_models/online-transducer/zipformer-transducer-models.html",
+            "retrievedAt": "2026-07-26"
+          },
+          "allowedStages": [
+            "STAGE_0_ADMISSION",
+            "STAGE_1_SHORT",
+            "STAGE_2_HELD_OUT"
+          ],
+          "scorecard": "end_to_end",
+          "effectiveConfig": {
+            "modelFamily": "streaming_transducer",
+            "provider": "cpu",
+            "numThreads": 2,
+            "modelPrecision": "int8",
+            "decodingMethod": "greedy_search",
+            "chunkSeconds": 0.32,
+            "pacingPolicy": "realtime_audio_clock",
+            "endpointPolicy": "official_default"
+          },
+          "notApplicableControls": [
+            "language",
+            "itn",
+            "hotwords",
+            "seed"
+          ]
+        },
+        "fixed-resource": {
+          "profileRevision": "fixed-resource-v1",
+          "configurationSource": {
+            "url": "https://k2-fsa.github.io/sherpa/onnx/pretrained_models/online-transducer/zipformer-transducer-models.html",
+            "retrievedAt": "2026-07-26"
+          },
+          "allowedStages": [
+            "STAGE_1_SHORT",
+            "STAGE_2_HELD_OUT"
+          ],
+          "scorecard": "core_asr",
+          "effectiveConfig": {
+            "modelFamily": "streaming_transducer",
+            "provider": "cpu",
+            "numThreads": 2,
+            "concurrency": 1,
+            "inputMode": "frozen_segments",
+            "pacingPolicy": "unpaced",
+            "warmupRuns": 1,
+            "measuredRuns": 5,
+            "modelPrecision": "int8",
+            "decodingMethod": "greedy_search"
+          },
+          "notApplicableControls": [
+            "language",
+            "itn",
+            "hotwords",
+            "seed"
+          ]
+        }
+      },
+      "admission": {
+        "status": "PENDING_ARTIFACTS",
+        "apiSupport": "PENDING",
+        "offlineVerified": "PENDING",
+        "smokeDecode": "PENDING",
+        "terminalDisposition": null,
+        "reasons": [
+          "Exact archive/component hashes and runtime API characterization are pending"
+        ]
+      },
+      "diagnosticExtensions": {}
+    },
+    {
+      "candidateId": "sherpa-onnx-funasr-nano-int8-2025-12-30",
+      "displayName": "Sherpa FunASR Nano int8 (2025-12-30)",
+      "runtimeKind": "sherpa_onnx",
+      "family": "funasr_nano",
+      "modelDate": "2025-12-30",
+      "role": "generative_candidate",
+      "runtimeLaneIds": [
+        "sherpa-onnx-dart-1.13.4-macos-arm64"
+      ],
+      "source": {
+        "officialUrl": "https://k2-fsa.github.io/sherpa/onnx/funasr-nano/pretrained.html",
+        "retrievedAt": "2026-07-26",
+        "screeningContextOnly": false
+      },
+      "artifacts": [
+        {
+          "componentId": "model-bundle",
+          "fileRole": "encoder_llm_embedding_projector_tokens",
+          "sourceUrl": "https://github.com/k2-fsa/sherpa-onnx/releases",
+          "sha256": null,
+          "hashState": "PENDING_PROVISIONING"
+        }
+      ],
+      "license": {
+        "spdx": "Apache-2.0",
+        "disposition": "REVIEW_REQUIRED",
+        "noticeSource": "pending_archive"
+      },
+      "capabilities": {
+        "streaming": false,
+        "timestamps": false,
+        "partialResults": false,
+        "endpointing": false,
+        "hotwords": true,
+        "punctuation": true,
+        "itn": true,
+        "seededGeneration": true
+      },
+      "profiles": {
+        "recommended": {
+          "profileRevision": "recommended-v1",
+          "configurationSource": {
+            "url": "https://k2-fsa.github.io/sherpa/onnx/funasr-nano/pretrained.html",
+            "retrievedAt": "2026-07-26"
+          },
+          "allowedStages": [
+            "STAGE_0_ADMISSION",
+            "STAGE_1_SHORT",
+            "STAGE_2_HELD_OUT"
+          ],
+          "scorecard": "end_to_end",
+          "effectiveConfig": {
+            "modelFamily": "funasr_nano",
+            "provider": "cpu",
+            "numThreads": 2,
+            "modelPrecision": "int8",
+            "language": "zh",
+            "itn": true,
+            "hotwords": "manifest_or_empty",
+            "prompt": "",
+            "seed": 20260726,
+            "maxNewTokens": 512,
+            "temperature": 0.0
+          },
+          "notApplicableControls": [
+            "streamingEndpoint"
+          ]
+        },
+        "fixed-resource": {
+          "profileRevision": "fixed-resource-v1",
+          "configurationSource": {
+            "url": "https://k2-fsa.github.io/sherpa/onnx/funasr-nano/pretrained.html",
+            "retrievedAt": "2026-07-26"
+          },
+          "allowedStages": [
+            "STAGE_1_SHORT",
+            "STAGE_2_HELD_OUT"
+          ],
+          "scorecard": "core_asr",
+          "effectiveConfig": {
+            "modelFamily": "funasr_nano",
+            "provider": "cpu",
+            "numThreads": 2,
+            "concurrency": 1,
+            "inputMode": "frozen_segments",
+            "pacingPolicy": "unpaced",
+            "warmupRuns": 1,
+            "measuredRuns": 5,
+            "modelPrecision": "int8",
+            "language": "zh",
+            "itn": false,
+            "hotwords": "",
+            "prompt": "",
+            "seed": 20260726,
+            "temperature": 0.0
+          },
+          "notApplicableControls": [
+            "streamingEndpoint"
+          ]
+        }
+      },
+      "admission": {
+        "status": "PENDING_ARTIFACTS",
+        "apiSupport": "PENDING",
+        "offlineVerified": "PENDING",
+        "smokeDecode": "PENDING",
+        "terminalDisposition": null,
+        "reasons": [
+          "Exact artifacts and installed Dart API support are pending U4 characterization"
+        ]
+      },
+      "diagnosticExtensions": {}
+    },
+    {
+      "candidateId": "sherpa-onnx-fire-red-asr2-ctc-zh_en-int8-2026-02-25",
+      "displayName": "Sherpa FireRedASR2 CTC zh/en int8 (2026-02-25)",
+      "runtimeKind": "sherpa_onnx",
+      "family": "firered_asr_ctc",
+      "modelDate": "2026-02-25",
+      "role": "ctc_candidate",
+      "runtimeLaneIds": [
+        "sherpa-onnx-dart-1.13.4-macos-arm64"
+      ],
+      "source": {
+        "officialUrl": "https://k2-fsa.github.io/sherpa/onnx/FireRedAsr/pretrained.html",
+        "retrievedAt": "2026-07-26",
+        "screeningContextOnly": false
+      },
+      "artifacts": [
+        {
+          "componentId": "model-bundle",
+          "fileRole": "firered_ctc_int8_tokens",
+          "sourceUrl": "https://github.com/k2-fsa/sherpa-onnx/releases",
+          "sha256": null,
+          "hashState": "PENDING_PROVISIONING"
+        }
+      ],
+      "license": {
+        "spdx": "Apache-2.0",
+        "disposition": "REVIEW_REQUIRED",
+        "noticeSource": "pending_archive"
+      },
+      "capabilities": {
+        "streaming": false,
+        "timestamps": true,
+        "partialResults": false,
+        "endpointing": false,
+        "hotwords": false,
+        "punctuation": false,
+        "itn": false,
+        "seededGeneration": false
+      },
+      "profiles": {
+        "recommended": {
+          "profileRevision": "recommended-v1",
+          "configurationSource": {
+            "url": "https://k2-fsa.github.io/sherpa/onnx/FireRedAsr/pretrained.html",
+            "retrievedAt": "2026-07-26"
+          },
+          "allowedStages": [
+            "STAGE_0_ADMISSION",
+            "STAGE_1_SHORT",
+            "STAGE_2_HELD_OUT"
+          ],
+          "scorecard": "end_to_end",
+          "effectiveConfig": {
+            "modelFamily": "firered_asr_ctc",
+            "provider": "cpu",
+            "numThreads": 2,
+            "modelPrecision": "int8",
+            "decodingMethod": "greedy_search"
+          },
+          "notApplicableControls": [
+            "language",
+            "itn",
+            "hotwords",
+            "seed",
+            "streamingEndpoint"
+          ]
+        },
+        "fixed-resource": {
+          "profileRevision": "fixed-resource-v1",
+          "configurationSource": {
+            "url": "https://k2-fsa.github.io/sherpa/onnx/FireRedAsr/pretrained.html",
+            "retrievedAt": "2026-07-26"
+          },
+          "allowedStages": [
+            "STAGE_1_SHORT",
+            "STAGE_2_HELD_OUT"
+          ],
+          "scorecard": "core_asr",
+          "effectiveConfig": {
+            "modelFamily": "firered_asr_ctc",
+            "provider": "cpu",
+            "numThreads": 2,
+            "concurrency": 1,
+            "inputMode": "frozen_segments",
+            "pacingPolicy": "unpaced",
+            "warmupRuns": 1,
+            "measuredRuns": 5,
+            "modelPrecision": "int8",
+            "decodingMethod": "greedy_search"
+          },
+          "notApplicableControls": [
+            "language",
+            "itn",
+            "hotwords",
+            "seed",
+            "streamingEndpoint"
+          ]
+        }
+      },
+      "admission": {
+        "status": "PENDING_ARTIFACTS",
+        "apiSupport": "PENDING",
+        "offlineVerified": "PENDING",
+        "smokeDecode": "PENDING",
+        "terminalDisposition": null,
+        "reasons": [
+          "Exact artifacts and installed Dart API support are pending U4 characterization"
+        ]
+      },
+      "diagnosticExtensions": {}
+    },
+    {
+      "candidateId": "native-funasr-1.3.22-paraformer-vad-punctuation",
+      "displayName": "Native FunASR 1.3.22 Paraformer + FSMN VAD + CT punctuation",
+      "runtimeKind": "native_funasr",
+      "family": "native_funasr_paraformer_pipeline",
+      "modelDate": "2026-07-26",
+      "role": "cross_runtime_control",
+      "runtimeLaneIds": [],
+      "source": {
+        "officialUrl": "https://github.com/modelscope/FunASR",
+        "retrievedAt": "2026-07-26",
+        "screeningContextOnly": true
+      },
+      "artifacts": [
+        {
+          "componentId": "locked-environment-and-models",
+          "fileRole": "native_runtime_paraformer_vad_punctuation",
+          "sourceUrl": "https://github.com/modelscope/FunASR",
+          "sha256": null,
+          "hashState": "PENDING_PROVISIONING"
+        }
+      ],
+      "license": {
+        "spdx": "Apache-2.0",
+        "disposition": "REVIEW_REQUIRED",
+        "noticeSource": "locked_environment_and_model_archives"
+      },
+      "capabilities": {
+        "streaming": false,
+        "timestamps": true,
+        "partialResults": false,
+        "endpointing": true,
+        "hotwords": true,
+        "punctuation": true,
+        "itn": true,
+        "seededGeneration": false
+      },
+      "profiles": {
+        "recommended": {
+          "profileRevision": "native-control-v1",
+          "configurationSource": {
+            "url": "https://github.com/modelscope/FunASR",
+            "retrievedAt": "2026-07-26"
+          },
+          "allowedStages": [
+            "STAGE_1_SHORT"
+          ],
+          "scorecard": "end_to_end",
+          "effectiveConfig": {
+            "runtime": "funasr-1.3.22",
+            "provider": "cpu",
+            "numThreads": 2,
+            "pipeline": [
+              "paraformer",
+              "fsmn_vad",
+              "ct_punctuation"
+            ],
+            "itn": true
+          },
+          "notApplicableControls": [
+            "sherpaRuntimeLane",
+            "fixedResourceSherpaRanking",
+            "stage2",
+            "stage3"
+          ]
+        }
+      },
+      "admission": {
+        "status": "PENDING_ARTIFACTS",
+        "apiSupport": "PENDING",
+        "offlineVerified": "PENDING",
+        "smokeDecode": "PENDING",
+        "terminalDisposition": null,
+        "reasons": [
+          "Historical evidence is not substituted for a fresh comparison-v2 smoke run"
+        ]
+      },
+      "diagnosticExtensions": {}
+    }
+  ],
+  "terminalDispositionEnums": [
+    "REJECTED_IDENTITY",
+    "REJECTED_ARTIFACT_HASH",
+    "REJECTED_LICENSE",
+    "REJECTED_API_UNSUPPORTED",
+    "REJECTED_OFFLINE",
+    "REJECTED_SMOKE",
+    "REJECTED_HARD_GATE",
+    "REJECTED_NO_MATERIAL_BENEFIT",
+    "REJECTED_RELIABILITY",
+    "CROSS_RUNTIME_CONTROL_COMPLETE",
+    "FINALIST_NOT_RECOMMENDED",
+    "RECOMMEND_REPLACEMENT",
+    "RETAINED_BASELINE"
+  ],
+  "diagnosticExtensions": {}
+}

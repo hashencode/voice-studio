@@ -42,3 +42,20 @@ directories. Only bounded JSON evidence and its SHA-256 index belong here.
 The product capability state remains controlled by
 `docs/product/desktop-workstation-scope.json`; benchmark success alone does not
 open a UI capability.
+
+## Parallel ASR comparison v2
+
+The benchmark-only macOS ASR comparison lives under
+`benchmark/desktop/asr_comparison/`. It has an independent versioned contract,
+candidate registry, scoring rules, runtime lanes, fixture roles, and bounded
+evidence format. It does not modify the product v1 contract or selection.
+
+Validate its frozen first-round matrix with:
+
+```bash
+python3 benchmark/desktop/asr_comparison/validate_contract.py --print-hashes
+```
+
+See `benchmark/desktop/asr_comparison/README.md` for the provisioning/processing
+network boundary, local-only corpus prerequisites, runtime-lane rules, staged
+runner semantics, and evidence privacy policy.

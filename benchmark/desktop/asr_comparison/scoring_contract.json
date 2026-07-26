@@ -1,0 +1,46 @@
+{
+  "schemaVersion": 2,
+  "scoringContractId": "desktop-processing/macos-asr-scoring-v2",
+  "comparisonContractId": "desktop-processing/macos-asr-comparison-v2",
+  "normalization": {
+    "unicode": "NFKC",
+    "latinCase": "casefold",
+    "whitespace": "collapse_and_trim",
+    "lexicalPunctuation": "exclude",
+    "englishTokenization": "unicode_alphanumeric_runs"
+  },
+  "lexicalMetrics": [
+    "cer",
+    "wer",
+    "substitutions",
+    "deletions",
+    "insertions",
+    "exactUtteranceRate",
+    "terminologyRecall",
+    "numericEventAccuracy",
+    "codeSwitchZhCer",
+    "codeSwitchEnWer"
+  ],
+  "displayMetrics": [
+    "punctuationPrecision",
+    "punctuationRecall",
+    "punctuationF1",
+    "itnEventAccuracy"
+  ],
+  "scenarioAggregation": {
+    "fixtureToScenario": "arithmetic_mean",
+    "scenarioToMacro": "equal_weight_arithmetic_mean",
+    "durationWeighting": false,
+    "preserveIndividualRuns": true
+  },
+  "nonSpeech": {
+    "metric": "hallucinationLexicalCharactersPerMinute",
+    "zeroDurationPolicy": "reject"
+  },
+  "invalidMetricPolicy": {
+    "nonFinite": "reject",
+    "missingDenominator": "not_applicable_with_reason",
+    "emptyReferenceAndHypothesis": "exact_match_without_error_rate"
+  },
+  "diagnosticExtensions": {}
+}
