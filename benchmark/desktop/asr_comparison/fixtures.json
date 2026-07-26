@@ -1,0 +1,573 @@
+{
+  "schemaVersion": 2,
+  "fixtureManifestId": "desktop-processing/macos-asr-fixtures-v2-draft",
+  "comparisonContractId": "desktop-processing/macos-asr-comparison-v2",
+  "pcmFormat": {
+    "sampleRateHz": 16000,
+    "channels": 1,
+    "sampleWidthBytes": 2,
+    "encoding": "signed_pcm_little_endian"
+  },
+  "requiredHeldOutScenarios": [
+    "clean_near_field_mandarin",
+    "far_field_noisy_meeting",
+    "dialect_accent",
+    "zh_en_code_switch",
+    "terminology_numbers",
+    "non_speech",
+    "multi_segment_long_form"
+  ],
+  "fixtures": [
+    {
+      "fixtureId": "committed-zh-300s",
+      "fixtureRole": "smoke",
+      "scenario": "clean_near_field_mandarin",
+      "distributionState": "committed",
+      "useDisposition": "compatibility_only",
+      "sessionGroupId": "smoke-committed-zh-session",
+      "speakerGroupId": "smoke-committed-zh-speaker",
+      "sourceKind": "existing_repository_fixture",
+      "source": "benchmark/audio/zh.wav",
+      "licenseOrConsent": "existing_repository_fixture_smoke_only",
+      "redistribution": "already_committed_no_new_rehosting",
+      "referenceReview": "EXISTING_SMOKE_REFERENCE",
+      "varietyReview": "NOT_APPLICABLE",
+      "freezeState": "FROZEN",
+      "audio": {
+        "relativePath": "benchmark/audio/zh.wav",
+        "sha256": "9345f80fc835ae2afc9bb58ccdbd5047797d7de3afc4cb3a2c6ef44444a2a562",
+        "bytes": 9621036,
+        "durationSeconds": 300.6549375,
+        "sampleRateHz": 16000,
+        "channels": 1,
+        "sampleWidthBytes": 2,
+        "generator": null
+      },
+      "reference": {
+        "relativePath": "benchmark/audio/zh.txt",
+        "sha256": "40046fed2ac99717645087d59dfc54d764ec84e6554ec0879e699bbc4cdb231a",
+        "bytes": 3043
+      },
+      "normalizationNotes": "Existing smoke reference only; repetitive fixture is prohibited from ranked quality use."
+    },
+    {
+      "fixtureId": "generated-silence-1s",
+      "fixtureRole": "smoke",
+      "scenario": "non_speech",
+      "distributionState": "generated",
+      "useDisposition": "compatibility_only",
+      "sessionGroupId": "smoke-generated-silence-session",
+      "speakerGroupId": "no-speaker-smoke-silence",
+      "sourceKind": "deterministic_generator",
+      "source": "prepare_fixtures.py/silence_v1",
+      "licenseOrConsent": "deterministic_synthetic_no_human_voice",
+      "redistribution": "generated_not_committed",
+      "referenceReview": "GENERATED_EMPTY_REFERENCE",
+      "varietyReview": "NOT_APPLICABLE",
+      "freezeState": "FROZEN",
+      "audio": {
+        "relativePath": "generated/generated-silence-1s.wav",
+        "sha256": "643f8a8dc8bd9c19225afffad2becfec5426180b3749cb208abdf1a6c8354efc",
+        "bytes": 32044,
+        "durationSeconds": 1.0,
+        "sampleRateHz": 16000,
+        "channels": 1,
+        "sampleWidthBytes": 2,
+        "generator": "silence_v1"
+      },
+      "reference": {
+        "relativePath": "generated/generated-silence-1s.txt",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "bytes": 0
+      },
+      "normalizationNotes": "Empty lexical reference."
+    },
+    {
+      "fixtureId": "generated-tone-noise-2s",
+      "fixtureRole": "smoke",
+      "scenario": "non_speech",
+      "distributionState": "generated",
+      "useDisposition": "compatibility_only",
+      "sessionGroupId": "smoke-generated-tone-noise-session",
+      "speakerGroupId": "no-speaker-smoke-tone-noise",
+      "sourceKind": "deterministic_generator",
+      "source": "prepare_fixtures.py/tone_noise_v1_seed_20260726",
+      "licenseOrConsent": "deterministic_synthetic_no_human_voice",
+      "redistribution": "generated_not_committed",
+      "referenceReview": "GENERATED_EMPTY_REFERENCE",
+      "varietyReview": "NOT_APPLICABLE",
+      "freezeState": "FROZEN",
+      "audio": {
+        "relativePath": "generated/generated-tone-noise-2s.wav",
+        "sha256": "c0b97fa0382590333343efe3e8c84a2a3aa113935ba259eb52a8ddd41d420537",
+        "bytes": 64044,
+        "durationSeconds": 2.0,
+        "sampleRateHz": 16000,
+        "channels": 1,
+        "sampleWidthBytes": 2,
+        "generator": "tone_noise_v1"
+      },
+      "reference": {
+        "relativePath": "generated/generated-tone-noise-2s.txt",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "bytes": 0
+      },
+      "normalizationNotes": "Empty lexical reference; deterministic seed is part of the generator revision."
+    },
+    {
+      "fixtureId": "generated-short-silence-50ms",
+      "fixtureRole": "smoke",
+      "scenario": "non_speech",
+      "distributionState": "generated",
+      "useDisposition": "compatibility_only",
+      "sessionGroupId": "smoke-generated-short-session",
+      "speakerGroupId": "no-speaker-smoke-short",
+      "sourceKind": "deterministic_generator",
+      "source": "prepare_fixtures.py/short_silence_v1",
+      "licenseOrConsent": "deterministic_synthetic_no_human_voice",
+      "redistribution": "generated_not_committed",
+      "referenceReview": "GENERATED_EMPTY_REFERENCE",
+      "varietyReview": "NOT_APPLICABLE",
+      "freezeState": "FROZEN",
+      "audio": {
+        "relativePath": "generated/generated-short-silence-50ms.wav",
+        "sha256": "9a2bb97bf4897b1e5b2594a43f579bad4f084e6a7654dba1517a2ed330cf9e7d",
+        "bytes": 1644,
+        "durationSeconds": 0.05,
+        "sampleRateHz": 16000,
+        "channels": 1,
+        "sampleWidthBytes": 2,
+        "generator": "short_silence_v1"
+      },
+      "reference": {
+        "relativePath": "generated/generated-short-silence-50ms.txt",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "bytes": 0
+      },
+      "normalizationNotes": "Empty lexical reference."
+    },
+    {
+      "fixtureId": "generated-malformed-input",
+      "fixtureRole": "smoke",
+      "scenario": "malformed_input",
+      "distributionState": "generated",
+      "useDisposition": "compatibility_only",
+      "sessionGroupId": "smoke-generated-malformed-session",
+      "speakerGroupId": "no-speaker-smoke-malformed",
+      "sourceKind": "deterministic_generator",
+      "source": "prepare_fixtures.py/malformed_v1",
+      "licenseOrConsent": "deterministic_synthetic_no_human_voice",
+      "redistribution": "generated_not_committed",
+      "referenceReview": "GENERATED_EMPTY_REFERENCE",
+      "varietyReview": "NOT_APPLICABLE",
+      "freezeState": "FROZEN",
+      "audio": {
+        "relativePath": "generated/generated-malformed-input.bin",
+        "sha256": "8c5770e2d374afff2b863af91f09f66a9bf22d3f3d59d6216da84faf01a94244",
+        "bytes": 25,
+        "durationSeconds": null,
+        "sampleRateHz": null,
+        "channels": null,
+        "sampleWidthBytes": null,
+        "generator": "malformed_v1"
+      },
+      "reference": {
+        "relativePath": "generated/generated-malformed-input.txt",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "bytes": 0
+      },
+      "normalizationNotes": "The worker must reject this bounded non-WAV payload."
+    },
+    {
+      "fixtureId": "development-common-voice-clean",
+      "fixtureRole": "development",
+      "scenario": "clean_near_field_mandarin",
+      "distributionState": "local_only",
+      "useDisposition": "configuration_selection",
+      "sessionGroupId": "development-cv-clean-session-set",
+      "speakerGroupId": "development-cv-clean-speaker-set",
+      "sourceKind": "common_voice_local_subset",
+      "source": "local_sources/common_voice/development_clean",
+      "licenseOrConsent": "PENDING_LOCAL_TERMS_REVIEW",
+      "redistribution": "never_commit",
+      "referenceReview": "PENDING",
+      "varietyReview": "NOT_APPLICABLE",
+      "freezeState": "PENDING_LOCAL_ASSET",
+      "audio": {
+        "relativePath": "local_sources/common_voice/development_clean.wav",
+        "sha256": null,
+        "bytes": null,
+        "durationSeconds": null,
+        "sampleRateHz": 16000,
+        "channels": 1,
+        "sampleWidthBytes": 2,
+        "generator": null
+      },
+      "reference": {
+        "relativePath": "local_sources/common_voice/development_clean.txt",
+        "sha256": null,
+        "bytes": null
+      },
+      "normalizationNotes": "Deterministic local subset manifest must pin source clip identities."
+    },
+    {
+      "fixtureId": "development-aishell4-far-field",
+      "fixtureRole": "development",
+      "scenario": "far_field_noisy_meeting",
+      "distributionState": "local_only",
+      "useDisposition": "configuration_selection",
+      "sessionGroupId": "development-aishell4-session-set",
+      "speakerGroupId": "development-aishell4-speaker-set",
+      "sourceKind": "aishell4_local_subset",
+      "source": "local_sources/aishell4/development_far_field",
+      "licenseOrConsent": "PENDING_LOCAL_LICENSE_REVIEW",
+      "redistribution": "never_commit",
+      "referenceReview": "PENDING",
+      "varietyReview": "NOT_APPLICABLE",
+      "freezeState": "PENDING_LOCAL_ASSET",
+      "audio": {
+        "relativePath": "local_sources/aishell4/development_far_field.wav",
+        "sha256": null,
+        "bytes": null,
+        "durationSeconds": null,
+        "sampleRateHz": 16000,
+        "channels": 1,
+        "sampleWidthBytes": 2,
+        "generator": null
+      },
+      "reference": {
+        "relativePath": "local_sources/aishell4/development_far_field.txt",
+        "sha256": null,
+        "bytes": null
+      },
+      "normalizationNotes": "Sessions are development-only."
+    },
+    {
+      "fixtureId": "development-consented-dialect",
+      "fixtureRole": "development",
+      "scenario": "dialect_accent",
+      "distributionState": "local_only",
+      "useDisposition": "configuration_selection",
+      "sessionGroupId": "development-dialect-session-set",
+      "speakerGroupId": "development-dialect-speaker-set",
+      "sourceKind": "consented_internal_recording",
+      "source": "local_sources/consented/development_dialect",
+      "licenseOrConsent": "PENDING_SIGNED_CONSENT_RECORD",
+      "redistribution": "never_commit",
+      "referenceReview": "PENDING",
+      "varietyReview": "PENDING",
+      "freezeState": "PENDING_LOCAL_ASSET",
+      "audio": {
+        "relativePath": "local_sources/consented/development_dialect.wav",
+        "sha256": null,
+        "bytes": null,
+        "durationSeconds": null,
+        "sampleRateHz": 16000,
+        "channels": 1,
+        "sampleWidthBytes": 2,
+        "generator": null
+      },
+      "reference": {
+        "relativePath": "local_sources/consented/development_dialect.txt",
+        "sha256": null,
+        "bytes": null
+      },
+      "normalizationNotes": "Self-identified variety label and independent transcript review are required."
+    },
+    {
+      "fixtureId": "development-consented-scripted",
+      "fixtureRole": "development",
+      "scenario": "terminology_numbers",
+      "distributionState": "local_only",
+      "useDisposition": "configuration_selection",
+      "sessionGroupId": "development-scripted-session-set",
+      "speakerGroupId": "development-scripted-speaker-set",
+      "sourceKind": "consented_internal_recording",
+      "source": "local_sources/consented/development_scripted",
+      "licenseOrConsent": "PENDING_SIGNED_CONSENT_RECORD",
+      "redistribution": "never_commit",
+      "referenceReview": "PENDING",
+      "varietyReview": "NOT_APPLICABLE",
+      "freezeState": "PENDING_LOCAL_ASSET",
+      "audio": {
+        "relativePath": "local_sources/consented/development_scripted.wav",
+        "sha256": null,
+        "bytes": null,
+        "durationSeconds": null,
+        "sampleRateHz": 16000,
+        "channels": 1,
+        "sampleWidthBytes": 2,
+        "generator": null
+      },
+      "reference": {
+        "relativePath": "local_sources/consented/development_scripted.txt",
+        "sha256": null,
+        "bytes": null
+      },
+      "normalizationNotes": "Terms and numeric events are annotated outside raw audio."
+    },
+    {
+      "fixtureId": "held-out-common-voice-clean",
+      "fixtureRole": "held_out",
+      "scenario": "clean_near_field_mandarin",
+      "distributionState": "local_only",
+      "useDisposition": "ranking",
+      "sessionGroupId": "heldout-cv-clean-session-set",
+      "speakerGroupId": "heldout-cv-clean-speaker-set",
+      "sourceKind": "common_voice_local_subset",
+      "source": "local_sources/common_voice/heldout_clean",
+      "licenseOrConsent": "PENDING_LOCAL_TERMS_REVIEW",
+      "redistribution": "never_commit",
+      "referenceReview": "PENDING",
+      "varietyReview": "NOT_APPLICABLE",
+      "freezeState": "PENDING_LOCAL_ASSET",
+      "audio": {
+        "relativePath": "local_sources/common_voice/heldout_clean.wav",
+        "sha256": null,
+        "bytes": null,
+        "durationSeconds": null,
+        "sampleRateHz": 16000,
+        "channels": 1,
+        "sampleWidthBytes": 2,
+        "generator": null
+      },
+      "reference": {
+        "relativePath": "local_sources/common_voice/heldout_clean.txt",
+        "sha256": null,
+        "bytes": null
+      },
+      "normalizationNotes": "Speaker and session identities must be disjoint from development."
+    },
+    {
+      "fixtureId": "held-out-aishell4-far-field",
+      "fixtureRole": "held_out",
+      "scenario": "far_field_noisy_meeting",
+      "distributionState": "local_only",
+      "useDisposition": "ranking",
+      "sessionGroupId": "heldout-aishell4-session-set",
+      "speakerGroupId": "heldout-aishell4-speaker-set",
+      "sourceKind": "aishell4_local_subset",
+      "source": "local_sources/aishell4/heldout_far_field",
+      "licenseOrConsent": "PENDING_LOCAL_LICENSE_REVIEW",
+      "redistribution": "never_commit",
+      "referenceReview": "PENDING",
+      "varietyReview": "NOT_APPLICABLE",
+      "freezeState": "PENDING_LOCAL_ASSET",
+      "audio": {
+        "relativePath": "local_sources/aishell4/heldout_far_field.wav",
+        "sha256": null,
+        "bytes": null,
+        "durationSeconds": null,
+        "sampleRateHz": 16000,
+        "channels": 1,
+        "sampleWidthBytes": 2,
+        "generator": null
+      },
+      "reference": {
+        "relativePath": "local_sources/aishell4/heldout_far_field.txt",
+        "sha256": null,
+        "bytes": null
+      },
+      "normalizationNotes": "Meeting sessions must be held-out-only."
+    },
+    {
+      "fixtureId": "held-out-consented-dialect",
+      "fixtureRole": "held_out",
+      "scenario": "dialect_accent",
+      "distributionState": "local_only",
+      "useDisposition": "ranking",
+      "sessionGroupId": "heldout-dialect-session-set",
+      "speakerGroupId": "heldout-dialect-speaker-set",
+      "sourceKind": "consented_internal_recording",
+      "source": "local_sources/consented/heldout_dialect",
+      "licenseOrConsent": "PENDING_SIGNED_CONSENT_RECORD",
+      "redistribution": "never_commit",
+      "referenceReview": "PENDING",
+      "varietyReview": "PENDING",
+      "freezeState": "PENDING_LOCAL_ASSET",
+      "audio": {
+        "relativePath": "local_sources/consented/heldout_dialect.wav",
+        "sha256": null,
+        "bytes": null,
+        "durationSeconds": null,
+        "sampleRateHz": 16000,
+        "channels": 1,
+        "sampleWidthBytes": 2,
+        "generator": null
+      },
+      "reference": {
+        "relativePath": "local_sources/consented/heldout_dialect.txt",
+        "sha256": null,
+        "bytes": null
+      },
+      "normalizationNotes": "Must include Sichuan/Chongqing plus a separately reviewed non-target accent."
+    },
+    {
+      "fixtureId": "held-out-consented-code-switch",
+      "fixtureRole": "held_out",
+      "scenario": "zh_en_code_switch",
+      "distributionState": "local_only",
+      "useDisposition": "ranking",
+      "sessionGroupId": "heldout-code-switch-session-set",
+      "speakerGroupId": "heldout-code-switch-speaker-set",
+      "sourceKind": "consented_internal_recording",
+      "source": "local_sources/consented/heldout_code_switch",
+      "licenseOrConsent": "PENDING_SIGNED_CONSENT_RECORD",
+      "redistribution": "never_commit",
+      "referenceReview": "PENDING",
+      "varietyReview": "NOT_APPLICABLE",
+      "freezeState": "PENDING_LOCAL_ASSET",
+      "audio": {
+        "relativePath": "local_sources/consented/heldout_code_switch.wav",
+        "sha256": null,
+        "bytes": null,
+        "durationSeconds": null,
+        "sampleRateHz": 16000,
+        "channels": 1,
+        "sampleWidthBytes": 2,
+        "generator": null
+      },
+      "reference": {
+        "relativePath": "local_sources/consented/heldout_code_switch.txt",
+        "sha256": null,
+        "bytes": null
+      },
+      "normalizationNotes": "Reference must annotate Chinese spans, English tokens, and combined events."
+    },
+    {
+      "fixtureId": "held-out-consented-terms-numbers",
+      "fixtureRole": "held_out",
+      "scenario": "terminology_numbers",
+      "distributionState": "local_only",
+      "useDisposition": "ranking",
+      "sessionGroupId": "heldout-terms-numbers-session-set",
+      "speakerGroupId": "heldout-terms-numbers-speaker-set",
+      "sourceKind": "consented_internal_recording",
+      "source": "local_sources/consented/heldout_terms_numbers",
+      "licenseOrConsent": "PENDING_SIGNED_CONSENT_RECORD",
+      "redistribution": "never_commit",
+      "referenceReview": "PENDING",
+      "varietyReview": "NOT_APPLICABLE",
+      "freezeState": "PENDING_LOCAL_ASSET",
+      "audio": {
+        "relativePath": "local_sources/consented/heldout_terms_numbers.wav",
+        "sha256": null,
+        "bytes": null,
+        "durationSeconds": null,
+        "sampleRateHz": 16000,
+        "channels": 1,
+        "sampleWidthBytes": 2,
+        "generator": null
+      },
+      "reference": {
+        "relativePath": "local_sources/consented/heldout_terms_numbers.txt",
+        "sha256": null,
+        "bytes": null
+      },
+      "normalizationNotes": "Terminology and numeric display events require independent annotation review."
+    },
+    {
+      "fixtureId": "held-out-local-non-speech",
+      "fixtureRole": "held_out",
+      "scenario": "non_speech",
+      "distributionState": "local_only",
+      "useDisposition": "ranking",
+      "sessionGroupId": "heldout-non-speech-session-set",
+      "speakerGroupId": "no-speaker-heldout-non-speech",
+      "sourceKind": "reviewed_local_non_speech",
+      "source": "local_sources/non_speech/heldout",
+      "licenseOrConsent": "PENDING_LOCAL_LICENSE_REVIEW",
+      "redistribution": "never_commit",
+      "referenceReview": "PENDING",
+      "varietyReview": "NOT_APPLICABLE",
+      "freezeState": "PENDING_LOCAL_ASSET",
+      "audio": {
+        "relativePath": "local_sources/non_speech/heldout.wav",
+        "sha256": null,
+        "bytes": null,
+        "durationSeconds": null,
+        "sampleRateHz": 16000,
+        "channels": 1,
+        "sampleWidthBytes": 2,
+        "generator": null
+      },
+      "reference": {
+        "relativePath": "local_sources/non_speech/heldout.txt",
+        "sha256": null,
+        "bytes": null
+      },
+      "normalizationNotes": "Empty lexical reference after independent content review."
+    },
+    {
+      "fixtureId": "held-out-multi-segment-long-form",
+      "fixtureRole": "held_out",
+      "scenario": "multi_segment_long_form",
+      "distributionState": "local_only",
+      "useDisposition": "ranking",
+      "sessionGroupId": "heldout-long-form-session-set",
+      "speakerGroupId": "heldout-long-form-speaker-set",
+      "sourceKind": "reviewed_local_meeting",
+      "source": "local_sources/meetings/heldout_long_form",
+      "licenseOrConsent": "PENDING_CONSENT_AND_REFERENCE_REVIEW",
+      "redistribution": "never_commit",
+      "referenceReview": "PENDING",
+      "varietyReview": "NOT_APPLICABLE",
+      "freezeState": "PENDING_LOCAL_ASSET",
+      "audio": {
+        "relativePath": "local_sources/meetings/heldout_long_form.wav",
+        "sha256": null,
+        "bytes": null,
+        "durationSeconds": null,
+        "sampleRateHz": 16000,
+        "channels": 1,
+        "sampleWidthBytes": 2,
+        "generator": null
+      },
+      "reference": {
+        "relativePath": "local_sources/meetings/heldout_long_form.txt",
+        "sha256": null,
+        "bytes": null
+      },
+      "normalizationNotes": "Multi-segment timestamps and references must be independently reviewed."
+    },
+    {
+      "fixtureId": "finalist-local-meeting-7200s",
+      "fixtureRole": "long_7200s",
+      "scenario": "multi_segment_long_form",
+      "distributionState": "local_only",
+      "useDisposition": "finalist_gate",
+      "sessionGroupId": "finalist-7200s-session",
+      "speakerGroupId": "finalist-7200s-speaker-set",
+      "sourceKind": "consented_local_meeting",
+      "source": "local_sources/meetings/finalist_7200s",
+      "licenseOrConsent": "PENDING_CONSENT_AND_REFERENCE_REVIEW",
+      "redistribution": "never_commit",
+      "referenceReview": "PENDING",
+      "varietyReview": "NOT_APPLICABLE",
+      "freezeState": "PENDING_LOCAL_ASSET",
+      "audio": {
+        "relativePath": "local_sources/meetings/finalist_7200s.wav",
+        "sha256": null,
+        "bytes": null,
+        "durationSeconds": 7200.0,
+        "sampleRateHz": 16000,
+        "channels": 1,
+        "sampleWidthBytes": 2,
+        "generator": null
+      },
+      "reference": {
+        "relativePath": "local_sources/meetings/finalist_7200s.txt",
+        "sha256": null,
+        "bytes": null
+      },
+      "normalizationNotes": "Must be a real reviewed meeting, never a repeated five-minute fixture."
+    }
+  ],
+  "privacyPolicy": {
+    "localOnlyRoot": "build/desktop_asr_comparison/fixtures/local_sources",
+    "publishRawAudio": false,
+    "publishTranscript": false,
+    "publishSpeakerIdentity": false,
+    "allowAbsolutePaths": false
+  }
+}

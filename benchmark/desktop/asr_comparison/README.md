@@ -69,6 +69,15 @@ Ranked execution must fail with an actionable missing-prerequisite disposition
 until all local-only assets, independent reference review, artifact hashes, and
 license dispositions are complete.
 
+Prepare the smoke fixture pack with:
+
+```bash
+python3 benchmark/desktop/asr_comparison/prepare_fixtures.py
+```
+
+The local-only acquisition and review checklist is in
+`benchmark/desktop/asr_comparison/fixtures/README.md`.
+
 Publishable evidence is bounded JSON. It contains hashes and aggregate metrics,
 not audio, PCM, transcripts, embeddings, voiceprints, secrets, private labels,
 user-home paths, or absolute paths.
