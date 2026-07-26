@@ -8,6 +8,7 @@ from pathlib import Path
 from run_m4_asr_matrix import (
     LANGUAGE_CANDIDATES,
     _job_model_files,
+    _rank_eligible_fixture_role,
     language_candidates,
     load_registries,
     profile_for,
@@ -104,6 +105,12 @@ class RunM4AsrMatrixTest(unittest.TestCase):
         self.assertEqual(profile["numThreads"], 2)
         self.assertEqual(profile["concurrency"], 1)
         self.assertEqual(profile["segmentDurationSeconds"], 15)
+
+    def test_observation_roles_are_not_ranked(self) -> None:
+        self.assertTrue(_rank_eligible_fixture_role("development"))
+        self.assertTrue(_rank_eligible_fixture_role("held_out"))
+        self.assertFalse(_rank_eligible_fixture_role("streaming"))
+        self.assertFalse(_rank_eligible_fixture_role("operational"))
 
 
 if __name__ == "__main__":

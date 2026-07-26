@@ -275,6 +275,7 @@ class ExecuteRunTest(unittest.TestCase):
         item: dict | None = None,
         run_binding: dict[str, str] | None = None,
         timeout: float = 3,
+        launcher_nested: bool = False,
     ) -> dict:
         specification = {
             **(item or matrix_item()),
@@ -289,7 +290,18 @@ class ExecuteRunTest(unittest.TestCase):
             worker_request["capabilities"]["partialResults"] = True
         return execute_run(
             command=[sys.executable, str(FAKE), "--mode", mode],
-            request=worker_request,
+            request=(
+                {
+                    **worker_request,
+                    "capabilities": {
+                        **worker_request["capabilities"],
+                        "streaming": False,
+                    },
+                    "workerRequest": worker_request,
+                }
+                if launcher_nested
+                else worker_request
+            ),
             specification=specification,
             binding=run_binding or binding(),
             run_root=self.run_root,
@@ -330,7 +342,11 @@ class ExecuteRunTest(unittest.TestCase):
             **matrix_item(),
             "pacingPolicy": "realtime_audio_clock",
         }
-        result = self.execute(mode="streaming", item=item)
+        result = self.execute(
+            mode="streaming",
+            item=item,
+            launcher_nested=True,
+        )
         self.assertEqual(result["streamingObservation"]["partialCount"], 1)
         self.assertEqual(
             result["streamingObservation"]["firstPartialAudioSeconds"], 0.5

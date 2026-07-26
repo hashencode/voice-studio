@@ -60,6 +60,10 @@ class M4MatrixError(RuntimeError):
     pass
 
 
+def _rank_eligible_fixture_role(role: str) -> bool:
+    return role in {"development", "held_out"}
+
+
 def require(condition: bool, message: str) -> None:
     if not condition:
         raise M4MatrixError(message)
@@ -263,8 +267,9 @@ def run_matrix(args: argparse.Namespace) -> dict[str, Any]:
                         else "end_to_end"
                     ),
                     "scenario": fixture["scenario"],
-                    "rankEligible": args.fixture_role
-                    in {"development", "held_out"},
+                    "rankEligible": _rank_eligible_fixture_role(
+                        args.fixture_role
+                    ),
                     "observationSource": f"m4_{args.stage}_real_authorized",
                     "pacingPolicy": profiles[candidate_id].get(
                         "pacingPolicy", "unpaced"
@@ -429,7 +434,13 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--language-lane", choices=("zh", "en"), required=True)
     parser.add_argument(
         "--fixture-role",
-        choices=("stability", "development", "held_out"),
+        choices=(
+            "stability",
+            "development",
+            "held_out",
+            "streaming",
+            "operational",
+        ),
         required=True,
     )
     parser.add_argument(

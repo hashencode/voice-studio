@@ -1032,8 +1032,9 @@ def execute_run(
         if live_elapsed_milliseconds is not None
         else decode_milliseconds
     )
+    worker_request = request.get("workerRequest", request)
     streaming_supported = bool(
-        request.get("capabilities", {}).get("streaming", False)
+        worker_request.get("capabilities", {}).get("streaming", False)
     )
     paced_streaming = (
         streaming_supported

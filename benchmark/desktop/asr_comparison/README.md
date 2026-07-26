@@ -34,6 +34,11 @@ and two failed runtime admission. These short, local smoke fixtures prove
 identity, offline execution, API/runtime compatibility, scoring, and resource
 sampling only. They are not development or held-out ranking evidence.
 
+The completed M4 Chinese and pure-English decision is published in
+`M4_ASR_MODEL_DECISION_REPORT.md`, with the same privacy-safe evidence in
+`m4_asr_model_decision.json`. Local authorized corpus, raw run output, models,
+and runtime binaries remain under the ignored build evidence root.
+
 ## Contract validation
 
 Run the fail-closed bundle validator:

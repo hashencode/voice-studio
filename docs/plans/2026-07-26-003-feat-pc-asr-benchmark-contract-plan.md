@@ -1,7 +1,7 @@
 ---
 title: macOS PC ASR Model Comparison and Selection Plan
 type: feat
-status: active
+status: completed
 date: 2026-07-26
 origin: docs/brainstorms/2026-07-26-pc-asr-benchmark-contract-requirements.md
 deepened: 2026-07-26
