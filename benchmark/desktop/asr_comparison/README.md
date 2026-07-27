@@ -39,6 +39,51 @@ The completed M4 Chinese and pure-English decision is published in
 `m4_asr_model_decision.json`. Local authorized corpus, raw run output, models,
 and runtime binaries remain under the ignored build evidence root.
 
+The later user-authorized revision removes the 2 GiB memory hard gate while
+continuing to require peak, incremental, and retained RSS measurements. Its
+current decision is published in `M4_ASR_NO_MEMORY_GATE_DECISION_REPORT.md`
+and `m4_asr_no_memory_gate_decision.json`. The earlier report remains frozen
+historical evidence.
+
+The independent Apple M4 reproduction of sherpa-onnx's published Qwen3-ASR
+`Obama.wav` RTF is in `M4_QWEN3_OFFICIAL_RTF_REPRODUCTION_REPORT.md`, with
+privacy-safe per-run evidence in
+`m4_qwen3_official_rtf_reproduction.json`. It compares native C++ runtime
+variants, the current Dart worker's fixed 15-second segmentation, official
+Silero VAD segmentation, threads, resource sampling, and result conversion.
+It is diagnostic-only and does not change the selected model or frozen ranking.
+
+Reproducing it requires the official Obama WAV, Silero VAD, Qwen3-ASR int8
+model, three official macOS arm64 shared runtime archives, and locally built
+benchmark tools under the ignored
+`build/desktop_asr_comparison/m4/official-rtf-repro` tree. Do not commit those
+assets. Keep each original archive/extraction unchanged; if macOS provenance
+enforcement terminates the downloaded binaries, execute a separate locally
+ad-hoc-signed copy. The runner records the archive, original artifacts, and
+exact executed CLI/dylib hashes independently.
+
+From the repository root, after preparing those local-only prerequisites, run:
+
+```bash
+python3 tool/build_cache_guard.py
+benchmark/desktop/asr_comparison/environment/.venv/bin/python \
+  benchmark/desktop/asr_comparison/run_qwen3_official_rtf_reproduction.py
+python3 tool/build_cache_guard.py
+benchmark/desktop/asr_comparison/environment/.venv/bin/python \
+  benchmark/desktop/asr_comparison/build_m4_qwen3_official_rtf_reproduction_report.py
+```
+
+Each runner invocation creates a new execution identity and requires every Dart
+record to be freshly executed (`resumed=false`). The builder rejects stale,
+partial, resumed, substituted, or locally hash-mismatched evidence and verifies
+that the Markdown/JSON publication IDs, bounded-evidence hashes, and complete
+Markdown byte hash match. Diagnostic fixed-15 and Silero lanes each receive an
+equal warm-up and then alternate their five measured runs; the builder checks
+that schedule before calling the comparison controlled. Every observation
+binds privacy-safe relative raw/run-record paths and hashes. The builder
+revalidates those local-only records while excluding transcript and token
+payloads from both published files.
+
 ## Contract validation
 
 Run the fail-closed bundle validator:
@@ -254,3 +299,25 @@ content-addressed atomic activation. The committed result is documented in
 Native FunASR remains a locked cross-runtime short-stage control through
 `native_funasr_adapter.py`; it is never admitted into a same-runtime sherpa
 ranking lane.
+
+## Qwen3-ASR and official-parameter parity
+
+`qwen3_experiment_m4.json` adds the sherpa-onnx Qwen3-ASR 0.6B int8 conversion
+as a post-decision experiment without changing the frozen
+`expanded_candidates_m4.json` set. `run_qwen3_m4_experiment.py` hash-binds its
+three ONNX files and tokenizer tree, reuses the network-denied launcher, and
+keeps audio, references, models, and raw observations under the ignored build
+root.
+
+The initial privacy-safe same-audio parity results are in
+`M4_ASR_OFFICIAL_PARAMETER_PARITY_REPORT.md` and
+`m4_asr_official_parameter_parity.json`. They combine the frozen formal model
+tables with a non-ranked same-audio experiment: one warm-up plus five measured
+runs for the recommended and fixed-resource profiles.
+
+Qwen3 subsequently completed independent Chinese and pure-English five-minute
+stability, five-scenario development, frozen held-out, and one-hour-class
+operational stages. Under the revision with memory as an advisory metric, it is
+the held-out recommendation for both languages and the single-model
+compromise. See `M4_ASR_NO_MEMORY_GATE_DECISION_REPORT.md`; this benchmark
+decision does not switch the product model.

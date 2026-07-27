@@ -143,7 +143,8 @@ class SandboxedCandidateLauncher {
         throw const FormatException('candidate model path is invalid');
       }
       final modelPath = value['path']! as String;
-      if (family == 'funasr_nano' && entry.key == 'tokenizer') {
+      if ({'funasr_nano', 'qwen3_asr'}.contains(family) &&
+          entry.key == 'tokenizer') {
         await _requireContainedTokenizerDirectory(
           roots.modelRoot,
           Directory(modelPath),

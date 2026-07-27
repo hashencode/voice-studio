@@ -94,6 +94,14 @@ class EffectiveProfile {
           'topP',
         },
         BenchmarkCandidateFamily.fireRedAsrCtc => <String>{'decodingMethod'},
+        BenchmarkCandidateFamily.qwen3Asr => <String>{
+          'maxTotalLen',
+          'maxNewTokens',
+          'temperature',
+          'topP',
+          'seed',
+          'hotwords',
+        },
       },
       if (request.profileId == 'fixed-resource') ...<String>{
         'concurrency',
@@ -309,6 +317,30 @@ class EffectiveProfile {
         effectiveConfig: config,
         capabilities: request.capabilities,
       ),
+      BenchmarkCandidateFamily.qwen3Asr => OfflineSherpaProfile(
+        config: sherpa.OfflineRecognizerConfig(
+          model: sherpa.OfflineModelConfig(
+            qwen3Asr: sherpa.OfflineQwen3AsrModelConfig(
+              convFrontend: _file('convFrontend'),
+              encoder: _file('encoder'),
+              decoder: _file('decoder'),
+              tokenizer: _file('tokenizer'),
+              maxTotalLen: config['maxTotalLen']! as int,
+              maxNewTokens: config['maxNewTokens']! as int,
+              temperature: (config['temperature']! as num).toDouble(),
+              topP: (config['topP']! as num).toDouble(),
+              seed: config['seed']! as int,
+              hotwords: config['hotwords']! as String,
+            ),
+            tokens: '',
+            numThreads: threads,
+            provider: provider,
+            debug: false,
+          ),
+        ),
+        effectiveConfig: config,
+        capabilities: request.capabilities,
+      ),
     };
   }
 
@@ -403,5 +435,29 @@ void _validateFamilyConfig(
       }
     case BenchmarkCandidateFamily.fireRedAsrCtc:
       break;
+    case BenchmarkCandidateFamily.qwen3Asr:
+      if (config['maxTotalLen'] is! int ||
+          config['maxNewTokens'] is! int ||
+          config['temperature'] is! num ||
+          config['topP'] is! num ||
+          config['seed'] is! int ||
+          config['hotwords'] is! String) {
+        throw const FormatException('Qwen3-ASR controls are invalid');
+      }
+      final maxTotalLen = config['maxTotalLen']! as int;
+      final maxNewTokens = config['maxNewTokens']! as int;
+      final temperature = (config['temperature']! as num).toDouble();
+      final topP = (config['topP']! as num).toDouble();
+      if (maxTotalLen <= 0 ||
+          maxTotalLen > 4096 ||
+          maxNewTokens <= 0 ||
+          maxNewTokens > maxTotalLen ||
+          !temperature.isFinite ||
+          temperature < 0 ||
+          !topP.isFinite ||
+          topP <= 0 ||
+          topP > 1) {
+        throw const FormatException('Qwen3-ASR generation bounds are invalid');
+      }
   }
 }

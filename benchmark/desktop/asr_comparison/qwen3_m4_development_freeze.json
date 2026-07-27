@@ -1,0 +1,57 @@
+{
+  "schemaVersion": 1,
+  "kind": "m4_qwen3_asr_development_freeze",
+  "frozenAt": "2026-07-27T11:59:21+08:00",
+  "candidateId": "sherpa-onnx-qwen3-asr-0.6B-int8-2026-03-25",
+  "runtimeLaneId": "sherpa-onnx-dart-1.13.4-macos-arm64",
+  "comparisonRevisionId": "m4-zh-en-qwen3-no-memory-gate-v2",
+  "profile": {
+    "profileId": "fixed-resource",
+    "provider": "cpu",
+    "numThreads": 2,
+    "concurrency": 1,
+    "segmentDurationSeconds": 15,
+    "maxTotalLen": 512,
+    "maxNewTokens": 512,
+    "temperature": 0.000001,
+    "topP": 0.8,
+    "seed": 42,
+    "hotwords": ""
+  },
+  "selectionPolicy": {
+    "maximumCer": 0.35,
+    "maximumWer": 0.35,
+    "maximumRtf": 0.5,
+    "memoryHardGate": false,
+    "memoryDisposition": "advisory_only"
+  },
+  "developmentResults": {
+    "zh": {
+      "cer": 0.1506298346903817,
+      "medianRtf": 0.22241628331607347,
+      "disposition": "PROMOTED_TO_HELD_OUT"
+    },
+    "en": {
+      "wer": 0.27708473601486117,
+      "medianRtf": 0.23725529895687708,
+      "disposition": "PROMOTED_TO_HELD_OUT"
+    }
+  },
+  "bindings": {
+    "comparisonRevisionSha256": "4c9410aa2ecc290a70368dfe187711861af43149f826620edfe0c16ead3f4dae",
+    "candidateExperimentSha256": "094b8c69924a86a68ff6c0073277b0b871b0c53b408409f68234bfe63a1769f1",
+    "developmentZhSummarySha256": "ab78d63bbd8223fd267434d3c296b636fc4a0a707f1e8695172d1adca84f0116",
+    "developmentEnSummarySha256": "f759eb8ec8c2bcb8f70135eabc1a48d6834df14dc1fbbfb758d744bf9ba59bf6",
+    "developmentZhManifestSha256": "53be068c98bc5c3e92d19ddecb70ea6afeb4aef892e106acb90c8a3a440fd803",
+    "developmentEnManifestSha256": "58e5a15296f5785d7e2d502a41abd1502c9fab6dd2c816e5d3fef57f28746acf",
+    "runtimeSha256": "102e8383640a6752dc9c51060836aba6f3da75bd644c3ddada1a0c15b8df0f02",
+    "workerSha256": "6019e0d020d26d4176d9af6e283c22cfc2756a994b7ce1533f02529191451e16"
+  },
+  "privacy": {
+    "modelFilesPublished": false,
+    "audioPublished": false,
+    "referenceTextPublished": false,
+    "transcriptPublished": false,
+    "absolutePathsPublished": false
+  }
+}

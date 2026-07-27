@@ -1,0 +1,3521 @@
+{
+  "conclusion": {
+    "frozenDecisionChanged": false,
+    "officialNumbersDirectlyComparable": false,
+    "qualityChangedUnderRecommendedProfiles": false,
+    "qwen3FormalRankingStatus": "short_parity_not_ranked; ranked_in_later_no_memory_gate_revision",
+    "supersededForSelectionBy": "m4_asr_no_memory_gate_decision.json"
+  },
+  "date": "2026-07-27",
+  "formalEvidence": {
+    "candidateDispositions": [
+      {
+        "candidateId": "sherpa-streaming-zipformer-zh-14m-2023-02-23",
+        "disposition": "REJECTED_QUALITY_GATE",
+        "languageLane": "zh",
+        "reason": "development CER 37.24% exceeds 35%"
+      },
+      {
+        "candidateId": "sherpa-onnx-paraformer-zh-int8-2025-10-07",
+        "disposition": "HELD_OUT_RUNNER_UP",
+        "languageLane": "zh",
+        "reason": "held-out CER 16.36%; slower and heavier than non-int8"
+      },
+      {
+        "candidateId": "sherpa-onnx-paraformer-zh-2024-03-09",
+        "disposition": "RECOMMENDED",
+        "languageLane": "zh",
+        "reason": "held-out CER 14.42%; best independent Chinese result"
+      },
+      {
+        "candidateId": "sherpa-onnx-funasr-nano-int8-2025-12-30",
+        "disposition": "REJECTED_RESOURCE_GATE",
+        "languageLane": "zh/en",
+        "reason": "five-minute absolute peak RSS exceeded 2 GiB"
+      },
+      {
+        "candidateId": "sherpa-onnx-fire-red-asr2-ctc-zh_en-int8-2026-02-25",
+        "disposition": "REJECTED",
+        "languageLane": "zh/en",
+        "reason": "Chinese Pareto-dominated; English WER 44.13% fails gate"
+      },
+      {
+        "candidateId": "sherpa-onnx-sense-voice-zh-en-ja-ko-yue-int8-2024-07-17",
+        "disposition": "EN_RECOMMENDED_SINGLE_MODEL_COMPROMISE",
+        "languageLane": "zh/en",
+        "reason": "English winner; Chinese development/operational competitive"
+      },
+      {
+        "candidateId": "sherpa-onnx-streaming-zipformer-en-20m-2023-02-17",
+        "disposition": "REJECTED_QUALITY_GATE",
+        "languageLane": "en",
+        "reason": "five-minute WER 72.44%"
+      },
+      {
+        "candidateId": "sherpa-onnx-whisper-base-en-int8-2023-01-31",
+        "disposition": "REJECTED_QUALITY_GATE",
+        "languageLane": "en",
+        "reason": "development WER 40.23%"
+      },
+      {
+        "candidateId": "sherpa-onnx-nemo-parakeet-tdt-0.6b-v2-int8-2025-05-01",
+        "disposition": "HELD_OUT_RUNNER_UP",
+        "languageLane": "en",
+        "reason": "held-out WER 33.23%; slower and heavier than SenseVoice"
+      },
+      {
+        "candidateId": "sherpa-onnx-streaming-zipformer-zh-int8-2025-06-30",
+        "disposition": "REJECTED_RUNTIME_MODEL_METADATA",
+        "languageLane": "zh",
+        "reason": "frozen runtime lane rejected model metadata"
+      },
+      {
+        "candidateId": "sherpa-onnx-moonshine-base-en-quantized-2026-02-27",
+        "disposition": "REJECTED_RUNTIME_MODEL_FORMAT",
+        "languageLane": "en",
+        "reason": "ORT protobuf parse failure in frozen runtime lane"
+      }
+    ],
+    "development": [
+      {
+        "absolutePeakRssBytes": {
+          "count": 25,
+          "dispersion": 4742342.910360136,
+          "maximum": 213581824,
+          "median": 194068480.0,
+          "p95": 200523776.0
+        },
+        "candidateId": "sherpa-streaming-zipformer-zh-14m-2023-02-23",
+        "decodeMilliseconds": {
+          "count": 25,
+          "dispersion": 50.197879587791356,
+          "median": 3210.659,
+          "p95": 3292.073
+        },
+        "endToEndWallMilliseconds": {
+          "count": 25,
+          "dispersion": 53.2890099399202,
+          "median": 3815.8804580016294,
+          "p95": 3892.6438330017845
+        },
+        "incrementalPeakRssBytes": {
+          "count": 25,
+          "dispersion": 4747256.578423879,
+          "maximum": 180207616,
+          "median": 159383552.0,
+          "p95": 165527552.0
+        },
+        "languageLane": "zh",
+        "lexicalErrorRate": 0.3724347793875246,
+        "lexicalMetric": "cer",
+        "loadMilliseconds": {
+          "count": 25,
+          "dispersion": 1.296817078234242,
+          "median": 108.258,
+          "p95": 109.326
+        },
+        "measuredRunCount": 25,
+        "retainedRssBytesAfterUnload": {
+          "count": 25,
+          "dispersion": 4721187.512999326,
+          "maximum": 200998912,
+          "median": 181583872.0,
+          "p95": 188088320.0
+        },
+        "rtf": {
+          "count": 25,
+          "dispersion": 0.0001016703378452337,
+          "median": 0.008537483569062516,
+          "p95": 0.008723958554165783
+        },
+        "segmentLatencyP50Milliseconds": {
+          "count": 25,
+          "dispersion": 1.1596257437639081,
+          "median": 132.924,
+          "p95": 134.526
+        },
+        "segmentLatencyP95Milliseconds": {
+          "count": 25,
+          "dispersion": 4.3745022599605505,
+          "median": 137.478,
+          "p95": 147.071
+        }
+      },
+      {
+        "absolutePeakRssBytes": {
+          "count": 25,
+          "dispersion": 44731102.077517405,
+          "maximum": 679051264,
+          "median": 642662400.0,
+          "p95": 647872512.0
+        },
+        "candidateId": "sherpa-onnx-paraformer-zh-int8-2025-10-07",
+        "decodeMilliseconds": {
+          "count": 25,
+          "dispersion": 289.7228791635592,
+          "median": 16224.211,
+          "p95": 16288.331
+        },
+        "endToEndWallMilliseconds": {
+          "count": 25,
+          "dispersion": 290.30580764687585,
+          "median": 18334.275832996354,
+          "p95": 18386.139166999783
+        },
+        "incrementalPeakRssBytes": {
+          "count": 25,
+          "dispersion": 44547681.52806498,
+          "maximum": 638779392,
+          "median": 606355456.0,
+          "p95": 611450880.0
+        },
+        "languageLane": "zh",
+        "lexicalErrorRate": 0.16745675684980732,
+        "lexicalMetric": "cer",
+        "loadMilliseconds": {
+          "count": 25,
+          "dispersion": 11.556373528058012,
+          "median": 645.325,
+          "p95": 658.712
+        },
+        "measuredRunCount": 25,
+        "retainedRssBytesAfterUnload": {
+          "count": 25,
+          "dispersion": 64095085.58000107,
+          "maximum": 632471552,
+          "median": 497729536.0,
+          "p95": 632193024.0
+        },
+        "rtf": {
+          "count": 25,
+          "dispersion": 0.00021164144653409774,
+          "median": 0.04268987889273356,
+          "p95": 0.04299887375450498
+        },
+        "segmentLatencyP50Milliseconds": {
+          "count": 25,
+          "dispersion": 2.723654554894944,
+          "median": 638.346,
+          "p95": 643.941
+        },
+        "segmentLatencyP95Milliseconds": {
+          "count": 25,
+          "dispersion": 4.955615111123946,
+          "median": 652.599,
+          "p95": 658.997
+        }
+      },
+      {
+        "absolutePeakRssBytes": {
+          "count": 25,
+          "dispersion": 20466990.421756297,
+          "maximum": 687079424,
+          "median": 616988672.0,
+          "p95": 666337280.0
+        },
+        "candidateId": "sherpa-onnx-paraformer-zh-2024-03-09",
+        "decodeMilliseconds": {
+          "count": 25,
+          "dispersion": 259.5802486253529,
+          "median": 15747.193,
+          "p95": 15835.598
+        },
+        "endToEndWallMilliseconds": {
+          "count": 25,
+          "dispersion": 265.7507688882441,
+          "median": 17655.83995799534,
+          "p95": 17731.60637500405
+        },
+        "incrementalPeakRssBytes": {
+          "count": 25,
+          "dispersion": 20529786.418427676,
+          "maximum": 653377536,
+          "median": 580943872.0,
+          "p95": 631406592.0
+        },
+        "languageLane": "zh",
+        "lexicalErrorRate": 0.1555812707458654,
+        "lexicalMetric": "cer",
+        "loadMilliseconds": {
+          "count": 25,
+          "dispersion": 8.980668353747392,
+          "median": 492.043,
+          "p95": 516.247
+        },
+        "measuredRunCount": 25,
+        "retainedRssBytesAfterUnload": {
+          "count": 25,
+          "dispersion": 64931214.66298777,
+          "maximum": 672792576,
+          "median": 601194496.0,
+          "p95": 645742592.0
+        },
+        "rtf": {
+          "count": 25,
+          "dispersion": 0.00017283038121825307,
+          "median": 0.04145762294222502,
+          "p95": 0.04173343756624974
+        },
+        "segmentLatencyP50Milliseconds": {
+          "count": 25,
+          "dispersion": 2.1029887493755233,
+          "median": 621.655,
+          "p95": 625.423
+        },
+        "segmentLatencyP95Milliseconds": {
+          "count": 25,
+          "dispersion": 3.570439821870699,
+          "median": 634.001,
+          "p95": 636.261
+        }
+      },
+      {
+        "absolutePeakRssBytes": {
+          "count": 25,
+          "dispersion": 86732764.98953207,
+          "maximum": 1464303616,
+          "median": 1332805632.0,
+          "p95": 1431519232.0
+        },
+        "candidateId": "sherpa-onnx-fire-red-asr2-ctc-zh_en-int8-2026-02-25",
+        "decodeMilliseconds": {
+          "count": 25,
+          "dispersion": 1777.2302872598127,
+          "median": 126062.616,
+          "p95": 129492.246
+        },
+        "endToEndWallMilliseconds": {
+          "count": 25,
+          "dispersion": 1782.911535550495,
+          "median": 130741.1646249966,
+          "p95": 134199.8104170052
+        },
+        "incrementalPeakRssBytes": {
+          "count": 25,
+          "dispersion": 87248655.54598945,
+          "maximum": 1428275200,
+          "median": 1296187392.0,
+          "p95": 1395752960.0
+        },
+        "languageLane": "zh",
+        "lexicalErrorRate": 0.17618131026180156,
+        "lexicalMetric": "cer",
+        "loadMilliseconds": {
+          "count": 25,
+          "dispersion": 10.74976862738915,
+          "median": 437.991,
+          "p95": 455.927
+        },
+        "measuredRunCount": 25,
+        "retainedRssBytesAfterUnload": {
+          "count": 25,
+          "dispersion": 119092666.19854362,
+          "maximum": 1050705920,
+          "median": 786808832.0,
+          "p95": 951861248.0
+        },
+        "rtf": {
+          "count": 25,
+          "dispersion": 0.004433921221646221,
+          "median": 0.3350407334591591,
+          "p95": 0.34315307928768285
+        },
+        "segmentLatencyP50Milliseconds": {
+          "count": 25,
+          "dispersion": 75.23537451413127,
+          "median": 5006.695,
+          "p95": 5151.486
+        },
+        "segmentLatencyP95Milliseconds": {
+          "count": 25,
+          "dispersion": 69.04901921847694,
+          "median": 5227.448,
+          "p95": 5330.897
+        }
+      },
+      {
+        "absolutePeakRssBytes": {
+          "count": 25,
+          "dispersion": 90282551.65979195,
+          "maximum": 687374336,
+          "median": 648364032.0,
+          "p95": 685752320.0
+        },
+        "candidateId": "sherpa-onnx-sense-voice-zh-en-ja-ko-yue-int8-2024-07-17",
+        "decodeMilliseconds": {
+          "count": 25,
+          "dispersion": 302.6088145950808,
+          "median": 21711.663,
+          "p95": 21953.626
+        },
+        "endToEndWallMilliseconds": {
+          "count": 25,
+          "dispersion": 303.17837749093087,
+          "median": 23494.91233399749,
+          "p95": 23745.164583000587
+        },
+        "incrementalPeakRssBytes": {
+          "count": 25,
+          "dispersion": 90085288.45281126,
+          "maximum": 652050432,
+          "median": 613236736.0,
+          "p95": 649986048.0
+        },
+        "languageLane": "zh",
+        "lexicalErrorRate": 0.16971678010692673,
+        "lexicalMetric": "cer",
+        "loadMilliseconds": {
+          "count": 25,
+          "dispersion": 6.877367329552781,
+          "median": 315.296,
+          "p95": 323.518
+        },
+        "measuredRunCount": 25,
+        "retainedRssBytesAfterUnload": {
+          "count": 25,
+          "dispersion": 93153079.18453372,
+          "maximum": 671907840,
+          "median": 627163136.0,
+          "p95": 670400512.0
+        },
+        "rtf": {
+          "count": 25,
+          "dispersion": 3.300390716219594e-05,
+          "median": 0.057530206635469795,
+          "p95": 0.05760351653593385
+        },
+        "segmentLatencyP50Milliseconds": {
+          "count": 25,
+          "dispersion": 0.15083233605563845,
+          "median": 862.495,
+          "p95": 862.698
+        },
+        "segmentLatencyP95Milliseconds": {
+          "count": 25,
+          "dispersion": 1.6018435359297651,
+          "median": 864.509,
+          "p95": 868.64
+        }
+      },
+      {
+        "absolutePeakRssBytes": {
+          "count": 25,
+          "dispersion": 5427925.425145901,
+          "maximum": 785940480,
+          "median": 772243456.0,
+          "p95": 785907712.0
+        },
+        "candidateId": "sherpa-onnx-whisper-base-en-int8-2023-01-31",
+        "decodeMilliseconds": {
+          "count": 25,
+          "dispersion": 2023.159850147401,
+          "median": 17207.739,
+          "p95": 17620.945
+        },
+        "endToEndWallMilliseconds": {
+          "count": 25,
+          "dispersion": 2024.5794564156126,
+          "median": 18470.64879199752,
+          "p95": 18884.400291004567
+        },
+        "incrementalPeakRssBytes": {
+          "count": 25,
+          "dispersion": 5975598.786342622,
+          "maximum": 753467392,
+          "median": 736657408.0,
+          "p95": 751108096.0
+        },
+        "languageLane": "en",
+        "lexicalErrorRate": 0.4022714162626023,
+        "lexicalMetric": "wer",
+        "loadMilliseconds": {
+          "count": 25,
+          "dispersion": 1.804885151360054,
+          "median": 205.163,
+          "p95": 207.125
+        },
+        "measuredRunCount": 25,
+        "retainedRssBytesAfterUnload": {
+          "count": 25,
+          "dispersion": 5434811.851972407,
+          "maximum": 663453696,
+          "median": 649428992.0,
+          "p95": 663371776.0
+        },
+        "rtf": {
+          "count": 25,
+          "dispersion": 0.005562362700537317,
+          "median": 0.04627726710413081,
+          "p95": 0.04723354152147108
+        },
+        "segmentLatencyP50Milliseconds": {
+          "count": 25,
+          "dispersion": 98.68482116759395,
+          "median": 675.612,
+          "p95": 709.208
+        },
+        "segmentLatencyP95Milliseconds": {
+          "count": 25,
+          "dispersion": 99.09507814438413,
+          "median": 868.309,
+          "p95": 932.04
+        }
+      },
+      {
+        "absolutePeakRssBytes": {
+          "count": 25,
+          "dispersion": 72415657.34604576,
+          "maximum": 1465483264,
+          "median": 1339310080.0,
+          "p95": 1464205312.0
+        },
+        "candidateId": "sherpa-onnx-nemo-parakeet-tdt-0.6b-v2-int8-2025-05-01",
+        "decodeMilliseconds": {
+          "count": 25,
+          "dispersion": 200.7110762366798,
+          "median": 42967.847,
+          "p95": 43426.774
+        },
+        "endToEndWallMilliseconds": {
+          "count": 25,
+          "dispersion": 199.81742641616873,
+          "median": 47250.28479100001,
+          "p95": 47691.15112500003
+        },
+        "incrementalPeakRssBytes": {
+          "count": 25,
+          "dispersion": 72116097.87063444,
+          "maximum": 1428422656,
+          "median": 1303117824.0,
+          "p95": 1422458880.0
+        },
+        "languageLane": "en",
+        "lexicalErrorRate": 0.3469202414163302,
+        "lexicalMetric": "wer",
+        "loadMilliseconds": {
+          "count": 25,
+          "dispersion": 12.917273689815504,
+          "median": 616.678,
+          "p95": 639.94
+        },
+        "measuredRunCount": 25,
+        "retainedRssBytesAfterUnload": {
+          "count": 25,
+          "dispersion": 126201350.10120311,
+          "maximum": 1101316096,
+          "median": 944406528.0,
+          "p95": 1085210624.0
+        },
+        "rtf": {
+          "count": 25,
+          "dispersion": 0.0002261862148002061,
+          "median": 0.11517502278453869,
+          "p95": 0.11552461811531842
+        },
+        "segmentLatencyP50Milliseconds": {
+          "count": 25,
+          "dispersion": 3.432131478600428,
+          "median": 1727.192,
+          "p95": 1731.065
+        },
+        "segmentLatencyP95Milliseconds": {
+          "count": 25,
+          "dispersion": 5.279390418447958,
+          "median": 1739.116,
+          "p95": 1749.448
+        }
+      },
+      {
+        "absolutePeakRssBytes": {
+          "count": 25,
+          "dispersion": 95533809.84911136,
+          "maximum": 1550106624,
+          "median": 1333067776.0,
+          "p95": 1418821632.0
+        },
+        "candidateId": "sherpa-onnx-fire-red-asr2-ctc-zh_en-int8-2026-02-25",
+        "decodeMilliseconds": {
+          "count": 25,
+          "dispersion": 1378.163143616256,
+          "median": 125236.277,
+          "p95": 128222.55
+        },
+        "endToEndWallMilliseconds": {
+          "count": 25,
+          "dispersion": 1387.88317177929,
+          "median": 129981.36366700055,
+          "p95": 132929.73929199798
+        },
+        "incrementalPeakRssBytes": {
+          "count": 25,
+          "dispersion": 95256011.52303007,
+          "maximum": 1514078208,
+          "median": 1293434880.0,
+          "p95": 1373716480.0
+        },
+        "languageLane": "en",
+        "lexicalErrorRate": 0.4412799610671622,
+        "lexicalMetric": "wer",
+        "loadMilliseconds": {
+          "count": 25,
+          "dispersion": 11.297195168076007,
+          "median": 440.374,
+          "p95": 463.239
+        },
+        "measuredRunCount": 25,
+        "retainedRssBytesAfterUnload": {
+          "count": 25,
+          "dispersion": 91400689.5074387,
+          "maximum": 1003356160,
+          "median": 782401536.0,
+          "p95": 902414336.0
+        },
+        "rtf": {
+          "count": 25,
+          "dispersion": 0.003652482237908973,
+          "median": 0.33472583100258174,
+          "p95": 0.34061882371692703
+        },
+        "segmentLatencyP50Milliseconds": {
+          "count": 25,
+          "dispersion": 63.75807400729725,
+          "median": 5007.891,
+          "p95": 5139.904
+        },
+        "segmentLatencyP95Milliseconds": {
+          "count": 25,
+          "dispersion": 63.89834166656912,
+          "median": 5217.014,
+          "p95": 5328.907
+        }
+      },
+      {
+        "absolutePeakRssBytes": {
+          "count": 25,
+          "dispersion": 98824892.82486361,
+          "maximum": 795492352,
+          "median": 618446848.0,
+          "p95": 692617216.0
+        },
+        "candidateId": "sherpa-onnx-sense-voice-zh-en-ja-ko-yue-int8-2024-07-17",
+        "decodeMilliseconds": {
+          "count": 25,
+          "dispersion": 104.40716109069146,
+          "median": 21467.543,
+          "p95": 21680.346
+        },
+        "endToEndWallMilliseconds": {
+          "count": 25,
+          "dispersion": 104.13527447699362,
+          "median": 23239.183875004528,
+          "p95": 23475.87249999924
+        },
+        "incrementalPeakRssBytes": {
+          "count": 25,
+          "dispersion": 98564833.02290721,
+          "maximum": 758169600,
+          "median": 582893568.0,
+          "p95": 656080896.0
+        },
+        "languageLane": "en",
+        "lexicalErrorRate": 0.33414344051004863,
+        "lexicalMetric": "wer",
+        "loadMilliseconds": {
+          "count": 25,
+          "dispersion": 9.594442478852013,
+          "median": 318.168,
+          "p95": 336.721
+        },
+        "measuredRunCount": 25,
+        "retainedRssBytesAfterUnload": {
+          "count": 25,
+          "dispersion": 88543415.80483912,
+          "maximum": 677167104,
+          "median": 563249152.0,
+          "p95": 672645120.0
+        },
+        "rtf": {
+          "count": 25,
+          "dispersion": 3.22981278977485e-05,
+          "median": 0.05753486665232821,
+          "p95": 0.05759309850175327
+        },
+        "segmentLatencyP50Milliseconds": {
+          "count": 25,
+          "dispersion": 0.15046500722759773,
+          "median": 862.53,
+          "p95": 862.814
+        },
+        "segmentLatencyP95Milliseconds": {
+          "count": 25,
+          "dispersion": 2.1399462520353274,
+          "median": 864.706,
+          "p95": 868.96
+        }
+      }
+    ],
+    "heldOut": [
+      {
+        "absolutePeakRssBytes": {
+          "count": 25,
+          "dispersion": 24853180.30656006,
+          "maximum": 758251520,
+          "median": 642105344.0,
+          "p95": 644399104.0
+        },
+        "candidateId": "sherpa-onnx-paraformer-zh-int8-2025-10-07",
+        "decodeMilliseconds": {
+          "count": 25,
+          "dispersion": 168.39945489259068,
+          "median": 15808.784,
+          "p95": 16049.214
+        },
+        "endToEndWallMilliseconds": {
+          "count": 25,
+          "dispersion": 173.74110111005135,
+          "median": 17914.31795799872,
+          "p95": 18165.909916999226
+        },
+        "incrementalPeakRssBytes": {
+          "count": 25,
+          "dispersion": 25242621.797355175,
+          "maximum": 723992576,
+          "median": 605978624.0,
+          "p95": 609222656.0
+        },
+        "languageLane": "zh",
+        "lexicalErrorRate": 0.16358151206159394,
+        "lexicalMetric": "cer",
+        "loadMilliseconds": {
+          "count": 25,
+          "dispersion": 7.38104178944951,
+          "median": 647.567,
+          "p95": 659.232
+        },
+        "measuredRunCount": 25,
+        "retainedRssBytesAfterUnload": {
+          "count": 25,
+          "dispersion": 71030967.82287575,
+          "maximum": 742883328,
+          "median": 623656960.0,
+          "p95": 629063680.0
+        },
+        "rtf": {
+          "count": 25,
+          "dispersion": 0.000214246458740583,
+          "median": 0.042696440339221084,
+          "p95": 0.04287023509205089
+        },
+        "segmentLatencyP50Milliseconds": {
+          "count": 25,
+          "dispersion": 3.467482483647163,
+          "median": 640.776,
+          "p95": 642.228
+        },
+        "segmentLatencyP95Milliseconds": {
+          "count": 25,
+          "dispersion": 3.5943449459393833,
+          "median": 651.702,
+          "p95": 656.871
+        }
+      },
+      {
+        "absolutePeakRssBytes": {
+          "count": 25,
+          "dispersion": 2906164.048465266,
+          "maximum": 619708416,
+          "median": 615661568.0,
+          "p95": 618496000.0
+        },
+        "candidateId": "sherpa-onnx-paraformer-zh-2024-03-09",
+        "decodeMilliseconds": {
+          "count": 25,
+          "dispersion": 181.19816901238264,
+          "median": 15369.035,
+          "p95": 15687.943
+        },
+        "endToEndWallMilliseconds": {
+          "count": 25,
+          "dispersion": 181.02418296424628,
+          "median": 17265.389375002997,
+          "p95": 17584.339749999344
+        },
+        "incrementalPeakRssBytes": {
+          "count": 25,
+          "dispersion": 3248520.6922712186,
+          "maximum": 583827456,
+          "median": 579895296.0,
+          "p95": 583450624.0
+        },
+        "languageLane": "zh",
+        "lexicalErrorRate": 0.14419532305782123,
+        "lexicalMetric": "cer",
+        "loadMilliseconds": {
+          "count": 25,
+          "dispersion": 4.497022315443853,
+          "median": 493.561,
+          "p95": 502.368
+        },
+        "measuredRunCount": 25,
+        "retainedRssBytesAfterUnload": {
+          "count": 25,
+          "dispersion": 60785253.936734386,
+          "maximum": 604192768,
+          "median": 600047616.0,
+          "p95": 603389952.0
+        },
+        "rtf": {
+          "count": 25,
+          "dispersion": 0.0001539513324426057,
+          "median": 0.04150876411170529,
+          "p95": 0.041671909720358544
+        },
+        "segmentLatencyP50Milliseconds": {
+          "count": 25,
+          "dispersion": 2.690916175283063,
+          "median": 623.065,
+          "p95": 624.578
+        },
+        "segmentLatencyP95Milliseconds": {
+          "count": 25,
+          "dispersion": 2.655410431552901,
+          "median": 632.932,
+          "p95": 637.049
+        }
+      },
+      {
+        "absolutePeakRssBytes": {
+          "count": 25,
+          "dispersion": 64618785.1487048,
+          "maximum": 1485651968,
+          "median": 1339965440.0,
+          "p95": 1463828480.0
+        },
+        "candidateId": "sherpa-onnx-nemo-parakeet-tdt-0.6b-v2-int8-2025-05-01",
+        "decodeMilliseconds": {
+          "count": 25,
+          "dispersion": 394.2179404950033,
+          "median": 43031.454,
+          "p95": 43661.658
+        },
+        "endToEndWallMilliseconds": {
+          "count": 25,
+          "dispersion": 393.575723579875,
+          "median": 47332.73700000427,
+          "p95": 47938.43179199757
+        },
+        "incrementalPeakRssBytes": {
+          "count": 25,
+          "dispersion": 64563520.09963807,
+          "maximum": 1441890304,
+          "median": 1301102592.0,
+          "p95": 1428897792.0
+        },
+        "languageLane": "en",
+        "lexicalErrorRate": 0.3322635878575815,
+        "lexicalMetric": "wer",
+        "loadMilliseconds": {
+          "count": 25,
+          "dispersion": 7.364812552237827,
+          "median": 616.996,
+          "p95": 629.058
+        },
+        "measuredRunCount": 25,
+        "retainedRssBytesAfterUnload": {
+          "count": 25,
+          "dispersion": 135391297.821463,
+          "maximum": 1218101248,
+          "median": 947585024.0,
+          "p95": 1215381504.0
+        },
+        "rtf": {
+          "count": 25,
+          "dispersion": 0.000340144926069872,
+          "median": 0.11535224520415818,
+          "p95": 0.11566245828698553
+        },
+        "segmentLatencyP50Milliseconds": {
+          "count": 25,
+          "dispersion": 5.575719114015683,
+          "median": 1728.812,
+          "p95": 1733.526
+        },
+        "segmentLatencyP95Milliseconds": {
+          "count": 25,
+          "dispersion": 6.119678509725815,
+          "median": 1743.328,
+          "p95": 1757.245
+        }
+      },
+      {
+        "absolutePeakRssBytes": {
+          "count": 25,
+          "dispersion": 51800403.5314251,
+          "maximum": 766115840,
+          "median": 681656320.0,
+          "p95": 687112192.0
+        },
+        "candidateId": "sherpa-onnx-sense-voice-zh-en-ja-ko-yue-int8-2024-07-17",
+        "decodeMilliseconds": {
+          "count": 25,
+          "dispersion": 176.70062995810287,
+          "median": 21467.042,
+          "p95": 21728.893
+        },
+        "endToEndWallMilliseconds": {
+          "count": 25,
+          "dispersion": 176.3763807068487,
+          "median": 23262.22295899788,
+          "p95": 23523.821750000934
+        },
+        "incrementalPeakRssBytes": {
+          "count": 25,
+          "dispersion": 52015344.65187742,
+          "maximum": 730513408,
+          "median": 644104192.0,
+          "p95": 651575296.0
+        },
+        "languageLane": "en",
+        "lexicalErrorRate": 0.3286364205859769,
+        "lexicalMetric": "wer",
+        "loadMilliseconds": {
+          "count": 25,
+          "dispersion": 7.732611785005116,
+          "median": 321.212,
+          "p95": 332.745
+        },
+        "measuredRunCount": 25,
+        "retainedRssBytesAfterUnload": {
+          "count": 25,
+          "dispersion": 71797407.30066171,
+          "maximum": 751796224,
+          "median": 660815872.0,
+          "p95": 673185792.0
+        },
+        "rtf": {
+          "count": 25,
+          "dispersion": 2.7641321420570147e-05,
+          "median": 0.057538423538352965,
+          "p95": 0.057577316649476136
+        },
+        "segmentLatencyP50Milliseconds": {
+          "count": 25,
+          "dispersion": 0.1354889574836348,
+          "median": 862.549,
+          "p95": 862.769
+        },
+        "segmentLatencyP95Milliseconds": {
+          "count": 25,
+          "dispersion": 2.0267067671471453,
+          "median": 864.342,
+          "p95": 869.116
+        }
+      }
+    ],
+    "operational": [
+      {
+        "absolutePeakRssBytes": {
+          "count": 1,
+          "dispersion": 0.0,
+          "maximum": 948420608,
+          "median": 948420608.0,
+          "p95": 948420608.0
+        },
+        "candidateId": "sherpa-onnx-paraformer-zh-2024-03-09",
+        "decodeMilliseconds": {
+          "count": 1,
+          "dispersion": 0.0,
+          "median": 155411.099,
+          "p95": 155411.099
+        },
+        "endToEndWallMilliseconds": {
+          "count": 1,
+          "dispersion": 0.0,
+          "median": 157965.64720800234,
+          "p95": 157965.64720800234
+        },
+        "incrementalPeakRssBytes": {
+          "count": 1,
+          "dispersion": 0.0,
+          "maximum": 911245312,
+          "median": 911245312.0,
+          "p95": 911245312.0
+        },
+        "languageLane": "zh",
+        "lexicalErrorRate": 0.14932472606812197,
+        "lexicalMetric": "cer",
+        "loadMilliseconds": {
+          "count": 1,
+          "dispersion": 0.0,
+          "median": 495.254,
+          "p95": 495.254
+        },
+        "measuredRunCount": 1,
+        "retainedRssBytesAfterUnload": {
+          "count": 1,
+          "dispersion": 0.0,
+          "maximum": 805650432,
+          "median": 805650432.0,
+          "p95": 805650432.0
+        },
+        "rtf": {
+          "count": 1,
+          "dispersion": 0.0,
+          "median": 0.04149363729568379,
+          "p95": 0.04149363729568379
+        },
+        "segmentLatencyP50Milliseconds": {
+          "count": 1,
+          "dispersion": 0.0,
+          "median": 622.39,
+          "p95": 622.39
+        },
+        "segmentLatencyP95Milliseconds": {
+          "count": 1,
+          "dispersion": 0.0,
+          "median": 633.617,
+          "p95": 633.617
+        }
+      },
+      {
+        "absolutePeakRssBytes": {
+          "count": 1,
+          "dispersion": 0.0,
+          "maximum": 993771520,
+          "median": 993771520.0,
+          "p95": 993771520.0
+        },
+        "candidateId": "sherpa-onnx-sense-voice-zh-en-ja-ko-yue-int8-2024-07-17",
+        "decodeMilliseconds": {
+          "count": 1,
+          "dispersion": 0.0,
+          "median": 215215.158,
+          "p95": 215215.158
+        },
+        "endToEndWallMilliseconds": {
+          "count": 1,
+          "dispersion": 0.0,
+          "median": 217643.5262080049,
+          "p95": 217643.5262080049
+        },
+        "incrementalPeakRssBytes": {
+          "count": 1,
+          "dispersion": 0.0,
+          "maximum": 955285504,
+          "median": 955285504.0,
+          "p95": 955285504.0
+        },
+        "languageLane": "en",
+        "lexicalErrorRate": 0.3175542406311637,
+        "lexicalMetric": "wer",
+        "loadMilliseconds": {
+          "count": 1,
+          "dispersion": 0.0,
+          "median": 313.738,
+          "p95": 313.738
+        },
+        "measuredRunCount": 1,
+        "retainedRssBytesAfterUnload": {
+          "count": 1,
+          "dispersion": 0.0,
+          "maximum": 847200256,
+          "median": 847200256.0,
+          "p95": 847200256.0
+        },
+        "rtf": {
+          "count": 1,
+          "dispersion": 0.0,
+          "median": 0.05751893768507927,
+          "p95": 0.05751893768507927
+        },
+        "segmentLatencyP50Milliseconds": {
+          "count": 1,
+          "dispersion": 0.0,
+          "median": 862.405,
+          "p95": 862.405
+        },
+        "segmentLatencyP95Milliseconds": {
+          "count": 1,
+          "dispersion": 0.0,
+          "median": 864.549,
+          "p95": 864.549
+        }
+      },
+      {
+        "absolutePeakRssBytes": {
+          "count": 1,
+          "dispersion": 0.0,
+          "maximum": 921124864,
+          "median": 921124864.0,
+          "p95": 921124864.0
+        },
+        "candidateId": "sherpa-onnx-sense-voice-zh-en-ja-ko-yue-int8-2024-07-17",
+        "decodeMilliseconds": {
+          "count": 1,
+          "dispersion": 0.0,
+          "median": 215408.571,
+          "p95": 215408.571
+        },
+        "endToEndWallMilliseconds": {
+          "count": 1,
+          "dispersion": 0.0,
+          "median": 217846.6752500026,
+          "p95": 217846.6752500026
+        },
+        "incrementalPeakRssBytes": {
+          "count": 1,
+          "dispersion": 0.0,
+          "maximum": 884424704,
+          "median": 884424704.0,
+          "p95": 884424704.0
+        },
+        "languageLane": "zh",
+        "lexicalErrorRate": 0.16478382740168182,
+        "lexicalMetric": "cer",
+        "loadMilliseconds": {
+          "count": 1,
+          "dispersion": 0.0,
+          "median": 312.769,
+          "p95": 312.769
+        },
+        "measuredRunCount": 1,
+        "retainedRssBytesAfterUnload": {
+          "count": 1,
+          "dispersion": 0.0,
+          "maximum": 777158656,
+          "median": 777158656.0,
+          "p95": 777158656.0
+        },
+        "rtf": {
+          "count": 1,
+          "dispersion": 0.0,
+          "median": 0.05751252756700183,
+          "p95": 0.05751252756700183
+        },
+        "segmentLatencyP50Milliseconds": {
+          "count": 1,
+          "dispersion": 0.0,
+          "median": 862.425,
+          "p95": 862.425
+        },
+        "segmentLatencyP95Milliseconds": {
+          "count": 1,
+          "dispersion": 0.0,
+          "median": 863.366,
+          "p95": 863.366
+        }
+      }
+    ],
+    "stability": [
+      {
+        "absolutePeakRssBytes": {
+          "count": 5,
+          "dispersion": 8824352.434627946,
+          "maximum": 209584128,
+          "median": 196132864.0,
+          "p95": 209584128.0
+        },
+        "candidateId": "sherpa-streaming-zipformer-zh-14m-2023-02-23",
+        "decodeMilliseconds": {
+          "count": 5,
+          "dispersion": 26.604590811361895,
+          "median": 2685.897,
+          "p95": 2731.824
+        },
+        "endToEndWallMilliseconds": {
+          "count": 5,
+          "dispersion": 26.636093163867173,
+          "median": 3256.5157920034835,
+          "p95": 3304.2716669951915
+        },
+        "incrementalPeakRssBytes": {
+          "count": 5,
+          "dispersion": 8289043.696140162,
+          "maximum": 172949504,
+          "median": 159203328.0,
+          "p95": 172949504.0
+        },
+        "languageLane": "zh",
+        "lexicalErrorRate": 0.2542037586547972,
+        "lexicalMetric": "cer",
+        "loadMilliseconds": {
+          "count": 5,
+          "dispersion": 2.6273109446732783,
+          "median": 112.054,
+          "p95": 113.277
+        },
+        "measuredRunCount": 5,
+        "retainedRssBytesAfterUnload": {
+          "count": 5,
+          "dispersion": 8532101.359841093,
+          "maximum": 196280320,
+          "median": 183762944.0,
+          "p95": 196280320.0
+        },
+        "rtf": {
+          "count": 5,
+          "dispersion": 8.582679789457956e-05,
+          "median": 0.008664742886637848,
+          "p95": 0.008812904058326344
+        },
+        "segmentLatencyP50Milliseconds": {
+          "count": 5,
+          "dispersion": 1.3983520872798811,
+          "median": 136.037,
+          "p95": 137.247
+        },
+        "segmentLatencyP95Milliseconds": {
+          "count": 5,
+          "dispersion": 1.1510729950789413,
+          "median": 140.519,
+          "p95": 140.92
+        }
+      },
+      {
+        "absolutePeakRssBytes": {
+          "count": 5,
+          "dispersion": 58412319.33574333,
+          "maximum": 687652864,
+          "median": 606404608.0,
+          "p95": 687652864.0
+        },
+        "candidateId": "sherpa-onnx-paraformer-zh-int8-2025-10-07",
+        "decodeMilliseconds": {
+          "count": 5,
+          "dispersion": 47.36465966688646,
+          "median": 13357.481,
+          "p95": 13413.604
+        },
+        "endToEndWallMilliseconds": {
+          "count": 5,
+          "dispersion": 69.27751751705,
+          "median": 15470.173791996785,
+          "p95": 15575.99054199818
+        },
+        "incrementalPeakRssBytes": {
+          "count": 5,
+          "dispersion": 59354397.64130636,
+          "maximum": 649150464,
+          "median": 568164352.0,
+          "p95": 649150464.0
+        },
+        "languageLane": "zh",
+        "lexicalErrorRate": 0.08605341246290801,
+        "lexicalMetric": "cer",
+        "loadMilliseconds": {
+          "count": 5,
+          "dispersion": 25.651196653567638,
+          "median": 657.413,
+          "p95": 709.097
+        },
+        "measuredRunCount": 5,
+        "retainedRssBytesAfterUnload": {
+          "count": 5,
+          "dispersion": 70045619.50264929,
+          "maximum": 613433344,
+          "median": 544587776.0,
+          "p95": 613433344.0
+        },
+        "rtf": {
+          "count": 5,
+          "dispersion": 0.00015279908273722946,
+          "median": 0.043091428479256726,
+          "p95": 0.04327248209561907
+        },
+        "segmentLatencyP50Milliseconds": {
+          "count": 5,
+          "dispersion": 2.216134147564163,
+          "median": 644.283,
+          "p95": 645.893
+        },
+        "segmentLatencyP95Milliseconds": {
+          "count": 5,
+          "dispersion": 2.029667598401259,
+          "median": 663.361,
+          "p95": 665.553
+        }
+      },
+      {
+        "absolutePeakRssBytes": {
+          "count": 5,
+          "dispersion": 74617359.92951956,
+          "maximum": 773881856,
+          "median": 685604864.0,
+          "p95": 773881856.0
+        },
+        "candidateId": "sherpa-onnx-paraformer-zh-2024-03-09",
+        "decodeMilliseconds": {
+          "count": 5,
+          "dispersion": 91.87807320443805,
+          "median": 13022.746,
+          "p95": 13232.191
+        },
+        "endToEndWallMilliseconds": {
+          "count": 5,
+          "dispersion": 93.32999931062449,
+          "median": 14942.656999999599,
+          "p95": 15160.726874993998
+        },
+        "incrementalPeakRssBytes": {
+          "count": 5,
+          "dispersion": 75011187.2532761,
+          "maximum": 731807744,
+          "median": 644022272.0,
+          "p95": 731807744.0
+        },
+        "languageLane": "zh",
+        "lexicalErrorRate": 0.09693372898120672,
+        "lexicalMetric": "cer",
+        "loadMilliseconds": {
+          "count": 5,
+          "dispersion": 5.138436322462297,
+          "median": 515.556,
+          "p95": 517.915
+        },
+        "measuredRunCount": 5,
+        "retainedRssBytesAfterUnload": {
+          "count": 5,
+          "dispersion": 35181863.99457288,
+          "maximum": 628129792,
+          "median": 546390016.0,
+          "p95": 628129792.0
+        },
+        "rtf": {
+          "count": 5,
+          "dispersion": 0.0002964000038855329,
+          "median": 0.04201156848828957,
+          "p95": 0.04268724111232983
+        },
+        "segmentLatencyP50Milliseconds": {
+          "count": 5,
+          "dispersion": 2.2244183958958805,
+          "median": 627.595,
+          "p95": 629.654
+        },
+        "segmentLatencyP95Milliseconds": {
+          "count": 5,
+          "dispersion": 48.96873201789073,
+          "median": 647.254,
+          "p95": 769.209
+        }
+      },
+      {
+        "absolutePeakRssBytes": {
+          "count": 5,
+          "dispersion": 65182676.87953958,
+          "maximum": 2227519488,
+          "median": 2107129856.0,
+          "p95": 2227519488.0
+        },
+        "candidateId": "sherpa-onnx-funasr-nano-int8-2025-12-30",
+        "decodeMilliseconds": {
+          "count": 5,
+          "dispersion": 283.1655170500814,
+          "median": 61293.577,
+          "p95": 61357.826
+        },
+        "endToEndWallMilliseconds": {
+          "count": 5,
+          "dispersion": 282.4264432060723,
+          "median": 68303.65433399857,
+          "p95": 68403.846084002
+        },
+        "incrementalPeakRssBytes": {
+          "count": 5,
+          "dispersion": 64321818.7103667,
+          "maximum": 2184675328,
+          "median": 2063548416.0,
+          "p95": 2184675328.0
+        },
+        "languageLane": "zh",
+        "lexicalErrorRate": 0.1543026706231454,
+        "lexicalMetric": "cer",
+        "loadMilliseconds": {
+          "count": 5,
+          "dispersion": 13.110373398191232,
+          "median": 1521.458,
+          "p95": 1534.621
+        },
+        "measuredRunCount": 5,
+        "retainedRssBytesAfterUnload": {
+          "count": 5,
+          "dispersion": 141034302.46536162,
+          "maximum": 1461764096,
+          "median": 1385873408.0,
+          "p95": 1461764096.0
+        },
+        "rtf": {
+          "count": 5,
+          "dispersion": 0.0009134960870058744,
+          "median": 0.19773397315955868,
+          "p95": 0.197941241370411
+        },
+        "segmentLatencyP50Milliseconds": {
+          "count": 5,
+          "dispersion": 14.47674513970591,
+          "median": 2913.817,
+          "p95": 2935.431
+        },
+        "segmentLatencyP95Milliseconds": {
+          "count": 5,
+          "dispersion": 16.13175967586915,
+          "median": 3486.307,
+          "p95": 3488.558
+        }
+      },
+      {
+        "absolutePeakRssBytes": {
+          "count": 5,
+          "dispersion": 60874514.5627236,
+          "maximum": 1501364224,
+          "median": 1420410880.0,
+          "p95": 1501364224.0
+        },
+        "candidateId": "sherpa-onnx-fire-red-asr2-ctc-zh_en-int8-2026-02-25",
+        "decodeMilliseconds": {
+          "count": 5,
+          "dispersion": 1565.1479117429876,
+          "median": 103840.126,
+          "p95": 105760.048
+        },
+        "endToEndWallMilliseconds": {
+          "count": 5,
+          "dispersion": 1558.8385901639672,
+          "median": 108560.96233299468,
+          "p95": 110458.94020800188
+        },
+        "incrementalPeakRssBytes": {
+          "count": 5,
+          "dispersion": 61392307.45730373,
+          "maximum": 1461698560,
+          "median": 1379434496.0,
+          "p95": 1461698560.0
+        },
+        "languageLane": "zh",
+        "lexicalErrorRate": 0.11374876360039565,
+        "lexicalMetric": "cer",
+        "loadMilliseconds": {
+          "count": 5,
+          "dispersion": 9.609997452653145,
+          "median": 459.13,
+          "p95": 475.579
+        },
+        "measuredRunCount": 5,
+        "retainedRssBytesAfterUnload": {
+          "count": 5,
+          "dispersion": 150182801.00177458,
+          "maximum": 1221492736,
+          "median": 1032257536.0,
+          "p95": 1221492736.0
+        },
+        "rtf": {
+          "count": 5,
+          "dispersion": 0.00504918998562161,
+          "median": 0.3349897606297181,
+          "p95": 0.34118345699722563
+        },
+        "segmentLatencyP50Milliseconds": {
+          "count": 5,
+          "dispersion": 75.1176357471399,
+          "median": 5033.241,
+          "p95": 5118.15
+        },
+        "segmentLatencyP95Milliseconds": {
+          "count": 5,
+          "dispersion": 93.20730073422364,
+          "median": 5087.006,
+          "p95": 5243.509
+        }
+      },
+      {
+        "absolutePeakRssBytes": {
+          "count": 5,
+          "dispersion": 31558108.02183909,
+          "maximum": 777568256,
+          "median": 746373120.0,
+          "p95": 777568256.0
+        },
+        "candidateId": "sherpa-onnx-sense-voice-zh-en-ja-ko-yue-int8-2024-07-17",
+        "decodeMilliseconds": {
+          "count": 5,
+          "dispersion": 69.87985680695134,
+          "median": 18026.725,
+          "p95": 18029.469
+        },
+        "endToEndWallMilliseconds": {
+          "count": 5,
+          "dispersion": 80.66784103521888,
+          "median": 19836.90383400244,
+          "p95": 19874.445374996867
+        },
+        "incrementalPeakRssBytes": {
+          "count": 5,
+          "dispersion": 30704312.967799176,
+          "maximum": 735903744,
+          "median": 707100672.0,
+          "p95": 735903744.0
+        },
+        "languageLane": "zh",
+        "lexicalErrorRate": 0.09891196834817013,
+        "lexicalMetric": "cer",
+        "loadMilliseconds": {
+          "count": 5,
+          "dispersion": 28.330734197334166,
+          "median": 339.782,
+          "p95": 406.94
+        },
+        "measuredRunCount": 5,
+        "retainedRssBytesAfterUnload": {
+          "count": 5,
+          "dispersion": 94058037.19461858,
+          "maximum": 762068992,
+          "median": 732692480.0,
+          "p95": 762068992.0
+        },
+        "rtf": {
+          "count": 5,
+          "dispersion": 0.00022543343701835885,
+          "median": 0.058154477708239234,
+          "p95": 0.05816332989225111
+        },
+        "segmentLatencyP50Milliseconds": {
+          "count": 5,
+          "dispersion": 2.6010564315293405,
+          "median": 869.849,
+          "p95": 870.133
+        },
+        "segmentLatencyP95Milliseconds": {
+          "count": 5,
+          "dispersion": 2.9785056387389948,
+          "median": 872.21,
+          "p95": 874.27
+        }
+      },
+      {
+        "absolutePeakRssBytes": {
+          "count": 5,
+          "dispersion": 10774270.877753166,
+          "maximum": 202276864,
+          "median": 181600256.0,
+          "p95": 202276864.0
+        },
+        "candidateId": "sherpa-onnx-streaming-zipformer-en-20m-2023-02-17",
+        "decodeMilliseconds": {
+          "count": 5,
+          "dispersion": 25.899779895589862,
+          "median": 3504.165,
+          "p95": 3535.366
+        },
+        "endToEndWallMilliseconds": {
+          "count": 5,
+          "dispersion": 29.263939695691125,
+          "median": 4150.270166996052,
+          "p95": 4186.5367499995045
+        },
+        "incrementalPeakRssBytes": {
+          "count": 5,
+          "dispersion": 9891966.152603444,
+          "maximum": 166576128,
+          "median": 147800064.0,
+          "p95": 166576128.0
+        },
+        "languageLane": "en",
+        "lexicalErrorRate": 0.7243867243867244,
+        "lexicalMetric": "wer",
+        "loadMilliseconds": {
+          "count": 5,
+          "dispersion": 1.0288082425797336,
+          "median": 96.866,
+          "p95": 98.356
+        },
+        "measuredRunCount": 5,
+        "retainedRssBytesAfterUnload": {
+          "count": 5,
+          "dispersion": 10791574.545946155,
+          "maximum": 189808640,
+          "median": 169181184.0,
+          "p95": 189808640.0
+        },
+        "rtf": {
+          "count": 5,
+          "dispersion": 8.26623895556934e-05,
+          "median": 0.011183981233243968,
+          "p95": 0.011283563130345972
+        },
+        "segmentLatencyP50Milliseconds": {
+          "count": 5,
+          "dispersion": 1.4530090983885804,
+          "median": 172.662,
+          "p95": 174.833
+        },
+        "segmentLatencyP95Milliseconds": {
+          "count": 5,
+          "dispersion": 1.3587555188480405,
+          "median": 177.298,
+          "p95": 178.576
+        }
+      },
+      {
+        "absolutePeakRssBytes": {
+          "count": 5,
+          "dispersion": 2460577.89929101,
+          "maximum": 765050880,
+          "median": 760856576.0,
+          "p95": 765050880.0
+        },
+        "candidateId": "sherpa-onnx-whisper-base-en-int8-2023-01-31",
+        "decodeMilliseconds": {
+          "count": 5,
+          "dispersion": 21.80605680080671,
+          "median": 15219.791,
+          "p95": 15250.732
+        },
+        "endToEndWallMilliseconds": {
+          "count": 5,
+          "dispersion": 26.58641164776653,
+          "median": 16473.3588329982,
+          "p95": 16513.212249999924
+        },
+        "incrementalPeakRssBytes": {
+          "count": 5,
+          "dispersion": 6046762.419983296,
+          "maximum": 733364224,
+          "median": 725188608.0,
+          "p95": 733364224.0
+        },
+        "languageLane": "en",
+        "lexicalErrorRate": 0.2886002886002886,
+        "lexicalMetric": "wer",
+        "loadMilliseconds": {
+          "count": 5,
+          "dispersion": 2.686219916536991,
+          "median": 207.292,
+          "p95": 209.235
+        },
+        "measuredRunCount": 5,
+        "retainedRssBytesAfterUnload": {
+          "count": 5,
+          "dispersion": 2452014.3543248354,
+          "maximum": 642531328,
+          "median": 638320640.0,
+          "p95": 642531328.0
+        },
+        "rtf": {
+          "count": 5,
+          "dispersion": 6.959675986469658e-05,
+          "median": 0.04857586812204774,
+          "p95": 0.04867462019660411
+        },
+        "segmentLatencyP50Milliseconds": {
+          "count": 5,
+          "dispersion": 3.559835580472778,
+          "median": 683.629,
+          "p95": 691.494
+        },
+        "segmentLatencyP95Milliseconds": {
+          "count": 5,
+          "dispersion": 1.3870147223443738,
+          "median": 1332.718,
+          "p95": 1333.681
+        }
+      },
+      {
+        "absolutePeakRssBytes": {
+          "count": 5,
+          "dispersion": 53803617.740971886,
+          "maximum": 1456914432,
+          "median": 1364131840.0,
+          "p95": 1456914432.0
+        },
+        "candidateId": "sherpa-onnx-nemo-parakeet-tdt-0.6b-v2-int8-2025-05-01",
+        "decodeMilliseconds": {
+          "count": 5,
+          "dispersion": 57.625513507821424,
+          "median": 36241.623,
+          "p95": 36261.385
+        },
+        "endToEndWallMilliseconds": {
+          "count": 5,
+          "dispersion": 53.744662528110815,
+          "median": 40539.57333300059,
+          "p95": 40551.02708299819
+        },
+        "incrementalPeakRssBytes": {
+          "count": 5,
+          "dispersion": 53477626.57823646,
+          "maximum": 1414987776,
+          "median": 1324515328.0,
+          "p95": 1414987776.0
+        },
+        "languageLane": "en",
+        "lexicalErrorRate": 0.2496392496392496,
+        "lexicalMetric": "wer",
+        "loadMilliseconds": {
+          "count": 5,
+          "dispersion": 6.816881005269194,
+          "median": 615.174,
+          "p95": 624.523
+        },
+        "measuredRunCount": 5,
+        "retainedRssBytesAfterUnload": {
+          "count": 5,
+          "dispersion": 83512615.4435983,
+          "maximum": 1076969472,
+          "median": 971603968.0,
+          "p95": 1076969472.0
+        },
+        "rtf": {
+          "count": 5,
+          "dispersion": 0.00018391903966494749,
+          "median": 0.1156696763692072,
+          "p95": 0.11573274926592622
+        },
+        "segmentLatencyP50Milliseconds": {
+          "count": 5,
+          "dispersion": 3.796563972857524,
+          "median": 1733.078,
+          "p95": 1736.867
+        },
+        "segmentLatencyP95Milliseconds": {
+          "count": 5,
+          "dispersion": 5.046366986258513,
+          "median": 1744.37,
+          "p95": 1749.001
+        }
+      },
+      {
+        "absolutePeakRssBytes": {
+          "count": 5,
+          "dispersion": 48090041.053229615,
+          "maximum": 2161836032,
+          "median": 2043658240.0,
+          "p95": 2161836032.0
+        },
+        "candidateId": "sherpa-onnx-funasr-nano-int8-2025-12-30",
+        "decodeMilliseconds": {
+          "count": 5,
+          "dispersion": 29.72097252378916,
+          "median": 66828.77,
+          "p95": 66884.722
+        },
+        "endToEndWallMilliseconds": {
+          "count": 5,
+          "dispersion": 52.600161501217585,
+          "median": 73806.42079200334,
+          "p95": 73926.01450000075
+        },
+        "incrementalPeakRssBytes": {
+          "count": 5,
+          "dispersion": 48091124.38286207,
+          "maximum": 2121072640,
+          "median": 2003517440.0,
+          "p95": 2121072640.0
+        },
+        "languageLane": "en",
+        "lexicalErrorRate": 0.21645021645021645,
+        "lexicalMetric": "wer",
+        "loadMilliseconds": {
+          "count": 5,
+          "dispersion": 20.114062947102433,
+          "median": 1488.435,
+          "p95": 1536.771
+        },
+        "measuredRunCount": 5,
+        "retainedRssBytesAfterUnload": {
+          "count": 5,
+          "dispersion": 66966456.58317644,
+          "maximum": 1164460032,
+          "median": 1082540032.0,
+          "p95": 1164460032.0
+        },
+        "rtf": {
+          "count": 5,
+          "dispersion": 9.48582041484404e-05,
+          "median": 0.21329238478233117,
+          "p95": 0.21347096259415294
+        },
+        "segmentLatencyP50Milliseconds": {
+          "count": 5,
+          "dispersion": 4.405532567125088,
+          "median": 3121.949,
+          "p95": 3126.04
+        },
+        "segmentLatencyP95Milliseconds": {
+          "count": 5,
+          "dispersion": 3.4236116602207844,
+          "median": 3880.828,
+          "p95": 3884.305
+        }
+      },
+      {
+        "absolutePeakRssBytes": {
+          "count": 5,
+          "dispersion": 86932811.70685522,
+          "maximum": 1433092096,
+          "median": 1308524544.0,
+          "p95": 1433092096.0
+        },
+        "candidateId": "sherpa-onnx-fire-red-asr2-ctc-zh_en-int8-2026-02-25",
+        "decodeMilliseconds": {
+          "count": 5,
+          "dispersion": 751.5844253770581,
+          "median": 105778.331,
+          "p95": 105885.841
+        },
+        "endToEndWallMilliseconds": {
+          "count": 5,
+          "dispersion": 759.1512846051014,
+          "median": 110492.30091699428,
+          "p95": 110609.90583300008
+        },
+        "incrementalPeakRssBytes": {
+          "count": 5,
+          "dispersion": 84180878.22391689,
+          "maximum": 1386987520,
+          "median": 1269334016.0,
+          "p95": 1386987520.0
+        },
+        "languageLane": "en",
+        "lexicalErrorRate": 0.3347763347763348,
+        "lexicalMetric": "wer",
+        "loadMilliseconds": {
+          "count": 5,
+          "dispersion": 9.484253910561437,
+          "median": 442.986,
+          "p95": 449.215
+        },
+        "measuredRunCount": 5,
+        "retainedRssBytesAfterUnload": {
+          "count": 5,
+          "dispersion": 129575310.63835122,
+          "maximum": 1019314176,
+          "median": 760823808.0,
+          "p95": 1019314176.0
+        },
+        "rtf": {
+          "count": 5,
+          "dispersion": 0.0023987757735767163,
+          "median": 0.33760478424613816,
+          "p95": 0.3379479158687604
+        },
+        "segmentLatencyP50Milliseconds": {
+          "count": 5,
+          "dispersion": 57.800514720891655,
+          "median": 5026.637,
+          "p95": 5115.828
+        },
+        "segmentLatencyP95Milliseconds": {
+          "count": 5,
+          "dispersion": 59.79008991128895,
+          "median": 5201.185,
+          "p95": 5314.207
+        }
+      },
+      {
+        "absolutePeakRssBytes": {
+          "count": 5,
+          "dispersion": 86236269.45138313,
+          "maximum": 673267712,
+          "median": 666943488.0,
+          "p95": 673267712.0
+        },
+        "candidateId": "sherpa-onnx-sense-voice-zh-en-ja-ko-yue-int8-2024-07-17",
+        "decodeMilliseconds": {
+          "count": 5,
+          "dispersion": 8.152383813339757,
+          "median": 18037.057,
+          "p95": 18055.486
+        },
+        "endToEndWallMilliseconds": {
+          "count": 5,
+          "dispersion": 5.0936062562920235,
+          "median": 19824.586666996765,
+          "p95": 19832.681208004942
+        },
+        "incrementalPeakRssBytes": {
+          "count": 5,
+          "dispersion": 88966769.48841389,
+          "maximum": 638009344,
+          "median": 630013952.0,
+          "p95": 638009344.0
+        },
+        "languageLane": "en",
+        "lexicalErrorRate": 0.14574314574314573,
+        "lexicalMetric": "wer",
+        "loadMilliseconds": {
+          "count": 5,
+          "dispersion": 5.591091929131557,
+          "median": 323.2,
+          "p95": 324.846
+        },
+        "measuredRunCount": 5,
+        "retainedRssBytesAfterUnload": {
+          "count": 5,
+          "dispersion": 83753964.18654728,
+          "maximum": 657850368,
+          "median": 556236800.0,
+          "p95": 657850368.0
+        },
+        "rtf": {
+          "count": 5,
+          "dispersion": 2.6019353419312742e-05,
+          "median": 0.05756752521383889,
+          "p95": 0.0576263436741989
+        },
+        "segmentLatencyP50Milliseconds": {
+          "count": 5,
+          "dispersion": 0.22405767114743447,
+          "median": 863.227,
+          "p95": 863.532
+        },
+        "segmentLatencyP95Milliseconds": {
+          "count": 5,
+          "dispersion": 1.021553836075239,
+          "median": 865.306,
+          "p95": 867.508
+        }
+      }
+    ]
+  },
+  "kind": "m4_asr_official_metric_and_parameter_parity_supplement",
+  "officialReferences": [
+    {
+      "candidateId": "sherpa-onnx-qwen3-asr-0.6B-int8-2026-03-25",
+      "comparability": "not_directly_comparable",
+      "reason": "The upstream number uses different datasets, the original model runtime, and its own normalization; this experiment uses a sherpa-onnx int8 conversion and local FLEURS fixtures.",
+      "reportedMetric": "Open ASR Leaderboard mean WER",
+      "reportedValue": 0.0631,
+      "sourceUrl": "https://huggingface.co/Qwen/Qwen3-ASR-0.6B-hf"
+    },
+    {
+      "candidateId": "sherpa-onnx-whisper-base-en-int8-2023-01-31",
+      "comparability": "not_directly_comparable",
+      "reason": "The upstream example uses LibriSpeech test-clean and the Transformers implementation; this benchmark uses FLEURS, sherpa-onnx, int8, and fixed 15-second segmentation.",
+      "reportedMetric": "LibriSpeech test-clean WER",
+      "reportedValue": 0.04271,
+      "sourceUrl": "https://huggingface.co/openai/whisper-base.en"
+    },
+    {
+      "candidateId": "sherpa-onnx-nemo-parakeet-tdt-0.6b-v2-int8-2025-05-01",
+      "comparability": "not_directly_comparable",
+      "reason": "The model card reports multiple Open ASR datasets with the native NeMo/GPU path; no single number matches this FLEURS sherpa-onnx int8 CPU lane.",
+      "reportedMetric": "model-card benchmark suite",
+      "reportedValue": null,
+      "sourceUrl": "https://huggingface.co/nvidia/parakeet-tdt-0.6b-v2"
+    }
+  ],
+  "parameterParity": [
+    {
+      "absolutePeakRssBytes": {
+        "count": 5,
+        "dispersion": 8837477.96321585,
+        "maximum": 138264576,
+        "median": 121274368.0,
+        "p95": 138264576.0
+      },
+      "candidateId": "sherpa-streaming-zipformer-zh-14m-2023-02-23",
+      "decodeMilliseconds": {
+        "count": 5,
+        "dispersion": 1.6897266761225038,
+        "median": 218.647,
+        "p95": 222.269
+      },
+      "distinctRawOutputCount": 1,
+      "endToEndWallMilliseconds": {
+        "count": 5,
+        "dispersion": 3.3589912934832347,
+        "median": 11454.216208003345,
+        "p95": 11457.888667006046
+      },
+      "incrementalPeakRssBytes": {
+        "count": 5,
+        "dispersion": 8778036.522958733,
+        "maximum": 102219776,
+        "median": 85360640.0,
+        "p95": 102219776.0
+      },
+      "languageLane": "zh",
+      "lexicalErrorRate": 0.10344827586206898,
+      "lexicalMetric": "cer",
+      "loadMilliseconds": {
+        "count": 5,
+        "dispersion": 0.7776068415336874,
+        "median": 110.533,
+        "p95": 111.803
+      },
+      "measuredRunCount": 5,
+      "profileId": "official_or_model_recommended",
+      "rankEligible": false,
+      "rawOutputSha256": "537ccbff9f65dd796b0954ff2c1d0f67f7581217aa803e27edb833e55e876c4b",
+      "retainedRssBytesAfterUnload": {
+        "count": 5,
+        "dispersion": 9141764.61043625,
+        "maximum": 125370368,
+        "median": 108658688.0,
+        "p95": 125370368.0
+      },
+      "rtf": {
+        "count": 5,
+        "dispersion": 0.00015277818048123885,
+        "median": 0.019769168173598552,
+        "p95": 0.020096654611211573
+      },
+      "segmentLatencyP50Milliseconds": {
+        "count": 5,
+        "dispersion": 0.5033054738427499,
+        "median": 11061.442,
+        "p95": 11061.899
+      },
+      "segmentLatencyP95Milliseconds": {
+        "count": 5,
+        "dispersion": 0.5033054738427499,
+        "median": 11061.442,
+        "p95": 11061.899
+      }
+    },
+    {
+      "absolutePeakRssBytes": {
+        "count": 5,
+        "dispersion": 46791550.2217419,
+        "maximum": 718602240,
+        "median": 641499136.0,
+        "p95": 718602240.0
+      },
+      "candidateId": "sherpa-onnx-paraformer-zh-int8-2025-10-07",
+      "decodeMilliseconds": {
+        "count": 5,
+        "dispersion": 1.5300660116478746,
+        "median": 470.649,
+        "p95": 471.273
+      },
+      "distinctRawOutputCount": 1,
+      "endToEndWallMilliseconds": {
+        "count": 5,
+        "dispersion": 7.869512671742113,
+        "median": 2537.0906669995748,
+        "p95": 2553.328750000219
+      },
+      "incrementalPeakRssBytes": {
+        "count": 5,
+        "dispersion": 46434166.77214495,
+        "maximum": 676741120,
+        "median": 599490560.0,
+        "p95": 676741120.0
+      },
+      "languageLane": "zh",
+      "lexicalErrorRate": 0.0,
+      "lexicalMetric": "cer",
+      "loadMilliseconds": {
+        "count": 5,
+        "dispersion": 3.229422090715308,
+        "median": 673.884,
+        "p95": 681.048
+      },
+      "measuredRunCount": 5,
+      "profileId": "official_or_model_recommended",
+      "rankEligible": false,
+      "rawOutputSha256": "e82cf9a3a48e97d179a5ad2ae10712f013cec1aa7e73be9b832a32a24414e980",
+      "retainedRssBytesAfterUnload": {
+        "count": 5,
+        "dispersion": 47011060.89705103,
+        "maximum": 704069632,
+        "median": 626032640.0,
+        "p95": 704069632.0
+      },
+      "rtf": {
+        "count": 5,
+        "dispersion": 0.0001383423157005311,
+        "median": 0.04255415913200723,
+        "p95": 0.042610578661844485
+      },
+      "segmentLatencyP50Milliseconds": {
+        "count": 5,
+        "dispersion": 1.5331859117537,
+        "median": 470.534,
+        "p95": 471.177
+      },
+      "segmentLatencyP95Milliseconds": {
+        "count": 5,
+        "dispersion": 1.5331859117537,
+        "median": 470.534,
+        "p95": 471.177
+      }
+    },
+    {
+      "absolutePeakRssBytes": {
+        "count": 5,
+        "dispersion": 52181954.47797782,
+        "maximum": 701349888,
+        "median": 583827456.0,
+        "p95": 701349888.0
+      },
+      "candidateId": "sherpa-onnx-paraformer-zh-2024-03-09",
+      "decodeMilliseconds": {
+        "count": 5,
+        "dispersion": 0.5809731835463662,
+        "median": 457.929,
+        "p95": 458.962
+      },
+      "distinctRawOutputCount": 1,
+      "endToEndWallMilliseconds": {
+        "count": 5,
+        "dispersion": 6.776770625076581,
+        "median": 2301.888999994844,
+        "p95": 2315.377708990127
+      },
+      "incrementalPeakRssBytes": {
+        "count": 5,
+        "dispersion": 52041264.026920766,
+        "maximum": 658407424,
+        "median": 543211520.0,
+        "p95": 658407424.0
+      },
+      "languageLane": "zh",
+      "lexicalErrorRate": 0.0,
+      "lexicalMetric": "cer",
+      "loadMilliseconds": {
+        "count": 5,
+        "dispersion": 6.143034474915455,
+        "median": 514.106,
+        "p95": 528.151
+      },
+      "measuredRunCount": 5,
+      "profileId": "official_or_model_recommended",
+      "rankEligible": false,
+      "rawOutputSha256": "e82cf9a3a48e97d179a5ad2ae10712f013cec1aa7e73be9b832a32a24414e980",
+      "retainedRssBytesAfterUnload": {
+        "count": 5,
+        "dispersion": 67499267.14263588,
+        "maximum": 599752704,
+        "median": 536100864.0,
+        "p95": 599752704.0
+      },
+      "rtf": {
+        "count": 5,
+        "dispersion": 5.252922093547544e-05,
+        "median": 0.041404068716094033,
+        "p95": 0.04149746835443038
+      },
+      "segmentLatencyP50Milliseconds": {
+        "count": 5,
+        "dispersion": 0.578119849166245,
+        "median": 457.825,
+        "p95": 458.855
+      },
+      "segmentLatencyP95Milliseconds": {
+        "count": 5,
+        "dispersion": 0.578119849166245,
+        "median": 457.825,
+        "p95": 458.855
+      }
+    },
+    {
+      "absolutePeakRssBytes": {
+        "count": 5,
+        "dispersion": 90175799.58886369,
+        "maximum": 1563115520,
+        "median": 1429667840.0,
+        "p95": 1563115520.0
+      },
+      "candidateId": "sherpa-onnx-fire-red-asr2-ctc-zh_en-int8-2026-02-25",
+      "decodeMilliseconds": {
+        "count": 5,
+        "dispersion": 69.7946103179895,
+        "median": 3601.377,
+        "p95": 3761.025
+      },
+      "distinctRawOutputCount": 1,
+      "endToEndWallMilliseconds": {
+        "count": 5,
+        "dispersion": 78.03009898926314,
+        "median": 8257.328125007916,
+        "p95": 8454.266250002547
+      },
+      "incrementalPeakRssBytes": {
+        "count": 5,
+        "dispersion": 89974313.05992518,
+        "maximum": 1519632384,
+        "median": 1386004480.0,
+        "p95": 1519632384.0
+      },
+      "languageLane": "zh",
+      "lexicalErrorRate": 0.0,
+      "lexicalMetric": "cer",
+      "loadMilliseconds": {
+        "count": 5,
+        "dispersion": 11.041537429180782,
+        "median": 479.378,
+        "p95": 500.026
+      },
+      "measuredRunCount": 5,
+      "profileId": "official_or_model_recommended",
+      "rankEligible": false,
+      "rawOutputSha256": "e97703c1eb3a5aafb8923e87ba3706f8972cd3ae97b4e7d68d4e53d37f4206b0",
+      "retainedRssBytesAfterUnload": {
+        "count": 5,
+        "dispersion": 96772729.43030141,
+        "maximum": 1283997696,
+        "median": 1112621056.0,
+        "p95": 1283997696.0
+      },
+      "rtf": {
+        "count": 5,
+        "dispersion": 0.00631054342838966,
+        "median": 0.32562179023508137,
+        "p95": 0.3400565099457505
+      },
+      "segmentLatencyP50Milliseconds": {
+        "count": 5,
+        "dispersion": 69.80181475176694,
+        "median": 3601.265,
+        "p95": 3760.932
+      },
+      "segmentLatencyP95Milliseconds": {
+        "count": 5,
+        "dispersion": 69.80181475176694,
+        "median": 3601.265,
+        "p95": 3760.932
+      }
+    },
+    {
+      "absolutePeakRssBytes": {
+        "count": 5,
+        "dispersion": 38977584.07072277,
+        "maximum": 736624640,
+        "median": 693354496.0,
+        "p95": 736624640.0
+      },
+      "candidateId": "sherpa-onnx-sense-voice-zh-en-ja-ko-yue-int8-2024-07-17",
+      "decodeMilliseconds": {
+        "count": 5,
+        "dispersion": 1.6526917921984077,
+        "median": 641.812,
+        "p95": 644.547
+      },
+      "distinctRawOutputCount": 1,
+      "endToEndWallMilliseconds": {
+        "count": 5,
+        "dispersion": 8.418390373992613,
+        "median": 2382.6491669897223,
+        "p95": 2397.8488330030814
+      },
+      "incrementalPeakRssBytes": {
+        "count": 5,
+        "dispersion": 38597291.58213716,
+        "maximum": 694091776,
+        "median": 650493952.0,
+        "p95": 694091776.0
+      },
+      "languageLane": "zh",
+      "lexicalErrorRate": 0.0,
+      "lexicalMetric": "cer",
+      "loadMilliseconds": {
+        "count": 5,
+        "dispersion": 6.146408935305248,
+        "median": 342.407,
+        "p95": 352.254
+      },
+      "measuredRunCount": 5,
+      "profileId": "official_or_model_recommended",
+      "rankEligible": false,
+      "rawOutputSha256": "a3b85bd93d8acb507def3d2ca698689e3e23739bca7fe52a72e2404b5c79575a",
+      "retainedRssBytesAfterUnload": {
+        "count": 5,
+        "dispersion": 76526009.62482858,
+        "maximum": 722092032,
+        "median": 609714176.0,
+        "p95": 722092032.0
+      },
+      "rtf": {
+        "count": 5,
+        "dispersion": 0.00014942963763095888,
+        "median": 0.058030018083182644,
+        "p95": 0.058277305605786624
+      },
+      "segmentLatencyP50Milliseconds": {
+        "count": 5,
+        "dispersion": 1.6573323866985739,
+        "median": 641.701,
+        "p95": 644.447
+      },
+      "segmentLatencyP95Milliseconds": {
+        "count": 5,
+        "dispersion": 1.6573323866985739,
+        "median": 641.701,
+        "p95": 644.447
+      }
+    },
+    {
+      "absolutePeakRssBytes": {
+        "count": 5,
+        "dispersion": 71349140.56787698,
+        "maximum": 2100723712,
+        "median": 2043346944.0,
+        "p95": 2100723712.0
+      },
+      "candidateId": "sherpa-onnx-qwen3-asr-0.6B-int8-2026-03-25",
+      "decodeMilliseconds": {
+        "count": 5,
+        "dispersion": 6.839332382623349,
+        "median": 2401.03,
+        "p95": 2411.993
+      },
+      "distinctRawOutputCount": 1,
+      "endToEndWallMilliseconds": {
+        "count": 5,
+        "dispersion": 29.358321235669127,
+        "median": 8810.32270900323,
+        "p95": 8835.229208998499
+      },
+      "incrementalPeakRssBytes": {
+        "count": 5,
+        "dispersion": 71111872.89865983,
+        "maximum": 2057666560,
+        "median": 1998979072.0,
+        "p95": 2057666560.0
+      },
+      "languageLane": "zh",
+      "lexicalErrorRate": 0.0,
+      "lexicalMetric": "cer",
+      "loadMilliseconds": {
+        "count": 5,
+        "dispersion": 14.698551882413403,
+        "median": 1111.456,
+        "p95": 1136.925
+      },
+      "measuredRunCount": 5,
+      "profileId": "official_recommended",
+      "rankEligible": false,
+      "rawOutputSha256": "c4706071fec970dfc088990b3c1c37335e06e8b52c50f0d871a5bfc82c2cae1e",
+      "retainedRssBytesAfterUnload": {
+        "count": 5,
+        "dispersion": 247380248.24917108,
+        "maximum": 1300480000,
+        "median": 896991232.0,
+        "p95": 1300480000.0
+      },
+      "rtf": {
+        "count": 5,
+        "dispersion": 0.0006183844830581727,
+        "median": 0.21709132007233276,
+        "p95": 0.21808254972875227
+      },
+      "segmentLatencyP50Milliseconds": {
+        "count": 5,
+        "dispersion": 6.84030116296052,
+        "median": 2400.934,
+        "p95": 2411.888
+      },
+      "segmentLatencyP95Milliseconds": {
+        "count": 5,
+        "dispersion": 6.84030116296052,
+        "median": 2400.934,
+        "p95": 2411.888
+      }
+    },
+    {
+      "absolutePeakRssBytes": {
+        "count": 5,
+        "dispersion": 7960409.492223113,
+        "maximum": 134479872,
+        "median": 120471552.0,
+        "p95": 134479872.0
+      },
+      "candidateId": "sherpa-streaming-zipformer-zh-14m-2023-02-23",
+      "decodeMilliseconds": {
+        "count": 5,
+        "dispersion": 2.8197788282062133,
+        "median": 96.28,
+        "p95": 102.37
+      },
+      "distinctRawOutputCount": 1,
+      "endToEndWallMilliseconds": {
+        "count": 5,
+        "dispersion": 6.51657735813618,
+        "median": 485.22437499195803,
+        "p95": 497.65254199155606
+      },
+      "incrementalPeakRssBytes": {
+        "count": 5,
+        "dispersion": 7782276.515399273,
+        "maximum": 100532224,
+        "median": 85311488.0,
+        "p95": 100532224.0
+      },
+      "languageLane": "zh",
+      "lexicalErrorRate": 0.10344827586206898,
+      "lexicalMetric": "cer",
+      "loadMilliseconds": {
+        "count": 5,
+        "dispersion": 0.3138158695796011,
+        "median": 110.18,
+        "p95": 110.769
+      },
+      "measuredRunCount": 5,
+      "profileId": "fixed_resource",
+      "rankEligible": false,
+      "rawOutputSha256": "537ccbff9f65dd796b0954ff2c1d0f67f7581217aa803e27edb833e55e876c4b",
+      "retainedRssBytesAfterUnload": {
+        "count": 5,
+        "dispersion": 8256278.497266177,
+        "maximum": 122060800,
+        "median": 107692032.0,
+        "p95": 122060800.0
+      },
+      "rtf": {
+        "count": 5,
+        "dispersion": 0.00025495287777632994,
+        "median": 0.008705244122965642,
+        "p95": 0.009255877034358047
+      },
+      "segmentLatencyP50Milliseconds": {
+        "count": 5,
+        "dispersion": 2.934331092429758,
+        "median": 100.644,
+        "p95": 107.016
+      },
+      "segmentLatencyP95Milliseconds": {
+        "count": 5,
+        "dispersion": 2.934331092429758,
+        "median": 100.644,
+        "p95": 107.016
+      }
+    },
+    {
+      "absolutePeakRssBytes": {
+        "count": 5,
+        "dispersion": 49818431.982002355,
+        "maximum": 724533248,
+        "median": 646053888.0,
+        "p95": 724533248.0
+      },
+      "candidateId": "sherpa-onnx-paraformer-zh-int8-2025-10-07",
+      "decodeMilliseconds": {
+        "count": 5,
+        "dispersion": 1.2735084766109734,
+        "median": 470.663,
+        "p95": 472.992
+      },
+      "distinctRawOutputCount": 1,
+      "endToEndWallMilliseconds": {
+        "count": 5,
+        "dispersion": 12.262896578461444,
+        "median": 2551.358666998567,
+        "p95": 2574.9415409954963
+      },
+      "incrementalPeakRssBytes": {
+        "count": 5,
+        "dispersion": 50183450.515553854,
+        "maximum": 684474368,
+        "median": 603897856.0,
+        "p95": 684474368.0
+      },
+      "languageLane": "zh",
+      "lexicalErrorRate": 0.0,
+      "lexicalMetric": "cer",
+      "loadMilliseconds": {
+        "count": 5,
+        "dispersion": 9.352484559730664,
+        "median": 680.487,
+        "p95": 700.339
+      },
+      "measuredRunCount": 5,
+      "profileId": "fixed_resource",
+      "rankEligible": false,
+      "rawOutputSha256": "e82cf9a3a48e97d179a5ad2ae10712f013cec1aa7e73be9b832a32a24414e980",
+      "retainedRssBytesAfterUnload": {
+        "count": 5,
+        "dispersion": 76692727.60237646,
+        "maximum": 709099520,
+        "median": 626753536.0,
+        "p95": 709099520.0
+      },
+      "rtf": {
+        "count": 5,
+        "dispersion": 0.00011514543188164279,
+        "median": 0.042555424954792045,
+        "p95": 0.04276600361663653
+      },
+      "segmentLatencyP50Milliseconds": {
+        "count": 5,
+        "dispersion": 1.270319865230805,
+        "median": 470.566,
+        "p95": 472.873
+      },
+      "segmentLatencyP95Milliseconds": {
+        "count": 5,
+        "dispersion": 1.270319865230805,
+        "median": 470.566,
+        "p95": 472.873
+      }
+    },
+    {
+      "absolutePeakRssBytes": {
+        "count": 5,
+        "dispersion": 28970359.10711167,
+        "maximum": 621182976,
+        "median": 570785792.0,
+        "p95": 621182976.0
+      },
+      "candidateId": "sherpa-onnx-paraformer-zh-2024-03-09",
+      "decodeMilliseconds": {
+        "count": 5,
+        "dispersion": 0.5828737770735579,
+        "median": 458.285,
+        "p95": 459.146
+      },
+      "distinctRawOutputCount": 1,
+      "endToEndWallMilliseconds": {
+        "count": 5,
+        "dispersion": 9.405846668592337,
+        "median": 2313.005999996676,
+        "p95": 2325.211916991975
+      },
+      "incrementalPeakRssBytes": {
+        "count": 5,
+        "dispersion": 28353657.531368706,
+        "maximum": 579305472,
+        "median": 529285120.0,
+        "p95": 579305472.0
+      },
+      "languageLane": "zh",
+      "lexicalErrorRate": 0.0,
+      "lexicalMetric": "cer",
+      "loadMilliseconds": {
+        "count": 5,
+        "dispersion": 6.651933330994853,
+        "median": 515.99,
+        "p95": 523.065
+      },
+      "measuredRunCount": 5,
+      "profileId": "fixed_resource",
+      "rankEligible": false,
+      "rawOutputSha256": "e82cf9a3a48e97d179a5ad2ae10712f013cec1aa7e73be9b832a32a24414e980",
+      "retainedRssBytesAfterUnload": {
+        "count": 5,
+        "dispersion": 28808414.291550573,
+        "maximum": 606552064,
+        "median": 556285952.0,
+        "p95": 606552064.0
+      },
+      "rtf": {
+        "count": 5,
+        "dispersion": 5.2701064834861156e-05,
+        "median": 0.04143625678119349,
+        "p95": 0.04151410488245932
+      },
+      "segmentLatencyP50Milliseconds": {
+        "count": 5,
+        "dispersion": 0.5778570757548985,
+        "median": 458.175,
+        "p95": 459.026
+      },
+      "segmentLatencyP95Milliseconds": {
+        "count": 5,
+        "dispersion": 0.5778570757548985,
+        "median": 458.175,
+        "p95": 459.026
+      }
+    },
+    {
+      "absolutePeakRssBytes": {
+        "count": 5,
+        "dispersion": 44570646.4627798,
+        "maximum": 1456373760,
+        "median": 1381449728.0,
+        "p95": 1456373760.0
+      },
+      "candidateId": "sherpa-onnx-fire-red-asr2-ctc-zh_en-int8-2026-02-25",
+      "decodeMilliseconds": {
+        "count": 5,
+        "dispersion": 50.00377163134795,
+        "median": 3639.988,
+        "p95": 3660.327
+      },
+      "distinctRawOutputCount": 1,
+      "endToEndWallMilliseconds": {
+        "count": 5,
+        "dispersion": 60.73144257353706,
+        "median": 8314.434582993272,
+        "p95": 8373.143958000583
+      },
+      "incrementalPeakRssBytes": {
+        "count": 5,
+        "dispersion": 45983738.481627956,
+        "maximum": 1414742016,
+        "median": 1339965440.0,
+        "p95": 1414742016.0
+      },
+      "languageLane": "zh",
+      "lexicalErrorRate": 0.0,
+      "lexicalMetric": "cer",
+      "loadMilliseconds": {
+        "count": 5,
+        "dispersion": 9.558322208421297,
+        "median": 474.392,
+        "p95": 490.84
+      },
+      "measuredRunCount": 5,
+      "profileId": "fixed_resource",
+      "rankEligible": false,
+      "rawOutputSha256": "e97703c1eb3a5aafb8923e87ba3706f8972cd3ae97b4e7d68d4e53d37f4206b0",
+      "retainedRssBytesAfterUnload": {
+        "count": 5,
+        "dispersion": 71106968.16428475,
+        "maximum": 981565440,
+        "median": 938196992.0,
+        "p95": 981565440.0
+      },
+      "rtf": {
+        "count": 5,
+        "dispersion": 0.004521136675528741,
+        "median": 0.3291128390596745,
+        "p95": 0.33095180831826404
+      },
+      "segmentLatencyP50Milliseconds": {
+        "count": 5,
+        "dispersion": 50.00316659812655,
+        "median": 3639.872,
+        "p95": 3660.202
+      },
+      "segmentLatencyP95Milliseconds": {
+        "count": 5,
+        "dispersion": 50.00316659812655,
+        "median": 3639.872,
+        "p95": 3660.202
+      }
+    },
+    {
+      "absolutePeakRssBytes": {
+        "count": 5,
+        "dispersion": 94347722.51473546,
+        "maximum": 773783552,
+        "median": 698712064.0,
+        "p95": 773783552.0
+      },
+      "candidateId": "sherpa-onnx-sense-voice-zh-en-ja-ko-yue-int8-2024-07-17",
+      "decodeMilliseconds": {
+        "count": 5,
+        "dispersion": 1.369209611418219,
+        "median": 642.484,
+        "p95": 644.816
+      },
+      "distinctRawOutputCount": 1,
+      "endToEndWallMilliseconds": {
+        "count": 5,
+        "dispersion": 5.173857541201069,
+        "median": 2383.4231669898145,
+        "p95": 2390.330082998844
+      },
+      "incrementalPeakRssBytes": {
+        "count": 5,
+        "dispersion": 96187606.0365072,
+        "maximum": 731381760,
+        "median": 657195008.0,
+        "p95": 731381760.0
+      },
+      "languageLane": "zh",
+      "lexicalErrorRate": 0.0,
+      "lexicalMetric": "cer",
+      "loadMilliseconds": {
+        "count": 5,
+        "dispersion": 8.100673339914414,
+        "median": 345.761,
+        "p95": 347.068
+      },
+      "measuredRunCount": 5,
+      "profileId": "fixed_resource",
+      "rankEligible": false,
+      "rawOutputSha256": "a3b85bd93d8acb507def3d2ca698689e3e23739bca7fe52a72e2404b5c79575a",
+      "retainedRssBytesAfterUnload": {
+        "count": 5,
+        "dispersion": 83843905.30209118,
+        "maximum": 758300672,
+        "median": 615088128.0,
+        "p95": 758300672.0
+      },
+      "rtf": {
+        "count": 5,
+        "dispersion": 0.0001237983373795855,
+        "median": 0.058090777576853526,
+        "p95": 0.058301627486437614
+      },
+      "segmentLatencyP50Milliseconds": {
+        "count": 5,
+        "dispersion": 1.3706037501772668,
+        "median": 642.372,
+        "p95": 644.713
+      },
+      "segmentLatencyP95Milliseconds": {
+        "count": 5,
+        "dispersion": 1.3706037501772668,
+        "median": 642.372,
+        "p95": 644.713
+      }
+    },
+    {
+      "absolutePeakRssBytes": {
+        "count": 5,
+        "dispersion": 69444637.55839235,
+        "maximum": 2180218880,
+        "median": 2042626048.0,
+        "p95": 2180218880.0
+      },
+      "candidateId": "sherpa-onnx-qwen3-asr-0.6B-int8-2026-03-25",
+      "decodeMilliseconds": {
+        "count": 5,
+        "dispersion": 4.57820962385956,
+        "median": 2414.774,
+        "p95": 2422.109
+      },
+      "distinctRawOutputCount": 1,
+      "endToEndWallMilliseconds": {
+        "count": 5,
+        "dispersion": 19.560602457670754,
+        "median": 8849.284124997212,
+        "p95": 8877.031416006503
+      },
+      "incrementalPeakRssBytes": {
+        "count": 5,
+        "dispersion": 69457470.62694794,
+        "maximum": 2136473600,
+        "median": 1999077376.0,
+        "p95": 2136473600.0
+      },
+      "languageLane": "zh",
+      "lexicalErrorRate": 0.0,
+      "lexicalMetric": "cer",
+      "loadMilliseconds": {
+        "count": 5,
+        "dispersion": 6.721719226507485,
+        "median": 1122.959,
+        "p95": 1127.259
+      },
+      "measuredRunCount": 5,
+      "profileId": "fixed_resource",
+      "rankEligible": false,
+      "rawOutputSha256": "c4706071fec970dfc088990b3c1c37335e06e8b52c50f0d871a5bfc82c2cae1e",
+      "retainedRssBytesAfterUnload": {
+        "count": 5,
+        "dispersion": 135524404.07057723,
+        "maximum": 1337819136,
+        "median": 1112260608.0,
+        "p95": 1337819136.0
+      },
+      "rtf": {
+        "count": 5,
+        "dispersion": 0.00041394300396560633,
+        "median": 0.21833399638336345,
+        "p95": 0.21899719710669077
+      },
+      "segmentLatencyP50Milliseconds": {
+        "count": 5,
+        "dispersion": 4.574421082497698,
+        "median": 2414.608,
+        "p95": 2421.997
+      },
+      "segmentLatencyP95Milliseconds": {
+        "count": 5,
+        "dispersion": 4.574421082497698,
+        "median": 2414.608,
+        "p95": 2421.997
+      }
+    },
+    {
+      "absolutePeakRssBytes": {
+        "count": 5,
+        "dispersion": 12495776.806153836,
+        "maximum": 551813120,
+        "median": 538607616.0,
+        "p95": 551813120.0
+      },
+      "candidateId": "sherpa-onnx-whisper-base-en-int8-2023-01-31",
+      "decodeMilliseconds": {
+        "count": 5,
+        "dispersion": 0.6083994082837272,
+        "median": 445.065,
+        "p95": 446.164
+      },
+      "distinctRawOutputCount": 1,
+      "endToEndWallMilliseconds": {
+        "count": 5,
+        "dispersion": 7.049275707568216,
+        "median": 1642.8648330038413,
+        "p95": 1657.980290998239
+      },
+      "incrementalPeakRssBytes": {
+        "count": 5,
+        "dispersion": 11778368.147441655,
+        "maximum": 511492096,
+        "median": 497287168.0,
+        "p95": 511492096.0
+      },
+      "languageLane": "en",
+      "lexicalErrorRate": 0.0,
+      "lexicalMetric": "wer",
+      "loadMilliseconds": {
+        "count": 5,
+        "dispersion": 0.8218686026367001,
+        "median": 213.076,
+        "p95": 213.712
+      },
+      "measuredRunCount": 5,
+      "profileId": "official_or_model_recommended",
+      "rankEligible": false,
+      "rawOutputSha256": "55b39e4a49b9f197e5d8411fc8374f4b7de6faa021ea05cb3ae4c265b5a2daf1",
+      "retainedRssBytesAfterUnload": {
+        "count": 5,
+        "dispersion": 12493062.033815883,
+        "maximum": 539394048,
+        "median": 526139392.0,
+        "p95": 539394048.0
+      },
+      "rtf": {
+        "count": 5,
+        "dispersion": 6.285117854170697e-05,
+        "median": 0.045977789256198345,
+        "p95": 0.04609132231404958
+      },
+      "segmentLatencyP50Milliseconds": {
+        "count": 5,
+        "dispersion": 0.6085398918723272,
+        "median": 444.993,
+        "p95": 446.085
+      },
+      "segmentLatencyP95Milliseconds": {
+        "count": 5,
+        "dispersion": 0.6085398918723272,
+        "median": 444.993,
+        "p95": 446.085
+      }
+    },
+    {
+      "absolutePeakRssBytes": {
+        "count": 5,
+        "dispersion": 106020105.38593066,
+        "maximum": 1351499776,
+        "median": 1286914048.0,
+        "p95": 1351499776.0
+      },
+      "candidateId": "sherpa-onnx-nemo-parakeet-tdt-0.6b-v2-int8-2025-05-01",
+      "decodeMilliseconds": {
+        "count": 5,
+        "dispersion": 12.176300998250625,
+        "median": 1143.547,
+        "p95": 1171.079
+      },
+      "distinctRawOutputCount": 1,
+      "endToEndWallMilliseconds": {
+        "count": 5,
+        "dispersion": 34.478067847715195,
+        "median": 5421.334500002558,
+        "p95": 5472.577291991911
+      },
+      "incrementalPeakRssBytes": {
+        "count": 5,
+        "dispersion": 106126693.74896696,
+        "maximum": 1308262400,
+        "median": 1243856896.0,
+        "p95": 1308262400.0
+      },
+      "languageLane": "en",
+      "lexicalErrorRate": 0.0,
+      "lexicalMetric": "wer",
+      "loadMilliseconds": {
+        "count": 5,
+        "dispersion": 19.129999257710395,
+        "median": 645.568,
+        "p95": 682.315
+      },
+      "measuredRunCount": 5,
+      "profileId": "official_or_model_recommended",
+      "rankEligible": false,
+      "rawOutputSha256": "20a4c07a58210ba44c42968cbda8b8bb6571df4ed375a15d444a22131a353cd2",
+      "retainedRssBytesAfterUnload": {
+        "count": 5,
+        "dispersion": 138870209.66963822,
+        "maximum": 1071857664,
+        "median": 874348544.0,
+        "p95": 1071857664.0
+      },
+      "rtf": {
+        "count": 5,
+        "dispersion": 0.0012578823345300216,
+        "median": 0.11813502066115703,
+        "p95": 0.12097923553719007
+      },
+      "segmentLatencyP50Milliseconds": {
+        "count": 5,
+        "dispersion": 12.173719487486174,
+        "median": 1143.455,
+        "p95": 1170.99
+      },
+      "segmentLatencyP95Milliseconds": {
+        "count": 5,
+        "dispersion": 12.173719487486174,
+        "median": 1143.455,
+        "p95": 1170.99
+      }
+    },
+    {
+      "absolutePeakRssBytes": {
+        "count": 5,
+        "dispersion": 26761109.01854793,
+        "maximum": 1452589056,
+        "median": 1392656384.0,
+        "p95": 1452589056.0
+      },
+      "candidateId": "sherpa-onnx-fire-red-asr2-ctc-zh_en-int8-2026-02-25",
+      "decodeMilliseconds": {
+        "count": 5,
+        "dispersion": 75.71670604140138,
+        "median": 3198.297,
+        "p95": 3265.207
+      },
+      "distinctRawOutputCount": 1,
+      "endToEndWallMilliseconds": {
+        "count": 5,
+        "dispersion": 72.7847526412322,
+        "median": 7872.983499997645,
+        "p95": 7942.507041996578
+      },
+      "incrementalPeakRssBytes": {
+        "count": 5,
+        "dispersion": 26714276.341917064,
+        "maximum": 1409662976,
+        "median": 1349091328.0,
+        "p95": 1409662976.0
+      },
+      "languageLane": "en",
+      "lexicalErrorRate": 0.125,
+      "lexicalMetric": "wer",
+      "loadMilliseconds": {
+        "count": 5,
+        "dispersion": 9.499955844107912,
+        "median": 474.991,
+        "p95": 496.666
+      },
+      "measuredRunCount": 5,
+      "profileId": "official_or_model_recommended",
+      "rankEligible": false,
+      "rawOutputSha256": "32d03c61de2c964b9db0f63c39a4d014ff0de1eea0b78f9227953b89ef9b92e5",
+      "retainedRssBytesAfterUnload": {
+        "count": 5,
+        "dispersion": 141077930.57472435,
+        "maximum": 1400422400,
+        "median": 1112424448.0,
+        "p95": 1400422400.0
+      },
+      "rtf": {
+        "count": 5,
+        "dispersion": 0.007821973764607592,
+        "median": 0.33040258264462813,
+        "p95": 0.3373147727272727
+      },
+      "segmentLatencyP50Milliseconds": {
+        "count": 5,
+        "dispersion": 75.71883150551133,
+        "median": 3198.184,
+        "p95": 3265.107
+      },
+      "segmentLatencyP95Milliseconds": {
+        "count": 5,
+        "dispersion": 75.71883150551133,
+        "median": 3198.184,
+        "p95": 3265.107
+      }
+    },
+    {
+      "absolutePeakRssBytes": {
+        "count": 5,
+        "dispersion": 81381466.03938347,
+        "maximum": 783056896,
+        "median": 627818496.0,
+        "p95": 783056896.0
+      },
+      "candidateId": "sherpa-onnx-sense-voice-zh-en-ja-ko-yue-int8-2024-07-17",
+      "decodeMilliseconds": {
+        "count": 5,
+        "dispersion": 0.5311178400317441,
+        "median": 555.998,
+        "p95": 556.144
+      },
+      "distinctRawOutputCount": 1,
+      "endToEndWallMilliseconds": {
+        "count": 5,
+        "dispersion": 6.962785128938906,
+        "median": 2307.531584010576,
+        "p95": 2309.2162090033526
+      },
+      "incrementalPeakRssBytes": {
+        "count": 5,
+        "dispersion": 82212590.78084685,
+        "maximum": 743178240,
+        "median": 586317824.0,
+        "p95": 743178240.0
+      },
+      "languageLane": "en",
+      "lexicalErrorRate": 0.0,
+      "lexicalMetric": "wer",
+      "loadMilliseconds": {
+        "count": 5,
+        "dispersion": 6.609509875928779,
+        "median": 334.678,
+        "p95": 350.146
+      },
+      "measuredRunCount": 5,
+      "profileId": "official_or_model_recommended",
+      "rankEligible": false,
+      "rawOutputSha256": "152a23e45354c4fa1080d4913b10dda0e11f772196af54bfdc7f98e11b05b8e4",
+      "retainedRssBytesAfterUnload": {
+        "count": 5,
+        "dispersion": 47521683.516952544,
+        "maximum": 670171136,
+        "median": 614432768.0,
+        "p95": 670171136.0
+      },
+      "rtf": {
+        "count": 5,
+        "dispersion": 5.486754545782465e-05,
+        "median": 0.05743780991735538,
+        "p95": 0.05745289256198347
+      },
+      "segmentLatencyP50Milliseconds": {
+        "count": 5,
+        "dispersion": 0.5294746830585858,
+        "median": 555.905,
+        "p95": 556.035
+      },
+      "segmentLatencyP95Milliseconds": {
+        "count": 5,
+        "dispersion": 0.5294746830585858,
+        "median": 555.905,
+        "p95": 556.035
+      }
+    },
+    {
+      "absolutePeakRssBytes": {
+        "count": 5,
+        "dispersion": 72294826.83675015,
+        "maximum": 2091139072,
+        "median": 1919647744.0,
+        "p95": 2091139072.0
+      },
+      "candidateId": "sherpa-onnx-qwen3-asr-0.6B-int8-2026-03-25",
+      "decodeMilliseconds": {
+        "count": 5,
+        "dispersion": 2.9271012691739973,
+        "median": 2258.389,
+        "p95": 2263.214
+      },
+      "distinctRawOutputCount": 1,
+      "endToEndWallMilliseconds": {
+        "count": 5,
+        "dispersion": 11.207985917104773,
+        "median": 8716.633541989722,
+        "p95": 8720.021792003536
+      },
+      "incrementalPeakRssBytes": {
+        "count": 5,
+        "dispersion": 72139668.79860763,
+        "maximum": 2046885888,
+        "median": 1875509248.0,
+        "p95": 2046885888.0
+      },
+      "languageLane": "en",
+      "lexicalErrorRate": 0.0,
+      "lexicalMetric": "wer",
+      "loadMilliseconds": {
+        "count": 5,
+        "dispersion": 5.168875800403761,
+        "median": 1132.335,
+        "p95": 1139.394
+      },
+      "measuredRunCount": 5,
+      "profileId": "official_recommended",
+      "rankEligible": false,
+      "rawOutputSha256": "84d3b0741adbf9052949798cf066158cb4dab01aba146d31e15fe73c51b65488",
+      "retainedRssBytesAfterUnload": {
+        "count": 5,
+        "dispersion": 91289268.23120779,
+        "maximum": 1285603328,
+        "median": 1194246144.0,
+        "p95": 1285603328.0
+      },
+      "rtf": {
+        "count": 5,
+        "dispersion": 0.0003023864947493826,
+        "median": 0.23330464876033058,
+        "p95": 0.2338030991735537
+      },
+      "segmentLatencyP50Milliseconds": {
+        "count": 5,
+        "dispersion": 2.9282328869131837,
+        "median": 2258.308,
+        "p95": 2263.134
+      },
+      "segmentLatencyP95Milliseconds": {
+        "count": 5,
+        "dispersion": 2.9282328869131837,
+        "median": 2258.308,
+        "p95": 2263.134
+      }
+    },
+    {
+      "absolutePeakRssBytes": {
+        "count": 5,
+        "dispersion": 11571264.694870472,
+        "maximum": 560529408,
+        "median": 530923520.0,
+        "p95": 560529408.0
+      },
+      "candidateId": "sherpa-onnx-whisper-base-en-int8-2023-01-31",
+      "decodeMilliseconds": {
+        "count": 5,
+        "dispersion": 1.1537400747135442,
+        "median": 445.184,
+        "p95": 446.348
+      },
+      "distinctRawOutputCount": 1,
+      "endToEndWallMilliseconds": {
+        "count": 5,
+        "dispersion": 3.3033580512809126,
+        "median": 1647.4167499982286,
+        "p95": 1648.33075000206
+      },
+      "incrementalPeakRssBytes": {
+        "count": 5,
+        "dispersion": 11059684.955767129,
+        "maximum": 518848512,
+        "median": 495353856.0,
+        "p95": 518848512.0
+      },
+      "languageLane": "en",
+      "lexicalErrorRate": 0.0,
+      "lexicalMetric": "wer",
+      "loadMilliseconds": {
+        "count": 5,
+        "dispersion": 0.4833133145279556,
+        "median": 212.071,
+        "p95": 213.03
+      },
+      "measuredRunCount": 5,
+      "profileId": "fixed_resource",
+      "rankEligible": false,
+      "rawOutputSha256": "55b39e4a49b9f197e5d8411fc8374f4b7de6faa021ea05cb3ae4c265b5a2daf1",
+      "retainedRssBytesAfterUnload": {
+        "count": 5,
+        "dispersion": 11585455.303378146,
+        "maximum": 548061184,
+        "median": 518455296.0,
+        "p95": 548061184.0
+      },
+      "rtf": {
+        "count": 5,
+        "dispersion": 0.00011918802424726713,
+        "median": 0.0459900826446281,
+        "p95": 0.046110330578512396
+      },
+      "segmentLatencyP50Milliseconds": {
+        "count": 5,
+        "dispersion": 1.1510081841585629,
+        "median": 445.104,
+        "p95": 446.274
+      },
+      "segmentLatencyP95Milliseconds": {
+        "count": 5,
+        "dispersion": 1.1510081841585629,
+        "median": 445.104,
+        "p95": 446.274
+      }
+    },
+    {
+      "absolutePeakRssBytes": {
+        "count": 5,
+        "dispersion": 62371833.4891686,
+        "maximum": 1291960320,
+        "median": 1243136000.0,
+        "p95": 1291960320.0
+      },
+      "candidateId": "sherpa-onnx-nemo-parakeet-tdt-0.6b-v2-int8-2025-05-01",
+      "decodeMilliseconds": {
+        "count": 5,
+        "dispersion": 7.963134448193095,
+        "median": 1143.774,
+        "p95": 1156.041
+      },
+      "distinctRawOutputCount": 1,
+      "endToEndWallMilliseconds": {
+        "count": 5,
+        "dispersion": 15.862650184567476,
+        "median": 5409.95687499526,
+        "p95": 5438.130916998489
+      },
+      "incrementalPeakRssBytes": {
+        "count": 5,
+        "dispersion": 62968609.956149906,
+        "maximum": 1250623488,
+        "median": 1201422336.0,
+        "p95": 1250623488.0
+      },
+      "languageLane": "en",
+      "lexicalErrorRate": 0.0,
+      "lexicalMetric": "wer",
+      "loadMilliseconds": {
+        "count": 5,
+        "dispersion": 6.879583981608202,
+        "median": 651.354,
+        "p95": 660.221
+      },
+      "measuredRunCount": 5,
+      "profileId": "fixed_resource",
+      "rankEligible": false,
+      "rawOutputSha256": "20a4c07a58210ba44c42968cbda8b8bb6571df4ed375a15d444a22131a353cd2",
+      "retainedRssBytesAfterUnload": {
+        "count": 5,
+        "dispersion": 66751423.60674207,
+        "maximum": 1010925568,
+        "median": 974241792.0,
+        "p95": 1010925568.0
+      },
+      "rtf": {
+        "count": 5,
+        "dispersion": 0.0008226378562182958,
+        "median": 0.11815847107438016,
+        "p95": 0.11942572314049586
+      },
+      "segmentLatencyP50Milliseconds": {
+        "count": 5,
+        "dispersion": 7.964646473008033,
+        "median": 1143.688,
+        "p95": 1155.945
+      },
+      "segmentLatencyP95Milliseconds": {
+        "count": 5,
+        "dispersion": 7.964646473008033,
+        "median": 1143.688,
+        "p95": 1155.945
+      }
+    },
+    {
+      "absolutePeakRssBytes": {
+        "count": 5,
+        "dispersion": 28241450.919451788,
+        "maximum": 1502838784,
+        "median": 1452539904.0,
+        "p95": 1502838784.0
+      },
+      "candidateId": "sherpa-onnx-fire-red-asr2-ctc-zh_en-int8-2026-02-25",
+      "decodeMilliseconds": {
+        "count": 5,
+        "dispersion": 58.46661178005791,
+        "median": 3217.772,
+        "p95": 3245.428
+      },
+      "distinctRawOutputCount": 1,
+      "endToEndWallMilliseconds": {
+        "count": 5,
+        "dispersion": 34.31919990149034,
+        "median": 7912.049999998999,
+        "p95": 7938.972417003242
+      },
+      "incrementalPeakRssBytes": {
+        "count": 5,
+        "dispersion": 29240635.284152787,
+        "maximum": 1460486144,
+        "median": 1410121728.0,
+        "p95": 1460486144.0
+      },
+      "languageLane": "en",
+      "lexicalErrorRate": 0.125,
+      "lexicalMetric": "wer",
+      "loadMilliseconds": {
+        "count": 5,
+        "dispersion": 4.907233909240514,
+        "median": 491.737,
+        "p95": 493.727
+      },
+      "measuredRunCount": 5,
+      "profileId": "fixed_resource",
+      "rankEligible": false,
+      "rawOutputSha256": "32d03c61de2c964b9db0f63c39a4d014ff0de1eea0b78f9227953b89ef9b92e5",
+      "retainedRssBytesAfterUnload": {
+        "count": 5,
+        "dispersion": 128169404.37571445,
+        "maximum": 1222967296,
+        "median": 1008861184.0,
+        "p95": 1222967296.0
+      },
+      "rtf": {
+        "count": 5,
+        "dispersion": 0.006039939233477056,
+        "median": 0.3324144628099173,
+        "p95": 0.3352714876033058
+      },
+      "segmentLatencyP50Milliseconds": {
+        "count": 5,
+        "dispersion": 58.46976846747383,
+        "median": 3217.672,
+        "p95": 3245.322
+      },
+      "segmentLatencyP95Milliseconds": {
+        "count": 5,
+        "dispersion": 58.46976846747383,
+        "median": 3217.672,
+        "p95": 3245.322
+      }
+    },
+    {
+      "absolutePeakRssBytes": {
+        "count": 5,
+        "dispersion": 47799412.90464078,
+        "maximum": 729989120,
+        "median": 647774208.0,
+        "p95": 729989120.0
+      },
+      "candidateId": "sherpa-onnx-sense-voice-zh-en-ja-ko-yue-int8-2024-07-17",
+      "decodeMilliseconds": {
+        "count": 5,
+        "dispersion": 1.8061213026815137,
+        "median": 554.238,
+        "p95": 558.342
+      },
+      "distinctRawOutputCount": 1,
+      "endToEndWallMilliseconds": {
+        "count": 5,
+        "dispersion": 6.0300400368932605,
+        "median": 2296.690707997186,
+        "p95": 2299.265791007201
+      },
+      "incrementalPeakRssBytes": {
+        "count": 5,
+        "dispersion": 47710938.972861886,
+        "maximum": 688160768,
+        "median": 606240768.0,
+        "p95": 688160768.0
+      },
+      "languageLane": "en",
+      "lexicalErrorRate": 0.0,
+      "lexicalMetric": "wer",
+      "loadMilliseconds": {
+        "count": 5,
+        "dispersion": 4.865740971321838,
+        "median": 336.107,
+        "p95": 342.211
+      },
+      "measuredRunCount": 5,
+      "profileId": "fixed_resource",
+      "rankEligible": false,
+      "rawOutputSha256": "152a23e45354c4fa1080d4913b10dda0e11f772196af54bfdc7f98e11b05b8e4",
+      "retainedRssBytesAfterUnload": {
+        "count": 5,
+        "dispersion": 47638037.93373311,
+        "maximum": 647905280,
+        "median": 583794688.0,
+        "p95": 647905280.0
+      },
+      "rtf": {
+        "count": 5,
+        "dispersion": 0.0001865827792026353,
+        "median": 0.05725599173553719,
+        "p95": 0.057679958677685945
+      },
+      "segmentLatencyP50Milliseconds": {
+        "count": 5,
+        "dispersion": 1.797607788145143,
+        "median": 554.142,
+        "p95": 558.224
+      },
+      "segmentLatencyP95Milliseconds": {
+        "count": 5,
+        "dispersion": 1.797607788145143,
+        "median": 554.142,
+        "p95": 558.224
+      }
+    },
+    {
+      "absolutePeakRssBytes": {
+        "count": 5,
+        "dispersion": 53944606.60105491,
+        "maximum": 2013954048,
+        "median": 2000764928.0,
+        "p95": 2013954048.0
+      },
+      "candidateId": "sherpa-onnx-qwen3-asr-0.6B-int8-2026-03-25",
+      "decodeMilliseconds": {
+        "count": 5,
+        "dispersion": 3.585394014609813,
+        "median": 2262.538,
+        "p95": 2266.133
+      },
+      "distinctRawOutputCount": 1,
+      "endToEndWallMilliseconds": {
+        "count": 5,
+        "dispersion": 11.793165140038685,
+        "median": 8733.395999995992,
+        "p95": 8749.824792001164
+      },
+      "incrementalPeakRssBytes": {
+        "count": 5,
+        "dispersion": 53605270.65165907,
+        "maximum": 1970651136,
+        "median": 1957462016.0,
+        "p95": 1970651136.0
+      },
+      "languageLane": "en",
+      "lexicalErrorRate": 0.0,
+      "lexicalMetric": "wer",
+      "loadMilliseconds": {
+        "count": 5,
+        "dispersion": 13.944003121055308,
+        "median": 1150.021,
+        "p95": 1159.2
+      },
+      "measuredRunCount": 5,
+      "profileId": "fixed_resource",
+      "rankEligible": false,
+      "rawOutputSha256": "84d3b0741adbf9052949798cf066158cb4dab01aba146d31e15fe73c51b65488",
+      "retainedRssBytesAfterUnload": {
+        "count": 5,
+        "dispersion": 135307696.0818045,
+        "maximum": 1369178112,
+        "median": 1114374144.0,
+        "p95": 1369178112.0
+      },
+      "rtf": {
+        "count": 5,
+        "dispersion": 0.0003703919436580343,
+        "median": 0.23373326446280993,
+        "p95": 0.23410464876033055
+      },
+      "segmentLatencyP50Milliseconds": {
+        "count": 5,
+        "dispersion": 3.5844523486859976,
+        "median": 2262.434,
+        "p95": 2266.047
+      },
+      "segmentLatencyP95Milliseconds": {
+        "count": 5,
+        "dispersion": 3.5844523486859976,
+        "median": 2262.434,
+        "p95": 2266.047
+      }
+    }
+  ],
+  "privacy": {
+    "absolutePathsPublished": false,
+    "modelFilesPublished": false,
+    "rawAudioPublished": false,
+    "referenceTextPublished": false,
+    "transcriptPublished": false
+  },
+  "profileComparisons": [
+    {
+      "candidateId": "sherpa-onnx-fire-red-asr2-ctc-zh_en-int8-2026-02-25",
+      "errorRateChanged": false,
+      "fixedResourceErrorRate": 0.125,
+      "languageLane": "en",
+      "lexicalMetric": "wer",
+      "rawOutputChanged": false,
+      "recommendedErrorRate": 0.125
+    },
+    {
+      "candidateId": "sherpa-onnx-nemo-parakeet-tdt-0.6b-v2-int8-2025-05-01",
+      "errorRateChanged": false,
+      "fixedResourceErrorRate": 0.0,
+      "languageLane": "en",
+      "lexicalMetric": "wer",
+      "rawOutputChanged": false,
+      "recommendedErrorRate": 0.0
+    },
+    {
+      "candidateId": "sherpa-onnx-qwen3-asr-0.6B-int8-2026-03-25",
+      "errorRateChanged": false,
+      "fixedResourceErrorRate": 0.0,
+      "languageLane": "en",
+      "lexicalMetric": "wer",
+      "rawOutputChanged": false,
+      "recommendedErrorRate": 0.0
+    },
+    {
+      "candidateId": "sherpa-onnx-sense-voice-zh-en-ja-ko-yue-int8-2024-07-17",
+      "errorRateChanged": false,
+      "fixedResourceErrorRate": 0.0,
+      "languageLane": "en",
+      "lexicalMetric": "wer",
+      "rawOutputChanged": false,
+      "recommendedErrorRate": 0.0
+    },
+    {
+      "candidateId": "sherpa-onnx-whisper-base-en-int8-2023-01-31",
+      "errorRateChanged": false,
+      "fixedResourceErrorRate": 0.0,
+      "languageLane": "en",
+      "lexicalMetric": "wer",
+      "rawOutputChanged": false,
+      "recommendedErrorRate": 0.0
+    },
+    {
+      "candidateId": "sherpa-onnx-fire-red-asr2-ctc-zh_en-int8-2026-02-25",
+      "errorRateChanged": false,
+      "fixedResourceErrorRate": 0.0,
+      "languageLane": "zh",
+      "lexicalMetric": "cer",
+      "rawOutputChanged": false,
+      "recommendedErrorRate": 0.0
+    },
+    {
+      "candidateId": "sherpa-onnx-paraformer-zh-2024-03-09",
+      "errorRateChanged": false,
+      "fixedResourceErrorRate": 0.0,
+      "languageLane": "zh",
+      "lexicalMetric": "cer",
+      "rawOutputChanged": false,
+      "recommendedErrorRate": 0.0
+    },
+    {
+      "candidateId": "sherpa-onnx-paraformer-zh-int8-2025-10-07",
+      "errorRateChanged": false,
+      "fixedResourceErrorRate": 0.0,
+      "languageLane": "zh",
+      "lexicalMetric": "cer",
+      "rawOutputChanged": false,
+      "recommendedErrorRate": 0.0
+    },
+    {
+      "candidateId": "sherpa-onnx-qwen3-asr-0.6B-int8-2026-03-25",
+      "errorRateChanged": false,
+      "fixedResourceErrorRate": 0.0,
+      "languageLane": "zh",
+      "lexicalMetric": "cer",
+      "rawOutputChanged": false,
+      "recommendedErrorRate": 0.0
+    },
+    {
+      "candidateId": "sherpa-onnx-sense-voice-zh-en-ja-ko-yue-int8-2024-07-17",
+      "errorRateChanged": false,
+      "fixedResourceErrorRate": 0.0,
+      "languageLane": "zh",
+      "lexicalMetric": "cer",
+      "rawOutputChanged": false,
+      "recommendedErrorRate": 0.0
+    },
+    {
+      "candidateId": "sherpa-streaming-zipformer-zh-14m-2023-02-23",
+      "errorRateChanged": false,
+      "fixedResourceErrorRate": 0.10344827586206898,
+      "languageLane": "zh",
+      "lexicalMetric": "cer",
+      "rawOutputChanged": false,
+      "recommendedErrorRate": 0.10344827586206898
+    }
+  ],
+  "schemaVersion": 1,
+  "scope": {
+    "parameterParityFixture": "one authorized FLEURS utterance per language, <=15 seconds",
+    "parameterParityRuns": "1 warm-up + 5 measured per cell",
+    "rankEligible": false,
+    "runtimeLaneId": "sherpa-onnx-dart-1.13.4-macos-arm64",
+    "targetCpuModel": "Apple M4"
+  }
+}

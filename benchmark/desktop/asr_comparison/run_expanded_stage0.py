@@ -68,7 +68,8 @@ def _candidate(
 
 def _capabilities(family: str) -> dict[str, bool]:
     streaming = family == "streaming_zipformer_transducer"
-    generative = family == "funasr_nano"
+    generative = family in {"funasr_nano", "qwen3_asr"}
+    qwen3 = family == "qwen3_asr"
     sense_voice = family == "sense_voice"
     return {
         "streaming": streaming,
@@ -77,7 +78,7 @@ def _capabilities(family: str) -> dict[str, bool]:
         "endpointing": streaming,
         "hotwords": generative,
         "punctuation": generative or sense_voice,
-        "itn": generative or sense_voice,
+        "itn": (generative and not qwen3) or sense_voice,
         "seededGeneration": generative,
     }
 

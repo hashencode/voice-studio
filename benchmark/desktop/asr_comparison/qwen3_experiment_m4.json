@@ -1,0 +1,85 @@
+{
+  "schemaVersion": 1,
+  "kind": "m4_asr_candidate_experiment",
+  "experimentId": "m4-qwen3-asr-official-profile-parity-v1",
+  "targetCpuModel": "Apple M4",
+  "runtimeLaneId": "sherpa-onnx-dart-1.13.4-macos-arm64",
+  "candidate": {
+    "candidateId": "sherpa-onnx-qwen3-asr-0.6B-int8-2026-03-25",
+    "family": "qwen3_asr",
+    "languageLanes": [
+      "zh",
+      "en"
+    ],
+    "sourceUrl": "https://github.com/k2-fsa/sherpa-onnx/releases/download/asr-models/sherpa-onnx-qwen3-asr-0.6B-int8-2026-03-25.tar.bz2",
+    "archiveSha256": "393f8a14e2f5fb96746aaab342997a40641001fbd5bf9592a080a8329178ee96",
+    "license": {
+      "spdx": "Apache-2.0",
+      "disposition": "ACCEPTED_FOR_BENCHMARK",
+      "noticeSource": "https://huggingface.co/Qwen/Qwen3-ASR-0.6B-hf"
+    },
+    "artifacts": {
+      "convFrontend": {
+        "relativePath": "conv_frontend.onnx",
+        "sha256": "d22dc4423e0940e49884e903d2ea2f7e5567c14fc1aed97e4e26d6b8f208ef9e"
+      },
+      "encoder": {
+        "relativePath": "encoder.int8.onnx",
+        "sha256": "60748d3e6744a57c9c91e1b17424a6c2990567e8adceb0783940c03ed98fa9d9"
+      },
+      "decoder": {
+        "relativePath": "decoder.int8.onnx",
+        "sha256": "4f6885be5959ae26af3089d38ee7972c5fafbeeb1cf8d5e76eab6d8b61ca5771"
+      },
+      "tokenizer": {
+        "relativePath": "tokenizer",
+        "sha256": "4aaf142ae42509d44653f1941e9add96deedae4c51557ae33cca1a96b83c42e4"
+      }
+    }
+  },
+  "profiles": {
+    "official-recommended": {
+      "provider": "cpu",
+      "numThreads": 2,
+      "modelPrecision": "int8",
+      "maxTotalLen": 512,
+      "maxNewTokens": 512,
+      "temperature": 0.000001,
+      "topP": 0.8,
+      "seed": 42,
+      "hotwords": "",
+      "inputMode": "whole_short_utterance"
+    },
+    "fixed-resource": {
+      "provider": "cpu",
+      "numThreads": 2,
+      "concurrency": 1,
+      "modelPrecision": "int8",
+      "maxTotalLen": 512,
+      "maxNewTokens": 512,
+      "temperature": 0.000001,
+      "topP": 0.8,
+      "seed": 42,
+      "hotwords": "",
+      "inputMode": "frozen_segments",
+      "segmentDurationSeconds": 15,
+      "pacingPolicy": "unpaced",
+      "warmupRuns": 1,
+      "measuredRuns": 5
+    }
+  },
+  "comparisonPolicy": {
+    "sameAudioRequired": true,
+    "sameScorerRequired": true,
+    "shortAudioMaximumSeconds": 15,
+    "rankEligible": false,
+    "reason": "Post-decision candidate and parameter-parity experiment; it does not rewrite the frozen M4 ranking."
+  },
+  "privacy": {
+    "modelFilesPublished": false,
+    "audioPublished": false,
+    "referenceTextPublished": false,
+    "transcriptPublished": false,
+    "absolutePathsPublished": false
+  }
+}

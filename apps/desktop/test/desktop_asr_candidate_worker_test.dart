@@ -3,9 +3,28 @@ import 'package:sherpa_onnx/sherpa_onnx.dart' as sherpa;
 
 import '../tool/asr_benchmark/candidate_registry.dart';
 import '../tool/asr_benchmark/effective_profile.dart';
+import '../tool/asr_benchmark/qwen3_json_compat.dart';
 
 void main() {
   group('sherpa_onnx 1.13.4 API characterization', () {
+    test('repairs literal control characters in Qwen3 result text', () {
+      final result = decodeQwen3ResultJson(
+        '{"lang":"","emotion":"","event":"","text":"提纲：\n第一项\t完成",'
+        '"tokens":[],"timestamps":[]}',
+      );
+
+      expect(result['text'], '提纲：\n第一项\t完成');
+    });
+
+    test('preserves valid Qwen3 JSON escapes', () {
+      final result = decodeQwen3ResultJson(
+        r'{"lang":"","emotion":"","event":"","text":"a \"quote\"\\path",'
+        r'"tokens":[],"timestamps":[]}',
+      );
+
+      expect(result['text'], 'a "quote"\\path');
+    });
+
     test('constructs streaming Zipformer configuration', () {
       final request = requestFor(
         family: 'streaming_zipformer_transducer',
@@ -196,6 +215,38 @@ void main() {
       );
     });
 
+    test('constructs Qwen3-ASR official generation controls', () {
+      final request = requestFor(
+        family: 'qwen3_asr',
+        modelFiles: <String, Object?>{
+          'convFrontend': modelFile('/models/conv_frontend.onnx'),
+          'encoder': modelFile('/models/encoder.int8.onnx'),
+          'decoder': modelFile('/models/decoder.int8.onnx'),
+          'tokenizer': modelFile('/models/tokenizer'),
+        },
+        config: <String, Object?>{
+          'modelFamily': 'qwen3_asr',
+          'provider': 'cpu',
+          'numThreads': 2,
+          'modelPrecision': 'int8',
+          'maxTotalLen': 512,
+          'maxNewTokens': 512,
+          'temperature': 0.000001,
+          'topP': 0.8,
+          'seed': 42,
+          'hotwords': '',
+        },
+      );
+      final built = EffectiveProfile.fromRequest(request).build();
+      final model = (built as OfflineSherpaProfile).config.model.qwen3Asr;
+
+      expect(model.convFrontend, '/models/conv_frontend.onnx');
+      expect(model.maxNewTokens, 512);
+      expect(model.temperature, 0.000001);
+      expect(model.topP, 0.8);
+      expect(model.seed, 42);
+    });
+
     test('installed package exposes every first-round family adapter', () {
       expect(
         BenchmarkCandidateFamily.values.map((value) => value.manifestValue),
@@ -208,6 +259,7 @@ void main() {
           'sense_voice',
           'funasr_nano',
           'firered_asr_ctc',
+          'qwen3_asr',
         ]),
       );
       expect(const sherpa.OfflineParaformerModelConfig(), isNotNull);
@@ -217,6 +269,7 @@ void main() {
       expect(const sherpa.OfflineSenseVoiceModelConfig(), isNotNull);
       expect(const sherpa.OfflineFunAsrNanoModelConfig(), isNotNull);
       expect(const sherpa.OfflineFireRedAsrCtcModelConfig(), isNotNull);
+      expect(const sherpa.OfflineQwen3AsrModelConfig(), isNotNull);
     });
   });
 
@@ -350,10 +403,10 @@ Map<String, Object?> requestFor({
     'timestamps': true,
     'partialResults': family == 'streaming_zipformer_transducer',
     'endpointing': family == 'streaming_zipformer_transducer',
-    'hotwords': family == 'funasr_nano',
-    'punctuation': family == 'funasr_nano',
+    'hotwords': {'funasr_nano', 'qwen3_asr'}.contains(family),
+    'punctuation': {'funasr_nano', 'qwen3_asr'}.contains(family),
     'itn': family == 'funasr_nano',
-    'seededGeneration': family == 'funasr_nano',
+    'seededGeneration': {'funasr_nano', 'qwen3_asr'}.contains(family),
   },
   'expectSpeech': true,
   'settleMilliseconds': 10,

@@ -1,0 +1,49 @@
+{
+  "schemaVersion": 1,
+  "kind": "m4_asr_comparison_policy_revision",
+  "revisionId": "m4-zh-en-qwen3-no-memory-gate-v2",
+  "supersedesForNewRuns": "m4-zh-en-measurement-v1",
+  "effectiveDate": "2026-07-27",
+  "authorizedBy": "explicit_user_instruction",
+  "runtimeLaneId": "sherpa-onnx-dart-1.13.4-macos-arm64",
+  "selectionPolicy": {
+    "hardGates": {
+      "maximumCer": 0.35,
+      "maximumWer": 0.35,
+      "maximumRtf": 0.5
+    },
+    "memory": {
+      "hardGate": false,
+      "disposition": "advisory_only",
+      "metricsStillRequired": [
+        "absolutePeakRssBytes",
+        "incrementalPeakRssBytes",
+        "retainedRssBytesAfterUnload"
+      ]
+    }
+  },
+  "candidatePolicy": {
+    "addCandidateId": "sherpa-onnx-qwen3-asr-0.6B-int8-2026-03-25",
+    "languageLanes": [
+      "zh",
+      "en"
+    ],
+    "historicalFrozenEvidenceMutated": false
+  },
+  "executionPolicy": {
+    "provider": "cpu",
+    "numThreads": 2,
+    "concurrency": 1,
+    "segmentDurationSeconds": 15,
+    "warmupRuns": 1,
+    "measuredRuns": 5,
+    "scheduleSeed": 20260726
+  },
+  "privacy": {
+    "modelFilesPublished": false,
+    "audioPublished": false,
+    "referenceTextPublished": false,
+    "transcriptPublished": false,
+    "absolutePathsPublished": false
+  }
+}

@@ -36,6 +36,12 @@ enum BenchmarkCandidateFamily {
   fireRedAsrCtc('firered_asr_ctc', 'firered_asr_ctc', <String>{
     'model',
     'tokens',
+  }),
+  qwen3Asr('qwen3_asr', 'qwen3_asr', <String>{
+    'convFrontend',
+    'encoder',
+    'decoder',
+    'tokenizer',
   });
 
   const BenchmarkCandidateFamily(
