@@ -182,6 +182,8 @@ register_watcher() {
 }
 
 start_flutter_run() {
+  python3 "$ROOT/tool/build_cache_guard.py" --wait-for-idle
+
   mkdir -p "$LOG_DIR" "$(dirname "$PID_FILE")"
   rm -f "$PID_FILE"
 
@@ -328,7 +330,8 @@ validate_positive_integer POLL_SECONDS "$POLL_SECONDS"
 validate_positive_integer RELOAD_CHECK_SECONDS "$RELOAD_CHECK_SECONDS"
 resolve_device_id
 register_watcher
-trap cleanup EXIT INT TERM
+trap cleanup EXIT
+trap 'exit 0' INT TERM
 
 echo "Watching UI device workflow"
 echo "Device: $DEVICE_ID"

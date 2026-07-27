@@ -49,6 +49,12 @@ echo "[9/21] Desktop workstation truth contract"
 python3 -m unittest tool/test_validate_desktop_workstation_scope.py
 python3 tool/validate_desktop_workstation_scope.py
 
+echo "[macOS prerequisite] Rebuild desktop product artifact"
+(
+  cd apps/desktop
+  flutter build macos --debug
+)
+
 echo "[10/21] macOS workstation closure contract"
 python3 -m unittest \
   tool/test_macos_artifact_hash.py \
