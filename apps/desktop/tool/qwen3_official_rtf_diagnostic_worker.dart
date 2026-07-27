@@ -8,8 +8,7 @@ import 'dart:typed_data';
 import 'package:sherpa_onnx/sherpa_onnx.dart' as sherpa;
 import 'package:sherpa_onnx/src/sherpa_onnx_bindings.dart';
 import 'package:sherpa_onnx/src/utils.dart';
-
-import 'asr_benchmark/qwen3_json_compat.dart';
+import 'package:voice2text_desktop/features/processing/qwen3_result.dart';
 
 const int _schemaVersion = 2;
 const double _maximumDurationSeconds = 600;

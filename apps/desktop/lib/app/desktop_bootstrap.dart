@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'dart:io';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:meeting_storage/meeting_storage.dart';
 import 'package:meeting_workflows/meeting_workflows.dart';
@@ -53,6 +54,7 @@ class DesktopBootstrap {
       root: modelRoot,
       fetcher: const HttpsFrozenSherpaFetcher(),
       capacityProbe: const MacosFrozenSherpaCapacityProbe(),
+      allowDevelopmentAssets: !kReleaseMode,
     );
     final installed = await modelManager.inspect(manifest);
 

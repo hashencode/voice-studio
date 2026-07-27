@@ -40,6 +40,7 @@ Future<Map<String, Object?>> runU7DogfoodGate() async {
     ),
     fetcher: const HttpsFrozenSherpaFetcher(),
     capacityProbe: const MacosFrozenSherpaCapacityProbe(),
+    allowDevelopmentAssets: true,
   );
   final installation = await manager.inspect(manifest);
   if (installation == null) {

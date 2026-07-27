@@ -19,6 +19,42 @@ void main() {
     }
   });
 
+  test('macOS product manifest contains one Qwen3 ASR model profile', () async {
+    final manifestFile = <File>[
+      File('assets/processing/frozen_sherpa_macos_arm64.json'),
+      File('apps/desktop/assets/processing/frozen_sherpa_macos_arm64.json'),
+    ].firstWhere((candidate) => candidate.existsSync());
+    final raw = jsonDecode(await manifestFile.readAsString());
+    final manifest = FrozenSherpaManifest.fromJson(
+      (raw as Map).cast<String, Object?>(),
+    );
+
+    expect(manifest.setId, contains('qwen3-asr-0.6b-int8'));
+    expect(manifest.licenseDisposition, contains('REVIEW_REQUIRED'));
+    expect(manifest.distributionEligible, isFalse);
+    expect(
+      manifest.downloads
+          .where((download) => download.id == 'qwen3-asr-archive')
+          .single
+          .sha256,
+      '393f8a14e2f5fb96746aaab342997a40641001fbd5bf9592a080a8329178ee96',
+    );
+    final paths = manifest.files.map((file) => file.relativePath).toSet();
+    expect(
+      paths,
+      containsAll(<String>{
+        'asr/conv_frontend.onnx',
+        'asr/encoder.int8.onnx',
+        'asr/decoder.int8.onnx',
+        'asr/tokenizer/tokenizer_config.json',
+        'asr/tokenizer/merges.txt',
+        'asr/tokenizer/vocab.json',
+      }),
+    );
+    expect(paths.any((path) => path.contains('zipformer')), isFalse);
+    expect(paths.any((path) => path.endsWith('joiner.onnx')), isFalse);
+  });
+
   test(
     'resumes, verifies, atomically activates, reuses and uninstalls',
     () async {
@@ -59,6 +95,12 @@ void main() {
         bytes,
       );
       expect(progress.last, 1);
+      expect(
+        await Directory(
+          p.join(root.path, 'staging', '${manifest.contentKey}.partial'),
+        ).exists(),
+        isFalse,
+      );
       expect((await manager.inspect(manifest))?.reused, isTrue);
       expect((await manager.install(manifest)).reused, isTrue);
       expect(fetcher.resumeOffsets, hasLength(1));
@@ -150,35 +192,90 @@ void main() {
     );
   });
 
-  test('accepts only target-specific macOS arm64 or Windows x86_64 manifests', () {
+  test('capacity gate reserves download plus two installed copies', () async {
     final bytes = utf8.encode('model');
     final digest = sha256.convert(bytes).toString();
-    final base = _manifestJson(digest: digest, bytes: bytes.length);
+    final manifest = _manifest(digest: digest, bytes: bytes.length);
+    final required =
+        manifest.downloadBytes +
+        manifest.installedBytes * 2 +
+        manifest.minimumFreeBytesAfterInstall;
+    final fetcher = _MemoryFetcher(bytes);
+    final manager = FrozenSherpaModelManager(
+      root: Directory(p.join(temporary.path, 'capacity-models')),
+      fetcher: fetcher,
+      capacityProbe: _CapacityProbe(required - 1),
+    );
 
-    final windows = FrozenSherpaManifest.fromJson(<String, Object?>{
-      ...base,
-      'platform': 'windows',
-      'architecture': 'x86_64',
-    });
-
-    expect(windows.platform, 'windows');
-    expect(windows.architecture, 'x86_64');
-    for (final unsupported in <(String, String)>[
-      ('macos', 'x86_64'),
-      ('windows', 'arm64'),
-      ('linux', 'x86_64'),
-    ]) {
-      expect(
-        () => FrozenSherpaManifest.fromJson(<String, Object?>{
-          ...base,
-          'platform': unsupported.$1,
-          'architecture': unsupported.$2,
-        }),
-        throwsFormatException,
-        reason: '${unsupported.$1}/${unsupported.$2} must remain blocked',
-      );
-    }
+    await expectLater(manager.install(manifest), throwsA(isA<StateError>()));
+    expect(fetcher.resumeOffsets, isEmpty);
   });
+
+  test(
+    'blocks license-review assets before fetch unless locally enabled',
+    () async {
+      final bytes = utf8.encode('model');
+      final digest = sha256.convert(bytes).toString();
+      final manifest = FrozenSherpaManifest.fromJson(<String, Object?>{
+        ..._manifestJson(digest: digest, bytes: bytes.length),
+        'licenseDisposition':
+            'PRODUCT_ELIGIBLE_WITH_PINNED_NOTICES_CONVERTER_LICENSE_REVIEW_REQUIRED',
+        'distributionEligible': false,
+      });
+      final fetcher = _MemoryFetcher(bytes);
+      final manager = FrozenSherpaModelManager(
+        root: Directory(p.join(temporary.path, 'blocked-models')),
+        fetcher: fetcher,
+        capacityProbe: const _CapacityProbe(1 << 30),
+      );
+
+      expect(await manager.inspect(manifest), isNull);
+      await expectLater(
+        manager.install(manifest),
+        throwsA(
+          isA<StateError>().having(
+            (error) => error.message,
+            'message',
+            'MODEL_LICENSE_REVIEW_REQUIRED',
+          ),
+        ),
+      );
+      expect(fetcher.resumeOffsets, isEmpty);
+    },
+  );
+
+  test(
+    'accepts only target-specific macOS arm64 or Windows x86_64 manifests',
+    () {
+      final bytes = utf8.encode('model');
+      final digest = sha256.convert(bytes).toString();
+      final base = _manifestJson(digest: digest, bytes: bytes.length);
+
+      final windows = FrozenSherpaManifest.fromJson(<String, Object?>{
+        ...base,
+        'platform': 'windows',
+        'architecture': 'x86_64',
+      });
+
+      expect(windows.platform, 'windows');
+      expect(windows.architecture, 'x86_64');
+      for (final unsupported in <(String, String)>[
+        ('macos', 'x86_64'),
+        ('windows', 'arm64'),
+        ('linux', 'x86_64'),
+      ]) {
+        expect(
+          () => FrozenSherpaManifest.fromJson(<String, Object?>{
+            ...base,
+            'platform': unsupported.$1,
+            'architecture': unsupported.$2,
+          }),
+          throwsFormatException,
+          reason: '${unsupported.$1}/${unsupported.$2} must remain blocked',
+        );
+      }
+    },
+  );
 }
 
 FrozenSherpaManifest _manifest({required String digest, required int bytes}) =>
@@ -194,7 +291,8 @@ Map<String, Object?> _manifestJson({
   'architecture': 'arm64',
   'contentKey':
       'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
-  'licenseDisposition': 'PRODUCT_ELIGIBLE_TEST',
+  'licenseDisposition': 'PRODUCT_ELIGIBLE_WITH_PINNED_NOTICES',
+  'distributionEligible': true,
   'requiresUserAcceptance': false,
   'minimumFreeBytesAfterInstall': 1,
   'downloads': <Object?>[

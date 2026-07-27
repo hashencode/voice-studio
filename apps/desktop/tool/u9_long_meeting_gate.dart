@@ -36,6 +36,7 @@ Future<Map<String, Object?>> runU9LongMeetingGate() async {
     ),
     fetcher: const HttpsFrozenSherpaFetcher(),
     capacityProbe: const MacosFrozenSherpaCapacityProbe(),
+    allowDevelopmentAssets: true,
   );
   final installation = await manager.inspect(manifest);
   if (installation == null) {
@@ -161,8 +162,7 @@ Future<Map<String, Object?>> runU9LongMeetingGate() async {
     'longMeetingShardCount': 2,
     'longMeetingShardThresholdSeconds':
         frozenMacosLongMeetingShardThresholdSeconds,
-    'longMeetingShardOverlapSeconds':
-        frozenMacosLongMeetingShardOverlapSeconds,
+    'longMeetingShardOverlapSeconds': frozenMacosLongMeetingShardOverlapSeconds,
     'manifestContentKey': manifest.contentKey,
     'segmentCount': result.segments.length,
     'diarizationSucceeded': result.diarizationSucceeded,

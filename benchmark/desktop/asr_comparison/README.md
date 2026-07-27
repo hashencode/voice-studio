@@ -39,6 +39,12 @@ The completed M4 Chinese and pure-English decision is published in
 `m4_asr_model_decision.json`. Local authorized corpus, raw run output, models,
 and runtime binaries remain under the ignored build evidence root.
 
+The desktop product convergence and future optimization anchor are
+`PC_QWEN3_OPTIMIZATION_BASELINE.md` and
+`pc_qwen3_optimization_baseline.json`. They select one product ASR profile,
+bind the reports and model hashes below, and keep the faster ORT 1.24.4 lane as
+a diagnostic optimization candidate until it passes product gates.
+
 The later user-authorized revision removes the 2 GiB memory hard gate while
 continuing to require peak, incremental, and retained RSS measurements. Its
 current decision is published in `M4_ASR_NO_MEMORY_GATE_DECISION_REPORT.md`

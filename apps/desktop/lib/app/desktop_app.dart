@@ -1040,7 +1040,7 @@ class _SettingsView extends StatelessWidget {
                       const GooListItem(
                         title: '固定处理引擎',
                         subtitle:
-                            'Sherpa ONNX 1.13.4 · Zipformer 14M · '
+                            'Sherpa ONNX 1.13.4 · Qwen3-ASR 0.6B int8 · '
                             'pyannote 3.0 segmentation · 3D-Speaker',
                         leadingIconName: GooIcons.info,
                         trailing: GooTag(

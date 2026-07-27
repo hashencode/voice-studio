@@ -44,6 +44,7 @@ Future<Map<String, Object?>> runU7RealFixtureSmoke() async {
     root: modelRoot,
     fetcher: const HttpsFrozenSherpaFetcher(),
     capacityProbe: const MacosFrozenSherpaCapacityProbe(),
+    allowDevelopmentAssets: true,
   );
   final installWatch = Stopwatch()..start();
   final installation = await manager.install(

@@ -16,6 +16,27 @@ void main() {
 
   tearDown(() => fixture.dispose());
 
+  test('freezes the Qwen3 product profile selected by the M4 benchmark', () {
+    expect(NativeSherpaWorkerEngine.engineId, contains('qwen3-asr-0.6b-int8'));
+    expect(frozenMacosWorkerThreads, 2);
+    expect(frozenMacosWorkerPhaseTimeout, const Duration(minutes: 70));
+    expect(frozenQwen3MaxTotalLen, 512);
+    expect(frozenQwen3MaxNewTokens, 512);
+    expect(frozenQwen3Temperature, 0.000001);
+    expect(frozenQwen3TopP, 0.8);
+    expect(frozenQwen3Seed, 42);
+    expect(frozenQwen3Hotwords, isEmpty);
+    expect(frozenQwen3SegmentDurationSeconds, 15);
+    final configuration = NativeSherpaWorkerConfiguration(
+      launcherPath: fixture.launcher,
+      workerPath: fixture.launcher,
+      runtimeRoot: fixture.runtimeRoot.path,
+      importRoot: fixture.importRoot.path,
+      models: fixture.models,
+    );
+    expect(configuration.timeout, frozenMacosWorkerPhaseTimeout);
+  });
+
   test(
     'isolated ASR and diarization phases publish anonymous assignments',
     () async {
@@ -68,6 +89,55 @@ void main() {
       );
     },
   );
+
+  test(
+    'sequential speakers in one Qwen chunk are not marked overlap',
+    () async {
+      final engine = fixture.engine(
+        await fixture.worker(_Mode.sequentialSpeakers),
+      );
+
+      final result = await engine.process(
+        fixture.job,
+        cancellationToken: ProcessingCancellationToken(),
+        onProgress: (_) {},
+      );
+
+      expect(result.segments, hasLength(1));
+      expect(
+        result.segments.single.speakerAssignment,
+        SpeakerAssignment.unknown,
+      );
+    },
+  );
+
+  test('concurrent speakers in one Qwen chunk remain overlap', () async {
+    final engine = fixture.engine(await fixture.worker(_Mode.overlapSpeakers));
+
+    final result = await engine.process(
+      fixture.job,
+      cancellationToken: ProcessingCancellationToken(),
+      onProgress: (_) {},
+    );
+
+    expect(result.segments, hasLength(1));
+    expect(result.segments.single.speakerAssignment, SpeakerAssignment.overlap);
+  });
+
+  test('ASR keeps two frozen threads when diarization uses four', () async {
+    final engine = fixture.engine(
+      await fixture.worker(_Mode.validatesThreadRouting),
+      workerThreads: 4,
+    );
+
+    final result = await engine.process(
+      fixture.job,
+      cancellationToken: ProcessingCancellationToken(),
+      onProgress: (_) {},
+    );
+
+    expect(result.diarizationSucceeded, isTrue);
+  });
 
   test(
     'worker exit without a result fails promptly instead of waiting timeout',
@@ -192,7 +262,15 @@ void main() {
   });
 }
 
-enum _Mode { success, diarizationFails, exitsEarly, hangs }
+enum _Mode {
+  success,
+  diarizationFails,
+  sequentialSpeakers,
+  overlapSpeakers,
+  validatesThreadRouting,
+  exitsEarly,
+  hangs,
+}
 
 class _Fixture {
   const _Fixture({
@@ -218,12 +296,14 @@ class _Fixture {
     final source = File(p.join(importRoot.path, 'meeting.wav'));
     await source.writeAsBytes(<int>[1, 2, 3]);
     final modelPaths = List<String>.generate(
-      6,
+      5,
       (index) => p.join(modelsRoot.path, '$index.model'),
     );
     for (var index = 0; index < modelPaths.length; index += 1) {
       await File(modelPaths[index]).writeAsBytes(<int>[index]);
     }
+    final tokenizerPath = p.join(modelsRoot.path, 'tokenizer');
+    await Directory(tokenizerPath).create();
     final launcher = p.join(root.path, 'launcher');
     final current = Directory.current;
     final launcherSources = <File>[
@@ -259,12 +339,12 @@ class _Fixture {
       launcher: launcher,
       runtimeRoot: runtimeRoot,
       models: SherpaDesktopModelSet(
-        encoderPath: modelPaths[0],
-        decoderPath: modelPaths[1],
-        joinerPath: modelPaths[2],
-        tokensPath: modelPaths[3],
-        segmentationPath: modelPaths[4],
-        embeddingPath: modelPaths[5],
+        convFrontendPath: modelPaths[0],
+        encoderPath: modelPaths[1],
+        decoderPath: modelPaths[2],
+        tokenizerPath: tokenizerPath,
+        segmentationPath: modelPaths[3],
+        embeddingPath: modelPaths[4],
       ),
     );
   }
@@ -290,14 +370,18 @@ class _Fixture {
     createdAtMs: 1,
   );
 
-  NativeSherpaWorkerEngine engine(String worker) => NativeSherpaWorkerEngine(
+  NativeSherpaWorkerEngine engine(
+    String worker, {
+    int workerThreads = frozenMacosWorkerThreads,
+  }) => NativeSherpaWorkerEngine(
     NativeSherpaWorkerConfiguration(
       launcherPath: launcher,
       workerPath: worker,
       runtimeRoot: runtimeRoot.path,
       importRoot: importRoot.path,
       models: models,
-      timeout: const Duration(seconds: 2),
+      workerThreads: workerThreads,
+      timeout: const Duration(seconds: 5),
     ),
   );
 
@@ -307,6 +391,9 @@ class _Fixture {
     final body = switch (mode) {
       _Mode.success => _workerBody(diarizationFails: false),
       _Mode.diarizationFails => _workerBody(diarizationFails: true),
+      _Mode.sequentialSpeakers => _chunkWorkerBody(overlap: false),
+      _Mode.overlapSpeakers => _chunkWorkerBody(overlap: true),
+      _Mode.validatesThreadRouting => _threadRoutingWorkerBody(),
       _Mode.exitsEarly => '#!/bin/sh\nread request\nexit 17\n',
       _Mode.hangs =>
         '#!/bin/sh\n'
@@ -324,6 +411,46 @@ class _Fixture {
     if (await root.exists()) await root.delete(recursive: true);
   }
 }
+
+String _chunkWorkerBody({required bool overlap}) {
+  final firstEnd = overlap ? 10.0 : 7.0;
+  final secondStart = overlap ? 5.0 : 7.0;
+  return '#!/bin/sh\n'
+      'phase=""\n'
+      'while [ "\$#" -gt 0 ]; do\n'
+      '  if [ "\$1" = "--phase" ]; then phase="\$2"; shift 2; else shift; fi\n'
+      'done\n'
+      'read request\n'
+      'if [ "\$phase" = "asr" ]; then\n'
+      '''  echo '{"schemaVersion":1,"type":"result","phase":"asr","sourceSha256":"${_Fixture.fingerprint}","asrResultVersion":2,"text":"整段","durationSeconds":15.0,"segments":["整段"],"segmentStartSeconds":[0.0],"residentBytes":1024}'
+'''
+      'else\n'
+      '''  echo '{"schemaVersion":1,"type":"result","phase":"diarization","sourceSha256":"${_Fixture.fingerprint}","turns":[{"startSeconds":0.0,"endSeconds":$firstEnd,"speakerKey":"speaker-1"},{"startSeconds":$secondStart,"endSeconds":15.0,"speakerKey":"speaker-2"}],"residentBytes":2048}'
+'''
+      'fi\n';
+}
+
+String _threadRoutingWorkerBody() =>
+    '#!/bin/sh\n'
+    'phase=""\n'
+    'threads=""\n'
+    'while [ "\$#" -gt 0 ]; do\n'
+    '  case "\$1" in\n'
+    '    --phase) phase="\$2"; shift 2 ;;\n'
+    '    --num-threads) threads="\$2"; shift 2 ;;\n'
+    '    *) shift ;;\n'
+    '  esac\n'
+    'done\n'
+    'read request\n'
+    'if [ "\$phase" = "asr" ] && [ "\$threads" != "2" ]; then exit 21; fi\n'
+    'if [ "\$phase" = "diarization" ] && [ "\$threads" != "4" ]; then exit 22; fi\n'
+    'if [ "\$phase" = "asr" ]; then\n'
+    '''  echo '{"schemaVersion":1,"type":"result","phase":"asr","sourceSha256":"${_Fixture.fingerprint}","asrResultVersion":2,"text":"确认","durationSeconds":1.0,"segments":["确认"],"segmentStartSeconds":[0.0],"residentBytes":1024}'
+'''
+    'else\n'
+    '''  echo '{"schemaVersion":1,"type":"result","phase":"diarization","sourceSha256":"${_Fixture.fingerprint}","turns":[{"startSeconds":0.0,"endSeconds":1.0,"speakerKey":"speaker-1"}],"residentBytes":2048}'
+'''
+    'fi\n';
 
 String _workerBody({required bool diarizationFails}) {
   final diarization = diarizationFails

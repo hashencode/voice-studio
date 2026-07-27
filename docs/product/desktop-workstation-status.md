@@ -5,8 +5,10 @@
 ## 当前结论
 
 桌面端是会议处理主工作站，手机是可靠采集端和可独立使用的移动核心。macOS
-已完成 closure，状态为 `PASS`；Windows 依赖已解除并进入 `PLANNED`。两个
-平台仍不得跨目标继承 PASS。
+现已将产品 ASR 收敛为唯一的 Qwen3-ASR 0.6B int8 配置，状态回到
+`PRODUCT_IN_PROGRESS`，旧 Zipformer closure 不继承给新模型；Windows 在
+Qwen3 产品门禁完成前保持 `BLOCKED_BY_MACOS_CLOSURE`。两个平台仍不得跨目标
+继承 PASS。此前的 Windows `PLANNED` 状态属于 Zipformer closure 后的历史状态。
 
 本状态页描述当前执行方向，不改写已经完成的 S2/S3 历史证据。paired-PC
 provider v1 继续只表示“转写片段到结构化纪要”；桌面 ASR、原始音频传输和
@@ -17,8 +19,8 @@ provider v1 继续只表示“转写片段到结构化纪要”；桌面 ASR、�
 | 目标 | 状态 | 当前边界 |
 | --- | --- | --- |
 | Android | `MOBILE_CORE_AVAILABLE` | 保持录音、导入、离线转写、复核、AI 纪要和导出回归；一次性最终移动说话人诊断已以 `FAIL_NO_ADMISSIBLE_CANDIDATE` 终态关闭，不继续候选循环 |
-| macOS | `PASS` | U9 已通过长会议、dogfood、性能、生命周期、安全、可访问性、真实集成和构建门禁，closure disposition 为 `MACOS_CLOSED_FOR_WINDOWS_ENTRY` |
-| Windows | `PLANNED` | 仅移植 macOS finalist 与产品流，并在 Windows 参考目标重新生成独立证据，不继承 macOS PASS |
+| macOS | `PRODUCT_IN_PROGRESS` | ASR 只保留 Qwen3-ASR 0.6B int8；需以新模型重新跑长会议、dogfood、生命周期、打包签名、取消和资源门禁，旧 U9 PASS 仅作历史证据 |
+| Windows | `BLOCKED_BY_MACOS_CLOSURE` | 等待 Qwen3 macOS closure；之后只移植同一 finalist 与产品流，并在 Windows 参考目标重新生成独立证据 |
 
 ## 模型与证据
 
@@ -31,6 +33,19 @@ macOS 第一轮固定比较：
 - ASR：Sherpa、FunASR。
 - 说话人分离：Sherpa、pyannote.audio。
 - Whisper、faster-whisper 和 whisper.cpp 不进入第一轮。
+
+2026-07-27 的产品收敛只保留一个 ASR profile：
+`sherpa-onnx-qwen3-asr-0.6B-int8-2026-03-25`，CPU provider、2 threads、
+concurrency 1、固定 15 秒分段、`maxTotalLen=512`、`maxNewTokens=512`、
+`temperature=1e-6`、`topP=0.8`、`seed=42`、空 hotwords。说话人分离保持独立
+能力，不作为第二个 ASR 候选。冻结测量、模型 hash、报告 hash 与后续优化比较
+契约位于
+`benchmark/desktop/asr_comparison/pc_qwen3_optimization_baseline.json`。
+当前产品 runtime 保持 sherpa-onnx 1.13.4 / ORT 1.27；更快的 ORT 1.24.4
+仅是诊断优化候选，在质量、稳定性、内存、打包签名、取消和清理门禁完成前
+不得替换产品 runtime。当前 sherpa 归档中的第三方 ONNX 转换仍缺少独立
+许可证声明，因此只允许 Debug/Profile 本地产品验证，Release 构建拒绝激活；
+外部分发前必须完成转换来源许可审查或改用可复现的一方转换。
 
 U4 在 Apple M2 / 16 GiB / macOS 15.7.5 上完成单 lockfile falsification 和
 Debug 构建。真实 `assets/sherpa/wav/test.wav` 已通过系统文件选择器导入，
@@ -58,7 +73,7 @@ RSS `3130687488` 字节，且模型权重 `1209984868` 字节；相对 Sherpa �
 commit `3533c8cf8e369892e6b79ff1bf80f7b0286a54ee`，但未接受用户条件、未下载
 模型，保持 `LAB_ONLY_USER_CONDITIONS_NOT_ACCEPTED`。
 
-冻结组合为 Sherpa Zipformer 14M ASR 与 Sherpa pyannote 3.0 segmentation +
+U6 当时冻结的组合为 Sherpa Zipformer 14M ASR 与 Sherpa pyannote 3.0 segmentation +
 3D-Speaker ERes2Net diarization，共用 `sherpa-onnx-c-api@1.13.4`。segmentation
 归档包含固定 MIT 许可证，embedding 模型固定 Apache-2.0 disposition；产品
 交付必须保留 notice，只输出匿名 speaker，不持久化 voiceprint。机器决策与
@@ -66,7 +81,7 @@ commit `3533c8cf8e369892e6b79ff1bf80f7b0286a54ee`，但未接受用户条件、�
 `benchmark/desktop/MACOS_ENGINE_SELECTION.md`，U6 汇总证据位于
 `docs/product/desktop-workstation-u6-evidence.json`。
 
-U7 将冻结组合产品化为独立 macOS 会议工作站。默认会议库、持久任务区、本机
+U7 将当时冻结的组合产品化为独立 macOS 会议工作站。默认会议库、持久任务区、本机
 播放、虚拟化转写、搜索/定位、编辑与 undo/redo、匿名说话人重命名/合并/
 人工指派、证据链接、五格式导出和会议笔记审核均使用共享 v19 SQLite 与
 `meeting_workflows`，desktop app 不导入根移动 package。处理任务和 AI 任务

@@ -16,7 +16,8 @@ DeepSeek 账户、把密钥保存在 Android Keystore 边界内，并在每场�
 后续平台方向已由 `DESKTOP-FIRST-MEETING-WORKSTATION-2026-07-26` 重新定基线：
 桌面端是会议处理主工作站，手机继续作为可靠采集端和可独立使用的移动核心。
 macOS 严格先行；Windows 在 macOS closure 前保持
-`PLANNED`，且不能继承 macOS 的模型 PASS。
+`BLOCKED_BY_MACOS_CLOSURE`，等待 Qwen3-ASR 重新完成 macOS closure，且不能
+继承 macOS 的模型 PASS。此前的 `PLANNED` 属于 Zipformer closure 后的历史状态。
 
 ## 分项状态
 

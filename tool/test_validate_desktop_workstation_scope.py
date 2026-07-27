@@ -8,6 +8,7 @@ from pathlib import Path
 
 from tool.validate_desktop_workstation_scope import (
     DEFAULT_MANIFEST,
+    _validate_qwen3_product_decision,
     validate_asr005_policy_text,
     validate_scope_contract,
 )
@@ -31,8 +32,8 @@ class DesktopWorkstationScopeTest(unittest.TestCase):
         result = validate_scope_contract()
 
         self.assertEqual("macos", result["firstDesktopTarget"])
-        self.assertEqual("PASS", result["macos"])
-        self.assertEqual("PLANNED", result["windows"])
+        self.assertEqual("PRODUCT_IN_PROGRESS", result["macos"])
+        self.assertEqual("BLOCKED_BY_MACOS_CLOSURE", result["windows"])
         self.assertEqual("PASS_MACOS_ANDROID_LAN", result["lanHandoff"])
         self.assertEqual(
             "FAIL_NO_ADMISSIBLE_CANDIDATE",
@@ -54,6 +55,41 @@ class DesktopWorkstationScopeTest(unittest.TestCase):
 
         with self.assertRaisesRegex(ValueError, "macOS closure PASS"):
             self._validate_mutation(manifest)
+
+    def test_qwen3_product_decision_cannot_drift(self) -> None:
+        for field, value in (
+            ("asrCandidateId", "another-model"),
+            ("asrCandidateCount", 2),
+            ("runtimeLaneId", "another-runtime"),
+        ):
+            with self.subTest(field=field):
+                manifest = copy.deepcopy(self.manifest)
+                decision_path = Path(
+                    manifest["targets"]["macos"]["frozenEngines"][
+                        "machineDecision"
+                    ]
+                )
+                decision = json.loads(decision_path.read_text(encoding="utf-8"))
+                decision["product"][field] = value
+                with self.assertRaisesRegex(
+                    ValueError,
+                    "frozen engines disagree",
+                ):
+                    _validate_qwen3_product_decision(
+                        decision,
+                        manifest["targets"]["macos"]["frozenEngines"],
+                    )
+        manifest = copy.deepcopy(self.manifest)
+        decision_path = Path(
+            manifest["targets"]["macos"]["frozenEngines"]["machineDecision"]
+        )
+        decision = json.loads(decision_path.read_text(encoding="utf-8"))
+        decision["product"]["profile"]["maxTotalLen"] = 256
+        with self.assertRaisesRegex(ValueError, "frozen engines disagree"):
+            _validate_qwen3_product_decision(
+                decision,
+                manifest["targets"]["macos"]["frozenEngines"],
+            )
 
     def test_target_cannot_reuse_another_targets_only_evidence_hash(self) -> None:
         manifest = copy.deepcopy(self.manifest)
@@ -108,6 +144,21 @@ class DesktopWorkstationScopeTest(unittest.TestCase):
 
         with self.assertRaisesRegex(ValueError, "LAN PASS evidence hash mismatch"):
             self._validate_mutation(manifest)
+
+    def test_vertical_slice_runner_uses_only_qwen3_product_arguments(self) -> None:
+        script = Path(
+            "benchmark/desktop/run_offline_vertical_slice.sh"
+        ).read_text(encoding="utf-8")
+        self.assertIn("sherpa-onnx-qwen3-asr-0.6B-int8", script)
+        for argument in (
+            "--conv-frontend",
+            "--encoder",
+            "--decoder",
+            "--tokenizer",
+        ):
+            self.assertIn(argument, script)
+        self.assertNotIn("--joiner", script)
+        self.assertNotIn("--tokens", script)
 
 
 if __name__ == "__main__":

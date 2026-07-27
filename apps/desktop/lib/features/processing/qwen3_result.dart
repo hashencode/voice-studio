@@ -1,4 +1,11 @@
 import 'dart:convert';
+import 'dart:ffi';
+
+import 'package:sherpa_onnx/sherpa_onnx.dart' as sherpa;
+// ignore: implementation_imports
+import 'package:sherpa_onnx/src/sherpa_onnx_bindings.dart';
+// ignore: implementation_imports
+import 'package:sherpa_onnx/src/utils.dart';
 
 /// Decodes sherpa-onnx Qwen3 result JSON while repairing only unescaped JSON
 /// control characters inside string values.
@@ -60,4 +67,29 @@ Map<String, Object?> decodeQwen3ResultJson(String source) {
     throw const FormatException('Qwen3 result must be a JSON object');
   }
   return decoded;
+}
+
+sherpa.OfflineRecognizerResult readQwen3Result(sherpa.OfflineStream stream) {
+  final getResult = SherpaOnnxBindings.getOfflineStreamResultAsJson;
+  final destroyResult = SherpaOnnxBindings.destroyOfflineStreamResultJson;
+  if (getResult == null || destroyResult == null) {
+    throw StateError('sherpa-onnx Qwen3 result bindings are unavailable');
+  }
+  final pointer = getResult(stream.ptr);
+  if (pointer == nullptr) {
+    throw const FormatException('Qwen3 result JSON is missing');
+  }
+  try {
+    final result = decodeQwen3ResultJson(toDartString(pointer));
+    return sherpa.OfflineRecognizerResult(
+      text: result['text']! as String,
+      tokens: List<String>.from(result['tokens']! as List),
+      timestamps: List<double>.from(result['timestamps']! as List),
+      lang: result['lang']! as String,
+      emotion: result['emotion']! as String,
+      event: result['event']! as String,
+    );
+  } finally {
+    destroyResult(pointer);
+  }
 }

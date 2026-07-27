@@ -69,6 +69,31 @@ def validate_macos_closure(
     scope_path: Path = DEFAULT_SCOPE,
     validate_scope: bool = True,
 ) -> dict[str, Any]:
+    if validate_scope:
+        scope = _load(scope_path, "desktop scope")
+        targets = _mapping(scope.get("targets"), "targets")
+        macos = _mapping(targets.get("macos"), "macos")
+        windows = _mapping(targets.get("windows"), "windows")
+        if (
+            macos.get("status") == "PRODUCT_IN_PROGRESS"
+            and macos.get("closureStatus") == "NOT_RUN"
+        ):
+            frozen = _mapping(macos.get("frozenEngines"), "macOS frozen engines")
+            _require(
+                frozen.get("asr")
+                == "sherpa-onnx-qwen3-asr-0.6B-int8-2026-03-25",
+                "Qwen3 revalidation has no frozen ASR",
+            )
+            _require(
+                windows.get("status") == "BLOCKED_BY_MACOS_CLOSURE",
+                "Windows must remain blocked during Qwen3 revalidation",
+            )
+            return {
+                "target": "macos",
+                "status": "PRODUCT_IN_PROGRESS",
+                "disposition": "MACOS_QWEN3_REVALIDATION_REQUIRED",
+            }
+
     evidence = _load(evidence_path, "U9 evidence")
     _require(evidence.get("schemaVersion") == 1, "U9 schema mismatch")
     _require(evidence.get("unit") == "U9", "U9 unit mismatch")
@@ -340,11 +365,15 @@ def main() -> int:
     parser.add_argument("--scope", type=Path, default=DEFAULT_SCOPE)
     parser.add_argument("--skip-scope", action="store_true")
     args = parser.parse_args()
-    result = validate_macos_closure(
-        args.evidence,
-        scope_path=args.scope,
-        validate_scope=not args.skip_scope,
-    )
+    try:
+        result = validate_macos_closure(
+            args.evidence,
+            scope_path=args.scope,
+            validate_scope=not args.skip_scope,
+        )
+    except (OSError, json.JSONDecodeError, ValueError) as error:
+        print(f"FAIL: {error}")
+        return 1
     print(json.dumps(result, ensure_ascii=False, sort_keys=True))
     return 0
 

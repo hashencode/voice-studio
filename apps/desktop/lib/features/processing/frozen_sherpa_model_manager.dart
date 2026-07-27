@@ -65,6 +65,7 @@ class FrozenSherpaManifest {
     required this.architecture,
     required this.contentKey,
     required this.licenseDisposition,
+    required this.distributionEligible,
     required this.requiresUserAcceptance,
     required this.minimumFreeBytesAfterInstall,
     required this.downloads,
@@ -73,7 +74,10 @@ class FrozenSherpaManifest {
     if (!_id.hasMatch(setId) ||
         !_supportedTargets.contains((platform, architecture)) ||
         !_sha.hasMatch(contentKey) ||
-        !licenseDisposition.startsWith('PRODUCT_ELIGIBLE') ||
+        (distributionEligible
+            ? licenseDisposition != 'PRODUCT_ELIGIBLE_WITH_PINNED_NOTICES'
+            : licenseDisposition !=
+                  'PRODUCT_ELIGIBLE_WITH_PINNED_NOTICES_CONVERTER_LICENSE_REVIEW_REQUIRED') ||
         requiresUserAcceptance ||
         minimumFreeBytesAfterInstall < 0 ||
         downloads.isEmpty ||
@@ -125,6 +129,7 @@ class FrozenSherpaManifest {
       architecture: json['architecture']! as String,
       contentKey: json['contentKey']! as String,
       licenseDisposition: json['licenseDisposition']! as String,
+      distributionEligible: json['distributionEligible']! as bool,
       requiresUserAcceptance: json['requiresUserAcceptance']! as bool,
       minimumFreeBytesAfterInstall:
           json['minimumFreeBytesAfterInstall']! as int,
@@ -138,12 +143,14 @@ class FrozenSherpaManifest {
   final String architecture;
   final String contentKey;
   final String licenseDisposition;
+  final bool distributionEligible;
   final bool requiresUserAcceptance;
   final int minimumFreeBytesAfterInstall;
   final List<FrozenSherpaDownload> downloads;
   final List<FrozenSherpaFile> files;
 
   int get downloadBytes => downloads.fold(0, (sum, item) => sum + item.bytes);
+  int get installedBytes => files.fold(0, (sum, item) => sum + item.bytes);
 
   static const Set<(String, String)> _supportedTargets = {
     ('macos', 'arm64'),
@@ -266,15 +273,18 @@ class FrozenSherpaModelManager {
     required this.root,
     required this.fetcher,
     required this.capacityProbe,
+    this.allowDevelopmentAssets = false,
   });
 
   final Directory root;
   final FrozenSherpaFetcher fetcher;
   final FrozenSherpaCapacityProbe capacityProbe;
+  final bool allowDevelopmentAssets;
 
   Future<FrozenSherpaInstallation?> inspect(
     FrozenSherpaManifest manifest,
   ) async {
+    if (!manifest.distributionEligible && !allowDevelopmentAssets) return null;
     final installed = _installedRoot(manifest);
     if (!await installed.exists()) return null;
     try {
@@ -293,11 +303,16 @@ class FrozenSherpaModelManager {
     FrozenSherpaManifest manifest, {
     void Function(double progress)? onProgress,
   }) async {
+    if (!manifest.distributionEligible && !allowDevelopmentAssets) {
+      throw StateError('MODEL_LICENSE_REVIEW_REQUIRED');
+    }
     final existing = await inspect(manifest);
     if (existing != null) return existing;
     await root.create(recursive: true);
     final required =
-        manifest.downloadBytes * 2 + manifest.minimumFreeBytesAfterInstall;
+        manifest.downloadBytes +
+        manifest.installedBytes * 2 +
+        manifest.minimumFreeBytesAfterInstall;
     if (await capacityProbe.availableBytes(root) < required) {
       throw StateError('MODEL_INSTALL_INSUFFICIENT_SPACE');
     }
@@ -391,6 +406,7 @@ class FrozenSherpaModelManager {
     }
     await prepared.rename(installed.path);
     await _verifyInstalled(manifest, installed);
+    if (await staging.exists()) await staging.delete(recursive: true);
     return FrozenSherpaInstallation(
       root: installed,
       models: _models(installed),
@@ -436,10 +452,10 @@ class FrozenSherpaModelManager {
       Directory(p.join(root.path, 'sets', manifest.contentKey));
 
   SherpaDesktopModelSet _models(Directory installed) => SherpaDesktopModelSet(
-    encoderPath: p.join(installed.path, 'asr', 'encoder.onnx'),
-    decoderPath: p.join(installed.path, 'asr', 'decoder.onnx'),
-    joinerPath: p.join(installed.path, 'asr', 'joiner.onnx'),
-    tokensPath: p.join(installed.path, 'asr', 'tokens.txt'),
+    convFrontendPath: p.join(installed.path, 'asr', 'conv_frontend.onnx'),
+    encoderPath: p.join(installed.path, 'asr', 'encoder.int8.onnx'),
+    decoderPath: p.join(installed.path, 'asr', 'decoder.int8.onnx'),
+    tokenizerPath: p.join(installed.path, 'asr', 'tokenizer'),
     segmentationPath: p.join(
       installed.path,
       'diarization',

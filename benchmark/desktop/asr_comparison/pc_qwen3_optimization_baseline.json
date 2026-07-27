@@ -1,0 +1,96 @@
+{
+  "schemaVersion": 1,
+  "kind": "pc_qwen3_asr_optimization_baseline",
+  "baselineId": "pc-qwen3-asr-product-baseline-v1",
+  "baselineDate": "2026-07-27",
+  "sourceCommit": "a481f9dc360ad7e972f92eccd7e127fe73f145f3",
+  "product": {
+    "asrCandidateId": "sherpa-onnx-qwen3-asr-0.6B-int8-2026-03-25",
+    "asrCandidateCount": 1,
+    "diarizationIsIndependent": true,
+    "runtimeLaneId": "sherpa-onnx-dart-1.13.4-ort-1.27.0-macos-arm64",
+    "profile": {
+      "provider": "cpu",
+      "numThreads": 2,
+      "concurrency": 1,
+      "modelPrecision": "int8",
+      "segmentDurationSeconds": 15,
+      "maxTotalLen": 512,
+      "maxNewTokens": 512,
+      "temperature": 0.000001,
+      "topP": 0.8,
+      "seed": 42,
+      "hotwords": ""
+    },
+    "modelHashes": {
+      "archive": "393f8a14e2f5fb96746aaab342997a40641001fbd5bf9592a080a8329178ee96",
+      "convFrontend": "d22dc4423e0940e49884e903d2ea2f7e5567c14fc1aed97e4e26d6b8f208ef9e",
+      "encoder": "60748d3e6744a57c9c91e1b17424a6c2990567e8adceb0783940c03ed98fa9d9",
+      "decoder": "4f6885be5959ae26af3089d38ee7972c5fafbeeb1cf8d5e76eab6d8b61ca5771",
+      "tokenizerTree": "4aaf142ae42509d44653f1941e9add96deedae4c51557ae33cca1a96b83c42e4"
+    }
+  },
+  "quality": {
+    "chineseHeldOutCer": 0.1122,
+    "englishHeldOutWer": 0.2514,
+    "englishFarFieldNoiseHeldOutWer": 0.7114
+  },
+  "performance": {
+    "chineseHeldOutMedianRtf": 0.2257,
+    "englishHeldOutMedianRtf": 0.2416,
+    "officialAudioCurrentDartMedianRtf": 0.2514363,
+    "officialAudioCurrentDartP95Rtf": 0.252015,
+    "officialAudioBestNativeDiagnosticMedianRtf": 0.1241914347,
+    "officialAudioBestNativeDiagnosticP95Rtf": 0.124266,
+    "nativeOrt127OverOrt1244MedianRatio": 2.061,
+    "sileroOverFixed15ControlledMedianPairRatio": 1.002547,
+    "resultConversionShare": 0.00000701087
+  },
+  "optimizationCandidate": {
+    "runtimeLaneId": "native-sherpa-onnx-1.13.4-ort-1.24.4-macos-arm64",
+    "productEligible": false,
+    "reason": "diagnostic lane requires product quality, stability, memory, packaging, signing, cancellation, and cleanup validation"
+  },
+  "license": {
+    "upstreamSpdx": "Apache-2.0",
+    "upstreamModel": "https://huggingface.co/Qwen/Qwen3-ASR-0.6B",
+    "upstreamRepository": "https://github.com/QwenLM/Qwen3-ASR",
+    "conversionRepository": "https://github.com/Wasser1462/Qwen3-ASR-onnx",
+    "disposition": "PRODUCT_ELIGIBLE_WITH_PINNED_NOTICES_CONVERTER_LICENSE_REVIEW_REQUIRED",
+    "distributionEligible": false
+  },
+  "evidence": [
+    {
+      "path": "M4_ASR_NO_MEMORY_GATE_DECISION_REPORT.md",
+      "sha256": "58c92f13a6257bd8aba3d694e0c7ed87a07d6035de0caf4f5afd92284c8bc625"
+    },
+    {
+      "path": "m4_asr_no_memory_gate_decision.json",
+      "sha256": "be2fb4027bd9ec2c6dc9deb027e93f4cceae99b219d4fb7e48e48d5e131b6b98"
+    },
+    {
+      "path": "M4_QWEN3_OFFICIAL_RTF_REPRODUCTION_REPORT.md",
+      "sha256": "8cf71bf93e42644514fb20a57573d3f524ba49252d49227797d6d1015426d535",
+      "publicationId": "e1e17b6e6f01fb06b2a9e558"
+    },
+    {
+      "path": "m4_qwen3_official_rtf_reproduction.json",
+      "sha256": "c359a6395f847f19d5e33ad6330046cd8851b51bf618136e572b6f31429a703d"
+    },
+    {
+      "path": "qwen3_experiment_m4.json",
+      "sha256": "094b8c69924a86a68ff6c0073277b0b871b0c53b408409f68234bfe63a1769f1"
+    },
+    {
+      "path": "qwen3_m4_development_freeze.json",
+      "sha256": "19407cd9985a68f9cd30ce6e5620aa4b2412fdf55eb4161cd3ced11e21bdbcd9"
+    }
+  ],
+  "privacy": {
+    "audioPublished": false,
+    "modelFilesPublished": false,
+    "transcriptsPublished": false,
+    "absolutePathsPublished": false,
+    "credentialsPublished": false
+  }
+}

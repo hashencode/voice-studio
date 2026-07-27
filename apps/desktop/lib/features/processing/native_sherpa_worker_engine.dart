@@ -12,6 +12,7 @@ import 'sherpa_desktop_processing_engine.dart';
 
 const double frozenMacosDiarizationClusteringThreshold = 0.65;
 const int frozenMacosWorkerThreads = 2;
+const Duration frozenMacosWorkerPhaseTimeout = Duration(minutes: 70);
 const double frozenMacosLongMeetingShardThresholdSeconds = 3600;
 const double frozenMacosLongMeetingShardOverlapSeconds = 120;
 
@@ -25,7 +26,7 @@ class NativeSherpaWorkerConfiguration {
     this.diarizationClusteringThreshold =
         frozenMacosDiarizationClusteringThreshold,
     this.workerThreads = frozenMacosWorkerThreads,
-    this.timeout = const Duration(minutes: 30),
+    this.timeout = frozenMacosWorkerPhaseTimeout,
   }) : assert(
          diarizationClusteringThreshold > 0 &&
              diarizationClusteringThreshold < 1 &&
@@ -52,7 +53,7 @@ class NativeSherpaWorkerConfiguration {
 class NativeSherpaWorkerEngine implements DesktopProcessingEngine {
   const NativeSherpaWorkerEngine(this.configuration);
 
-  static const engineId = 'sherpa-onnx-1.13.4/zipformer14m-pyannote3';
+  static const engineId = 'sherpa-onnx-1.13.4/qwen3-asr-0.6b-int8-pyannote3';
   final NativeSherpaWorkerConfiguration configuration;
 
   @override
@@ -137,14 +138,14 @@ class NativeSherpaWorkerEngine implements DesktopProcessingEngine {
       phase,
       '--runtime-root',
       configuration.runtimeRoot,
+      '--conv-frontend',
+      configuration.models.convFrontendPath,
       '--encoder',
       configuration.models.encoderPath,
       '--decoder',
       configuration.models.decoderPath,
-      '--joiner',
-      configuration.models.joinerPath,
-      '--tokens',
-      configuration.models.tokensPath,
+      '--tokenizer',
+      configuration.models.tokenizerPath,
       '--segmentation',
       configuration.models.segmentationPath,
       '--embedding',
@@ -152,7 +153,22 @@ class NativeSherpaWorkerEngine implements DesktopProcessingEngine {
       '--diarization-threshold',
       configuration.diarizationClusteringThreshold.toString(),
       '--num-threads',
-      configuration.workerThreads.toString(),
+      (phase == 'asr' ? frozenMacosWorkerThreads : configuration.workerThreads)
+          .toString(),
+      '--max-total-len',
+      frozenQwen3MaxTotalLen.toString(),
+      '--max-new-tokens',
+      frozenQwen3MaxNewTokens.toString(),
+      '--temperature',
+      frozenQwen3Temperature.toString(),
+      '--top-p',
+      frozenQwen3TopP.toString(),
+      '--seed',
+      frozenQwen3Seed.toString(),
+      '--hotwords',
+      frozenQwen3Hotwords,
+      '--segment-duration-seconds',
+      frozenQwen3SegmentDurationSeconds.toString(),
     ];
     if (phase == 'diarization' && startSeconds != null && endSeconds != null) {
       arguments.addAll(<String>[
@@ -368,15 +384,19 @@ class NativeSherpaWorkerEngine implements DesktopProcessingEngine {
   ) {
     final text = asr['text'];
     final duration = (asr['durationSeconds'] as num?)?.toDouble();
-    final tokens = asr['tokens'];
-    final timestamps = asr['timestamps'];
+    final units = asr['asrResultVersion'] == 2
+        ? asr['segments']
+        : asr['tokens'];
+    final starts = asr['asrResultVersion'] == 2
+        ? asr['segmentStartSeconds']
+        : asr['timestamps'];
     if (text is! String || text.trim().isEmpty || duration == null) {
       throw const FormatException('invalid ASR worker result');
     }
-    if (tokens is! List<Object?> ||
-        timestamps is! List<Object?> ||
-        tokens.length != timestamps.length ||
-        tokens.isEmpty) {
+    if (units is! List<Object?> ||
+        starts is! List<Object?> ||
+        units.length != starts.length ||
+        units.isEmpty) {
       return <ProcessingTranscriptSegment>[
         ProcessingTranscriptSegment(
           startSeconds: 0,
@@ -403,32 +423,59 @@ class NativeSherpaWorkerEngine implements DesktopProcessingEngine {
         }
       }
     }
-    return List<ProcessingTranscriptSegment>.generate(tokens.length, (index) {
-      final token = tokens[index];
-      final start = (timestamps[index] as num?)?.toDouble();
-      if (token is! String || start == null) {
+    return List<ProcessingTranscriptSegment>.generate(units.length, (index) {
+      final unit = units[index];
+      final start = (starts[index] as num?)?.toDouble();
+      if (unit is! String || start == null) {
         throw const FormatException('invalid ASR token timestamp');
       }
-      final next = index + 1 < timestamps.length
-          ? (timestamps[index + 1] as num?)?.toDouble()
+      final next = index + 1 < starts.length
+          ? (starts[index + 1] as num?)?.toDouble()
           : duration;
       final end = max(start + 0.001, min(duration, next ?? duration));
-      final active = turns
+      final activeTurns = turns
           .where((turn) => turn.start < end && turn.end > start)
-          .map((turn) => turn.key)
-          .toSet();
+          .toList(growable: false);
+      final active = activeTurns.map((turn) => turn.key).toSet();
+      final hasConcurrentSpeakers = _hasConcurrentSpeakerTurns(
+        activeTurns,
+        start: start,
+        end: end,
+      );
       return ProcessingTranscriptSegment(
         startSeconds: start.clamp(0, duration),
         endSeconds: end,
-        text: token,
-        speakerAssignment: active.length > 1
+        text: unit,
+        speakerAssignment: hasConcurrentSpeakers
             ? SpeakerAssignment.overlap
-            : active.isEmpty
+            : active.length != 1
             ? SpeakerAssignment.unknown
             : SpeakerAssignment.anonymous,
         anonymousSpeakerKey: active.length == 1 ? active.single : null,
       );
     });
+  }
+
+  bool _hasConcurrentSpeakerTurns(
+    List<_SpeakerTurn> turns, {
+    required double start,
+    required double end,
+  }) {
+    for (var leftIndex = 0; leftIndex < turns.length; leftIndex += 1) {
+      final left = turns[leftIndex];
+      for (
+        var rightIndex = leftIndex + 1;
+        rightIndex < turns.length;
+        rightIndex += 1
+      ) {
+        final right = turns[rightIndex];
+        if (left.key == right.key) continue;
+        final overlapStart = max(start, max(left.start, right.start));
+        final overlapEnd = min(end, min(left.end, right.end));
+        if (overlapEnd > overlapStart) return true;
+      }
+    }
+    return false;
   }
 
   void _requireSafeSource(String sourcePath) {

@@ -14,10 +14,10 @@ Future<void> main(List<String> arguments) async {
   final engine = SherpaDesktopProcessingEngine(
     runtimeRoot: _required(options, 'runtime-root'),
     models: SherpaDesktopModelSet(
+      convFrontendPath: _required(options, 'conv-frontend'),
       encoderPath: _required(options, 'encoder'),
       decoderPath: _required(options, 'decoder'),
-      joinerPath: _required(options, 'joiner'),
-      tokensPath: _required(options, 'tokens'),
+      tokenizerPath: _required(options, 'tokenizer'),
       segmentationPath: _required(options, 'segmentation'),
       embeddingPath: _required(options, 'embedding'),
     ),

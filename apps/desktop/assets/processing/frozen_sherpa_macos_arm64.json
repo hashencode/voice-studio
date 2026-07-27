@@ -1,18 +1,19 @@
 {
   "schemaVersion": 1,
-  "setId": "sherpa-onnx-1.13.4-zipformer14m-pyannote3",
+  "setId": "sherpa-onnx-1.13.4-qwen3-asr-0.6b-int8-pyannote3",
   "platform": "macos",
   "architecture": "arm64",
-  "contentKey": "e2385695f7367317fb915ab844f9dddced0d385113387d047cb7ab591220255e",
-  "licenseDisposition": "PRODUCT_ELIGIBLE_WITH_PINNED_NOTICES",
+  "contentKey": "8321b9f7d7146bc2e30c6fc80faddcf536b1b8eb2f48e17970eb8f2a05900735",
+  "licenseDisposition": "PRODUCT_ELIGIBLE_WITH_PINNED_NOTICES_CONVERTER_LICENSE_REVIEW_REQUIRED",
+  "distributionEligible": false,
   "requiresUserAcceptance": false,
-  "minimumFreeBytesAfterInstall": 536870912,
+  "minimumFreeBytesAfterInstall": 1073741824,
   "downloads": [
     {
-      "id": "asr-archive",
-      "source": "https://github.com/k2-fsa/sherpa-onnx/releases/download/asr-models/sherpa-onnx-streaming-zipformer-zh-14M-2023-02-23.tar.bz2",
-      "sha256": "2cbd71b640d9c37d3784f29367333a4577b0398b62e9deeed418170b081cba8b",
-      "bytes": 74004050,
+      "id": "qwen3-asr-archive",
+      "source": "https://github.com/k2-fsa/sherpa-onnx/releases/download/asr-models/sherpa-onnx-qwen3-asr-0.6B-int8-2026-03-25.tar.bz2",
+      "sha256": "393f8a14e2f5fb96746aaab342997a40641001fbd5bf9592a080a8329178ee96",
+      "bytes": 878702423,
       "kind": "tar.bz2"
     },
     {
@@ -32,43 +33,59 @@
   ],
   "files": [
     {
-      "relativePath": "asr/encoder.onnx",
-      "downloadId": "asr-archive",
-      "archiveMember": "sherpa-onnx-streaming-zipformer-zh-14M-2023-02-23/encoder-epoch-99-avg-1.int8.onnx",
-      "sha256": "1c556ea57cec304e55ec4b72e52c1cc098bb01476ed7d90f3de939fe126487b1",
-      "bytes": 21621684,
+      "relativePath": "asr/conv_frontend.onnx",
+      "downloadId": "qwen3-asr-archive",
+      "archiveMember": "sherpa-onnx-qwen3-asr-0.6B-int8-2026-03-25/conv_frontend.onnx",
+      "sha256": "d22dc4423e0940e49884e903d2ea2f7e5567c14fc1aed97e4e26d6b8f208ef9e",
+      "bytes": 44148281,
       "licenseSpdx": "Apache-2.0"
     },
     {
-      "relativePath": "asr/decoder.onnx",
-      "downloadId": "asr-archive",
-      "archiveMember": "sherpa-onnx-streaming-zipformer-zh-14M-2023-02-23/decoder-epoch-99-avg-1.int8.onnx",
-      "sha256": "22f123bb8cba9b38974b3df18a3f45e7081f4985ebb2e075d9f21f618c468bbf",
-      "bytes": 1888682,
+      "relativePath": "asr/encoder.int8.onnx",
+      "downloadId": "qwen3-asr-archive",
+      "archiveMember": "sherpa-onnx-qwen3-asr-0.6B-int8-2026-03-25/encoder.int8.onnx",
+      "sha256": "60748d3e6744a57c9c91e1b17424a6c2990567e8adceb0783940c03ed98fa9d9",
+      "bytes": 182491662,
       "licenseSpdx": "Apache-2.0"
     },
     {
-      "relativePath": "asr/joiner.onnx",
-      "downloadId": "asr-archive",
-      "archiveMember": "sherpa-onnx-streaming-zipformer-zh-14M-2023-02-23/joiner-epoch-99-avg-1.int8.onnx",
-      "sha256": "a7cf9d82757bdcf786059454495a9ca95e4bd7347f72473fc08d794475c36169",
-      "bytes": 1795562,
+      "relativePath": "asr/decoder.int8.onnx",
+      "downloadId": "qwen3-asr-archive",
+      "archiveMember": "sherpa-onnx-qwen3-asr-0.6B-int8-2026-03-25/decoder.int8.onnx",
+      "sha256": "4f6885be5959ae26af3089d38ee7972c5fafbeeb1cf8d5e76eab6d8b61ca5771",
+      "bytes": 755914231,
       "licenseSpdx": "Apache-2.0"
     },
     {
-      "relativePath": "asr/tokens.txt",
-      "downloadId": "asr-archive",
-      "archiveMember": "sherpa-onnx-streaming-zipformer-zh-14M-2023-02-23/tokens.txt",
-      "sha256": "8b294db9045d6e5f94647f4c1eec1af4da143a75053c399611444b378ff966ac",
-      "bytes": 48697,
+      "relativePath": "asr/tokenizer/tokenizer_config.json",
+      "downloadId": "qwen3-asr-archive",
+      "archiveMember": "sherpa-onnx-qwen3-asr-0.6B-int8-2026-03-25/tokenizer/tokenizer_config.json",
+      "sha256": "4942d005604266809309cabc9f4e9cb89ce855d59b14681fdc0e1cc62ea26c4c",
+      "bytes": 12487,
       "licenseSpdx": "Apache-2.0"
     },
     {
-      "relativePath": "asr/README.md",
-      "downloadId": "asr-archive",
-      "archiveMember": "sherpa-onnx-streaming-zipformer-zh-14M-2023-02-23/README.md",
-      "sha256": "515751f07faad368f0863ae41773ff09635eba5920122d549abb8e45d5c88282",
-      "bytes": 226,
+      "relativePath": "asr/tokenizer/merges.txt",
+      "downloadId": "qwen3-asr-archive",
+      "archiveMember": "sherpa-onnx-qwen3-asr-0.6B-int8-2026-03-25/tokenizer/merges.txt",
+      "sha256": "8831e4f1a044471340f7c0a83d7bd71306a5b867e95fd870f74d0c5308a904d5",
+      "bytes": 1671853,
+      "licenseSpdx": "Apache-2.0"
+    },
+    {
+      "relativePath": "asr/tokenizer/vocab.json",
+      "downloadId": "qwen3-asr-archive",
+      "archiveMember": "sherpa-onnx-qwen3-asr-0.6B-int8-2026-03-25/tokenizer/vocab.json",
+      "sha256": "ca10d7e9fb3ed18575dd1e277a2579c16d108e32f27439684afa0e10b1440910",
+      "bytes": 2776833,
+      "licenseSpdx": "Apache-2.0"
+    },
+    {
+      "relativePath": "licenses/qwen3-asr-README.md",
+      "downloadId": "qwen3-asr-archive",
+      "archiveMember": "sherpa-onnx-qwen3-asr-0.6B-int8-2026-03-25/README.md",
+      "sha256": "bbc6dbeb9dce5b4ed0e839057137e9cba4bf05c5797277d36a80e22594414e14",
+      "bytes": 328,
       "licenseSpdx": "Apache-2.0"
     },
     {

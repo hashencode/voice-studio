@@ -44,6 +44,7 @@ void main() {
 
     expect(find.bySemanticsLabel('工作站主导航'), findsOneWidget);
     expect(find.text('固定处理引擎'), findsOneWidget);
+    expect(find.textContaining('Qwen3-ASR 0.6B int8'), findsOneWidget);
     expect(find.text('FileVault 磁盘加密未启用'), findsOneWidget);
     expect(find.textContaining('没有应用层整库加密'), findsOneWidget);
     expect(

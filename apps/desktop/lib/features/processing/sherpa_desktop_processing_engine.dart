@@ -5,33 +5,65 @@ import 'dart:typed_data';
 import 'package:processing_contracts/processing_contracts.dart';
 import 'package:sherpa_onnx/sherpa_onnx.dart' as sherpa;
 
+import 'qwen3_result.dart';
 import 'sherpa_runtime_probe.dart';
+
+const int frozenQwen3MaxTotalLen = 512;
+const int frozenQwen3MaxNewTokens = 512;
+const double frozenQwen3Temperature = 0.000001;
+const double frozenQwen3TopP = 0.8;
+const int frozenQwen3Seed = 42;
+const String frozenQwen3Hotwords = '';
+const int frozenQwen3SegmentDurationSeconds = 15;
+
+void validateFrozenQwen3ProductProfile({
+  required int numThreads,
+  required int maxTotalLen,
+  required int maxNewTokens,
+  required double temperature,
+  required double topP,
+  required int seed,
+  required String hotwords,
+  required int segmentDurationSeconds,
+}) {
+  if (numThreads != 2 ||
+      maxTotalLen != frozenQwen3MaxTotalLen ||
+      maxNewTokens != frozenQwen3MaxNewTokens ||
+      temperature != frozenQwen3Temperature ||
+      topP != frozenQwen3TopP ||
+      seed != frozenQwen3Seed ||
+      hotwords != frozenQwen3Hotwords ||
+      segmentDurationSeconds != frozenQwen3SegmentDurationSeconds) {
+    throw const FormatException('Qwen3 product profile is not frozen');
+  }
+}
 
 class SherpaDesktopModelSet {
   const SherpaDesktopModelSet({
+    required this.convFrontendPath,
     required this.encoderPath,
     required this.decoderPath,
-    required this.joinerPath,
-    required this.tokensPath,
+    required this.tokenizerPath,
     required this.segmentationPath,
     required this.embeddingPath,
   });
 
+  final String convFrontendPath;
   final String encoderPath;
   final String decoderPath;
-  final String joinerPath;
-  final String tokensPath;
+  final String tokenizerPath;
   final String segmentationPath;
   final String embeddingPath;
 
-  bool get allFilesPresent => <String>[
-    encoderPath,
-    decoderPath,
-    joinerPath,
-    tokensPath,
-    segmentationPath,
-    embeddingPath,
-  ].every((path) => File(path).existsSync());
+  bool get allFilesPresent =>
+      <String>[
+        convFrontendPath,
+        encoderPath,
+        decoderPath,
+        segmentationPath,
+        embeddingPath,
+      ].every((path) => File(path).existsSync()) &&
+      Directory(tokenizerPath).existsSync();
 }
 
 class SherpaDesktopProcessingEngine implements ProcessingEnginePort {
@@ -55,7 +87,7 @@ class SherpaDesktopProcessingEngine implements ProcessingEnginePort {
   final int maxSegments;
 
   @override
-  String get engineId => 'sherpa-onnx-1.13.4/zipformer14m-pyannote3';
+  String get engineId => 'sherpa-onnx-1.13.4/qwen3-asr-0.6b-int8-pyannote3';
 
   @override
   Future<ProcessingResult> process(
@@ -110,46 +142,59 @@ class SherpaDesktopProcessingEngine implements ProcessingEnginePort {
     );
   }
 
-  sherpa.OnlineRecognizerResult _recognize(
+  _Qwen3Recognition _recognize(
     sherpa.WaveData wave, {
     required ProcessingCancellationToken cancellationToken,
     required void Function(ProcessingProgress progress) onProgress,
   }) {
-    final recognizer = sherpa.OnlineRecognizer(
-      sherpa.OnlineRecognizerConfig(
-        model: sherpa.OnlineModelConfig(
-          transducer: sherpa.OnlineTransducerModelConfig(
+    final recognizer = sherpa.OfflineRecognizer(
+      sherpa.OfflineRecognizerConfig(
+        model: sherpa.OfflineModelConfig(
+          qwen3Asr: sherpa.OfflineQwen3AsrModelConfig(
+            convFrontend: models.convFrontendPath,
             encoder: models.encoderPath,
             decoder: models.decoderPath,
-            joiner: models.joinerPath,
+            tokenizer: models.tokenizerPath,
+            maxTotalLen: frozenQwen3MaxTotalLen,
+            maxNewTokens: frozenQwen3MaxNewTokens,
+            temperature: frozenQwen3Temperature,
+            topP: frozenQwen3TopP,
+            seed: frozenQwen3Seed,
+            hotwords: frozenQwen3Hotwords,
           ),
-          tokens: models.tokensPath,
+          tokens: '',
           numThreads: numThreads,
           debug: false,
           provider: 'cpu',
-          modelType: 'zipformer',
-          modelingUnit: 'char',
         ),
-        enableEndpoint: false,
       ),
     );
-    final stream = recognizer.createStream();
+    final texts = <String>[];
+    final timestamps = <double>[];
+    final segmentSamples = wave.sampleRate * frozenQwen3SegmentDurationSeconds;
     try {
-      final chunkSamples = max(1, wave.sampleRate ~/ 10);
       for (
         var offset = 0;
         offset < wave.samples.length;
-        offset += chunkSamples
+        offset += segmentSamples
       ) {
         cancellationToken.throwIfCancelled();
-        final end = min(offset + chunkSamples, wave.samples.length);
-        stream.acceptWaveform(
-          samples: Float32List.sublistView(wave.samples, offset, end),
-          sampleRate: wave.sampleRate,
-        );
-        while (recognizer.isReady(stream)) {
+        final end = min(offset + segmentSamples, wave.samples.length);
+        final stream = recognizer.createStream();
+        try {
+          stream.acceptWaveform(
+            samples: Float32List.sublistView(wave.samples, offset, end),
+            sampleRate: wave.sampleRate,
+          );
           cancellationToken.throwIfCancelled();
           recognizer.decode(stream);
+          final text = readQwen3Result(stream).text.trim();
+          if (text.isNotEmpty) {
+            texts.add(text);
+            timestamps.add(offset / wave.sampleRate);
+          }
+        } finally {
+          stream.free();
         }
         onProgress(
           ProcessingProgress(
@@ -158,14 +203,15 @@ class SherpaDesktopProcessingEngine implements ProcessingEnginePort {
           ),
         );
       }
-      stream.inputFinished();
-      while (recognizer.isReady(stream)) {
-        cancellationToken.throwIfCancelled();
-        recognizer.decode(stream);
+      if (texts.isEmpty) {
+        throw StateError('Sherpa returned an empty transcript.');
       }
-      return recognizer.getResult(stream);
+      return _Qwen3Recognition(
+        text: texts.join(' '),
+        segments: texts,
+        timestamps: timestamps,
+      );
     } finally {
-      stream.free();
       recognizer.free();
     }
   }
@@ -218,15 +264,15 @@ class SherpaDesktopProcessingEngine implements ProcessingEnginePort {
   }
 
   List<ProcessingTranscriptSegment> _merge(
-    sherpa.OnlineRecognizerResult recognition,
+    _Qwen3Recognition recognition,
     List<sherpa.OfflineSpeakerDiarizationSegment> speakers, {
     required double duration,
   }) {
     if (recognition.text.trim().isEmpty) {
       throw StateError('Sherpa returned an empty transcript.');
     }
-    if (recognition.tokens.isEmpty ||
-        recognition.timestamps.length != recognition.tokens.length) {
+    if (recognition.segments.isEmpty ||
+        recognition.timestamps.length != recognition.segments.length) {
       return <ProcessingTranscriptSegment>[
         ProcessingTranscriptSegment(
           startSeconds: 0,
@@ -237,24 +283,29 @@ class SherpaDesktopProcessingEngine implements ProcessingEnginePort {
       ];
     }
     final output = <ProcessingTranscriptSegment>[];
-    for (var index = 0; index < recognition.tokens.length; index += 1) {
+    for (var index = 0; index < recognition.segments.length; index += 1) {
       final start = recognition.timestamps[index].clamp(0.0, duration);
       final next = index + 1 < recognition.timestamps.length
           ? recognition.timestamps[index + 1]
           : duration;
       final end = max(start + 0.001, min(duration, next));
-      final active = speakers
+      final activeTurns = speakers
           .where((speaker) => speaker.start < end && speaker.end > start)
-          .map((speaker) => speaker.speaker)
-          .toSet();
+          .toList(growable: false);
+      final active = activeTurns.map((speaker) => speaker.speaker).toSet();
+      final hasConcurrentSpeakers = _hasConcurrentSpeakerTurns(
+        activeTurns,
+        start: start,
+        end: end,
+      );
       output.add(
         ProcessingTranscriptSegment(
           startSeconds: start,
           endSeconds: end,
-          text: recognition.tokens[index],
-          speakerAssignment: active.length > 1
+          text: recognition.segments[index],
+          speakerAssignment: hasConcurrentSpeakers
               ? SpeakerAssignment.overlap
-              : active.isEmpty
+              : active.length != 1
               ? SpeakerAssignment.unknown
               : SpeakerAssignment.anonymous,
           anonymousSpeakerKey: active.length == 1
@@ -264,6 +315,28 @@ class SherpaDesktopProcessingEngine implements ProcessingEnginePort {
       );
     }
     return output;
+  }
+
+  bool _hasConcurrentSpeakerTurns(
+    List<sherpa.OfflineSpeakerDiarizationSegment> turns, {
+    required double start,
+    required double end,
+  }) {
+    for (var leftIndex = 0; leftIndex < turns.length; leftIndex += 1) {
+      final left = turns[leftIndex];
+      for (
+        var rightIndex = leftIndex + 1;
+        rightIndex < turns.length;
+        rightIndex += 1
+      ) {
+        final right = turns[rightIndex];
+        if (left.speaker == right.speaker) continue;
+        final overlapStart = max(start, max(left.start, right.start));
+        final overlapEnd = min(end, min(left.end, right.end));
+        if (overlapEnd > overlapStart) return true;
+      }
+    }
+    return false;
   }
 
   List<sherpa.OfflineSpeakerDiarizationSegment> _suppressDetectedSilence(
@@ -334,4 +407,16 @@ class SherpaDesktopProcessingEngine implements ProcessingEnginePort {
     }
     return output;
   }
+}
+
+class _Qwen3Recognition {
+  const _Qwen3Recognition({
+    required this.text,
+    required this.segments,
+    required this.timestamps,
+  });
+
+  final String text;
+  final List<String> segments;
+  final List<double> timestamps;
 }

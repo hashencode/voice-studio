@@ -16,22 +16,26 @@ DECISION_ID = "DESKTOP-FIRST-MEETING-WORKSTATION-2026-07-26"
 EXPECTED_DOCUMENTS = {
     "docs/product/meeting-voice-recognition-prd-v1.0.md": {
         DECISION_ID,
-        "PLANNED",
+        "PRODUCT_IN_PROGRESS",
+        "BLOCKED_BY_MACOS_CLOSURE",
         "USER_PRE_RELEASE_ACCEPTANCE_ONLY",
     },
     "docs/product/mobile-capability-matrix.md": {
         DECISION_ID,
         "桌面主工作站",
+        "PRODUCT_IN_PROGRESS",
+        "BLOCKED_BY_MACOS_CLOSURE",
         "USER_PRE_RELEASE_ACCEPTANCE_ONLY",
     },
     "docs/product/s3-productization-status.md": {
         DECISION_ID,
         "桌面主工作站",
-        "PLANNED",
+        "BLOCKED_BY_MACOS_CLOSURE",
     },
     "docs/product/desktop-workstation-status.md": {
         DECISION_ID,
-        "PLANNED",
+        "PRODUCT_IN_PROGRESS",
+        "BLOCKED_BY_MACOS_CLOSURE",
         "TARGET_SPECIFIC",
     },
 }
@@ -152,6 +156,36 @@ def _validate_documents(manifest: dict[str, Any], root: Path) -> None:
         validate_asr005_policy_text(text, relative_path)
 
 
+def _validate_qwen3_product_decision(
+    decision: dict[str, Any],
+    frozen: dict[str, Any],
+) -> None:
+    product = _mapping(decision.get("product"), "Qwen3 product decision")
+    profile = _mapping(product.get("profile"), "Qwen3 product profile")
+    _require(
+        product.get("asrCandidateId") == frozen["asr"]
+        and product.get("asrCandidateCount") == 1
+        and product.get("diarizationIsIndependent") is True
+        and product.get("runtimeLaneId")
+        == "sherpa-onnx-dart-1.13.4-ort-1.27.0-macos-arm64"
+        and profile
+        == {
+            "provider": "cpu",
+            "numThreads": 2,
+            "concurrency": 1,
+            "modelPrecision": "int8",
+            "segmentDurationSeconds": 15,
+            "maxTotalLen": 512,
+            "maxNewTokens": 512,
+            "temperature": 0.000001,
+            "topP": 0.8,
+            "seed": 42,
+            "hotwords": "",
+        },
+        "macOS frozen engines disagree with machine decision",
+    )
+
+
 def validate_scope_contract(
     manifest_path: Path = DEFAULT_MANIFEST,
     root: Path = ROOT,
@@ -268,12 +302,13 @@ def validate_scope_contract(
         _require(
             frozen
             == {
-                "asr": "sherpa-streaming-zipformer-zh-14m-2023-02-23",
+                "asr": "sherpa-onnx-qwen3-asr-0.6B-int8-2026-03-25",
                 "diarization": "sherpa-pyannote-3.0-3dspeaker",
                 "runtime": "sherpa-onnx-c-api@1.13.4",
                 "boundary": "native_worker_process_group",
                 "machineDecision": (
-                    "benchmark/desktop/desktop_model_candidates.json"
+                    "benchmark/desktop/asr_comparison/"
+                    "pc_qwen3_optimization_baseline.json"
                 ),
             },
             "macOS frozen engine set changed",
@@ -286,18 +321,8 @@ def validate_scope_contract(
                     "targets.macos.frozenEngines.machineDecision",
                 )
             ).read_text(encoding="utf-8")
-        ).get("machineDecision")
-        _require(
-            isinstance(decision, dict)
-            and decision.get("winners")
-            == {
-                "asr": frozen["asr"],
-                "diarization": frozen["diarization"],
-            }
-            and decision.get("selectedRuntime") == frozen["runtime"]
-            and decision.get("selectedBoundary") == frozen["boundary"],
-            "macOS frozen engines disagree with machine decision",
         )
+        _validate_qwen3_product_decision(decision, frozen)
 
     windows = targets["windows"]
     _require(

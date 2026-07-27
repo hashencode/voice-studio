@@ -1,18 +1,15 @@
 import 'dart:async';
 import 'dart:convert';
-import 'dart:ffi';
 import 'dart:io';
 import 'dart:math';
 import 'dart:typed_data';
 
 import 'package:crypto/crypto.dart';
 import 'package:sherpa_onnx/sherpa_onnx.dart' as sherpa;
-import 'package:sherpa_onnx/src/sherpa_onnx_bindings.dart';
-import 'package:sherpa_onnx/src/utils.dart';
+import 'package:voice2text_desktop/features/processing/qwen3_result.dart';
 
 import 'asr_benchmark/candidate_registry.dart';
 import 'asr_benchmark/effective_profile.dart';
-import 'asr_benchmark/qwen3_json_compat.dart';
 
 const int _maximumOutputTextBytes = 1024 * 1024;
 const int _maximumTokenCount = 100000;
@@ -268,31 +265,6 @@ Future<Map<String, Object?>> _decodeOnline({
   }
 }
 
-sherpa.OfflineRecognizerResult _getQwen3Result(sherpa.OfflineStream stream) {
-  final getResult = SherpaOnnxBindings.getOfflineStreamResultAsJson;
-  final destroyResult = SherpaOnnxBindings.destroyOfflineStreamResultJson;
-  if (getResult == null || destroyResult == null) {
-    throw StateError('sherpa-onnx Qwen3 result bindings are unavailable');
-  }
-  final pointer = getResult(stream.ptr);
-  if (pointer == nullptr) {
-    throw const FormatException('Qwen3 result JSON is missing');
-  }
-  try {
-    final result = decodeQwen3ResultJson(toDartString(pointer));
-    return sherpa.OfflineRecognizerResult(
-      text: result['text']! as String,
-      tokens: List<String>.from(result['tokens']! as List),
-      timestamps: List<double>.from(result['timestamps']! as List),
-      lang: result['lang']! as String,
-      emotion: result['emotion']! as String,
-      event: result['event']! as String,
-    );
-  } finally {
-    destroyResult(pointer);
-  }
-}
-
 Future<Map<String, Object?>> _decodeOffline({
   required CandidateWorkerRequest request,
   required OfflineSherpaProfile profile,
@@ -335,7 +307,7 @@ Future<Map<String, Object?>> _decodeOffline({
         );
         recognizer.decode(stream);
         final result = request.family == BenchmarkCandidateFamily.qwen3Asr
-            ? _getQwen3Result(stream)
+            ? readQwen3Result(stream)
             : recognizer.getResult(stream);
         if (result.text.isNotEmpty) texts.add(result.text);
         tokens.addAll(result.tokens);

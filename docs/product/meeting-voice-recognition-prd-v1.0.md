@@ -13,7 +13,7 @@
 
 本产品面向需要记录、复核和推动会议结果的个人与团队。产品不以“把语音变成一段文字”为终点，而以完成“可靠采集 → 准确转写 → 证据复核 → 形成纪要 → 推动执行 → 沉淀知识”的闭环为目标。
 
-当前项目已经形成 Android 本地录音、离线中文识别、持久队列、结构化时间戳、会议播放复核工作区，以及可配置的 DeepSeek 云端直连和结构化纪要产品闭环。决策 `S2-MOBILE-CORE-2026-07-25` 将手机保留为可靠采集端和可独立使用的移动核心；决策 `S3-PRODUCTIZATION-2026-07-25` 交付云端直连和可追溯纪要第一增量。新的 `DESKTOP-FIRST-MEETING-WORKSTATION-2026-07-26` 把桌面端设为会议处理主工作站：macOS 已完成本地导入、目标独立模型证据、会议复核、AI 纪要、导出、安全局域网接收与 closure；Windows 当前为 `PLANNED`，只重测已冻结 finalist，不能继承 macOS PASS。移动端不建设 Live VAD 或实时转写；多语言 Whisper 路线、S4 协作与知识库、S5 企业能力仍使用后续独立计划。本 PRD 对每项功能同时标注目标阶段和当前状态。
+当前项目已经形成 Android 本地录音、离线中文识别、持久队列、结构化时间戳、会议播放复核工作区，以及可配置的 DeepSeek 云端直连和结构化纪要产品闭环。决策 `S2-MOBILE-CORE-2026-07-25` 将手机保留为可靠采集端和可独立使用的移动核心；决策 `S3-PRODUCTIZATION-2026-07-25` 交付云端直连和可追溯纪要第一增量。新的 `DESKTOP-FIRST-MEETING-WORKSTATION-2026-07-26` 把桌面端设为会议处理主工作站：macOS 已完成本地导入、会议复核、AI 纪要、导出和安全局域网接收，但 ASR 已收敛为唯一 Qwen3-ASR 0.6B int8 profile，因此旧 Zipformer closure 不继承，macOS 回到 `PRODUCT_IN_PROGRESS`；Windows 当前为 `BLOCKED_BY_MACOS_CLOSURE`。移动端不建设 Live VAD 或实时转写；多语言 Whisper 路线、S4 协作与知识库、S5 企业能力仍使用后续独立计划。本 PRD 对每项功能同时标注目标阶段和当前状态。
 
 **产品北极星：** 用户能够在会议结束后快速获得一份可复核、可追溯、可执行的会议记录；任何 AI 结论都能回到原始文字和音频证据。
 
@@ -94,8 +94,8 @@ S1-S3 优先服务“项目周会”和“客户访谈”。两者能够共同�
 | S1 | 可靠录音与离线转写 | 交付 Android MVP：录得住、转得出、失败可恢复、数据可管理。 | 2 小时录音不丢失；离线转写任务可后台执行与重试；导入音频可用。 |
 | S2 Mobile Core | 可读可人工复核的会议记录 | 让移动用户可以在可靠的 Paraformer 离线基线上边听边核对、编辑、搜索、定位和导出会议原文。 | 独立时间戳 P95、播放器联动、真实标点/分段、人工三态复核、基础导出、隐私与核心无障碍闭环。 |
 | S3 | AI 产品化第一增量 | 云端直连使用用户自有密钥和单场明确同意；生成可编辑、可审核、可追溯的结构化纪要；移动说话人诊断一次性收口。 | DeepSeek `cloudDirect` 与纪要闭环 PASS；移动说话人得到唯一 terminal disposition，默认不上传。 |
-| D1 macOS | 桌面会议主工作站 | 本地导入、模型处理、复核、AI 纪要、导出和安全 LAN 接收形成真实闭环。 | macOS closure validator PASS；模型和运行时证据可重建。 |
-| D2 Windows | finalist 独立移植 | 只移植 macOS 冻结的 finalist 与产品流，并在 Windows 参考机重新验证。 | macOS closure 已 PASS；Windows 拥有独立证据且不继承 macOS PASS。 |
+| D1 macOS | 桌面会议主工作站 | 本地导入、模型处理、复核、AI 纪要、导出和安全 LAN 接收形成真实闭环。 | Qwen3 产品门禁完成并由 macOS closure validator PASS；模型和运行时证据可重建。 |
+| D2 Windows | finalist 独立移植 | 只移植 macOS 冻结的 finalist 与产品流，并在 Windows 参考机重新验证。 | Qwen3 macOS closure 已 PASS；Windows 拥有独立证据且不继承 macOS PASS。 |
 | S4 | 协作与知识库 | 把单场会议资产变成团队可搜索、可共享、可连接工作流的长期知识。 | 跨会议检索、权限分享、评论协作、任务/日历集成和主动云同步可用。 |
 | S5 | 企业级与生态能力 | 满足组织治理、合规、私有化、多端和高级分析需求。 | SSO、审计、保留策略、私有部署、组织权限和跨会议洞察通过企业验收。 |
 
@@ -279,7 +279,7 @@ AI 生成内容必须可追溯、可编辑、可确认，并明确区分原文�
 | EXP-004 | 无障碍与大字体 | 核心流程支持读屏、动态字体、对比度和触控目标。 | S2 | 已实现会议复核核心流程：语义标签/live region、禁用态、非颜色状态文本和触控组件有自动化；Xiaomi M2102J2SC 在 TalkBack 绑定、200% 字体、深色横屏下完成复核集成门禁，浅色竖屏路径亦通过 |
 | EXP-005 | Android 生产发布 | 唯一无 Flavor 基线的构建、签名、回归和升级路径明确。 | S1 | 部分实现 |
 | EXP-006 | iOS 客户端 | 录音、导入、播放、转写和同步遵循同一产品契约。 | S4 | 未实现 |
-| EXP-007 | 桌面会议主工作站 | 适合本地文件导入、长任务处理、密集复核、AI 纪要和多格式导出。 | D1 macOS / D2 Windows | `DESKTOP-FIRST-MEETING-WORKSTATION-2026-07-26`：macOS `PASS`，Windows `PLANNED` |
+| EXP-007 | 桌面会议主工作站 | 适合本地文件导入、长任务处理、密集复核、AI 纪要和多格式导出。 | D1 macOS / D2 Windows | `DESKTOP-FIRST-MEETING-WORKSTATION-2026-07-26`：macOS Qwen3 `PRODUCT_IN_PROGRESS`，Windows `BLOCKED_BY_MACOS_CLOSURE` |
 | EXP-008 | 质量监控和诊断 | 统计不含正文的成功率、耗时、崩溃、热/电量和降级原因。 | S1+ | 部分实现：有日志和 benchmark |
 | EXP-009 | 应用内帮助与反馈 | Mobile Core 提供离线帮助和用户主动安全诊断分享；服务端上传仅在获批后另行建设。 | S2 Mobile Core / 高级服务 | Mobile Core 部分 PASS：离线帮助覆盖录音合规、故障恢复、模型能力和数据边界；用户预览允许列表后可主动分享只读诊断 ZIP，临时包在 24 小时内或下次启动清理。服务端上传为 `DEFERRED_NOT_PASSED`，没有后台联网 |
 
@@ -435,7 +435,9 @@ RTF 2.3348 与 2.4020，且静音/overlap 语义仍有硬失败；两者均未�
 “转写片段到结构化纪要”，runtime/adapter/入口仍为
 `DEFERRED_PC_RUNTIME_MISSING`；它不得被不兼容地扩展为原始音频传输或桌面
 ASR。桌面主工作站由 `DESKTOP-FIRST-MEETING-WORKSTATION-2026-07-26`
-独立承接，macOS closure 已 `PASS`，Windows 进入 `PLANNED`。多语言
+独立承接；Qwen3 收敛后 macOS 为 `PRODUCT_IN_PROGRESS`，Windows 为
+`BLOCKED_BY_MACOS_CLOSURE`。旧 Zipformer closure 的 `PASS` 与 Windows
+`PLANNED` 只保留为历史证据。多语言
 仍未实现，整体不得声明发布就绪。
 
 ### 11.6 S4

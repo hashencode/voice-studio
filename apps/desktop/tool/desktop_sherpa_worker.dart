@@ -5,6 +5,8 @@ import 'dart:typed_data';
 
 import 'package:crypto/crypto.dart';
 import 'package:sherpa_onnx/sherpa_onnx.dart' as sherpa;
+import 'package:voice2text_desktop/features/processing/qwen3_result.dart';
+import 'package:voice2text_desktop/features/processing/sherpa_desktop_processing_engine.dart';
 
 Future<void> main(List<String> arguments) async {
   try {
@@ -55,46 +57,74 @@ Future<void> _asr(
   sherpa.WaveData wave,
 ) async {
   final numThreads = _numThreads(options);
-  final recognizer = sherpa.OnlineRecognizer(
-    sherpa.OnlineRecognizerConfig(
-      model: sherpa.OnlineModelConfig(
-        transducer: sherpa.OnlineTransducerModelConfig(
+  final maxTotalLen = int.parse(_required(options, 'max-total-len'));
+  final maxNewTokens = int.parse(_required(options, 'max-new-tokens'));
+  final temperature = double.parse(_required(options, 'temperature'));
+  final topP = double.parse(_required(options, 'top-p'));
+  final seed = int.parse(_required(options, 'seed'));
+  final segmentDurationSeconds = int.parse(
+    _required(options, 'segment-duration-seconds'),
+  );
+  validateFrozenQwen3ProductProfile(
+    numThreads: numThreads,
+    maxTotalLen: maxTotalLen,
+    maxNewTokens: maxNewTokens,
+    temperature: temperature,
+    topP: topP,
+    seed: seed,
+    hotwords: options['hotwords'] ?? '',
+    segmentDurationSeconds: segmentDurationSeconds,
+  );
+  final recognizer = sherpa.OfflineRecognizer(
+    sherpa.OfflineRecognizerConfig(
+      model: sherpa.OfflineModelConfig(
+        qwen3Asr: sherpa.OfflineQwen3AsrModelConfig(
+          convFrontend: _required(options, 'conv-frontend'),
           encoder: _required(options, 'encoder'),
           decoder: _required(options, 'decoder'),
-          joiner: _required(options, 'joiner'),
+          tokenizer: _required(options, 'tokenizer'),
+          maxTotalLen: maxTotalLen,
+          maxNewTokens: maxNewTokens,
+          temperature: temperature,
+          topP: topP,
+          seed: seed,
+          hotwords: options['hotwords'] ?? '',
         ),
-        tokens: _required(options, 'tokens'),
+        tokens: '',
         numThreads: numThreads,
         debug: false,
         provider: 'cpu',
-        modelType: 'zipformer',
-        modelingUnit: 'char',
       ),
-      enableEndpoint: false,
     ),
   );
-  final stream = recognizer.createStream();
+  final segmentSamples = wave.sampleRate * segmentDurationSeconds;
+  final texts = <String>[];
+  final timestamps = <double>[];
   try {
-    final chunkSamples = max(1, wave.sampleRate ~/ 10);
-    for (var offset = 0; offset < wave.samples.length; offset += chunkSamples) {
-      final end = min(offset + chunkSamples, wave.samples.length);
-      stream.acceptWaveform(
-        samples: Float32List.sublistView(wave.samples, offset, end),
-        sampleRate: wave.sampleRate,
-      );
-      while (recognizer.isReady(stream)) {
+    for (
+      var offset = 0;
+      offset < wave.samples.length;
+      offset += segmentSamples
+    ) {
+      final end = min(offset + segmentSamples, wave.samples.length);
+      final stream = recognizer.createStream();
+      try {
+        stream.acceptWaveform(
+          samples: Float32List.sublistView(wave.samples, offset, end),
+          sampleRate: wave.sampleRate,
+        );
         recognizer.decode(stream);
+        final text = readQwen3Result(stream).text.trim();
+        if (text.isNotEmpty) {
+          texts.add(text);
+          timestamps.add(offset / wave.sampleRate);
+        }
+      } finally {
+        stream.free();
       }
-      if (offset % (chunkSamples * 20) == 0) {
-        _progress('asr', 0.45 * end / wave.samples.length);
-      }
+      _progress('asr', 0.45 * end / wave.samples.length);
     }
-    stream.inputFinished();
-    while (recognizer.isReady(stream)) {
-      recognizer.decode(stream);
-    }
-    final result = recognizer.getResult(stream);
-    if (result.text.trim().isEmpty) {
+    if (texts.isEmpty) {
       throw StateError('empty transcript');
     }
     _emit(<String, Object?>{
@@ -102,14 +132,14 @@ Future<void> _asr(
       'type': 'result',
       'phase': 'asr',
       'sourceSha256': request['sourceSha256'],
-      'text': result.text,
-      'tokens': result.tokens,
-      'timestamps': result.timestamps,
+      'asrResultVersion': 2,
+      'text': texts.join(' '),
+      'segments': texts,
+      'segmentStartSeconds': timestamps,
       'durationSeconds': wave.samples.length / wave.sampleRate,
       'residentBytes': ProcessInfo.currentRss,
     });
   } finally {
-    stream.free();
     recognizer.free();
   }
 }

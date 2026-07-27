@@ -1,9 +1,10 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:sherpa_onnx/sherpa_onnx.dart' as sherpa;
+import 'package:voice2text_desktop/features/processing/qwen3_result.dart';
+import 'package:voice2text_desktop/features/processing/sherpa_desktop_processing_engine.dart';
 
 import '../tool/asr_benchmark/candidate_registry.dart';
 import '../tool/asr_benchmark/effective_profile.dart';
-import '../tool/asr_benchmark/qwen3_json_compat.dart';
 
 void main() {
   group('sherpa_onnx 1.13.4 API characterization', () {
@@ -380,6 +381,40 @@ void main() {
       }, request),
       throwsA(isA<FormatException>()),
     );
+  });
+
+  test('Qwen3 product profile rejects every non-frozen control', () {
+    void validate({
+      int numThreads = 2,
+      int maxTotalLen = 512,
+      int maxNewTokens = 512,
+      double temperature = 0.000001,
+      double topP = 0.8,
+      int seed = 42,
+      String hotwords = '',
+      int segmentDurationSeconds = 15,
+    }) {
+      validateFrozenQwen3ProductProfile(
+        numThreads: numThreads,
+        maxTotalLen: maxTotalLen,
+        maxNewTokens: maxNewTokens,
+        temperature: temperature,
+        topP: topP,
+        seed: seed,
+        hotwords: hotwords,
+        segmentDurationSeconds: segmentDurationSeconds,
+      );
+    }
+
+    expect(validate, returnsNormally);
+    expect(() => validate(numThreads: 4), throwsFormatException);
+    expect(() => validate(maxTotalLen: 256), throwsFormatException);
+    expect(() => validate(maxNewTokens: 256), throwsFormatException);
+    expect(() => validate(temperature: 0.1), throwsFormatException);
+    expect(() => validate(topP: 0.9), throwsFormatException);
+    expect(() => validate(seed: 7), throwsFormatException);
+    expect(() => validate(hotwords: 'hint'), throwsFormatException);
+    expect(() => validate(segmentDurationSeconds: 30), throwsFormatException);
   });
 }
 
