@@ -1,3 +1,4 @@
+// ignore: depend_on_referenced_packages
 import 'package:sherpa_onnx/sherpa_onnx.dart' as sherpa;
 
 import 'candidate_registry.dart';

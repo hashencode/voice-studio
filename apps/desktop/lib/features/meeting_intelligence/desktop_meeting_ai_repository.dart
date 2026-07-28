@@ -18,17 +18,24 @@ class DesktopMeetingAiRun {
 }
 
 class DesktopMeetingAiRepository {
-  const DesktopMeetingAiRepository({
+  DesktopMeetingAiRepository({
     required AppDatabase database,
     required MeetingAiWorkflow workflow,
     required MeetingAiProviderPort provider,
   }) : _database = database,
-       _workflow = workflow,
-       _provider = provider;
+       _providerResolver = _LegacyProviderResolver(provider).call,
+       _legacyWorkflow = workflow;
+
+  const DesktopMeetingAiRepository.withProviderResolver({
+    required AppDatabase database,
+    required Future<MeetingAiProviderPort> Function() providerResolver,
+  }) : _database = database,
+       _providerResolver = providerResolver,
+       _legacyWorkflow = null;
 
   final AppDatabase _database;
-  final MeetingAiWorkflow _workflow;
-  final MeetingAiProviderPort _provider;
+  final Future<MeetingAiProviderPort> Function() _providerResolver;
+  final MeetingAiWorkflow? _legacyWorkflow;
 
   Future<int> reconcileInterrupted() async {
     final database = await _database.database;
@@ -41,7 +48,10 @@ class DesktopMeetingAiRepository {
   }
 
   Future<DesktopMeetingAiRun> generate(MeetingAiRequest request) async {
-    if (request.consent != MeetingAiConsent.granted) {
+    final provider = await _providerResolver();
+    final descriptor = meetingAiDescriptorOf(provider);
+    if (descriptor.requiresMeetingConsent &&
+        request.consent != MeetingAiConsent.granted) {
       throw const MeetingAiFailure(
         MeetingAiFailureCode.consentRequired,
         '需要针对本次会议明确同意发送转写文本',
@@ -61,7 +71,7 @@ class DesktopMeetingAiRepository {
         .convert(
           utf8.encode(
             '${request.recordingId}|${request.generationId}|'
-            '${_provider.providerId}|${_provider.modelId}|'
+            '${provider.providerId}|${provider.modelId}|'
             '${request.templateId}|$now',
           ),
         )
@@ -72,9 +82,9 @@ class DesktopMeetingAiRepository {
     >{
       'recording_id': request.recordingId,
       'generation_id': request.generationId,
-      'provider_id': _provider.providerId,
-      'model_id': _provider.modelId,
-      'processing_location': 'cloudDirect',
+      'provider_id': provider.providerId,
+      'model_id': provider.modelId,
+      'processing_location': _storageLocation(descriptor),
       'template_id': request.templateId,
       'status': 'queued',
       'progress': 0.0,
@@ -87,8 +97,8 @@ class DesktopMeetingAiRepository {
       'segment_count': request.segments.length,
       'estimated_request_count': 1,
       'speaker_labels_included': 0,
-      'consent_version': 1,
-      'consent_at_ms': now,
+      'consent_version': descriptor.requiresMeetingConsent ? 1 : 0,
+      'consent_at_ms': descriptor.requiresMeetingConsent ? now : null,
       'payload_summary':
           '${request.segments.length} segments, '
           '${request.segments.fold<int>(0, (sum, item) => sum + item.text.length)} chars',
@@ -112,7 +122,8 @@ class DesktopMeetingAiRepository {
       whereArgs: <Object>[jobId],
     );
     try {
-      final output = await _workflow.generate(request);
+      final workflow = _legacyWorkflow ?? MeetingAiWorkflow(provider: provider);
+      final output = await workflow.generate(request);
       final noteId = await database.transaction<int>((transaction) async {
         final completedAt = DateTime.now().millisecondsSinceEpoch;
         final noteId = await transaction
@@ -121,12 +132,12 @@ class DesktopMeetingAiRepository {
               'generation_id': request.generationId,
               'job_id': jobId,
               'status': 'draft',
-              'provider_id': _provider.providerId,
-              'model_id': _provider.modelId,
-              'processing_location': 'cloudDirect',
-              'consent_granted': 1,
-              'consent_version': 1,
-              'consent_at_ms': now,
+              'provider_id': provider.providerId,
+              'model_id': provider.modelId,
+              'processing_location': _storageLocation(descriptor),
+              'consent_granted': descriptor.requiresMeetingConsent ? 1 : 0,
+              'consent_version': descriptor.requiresMeetingConsent ? 1 : 0,
+              'consent_at_ms': descriptor.requiresMeetingConsent ? now : null,
               'payload_summary':
                   '${request.segments.length} segments, speaker labels omitted',
               'input_start_ms': request.segments.first.startMs,
@@ -280,4 +291,19 @@ class DesktopMeetingAiRepository {
       whereArgs: <Object>[jobId],
     );
   }
+
+  String _storageLocation(MeetingAiProviderDescriptor descriptor) {
+    return descriptor.processingLocation ==
+            MeetingAiProcessingLocation.localEndpoint
+        ? 'onDevice'
+        : 'cloudDirect';
+  }
+}
+
+class _LegacyProviderResolver {
+  const _LegacyProviderResolver(this.provider);
+
+  final MeetingAiProviderPort provider;
+
+  Future<MeetingAiProviderPort> call() async => provider;
 }

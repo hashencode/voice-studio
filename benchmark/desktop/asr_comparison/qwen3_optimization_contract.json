@@ -1,0 +1,125 @@
+{
+  "schemaVersion": 2,
+  "contractId": "qwen3-asr-bounded-optimization/macos-m4/v1",
+  "developmentPosture": "DEVELOPMENT_ONLY",
+  "maximumProbeMinutes": 30,
+  "screeningRuns": {
+    "warmup": 1,
+    "measured": 3
+  },
+  "finalistRuns": {
+    "warmup": 1,
+    "measured": 5
+  },
+  "target": {
+    "os": "macOS 15.7.5",
+    "osBuild": "24G624",
+    "architecture": "arm64",
+    "cpu": "Apple M4",
+    "logicalCpuCount": 10,
+    "memoryBytes": 17179869184,
+    "buildMode": "debug"
+  },
+  "inputs": {
+    "fixtureManifestPath": "benchmark/desktop/asr_comparison/qwen3_optimization_fixtures.json",
+    "fixtureManifestSha256": "c0ee7d2652bb8b3bbdf12fc77bdb98be0b10c125458efb19a9e326a4ddf665ce",
+    "scoringContractPath": "benchmark/desktop/asr_comparison/scoring_contract.json",
+    "scoringContractSha256": "4ff8a22f5a1184fb0cf09e6c9f30427fe6e7171827c7db98c9640c5a8108dbf7",
+    "requiredScenarios": [
+      "clean_near_field_mandarin",
+      "far_field_noisy_meeting",
+      "zh_en_code_switch",
+      "terminology_numbers",
+      "system_microphone_double_talk",
+      "non_speech"
+    ]
+  },
+  "model": {
+    "id": "sherpa-onnx-qwen3-asr-0.6B-int8-2026-03-25",
+    "precision": "int8",
+    "hashes": {
+      "archive": "393f8a14e2f5fb96746aaab342997a40641001fbd5bf9592a080a8329178ee96",
+      "convFrontend": "d22dc4423e0940e49884e903d2ea2f7e5567c14fc1aed97e4e26d6b8f208ef9e",
+      "encoder": "60748d3e6744a57c9c91e1b17424a6c2990567e8adceb0783940c03ed98fa9d9",
+      "decoder": "4f6885be5959ae26af3089d38ee7972c5fafbeeb1cf8d5e76eab6d8b61ca5771",
+      "tokenizerTree": "4aaf142ae42509d44653f1941e9add96deedae4c51557ae33cca1a96b83c42e4",
+      "sileroVad": "9e2449e1087496d8d4caba907f23e0bd3f78d91fa552479bb9c23ac09cbb1fd6"
+    }
+  },
+  "control": {
+    "runtime": "sherpa-onnx-1.13.4-ort-1.27.0",
+    "runtimeSha256": "809ab5d0c77bd8f358364a244e6ab17f2afecf9779eb9fd436fa469c3ff5375c",
+    "provider": "cpu",
+    "threads": 2,
+    "concurrency": 1,
+    "segmentation": "fixed",
+    "segmentDurationSeconds": 15,
+    "maxSpeechSeconds": 20,
+    "vadThreshold": 0.2,
+    "minSpeechSeconds": 0.2,
+    "hotwords": "",
+    "maxTotalLen": 512,
+    "maxNewTokens": 512,
+    "temperature": 0.000001,
+    "topP": 0.8,
+    "seed": 42
+  },
+  "arms": [
+    {
+      "id": "runtime-ort-1.24.4",
+      "baseArmId": "control",
+      "variable": "runtime",
+      "value": "sherpa-onnx-1.13.4-ort-1.24.4",
+      "runtimeSha256": "cb4198f8dee474d16e3ff98a4cd2448e3a9a10195a4809e13b738934beab4aad"
+    },
+    {
+      "id": "hotwords-session-bounded",
+      "baseArmId": "control",
+      "variable": "hotwords",
+      "value": "session_bounded_v1"
+    },
+    {
+      "id": "vad-official-20",
+      "baseArmId": "control",
+      "variable": "segmentation",
+      "value": "official_silero_vad"
+    },
+    {
+      "id": "vad-max-speech-12",
+      "baseArmId": "vad-official-20",
+      "variable": "maxSpeechSeconds",
+      "value": 12
+    },
+    {
+      "id": "vad-max-speech-15",
+      "baseArmId": "vad-official-20",
+      "variable": "maxSpeechSeconds",
+      "value": 15
+    },
+    {
+      "id": "tokens-128",
+      "baseArmId": "control",
+      "variable": "maxNewTokens",
+      "value": 128
+    },
+    {
+      "id": "tokens-256",
+      "baseArmId": "control",
+      "variable": "maxNewTokens",
+      "value": 256
+    }
+  ],
+  "hotwordBounds": {
+    "maximumTerms": 64,
+    "maximumTermCharacters": 48,
+    "maximumTotalCharacters": 1024,
+    "normalization": "NFKC_TRIM_DEDUPLICATE"
+  },
+  "promotion": {
+    "qualityAbsoluteImprovement": 0.005,
+    "targetTermRelativeRecallImprovement": 0.1,
+    "maximumNonTargetErrorRegression": 0.003,
+    "maximumRtfRegression": 0.1,
+    "speedRelativeImprovement": 0.15
+  }
+}

@@ -1,21 +1,24 @@
 # PC Qwen3-ASR Optimization Baseline
 
-Baseline date: 2026-07-27
+Baseline date: 2026-07-28
 Baseline ID: `pc-qwen3-asr-product-baseline-v1`
 
 ## Product decision
 
 The desktop product has one ASR model profile:
 `sherpa-onnx-qwen3-asr-0.6B-int8-2026-03-25`, CPU provider, two threads,
-concurrency one, fixed 15-second segments, `maxTotalLen=512`,
+concurrency one, official Silero VAD segmentation, `maxTotalLen=512`,
 `maxNewTokens=512`, `temperature=1e-6`, `topP=0.8`, `seed=42`, and empty
-hotwords. Speaker diarization remains an independent product capability and is
-not an alternative ASR model.
+hotwords. U17 froze the VAD at `threshold=0.2`, `minSpeech=0.2`, and
+`maxSpeech=12` seconds. Speaker
+diarization remains an independent product capability and is not an alternative
+ASR model.
 
 The product stays on the currently integrated sherpa-onnx 1.13.4 / ORT 1.27
-runtime lane. The native ORT 1.24.4 result is the leading optimization
-candidate, not a product runtime pin, until it passes the same quality,
-stability, memory, packaging, code-signing, and cancellation gates.
+runtime lane. The native ORT 1.24.4 arm passed its isolated speed and quality
+gates, but the fixed evaluator selected the admitted arm with the lowest error
+rate. Combining the faster runtime with the VAD winner would violate the
+single-variable contract, so it is not a product runtime pin.
 
 ## Frozen measurements
 
@@ -30,6 +33,9 @@ stability, memory, packaging, code-signing, and cancellation gates.
 | Same-source ORT 1.27 / ORT 1.24.4 ratio | 2.061x |
 | Fixed-15 / official Silero controlled difference | approximately 1.003x |
 | Qwen3 result conversion share | 0.000701% |
+| U17 control / selected aggregate error | 0.225381 / 0.200605 |
+| U17 control / selected non-target error | 0.267542 / 0.240118 |
+| U17 selected RTF / P95 segment latency | 0.206783 / 5130.81 ms |
 
 Future optimization claims must name the audio set, model hashes, runtime lane,
 provider, thread count, segmentation, timing boundary, warm-up count, measured
@@ -46,6 +52,11 @@ The complete aggregate reports and machine-readable evidence are:
 - `m4_qwen3_official_rtf_reproduction.json`
 - `qwen3_experiment_m4.json`
 - `qwen3_m4_development_freeze.json`
+- `evidence/qwen3-optimization/macos/matrix.json`
+- `evidence/qwen3-optimization/macos/u17-raw-manifest.json`
+- `evidence/qwen3-optimization/macos/u17-summary.json`
+- `evidence/qwen3-optimization/macos/u17-decision.json`
+- `evidence/qwen3-optimization/macos/u17-product-worker-smoke.json`
 
 Their SHA-256 bindings are recorded in
 `pc_qwen3_optimization_baseline.json`. Local audio, models, raw transcripts,

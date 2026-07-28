@@ -8,9 +8,14 @@ import 'package:meeting_workflows/meeting_workflows.dart';
 import 'package:qr/qr.dart';
 
 import '../features/companion/desktop_companion_repository.dart';
+import '../features/capture/desktop_capture_preflight_page.dart';
+import '../features/capture/desktop_capture_recovery_page.dart';
+import '../features/capture/desktop_capture_view_model.dart';
+import '../features/capture/desktop_recording_workspace.dart';
 import '../features/meetings/playback/desktop_meeting_playback.dart';
 import '../features/processing/desktop_job.dart';
 import '../features/security/desktop_disk_encryption.dart';
+import '../features/settings/desktop_ai_provider_settings_repository.dart';
 import 'desktop_home_model.dart';
 import 'desktop_workstation_model.dart';
 
@@ -77,6 +82,11 @@ class _DesktopWorkstationPageState extends State<_DesktopWorkstationPage> {
           bindings: <ShortcutActivator, VoidCallback>{
             const SingleActivator(LogicalKeyboardKey.keyO, meta: true):
                 model.importMeeting,
+            const SingleActivator(
+              LogicalKeyboardKey.keyR,
+              meta: true,
+              shift: true,
+            ): model.captureController.preflight,
             const SingleActivator(LogicalKeyboardKey.keyZ, meta: true):
                 model.undoTranscript,
             const SingleActivator(
@@ -159,6 +169,33 @@ class _LibraryView extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final capture = model.captureController.value;
+    if (capture.recoveries.isNotEmpty &&
+        capture.phase == DesktopCapturePhase.idle) {
+      return DesktopCaptureRecoveryPage(
+        controller: model.captureController,
+        model: capture,
+      );
+    }
+    if (capture.phase == DesktopCapturePhase.checking ||
+        capture.phase == DesktopCapturePhase.ready ||
+        (capture.phase == DesktopCapturePhase.failed &&
+            capture.snapshot == null &&
+            capture.preflight != null)) {
+      return DesktopCapturePreflightPage(
+        controller: model.captureController,
+        model: capture,
+      );
+    }
+    if (capture.isActive ||
+        capture.phase == DesktopCapturePhase.completed ||
+        (capture.phase == DesktopCapturePhase.failed &&
+            capture.snapshot != null)) {
+      return DesktopRecordingWorkspace(
+        controller: model.captureController,
+        model: capture,
+      );
+    }
     final selected = model.selectedMeeting;
     if (selected != null) {
       return _MeetingWorkspaceView(model: model, workspace: selected);
@@ -178,9 +215,7 @@ class _LibraryView extends StatelessWidget {
               child: ListView(
                 padding: const EdgeInsets.fromLTRB(24, 20, 24, 48),
                 children: <Widget>[
-                  _EngineBanner(model: model),
                   if (model.errorMessage != null) ...[
-                    const SizedBox(height: 12),
                     _MessageCard(
                       title: '需要处理',
                       message: model.errorMessage!,
@@ -204,16 +239,25 @@ class _LibraryView extends StatelessWidget {
                           variant: GooTextVariant.heading,
                         ),
                       ),
+                      GooButton(
+                        key: const ValueKey('start_meeting_button'),
+                        iconName: GooIcons.phoneRecord,
+                        onPressed: model.captureController.preflight,
+                        child: const GooText('开始会议'),
+                      ),
+                      const SizedBox(width: 8),
                       model.importing
                           ? GooButton.loading(
+                              variant: GooButtonVariant.secondary,
                               onPressed: null,
                               child: const GooText('正在安全导入'),
                             )
                           : GooButton(
                               key: const ValueKey('import_meeting_button'),
                               iconName: GooIcons.add,
+                              variant: GooButtonVariant.secondary,
                               onPressed: model.importMeeting,
-                              child: const GooText('导入会议文件'),
+                              child: const GooText('导入文件'),
                             ),
                     ],
                   ),
@@ -226,9 +270,9 @@ class _LibraryView extends StatelessWidget {
                   else if (model.meetings.isEmpty)
                     GooResult(
                       title: '还没有本机会议',
-                      description: '导入音频或视频后，会先完成私有复制和哈希校验，再进入可恢复处理队列。',
-                      buttonLabel: '导入会议文件',
-                      onButtonPressed: model.importMeeting,
+                      description: '直接开始电脑会议，或导入已有音频/视频。录音会分别保存系统音频和麦克风。',
+                      buttonLabel: '开始电脑会议',
+                      onButtonPressed: model.captureController.preflight,
                     )
                   else
                     GooList(
@@ -604,7 +648,7 @@ class _NotesPane extends StatelessWidget {
         GooList(
           children: <Widget>[
             GooListItem(
-              title: '可选 DeepSeek 会议笔记',
+              title: '可选 ${model.aiProviderSettings.displayName} 会议笔记',
               subtitle: model.aiSecretConfigured
                   ? '密钥保存在 macOS 钥匙串；每次会议仍需单独同意。'
                   : '未配置密钥。所有本机识别、编辑、搜索与导出仍可使用。',
@@ -1000,7 +1044,7 @@ class _SettingsView extends StatelessWidget {
   Widget build(BuildContext context) {
     return Column(
       children: <Widget>[
-        const GooAppBar.primary(title: '设置', subtitle: '准入模型、隐私边界与可选云端密钥'),
+        const GooAppBar.primary(title: '设置', subtitle: '准入模型、隐私边界与会议智能提供商'),
         Expanded(
           child: Center(
             child: ConstrainedBox(
@@ -1031,7 +1075,7 @@ class _SettingsView extends StatelessWidget {
                             : GooButton(
                                 onPressed: model.engineAvailable
                                     ? null
-                                    : model.installModels,
+                                    : () => _installLocalModels(context, model),
                                 child: GooText(
                                   model.engineAvailable ? '已验证' : '安装模型',
                                 ),
@@ -1057,9 +1101,37 @@ class _SettingsView extends StatelessWidget {
                   GooList(
                     children: <Widget>[
                       GooListItem(
+                        title:
+                            '${model.aiProviderSettings.displayName} · '
+                            '${model.aiProviderSettings.modelId}',
+                        subtitle: '远程 HTTPS；每场会议必须单独同意，不自动回退。',
+                        leadingIconName: GooIcons.settingPermissionsAndPrivacy,
+                        trailing: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: <Widget>[
+                            if (model.aiProviderProbing)
+                              GooButton.loading(
+                                onPressed: null,
+                                child: const GooText('检查中'),
+                              )
+                            else
+                              GooButton.text(
+                                onPressed: model.probeAiProvider,
+                                child: const GooText('检查配置'),
+                              ),
+                            const SizedBox(width: 8),
+                            GooButton(
+                              onPressed: () =>
+                                  _showAiProviderEditor(context, model),
+                              child: const GooText('配置'),
+                            ),
+                          ],
+                        ),
+                      ),
+                      GooListItem(
                         title: model.aiSecretConfigured
-                            ? 'DeepSeek 密钥已配置'
-                            : 'DeepSeek 密钥未配置',
+                            ? '${model.aiProviderSettings.displayName} 密钥已配置'
+                            : '${model.aiProviderSettings.displayName} 密钥未配置',
                         subtitle: '密钥只保存在 macOS 钥匙串，不写入 SQLite、配置、环境变量或诊断。',
                         leadingIconName: GooIcons.keyPointsSummary,
                         trailing: GooButton(
@@ -1071,7 +1143,8 @@ class _SettingsView extends StatelessWidget {
                       ),
                       if (model.aiSecretConfigured)
                         GooListItem(
-                          title: '删除 DeepSeek 密钥',
+                          title:
+                              '删除 ${model.aiProviderSettings.displayName} 密钥',
                           subtitle: '删除后，本机识别、编辑、搜索和导出不受影响。',
                           leadingIconName: GooIcons.delete,
                           trailing: GooButton(
@@ -1085,11 +1158,12 @@ class _SettingsView extends StatelessWidget {
                   const SizedBox(height: 24),
                   GooList(
                     children: <Widget>[
-                      const GooListItem(
+                      GooListItem(
                         title: '隐私边界',
                         subtitle:
                             '本机文件闭环默认不联网。只有已配置密钥且针对当前会议明确同意时，'
-                            '才会将所选转写文本发送给 DeepSeek；匿名说话人标签不用于身份识别。',
+                            '才会将所选转写文本发送给 ${model.aiProviderSettings.displayName}；'
+                            '匿名说话人标签不用于身份识别。',
                         leadingIconName: GooIcons.settingPermissionsAndPrivacy,
                       ),
                       GooListItem(
@@ -1134,38 +1208,6 @@ class _SettingsView extends StatelessWidget {
               ),
             ),
           ),
-        ),
-      ],
-    );
-  }
-}
-
-class _EngineBanner extends StatelessWidget {
-  const _EngineBanner({required this.model});
-
-  final DesktopWorkstationModel model;
-
-  @override
-  Widget build(BuildContext context) {
-    return GooList(
-      children: <Widget>[
-        GooListItem(
-          title: model.engineAvailable ? '本机处理引擎可用' : '本机处理引擎尚不可用',
-          subtitle: model.engineAvailabilityMessage,
-          leadingIconName: model.engineAvailable
-              ? GooIcons.done
-              : GooIcons.info,
-          trailing: model.engineAvailable
-              ? const GooTag(
-                  label: '可处理',
-                  accent: GooTagAccent.green,
-                  variant: GooTagVariant.capsule,
-                )
-              : GooButton.text(
-                  onPressed: () =>
-                      model.selectSection(DesktopWorkstationSection.settings),
-                  child: const GooText('前往安装'),
-                ),
         ),
       ],
     );
@@ -1370,13 +1412,16 @@ Future<void> _askAiConsent(
 ) async {
   final accepted = await showGooDialog<bool>(
     context: context,
-    builder: (_) => const _AiConsentDialog(),
+    builder: (_) =>
+        _AiConsentDialog(providerName: model.aiProviderSettings.displayName),
   );
   await model.generateAiNotes(consentGranted: accepted == true);
 }
 
 class _AiConsentDialog extends StatefulWidget {
-  const _AiConsentDialog();
+  const _AiConsentDialog({required this.providerName});
+
+  final String providerName;
 
   @override
   State<_AiConsentDialog> createState() => _AiConsentDialogState();
@@ -1390,7 +1435,7 @@ class _AiConsentDialogState extends State<_AiConsentDialog> {
     return GooDialog.custom(
       title: '本次会议云端处理同意',
       description:
-          '将发送本次会议的转写文本、时间范围和匿名说话人状态给 DeepSeek。'
+          '将发送本次会议的转写文本、时间范围和匿名说话人状态给 ${widget.providerName}。'
           '不会发送音频、密钥、声纹或其他会议。',
       actions: <GooDialogAction>[
         const GooDialogAction(label: '取消', result: false),
@@ -1411,6 +1456,17 @@ class _AiConsentDialogState extends State<_AiConsentDialog> {
   }
 }
 
+Future<void> _installLocalModels(
+  BuildContext context,
+  DesktopWorkstationModel model,
+) async {
+  if (!model.localProcessingSupported) {
+    GooToastScope.of(context).warning('本地离线转写需要 macOS 15.5 或更高版本；其他工作站功能仍可使用。');
+    return;
+  }
+  await model.installModels();
+}
+
 Future<void> _showSecretEditor(
   BuildContext context,
   DesktopWorkstationModel model,
@@ -1420,7 +1476,9 @@ Future<void> _showSecretEditor(
     await showGooDialog<void>(
       context: context,
       builder: (_) => GooDialog.custom(
-        title: model.aiSecretConfigured ? '替换 DeepSeek 密钥' : '输入 DeepSeek 密钥',
+        title: model.aiSecretConfigured
+            ? '替换 ${model.aiProviderSettings.displayName} 密钥'
+            : '输入 ${model.aiProviderSettings.displayName} 密钥',
         description: '密钥写入 macOS 钥匙串；保存后不会再次显示。',
         actions: <GooDialogAction>[
           const GooDialogAction(label: '取消'),
@@ -1445,6 +1503,127 @@ Future<void> _showSecretEditor(
     controller
       ..clear()
       ..dispose();
+  }
+}
+
+Future<void> _showAiProviderEditor(
+  BuildContext context,
+  DesktopWorkstationModel model,
+) async {
+  final settings = await showGooDialog<DesktopAiProviderSettings>(
+    context: context,
+    builder: (_) => _AiProviderDialog(initial: model.aiProviderSettings),
+  );
+  if (settings == null || !context.mounted) return;
+  try {
+    await model.configureAiProvider(settings);
+    if (context.mounted) {
+      GooToastScope.of(context).success('AI 提供商配置已保存');
+    }
+  } on Object {
+    if (context.mounted) {
+      GooToastScope.of(context).error('配置无效；自定义接口必须使用远程 HTTPS 地址');
+    }
+  }
+}
+
+class _AiProviderDialog extends StatefulWidget {
+  const _AiProviderDialog({required this.initial});
+
+  final DesktopAiProviderSettings initial;
+
+  @override
+  State<_AiProviderDialog> createState() => _AiProviderDialogState();
+}
+
+class _AiProviderDialogState extends State<_AiProviderDialog> {
+  late String providerId;
+  late final TextEditingController modelController;
+  late final TextEditingController endpointController;
+
+  @override
+  void initState() {
+    super.initState();
+    providerId = widget.initial.providerId;
+    modelController = TextEditingController(text: widget.initial.modelId);
+    endpointController = TextEditingController(text: widget.initial.endpoint);
+  }
+
+  @override
+  void dispose() {
+    modelController.dispose();
+    endpointController.dispose();
+    super.dispose();
+  }
+
+  void _selectProvider(String value) {
+    final defaults = switch (value) {
+      'openai-compatible' => DesktopAiProviderSettings.openAiCompatible,
+      _ => DesktopAiProviderSettings.deepSeek,
+    };
+    setState(() {
+      providerId = value;
+      modelController.text = defaults.modelId;
+      endpointController.text = defaults.endpoint;
+    });
+  }
+
+  DesktopAiProviderSettings get _result => DesktopAiProviderSettings(
+    providerId: providerId,
+    modelId: modelController.text,
+    endpoint: endpointController.text,
+  );
+
+  @override
+  Widget build(BuildContext context) {
+    return GooDialog.custom(
+      title: '配置会议智能提供商',
+      description: '选择只作用于后续任务；运行中的任务保持原 provider/model 快照。',
+      customContentSizing: GooDialogContentSizing.adaptive,
+      actions: <GooDialogAction>[
+        const GooDialogAction(label: '取消'),
+        GooDialogAction(
+          label: '保存配置',
+          result: _result,
+          enabled:
+              modelController.text.trim().isNotEmpty &&
+              endpointController.text.trim().isNotEmpty,
+          style: GooDialogActionStyle.primary,
+        ),
+      ],
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        mainAxisSize: MainAxisSize.min,
+        children: <Widget>[
+          GooSegmentedButton<String>(
+            value: providerId,
+            semanticLabel: '会议智能提供商',
+            items: const <GooSegmentedButtonItem<String>>[
+              GooSegmentedButtonItem(value: 'deepseek', label: 'DeepSeek'),
+              GooSegmentedButtonItem(value: 'openai-compatible', label: '开放接口'),
+            ],
+            onValueChange: _selectProvider,
+          ),
+          const SizedBox(height: 12),
+          GooInput(
+            controller: modelController,
+            label: '模型 ID',
+            maxLength: 256,
+            onChanged: (_) => setState(() {}),
+          ),
+          const SizedBox(height: 12),
+          GooInput(
+            controller: endpointController,
+            label: '服务地址',
+            maxLength: 2048,
+            disabled: providerId == 'deepseek',
+            autocorrect: false,
+            enableSuggestions: false,
+            onChanged: (_) => setState(() {}),
+          ),
+        ],
+      ),
+    );
   }
 }
 

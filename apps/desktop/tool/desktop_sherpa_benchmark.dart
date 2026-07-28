@@ -4,6 +4,7 @@ import 'dart:math';
 import 'dart:typed_data';
 
 import 'package:crypto/crypto.dart';
+// ignore: depend_on_referenced_packages
 import 'package:sherpa_onnx/sherpa_onnx.dart' as sherpa;
 
 Future<void> main(List<String> arguments) async {

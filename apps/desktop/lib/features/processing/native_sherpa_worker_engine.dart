@@ -8,7 +8,6 @@ import 'package:processing_contracts/processing_contracts.dart';
 
 import 'desktop_job.dart';
 import 'desktop_processing_engine.dart';
-import 'sherpa_desktop_processing_engine.dart';
 
 const double frozenMacosDiarizationClusteringThreshold = 0.65;
 const int frozenMacosWorkerThreads = 2;
@@ -146,6 +145,8 @@ class NativeSherpaWorkerEngine implements DesktopProcessingEngine {
       configuration.models.decoderPath,
       '--tokenizer',
       configuration.models.tokenizerPath,
+      '--vad',
+      configuration.models.vadPath,
       '--segmentation',
       configuration.models.segmentationPath,
       '--embedding',
@@ -169,6 +170,14 @@ class NativeSherpaWorkerEngine implements DesktopProcessingEngine {
       frozenQwen3Hotwords,
       '--segment-duration-seconds',
       frozenQwen3SegmentDurationSeconds.toString(),
+      '--asr-segmentation',
+      frozenQwen3Segmentation,
+      '--vad-threshold',
+      frozenQwen3VadThreshold.toString(),
+      '--minimum-speech-seconds',
+      frozenQwen3MinimumSpeechSeconds.toString(),
+      '--maximum-speech-seconds',
+      frozenQwen3MaximumSpeechSeconds.toString(),
     ];
     if (phase == 'diarization' && startSeconds != null && endSeconds != null) {
       arguments.addAll(<String>[

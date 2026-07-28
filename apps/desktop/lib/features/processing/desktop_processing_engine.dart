@@ -10,6 +10,7 @@ class DesktopProcessingResult {
     required this.elapsedMilliseconds,
     required this.peakResidentBytes,
     required this.diarizationSucceeded,
+    this.transcriptComplete = true,
     this.diarizationErrorCode,
   });
 
@@ -18,6 +19,7 @@ class DesktopProcessingResult {
   final int elapsedMilliseconds;
   final int peakResidentBytes;
   final bool diarizationSucceeded;
+  final bool transcriptComplete;
   final String? diarizationErrorCode;
 }
 
@@ -34,15 +36,22 @@ abstract interface class DesktopProcessingEngine {
 }
 
 class UnavailableDesktopProcessingEngine implements DesktopProcessingEngine {
-  const UnavailableDesktopProcessingEngine({required this.nativeRuntimeLoaded});
+  const UnavailableDesktopProcessingEngine({
+    required this.nativeRuntimeLoaded,
+    this.minimumMacosVersionRequired,
+  });
 
   final bool nativeRuntimeLoaded;
+  final String? minimumMacosVersionRequired;
 
   @override
   bool get isAvailable => false;
 
   @override
-  String get availabilityMessage => nativeRuntimeLoaded
+  String get availabilityMessage => minimumMacosVersionRequired != null
+      ? '当前系统可使用会议资料库，但本地离线转写需要 macOS '
+            '$minimumMacosVersionRequired 或更高版本。'
+      : nativeRuntimeLoaded
       ? '本机运行库已就绪，但尚未安装通过 macOS 准入的模型；任务会安全保留。'
       : '本机处理运行库不可用；任务会安全保留，不会生成模拟转写。';
 

@@ -1,0 +1,16 @@
+{
+  "bindingSha256": "4291640eac71cbcf0a6c32b4aa905779bd84fd953740b20438122273a9566e4a",
+  "complete": false,
+  "diagnosticSha256": "434c4c4706877302ec187171be45eab135e472fa9b8f6b82c032871a9f435b8f",
+  "disposition": "MALFORMED_OUTPUT",
+  "runId": "asr2-3d9cdec9afd78d683eb8a492b1b34967",
+  "schemaVersion": 2,
+  "temporaryArtifactsReleased": true,
+  "termination": {
+    "descendantProcessesGone": true,
+    "killSent": false,
+    "observedDescendantCount": 0,
+    "processGroupGone": true,
+    "termSent": true
+  }
+}

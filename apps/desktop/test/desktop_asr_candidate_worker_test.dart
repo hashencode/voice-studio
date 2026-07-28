@@ -1,7 +1,8 @@
 import 'package:flutter_test/flutter_test.dart';
+// ignore: depend_on_referenced_packages
 import 'package:sherpa_onnx/sherpa_onnx.dart' as sherpa;
-import 'package:voice2text_desktop/features/processing/qwen3_result.dart';
-import 'package:voice2text_desktop/features/processing/sherpa_desktop_processing_engine.dart';
+// ignore: depend_on_referenced_packages
+import 'package:desktop_sherpa_worker/desktop_sherpa_worker.dart';
 
 import '../tool/asr_benchmark/candidate_registry.dart';
 import '../tool/asr_benchmark/effective_profile.dart';
@@ -393,6 +394,10 @@ void main() {
       int seed = 42,
       String hotwords = '',
       int segmentDurationSeconds = 15,
+      String segmentation = frozenQwen3Segmentation,
+      double vadThreshold = frozenQwen3VadThreshold,
+      double minimumSpeechSeconds = frozenQwen3MinimumSpeechSeconds,
+      double maximumSpeechSeconds = frozenQwen3MaximumSpeechSeconds,
     }) {
       validateFrozenQwen3ProductProfile(
         numThreads: numThreads,
@@ -403,6 +408,10 @@ void main() {
         seed: seed,
         hotwords: hotwords,
         segmentDurationSeconds: segmentDurationSeconds,
+        segmentation: segmentation,
+        vadThreshold: vadThreshold,
+        minimumSpeechSeconds: minimumSpeechSeconds,
+        maximumSpeechSeconds: maximumSpeechSeconds,
       );
     }
 
@@ -415,6 +424,10 @@ void main() {
     expect(() => validate(seed: 7), throwsFormatException);
     expect(() => validate(hotwords: 'hint'), throwsFormatException);
     expect(() => validate(segmentDurationSeconds: 30), throwsFormatException);
+    expect(() => validate(segmentation: 'fixed'), throwsFormatException);
+    expect(() => validate(vadThreshold: 0.5), throwsFormatException);
+    expect(() => validate(minimumSpeechSeconds: 0.1), throwsFormatException);
+    expect(() => validate(maximumSpeechSeconds: 15), throwsFormatException);
   });
 }
 

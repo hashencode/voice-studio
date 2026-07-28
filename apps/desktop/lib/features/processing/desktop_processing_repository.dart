@@ -2,9 +2,11 @@ import 'dart:math';
 
 import 'package:meeting_core/meeting_core.dart';
 import 'package:meeting_storage/meeting_storage.dart';
+import 'package:meeting_workflows/meeting_workflows.dart';
 import 'package:processing_contracts/processing_contracts.dart';
 import 'package:sqflite/sqflite.dart';
 
+import '../captions/live_caption_models.dart';
 import 'desktop_job.dart';
 import 'desktop_processing_engine.dart';
 
@@ -22,7 +24,7 @@ class DesktopImportCommitResult {
   final ProcessingJobReference? processingJob;
 }
 
-class DesktopProcessingRepository {
+class DesktopProcessingRepository implements MeetingFormalTranscriptionPort {
   const DesktopProcessingRepository({required AppDatabase database})
     : _database = database;
 
@@ -33,7 +35,7 @@ class DesktopProcessingRepository {
     final rows = await database.rawQuery('''
       SELECT COUNT(*) AS count
       FROM transcription_jobs
-      WHERE source = 'desktop_local_import'
+      WHERE source IN ('desktop_local_import', 'qwen3_post_meeting')
         AND status IN ('pending', 'processing')
     ''');
     return (rows.single['count']! as num).toInt();
@@ -124,6 +126,66 @@ class DesktopProcessingRepository {
     });
   }
 
+  @override
+  Future<FormalTranscriptionJobReference> enqueuePostMeeting(
+    CommittedMeetingCapture capture,
+  ) async {
+    final database = await _database.database;
+    return database.transaction((transaction) async {
+      final recordingRows = await transaction.query(
+        'recordings',
+        columns: <String>['fingerprint_sha256'],
+        where: 'id = ? AND session_id = ?',
+        whereArgs: <Object?>[capture.recordingId, capture.sessionId],
+        limit: 1,
+      );
+      if (recordingRows.isEmpty ||
+          recordingRows.single['fingerprint_sha256'] !=
+              capture.recordingSha256) {
+        throw StateError('Post-meeting capture authority drifted');
+      }
+      final existing = await transaction.query(
+        'transcription_jobs',
+        columns: <String>['id'],
+        where: 'recording_id = ? AND source = ?',
+        whereArgs: <Object?>[capture.recordingId, qwen3PostMeetingSource],
+        limit: 1,
+      );
+      if (existing.isNotEmpty) {
+        return FormalTranscriptionJobReference(
+          jobId: existing.single['id']! as int,
+          inserted: false,
+        );
+      }
+      final now = DateTime.now().millisecondsSinceEpoch;
+      final jobId = await transaction
+          .insert('transcription_jobs', <String, Object?>{
+            'recording_path': capture.processingPath,
+            'duration_ms': capture.durationMs,
+            'status': 'pending',
+            'recording_mode': 'standard',
+            'source': qwen3PostMeetingSource,
+            'failure_stage': null,
+            'stage': 'queued',
+            'progress': 0.0,
+            'attempt_count': 0,
+            'cancel_requested': 0,
+            'error_code': null,
+            'dedupe_key': '${capture.recordingSha256}|$qwen3PostMeetingSource',
+            'started_at_ms': null,
+            'completed_at_ms': null,
+            'heartbeat_at_ms': null,
+            'recording_id': capture.recordingId,
+            'generation_id': null,
+            'created_at_ms': now,
+            'updated_at_ms': now,
+            'result_text': null,
+            'error_message': null,
+          });
+      return FormalTranscriptionJobReference(jobId: jobId, inserted: true);
+    });
+  }
+
   Future<List<DesktopProcessingJob>> listJobs() async {
     final database = await _database.database;
     final rows = await database.rawQuery('''
@@ -140,7 +202,7 @@ class DesktopProcessingRepository {
         r.fingerprint_sha256
       FROM transcription_jobs AS j
       INNER JOIN recordings AS r ON r.id = j.recording_id
-      WHERE j.source = 'desktop_local_import'
+      WHERE j.source IN ('desktop_local_import', 'qwen3_post_meeting')
       ORDER BY j.created_at_ms DESC, j.id DESC
     ''');
     return rows
@@ -167,7 +229,7 @@ class DesktopProcessingRepository {
       final rows = await transaction.rawQuery('''
         SELECT j.id
         FROM transcription_jobs AS j
-        WHERE j.source = 'desktop_local_import'
+        WHERE j.source IN ('desktop_local_import', 'qwen3_post_meeting')
           AND j.status = 'pending'
         ORDER BY j.created_at_ms ASC, j.id ASC
         LIMIT 1
@@ -236,6 +298,48 @@ class DesktopProcessingRepository {
           jobRows.single['cancel_requested'] == 1) {
         throw const ProcessingCancelled();
       }
+      final recordingRows = await transaction.query(
+        'recordings',
+        columns: <String>['active_generation_id'],
+        where: 'id = ?',
+        whereArgs: <Object>[job.recordingId],
+        limit: 1,
+      );
+      if (recordingRows.isEmpty) {
+        throw StateError('processing recording is missing');
+      }
+      var previousActiveGenerationId =
+          recordingRows.single['active_generation_id'] as int?;
+      if (previousActiveGenerationId == null) {
+        final draftRows = await transaction.query(
+          'desktop_live_caption_sessions',
+          columns: <String>['generation_id'],
+          where: 'recording_id = ?',
+          whereArgs: <Object>[job.recordingId],
+          orderBy: 'created_at_ms DESC',
+          limit: 1,
+        );
+        if (draftRows.isNotEmpty) {
+          previousActiveGenerationId =
+              draftRows.single['generation_id']! as int;
+        }
+      }
+      var previousActiveHasUserEdits = false;
+      var previousActiveIsDraft = false;
+      if (previousActiveGenerationId != null) {
+        final activeRows = await transaction.query(
+          'transcript_generations',
+          columns: <String>['has_user_edits', 'generation_kind'],
+          where: 'id = ?',
+          whereArgs: <Object>[previousActiveGenerationId],
+          limit: 1,
+        );
+        if (activeRows.isNotEmpty) {
+          previousActiveHasUserEdits = activeRows.single['has_user_edits'] == 1;
+          previousActiveIsDraft =
+              activeRows.single['generation_kind'] == 'draft';
+        }
+      }
       var generationId = jobRows.single['generation_id'] as int?;
       if (generationId == null) {
         generationId = await transaction
@@ -246,13 +350,19 @@ class DesktopProcessingRepository {
               'status': result.diarizationSucceeded
                   ? 'completed'
                   : 'partial_success',
-              'source': result.engineId,
+              'source': qwen3PostMeetingSource,
               'merged_text': result.segments
                   .map((segment) => segment.text.trim())
                   .where((text) => text.isNotEmpty)
                   .join(' '),
               'has_user_edits': 0,
               'has_evidence_links': 0,
+              'generation_kind': 'formal',
+              'supersedes_generation_id':
+                  previousActiveIsDraft || previousActiveHasUserEdits
+                  ? previousActiveGenerationId
+                  : null,
+              'reconciliation_state': 'not_required',
               'created_at_ms': now,
               'activated_at_ms': now,
               'updated_at_ms': now,
@@ -344,33 +454,55 @@ class DesktopProcessingRepository {
       await transaction.update(
         'transcript_generations',
         <String, Object?>{
-          'status': result.diarizationSucceeded
+          'status': !result.transcriptComplete
+              ? 'partial_output'
+              : result.diarizationSucceeded
               ? 'completed'
               : 'partial_success',
-          'source': result.engineId,
+          'source': qwen3PostMeetingSource,
           'merged_text': mergedText,
-          'activated_at_ms': now,
+          'generation_kind': 'formal',
+          'supersedes_generation_id':
+              previousActiveIsDraft || previousActiveHasUserEdits
+              ? previousActiveGenerationId
+              : null,
+          'reconciliation_state':
+              result.transcriptComplete && previousActiveHasUserEdits
+              ? 'pending'
+              : 'not_required',
+          'activated_at_ms':
+              result.transcriptComplete && !previousActiveHasUserEdits
+              ? now
+              : null,
           'updated_at_ms': now,
         },
         where: 'id = ?',
         whereArgs: <Object>[generationId],
       );
-      await transaction.update(
-        'recordings',
-        <String, Object?>{'active_generation_id': generationId},
-        where: 'id = ?',
-        whereArgs: <Object>[job.recordingId],
-      );
+      if (result.transcriptComplete && !previousActiveHasUserEdits) {
+        await transaction.update(
+          'recordings',
+          <String, Object?>{'active_generation_id': generationId},
+          where: 'id = ?',
+          whereArgs: <Object>[job.recordingId],
+        );
+      }
       await transaction.update(
         'transcription_jobs',
         <String, Object?>{
-          'status': 'completed',
-          'stage': result.diarizationSucceeded
+          'status': result.transcriptComplete ? 'completed' : 'failed',
+          'stage': !result.transcriptComplete
+              ? 'partial_output'
+              : result.diarizationSucceeded
               ? 'completed'
               : 'partial_success',
           'progress': 1.0,
-          'error_code': result.diarizationErrorCode,
-          'error_message': result.diarizationSucceeded
+          'error_code': result.transcriptComplete
+              ? result.diarizationErrorCode
+              : 'PROCESSING_PARTIAL_OUTPUT',
+          'error_message': !result.transcriptComplete
+              ? '正式转写输出不完整，已保留草稿且未切换，可重试'
+              : result.diarizationSucceeded
               ? null
               : '转写已完成，说话人分离失败；音频与转写均已保留，可单独重试',
           'result_text': mergedText,
@@ -418,7 +550,9 @@ class DesktopProcessingRepository {
         'cancel_requested': 1,
         'updated_at_ms': now,
       },
-      where: "source = 'desktop_local_import' AND status = 'processing'",
+      where:
+          "source IN ('desktop_local_import', 'qwen3_post_meeting') "
+          "AND status = 'processing'",
     );
   }
 
@@ -477,8 +611,10 @@ class DesktopProcessingRepository {
         'error_message': '应用退出时任务状态未知；已停止自动发布，可安全重试',
         'updated_at_ms': now,
       },
-      where: 'source = ? AND status = ?',
-      whereArgs: <Object>['desktop_local_import', 'processing'],
+      where:
+          "source IN ('desktop_local_import', 'qwen3_post_meeting') "
+          'AND status = ?',
+      whereArgs: <Object>['processing'],
     );
   }
 

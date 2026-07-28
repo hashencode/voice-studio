@@ -6,18 +6,21 @@ import 'package:processing_contracts/processing_contracts.dart';
 
 import '../features/companion/desktop_companion_repository.dart';
 import '../features/companion/desktop_companion_service.dart';
+import '../features/capture/desktop_capture_controller.dart';
 import '../features/importing/desktop_import_service.dart';
 import '../features/importing/import_transfer_port.dart';
 import '../features/meeting_intelligence/desktop_meeting_ai_repository.dart';
+import '../features/meeting_intelligence/desktop_ai_provider_registry.dart';
 import '../features/meetings/export/desktop_meeting_export.dart';
 import '../features/meetings/playback/desktop_meeting_playback.dart';
 import '../features/processing/desktop_job.dart';
 import '../features/processing/desktop_processing_engine.dart';
 import '../features/processing/desktop_processing_repository.dart';
 import '../features/processing/frozen_sherpa_model_manager.dart';
+import '../features/platform/macos_runtime_capabilities.dart';
 import '../features/security/desktop_disk_encryption.dart';
-import '../features/processing/sherpa_desktop_processing_engine.dart';
 import '../features/secrets/desktop_secret_store.dart';
+import '../features/settings/desktop_ai_provider_settings_repository.dart';
 import 'desktop_workstation_model.dart';
 
 typedef DesktopEngineFactory =
@@ -34,8 +37,12 @@ class DesktopHomeController extends ChangeNotifier
     required FrozenSherpaManifest modelManifest,
     required DesktopEngineFactory engineFactory,
     required DesktopMeetingAiRepository aiRepository,
+    required DesktopAiProviderRegistry aiProviderRegistry,
     required DesktopSecretStore secretStore,
+    required DesktopAiProviderSettingsRepository aiSettingsRepository,
+    required this.captureController,
     required this.playback,
+    required this.runtimeCapabilities,
     DesktopCompanionService? companionService,
     DesktopMeetingExportPort exportPort =
         const FileSelectorDesktopMeetingExportPort(),
@@ -50,10 +57,19 @@ class DesktopHomeController extends ChangeNotifier
        _modelManifest = modelManifest,
        _engineFactory = engineFactory,
        _aiRepository = aiRepository,
+       _aiProviderRegistry = aiProviderRegistry,
        _secretStore = secretStore,
+       _aiSettingsRepository = aiSettingsRepository,
        _companionService = companionService,
        _exportPort = exportPort,
-       _modelInstallStatus = initialModelStatus;
+       _modelInstallStatus = initialModelStatus {
+    captureController.addListener(_captureChanged);
+    captureController.onCompleted = (_) async {
+      await _refreshLibrary();
+      notifyListeners();
+      unawaited(_drainQueue());
+    };
+  }
 
   final DesktopImportService _importService;
   final DesktopProcessingRepository _repository;
@@ -63,12 +79,23 @@ class DesktopHomeController extends ChangeNotifier
   final FrozenSherpaManifest _modelManifest;
   final DesktopEngineFactory _engineFactory;
   final DesktopMeetingAiRepository _aiRepository;
+  final DesktopAiProviderRegistry _aiProviderRegistry;
   final DesktopSecretStore _secretStore;
+  final DesktopAiProviderSettingsRepository _aiSettingsRepository;
   final DesktopCompanionService? _companionService;
   final DesktopMeetingExportPort _exportPort;
 
   @override
   final DesktopMeetingPlaybackController playback;
+
+  @override
+  final DesktopCaptureController captureController;
+
+  final MacosRuntimeCapabilities runtimeCapabilities;
+
+  @override
+  bool get localProcessingSupported =>
+      runtimeCapabilities.supportsLocalProcessing;
 
   @override
   final DesktopDiskEncryptionStatus diskEncryptionStatus;
@@ -131,6 +158,13 @@ class DesktopHomeController extends ChangeNotifier
   bool aiSecretConfigured = false;
 
   @override
+  DesktopAiProviderSettings aiProviderSettings =
+      DesktopAiProviderSettings.deepSeek;
+
+  @override
+  bool aiProviderProbing = false;
+
+  @override
   bool aiGenerating = false;
 
   @override
@@ -167,8 +201,12 @@ class DesktopHomeController extends ChangeNotifier
     errorMessage = null;
     notifyListeners();
     try {
+      await captureController.initialize();
       await _refreshLibrary();
-      aiSecretConfigured = await _secretStore.contains('deepseek');
+      aiProviderSettings = await _aiSettingsRepository.load();
+      aiSecretConfigured = await _secretStore.contains(
+        aiProviderSettings.providerId,
+      );
       final companion = _companionService;
       if (companion != null) {
         try {
@@ -386,6 +424,13 @@ class DesktopHomeController extends ChangeNotifier
   @override
   Future<void> installModels() async {
     if (installingModels || engineAvailable) return;
+    if (!localProcessingSupported) {
+      errorMessage =
+          '本地离线转写需要 macOS $macosLocalProcessingMinimumVersion 或更高版本；'
+          '其他工作站功能仍可继续使用。';
+      notifyListeners();
+      return;
+    }
     installingModels = true;
     _modelInstallStatus = ModelAssetInstallStatus.installing;
     modelInstallProgress = 0;
@@ -431,18 +476,52 @@ class DesktopHomeController extends ChangeNotifier
 
   @override
   Future<void> replaceAiSecret(String secret) async {
-    await _secretStore.replace('deepseek', secret);
+    await _secretStore.replace(aiProviderSettings.providerId, secret);
     aiSecretConfigured = true;
-    aiMessage = 'DeepSeek 密钥已替换并保存在 macOS 钥匙串';
+    aiMessage = '${aiProviderSettings.displayName} 密钥已替换并保存在 macOS 钥匙串';
     notifyListeners();
   }
 
   @override
   Future<void> deleteAiSecret() async {
-    await _secretStore.delete('deepseek');
+    await _secretStore.delete(aiProviderSettings.providerId);
     aiSecretConfigured = false;
-    aiMessage = 'DeepSeek 密钥已从 macOS 钥匙串删除';
+    aiMessage = '${aiProviderSettings.displayName} 密钥已从 macOS 钥匙串删除';
     notifyListeners();
+  }
+
+  @override
+  Future<void> configureAiProvider(DesktopAiProviderSettings settings) async {
+    final validated = settings.validated();
+    await _aiSettingsRepository.save(validated);
+    aiProviderSettings = validated;
+    aiSecretConfigured = await _secretStore.contains(validated.providerId);
+    aiMessage = '${validated.displayName} 已启用；每场会议仍需单独同意';
+    notifyListeners();
+  }
+
+  @override
+  Future<void> probeAiProvider() async {
+    if (aiProviderProbing) return;
+    aiProviderProbing = true;
+    aiMessage = null;
+    notifyListeners();
+    try {
+      final provider = _aiProviderRegistry.resolve(aiProviderSettings);
+      if (provider is! MeetingAiExtendedProviderPort) {
+        aiMessage = '当前提供商不支持可用性检查';
+        return;
+      }
+      final availability = await provider.probeAvailability();
+      if (!availability.available) {
+        aiMessage = availability.failure?.message ?? 'AI 提供商不可用';
+        return;
+      }
+      aiMessage = '${aiProviderSettings.displayName} 配置有效；远程连接只会在本场明确同意后建立';
+    } finally {
+      aiProviderProbing = false;
+      notifyListeners();
+    }
   }
 
   @override
@@ -550,7 +629,14 @@ class DesktopHomeController extends ChangeNotifier
     _disposed = true;
     _jobRefreshTimer?.cancel();
     playback.dispose();
+    captureController
+      ..removeListener(_captureChanged)
+      ..dispose();
     unawaited(_companionService?.stop());
     super.dispose();
+  }
+
+  void _captureChanged() {
+    if (!_disposed) notifyListeners();
   }
 }

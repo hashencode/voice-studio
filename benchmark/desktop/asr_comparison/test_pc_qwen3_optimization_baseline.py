@@ -47,6 +47,10 @@ class PcQwen3OptimizationBaselineTest(unittest.TestCase):
                 "topP": 0.8,
                 "seed": 42,
                 "hotwords": "",
+                "segmentation": "official_silero_vad",
+                "vadThreshold": 0.2,
+                "minimumSpeechSeconds": 0.2,
+                "maximumSpeechSeconds": 12,
             },
         )
 
@@ -58,7 +62,9 @@ class PcQwen3OptimizationBaselineTest(unittest.TestCase):
         assert isinstance(product, dict)
         assert isinstance(optimization, dict)
         assert isinstance(license_state, dict)
-        self.assertIs(optimization["productEligible"], False)
+        self.assertIs(optimization["productEligible"], True)
+        self.assertEqual(optimization["status"], "OPTIMIZATION_ADMITTED")
+        self.assertEqual(optimization["selectedArm"], "vad-max-speech-12")
         self.assertIs(license_state["distributionEligible"], False)
 
         manifest = json.loads(PRODUCT_MANIFEST_PATH.read_text(encoding="utf-8"))
@@ -74,6 +80,7 @@ class PcQwen3OptimizationBaselineTest(unittest.TestCase):
             ("convFrontend", "asr/conv_frontend.onnx"),
             ("encoder", "asr/encoder.int8.onnx"),
             ("decoder", "asr/decoder.int8.onnx"),
+            ("sileroVad", "asr/silero_vad.onnx"),
         ):
             self.assertEqual(hashes[baseline_key], files[relative_path]["sha256"])
 

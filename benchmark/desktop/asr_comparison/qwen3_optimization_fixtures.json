@@ -1,0 +1,455 @@
+{
+  "dataset": {
+    "datasetCard": "https://huggingface.co/datasets/google/fleurs",
+    "id": "google/fleurs",
+    "license": "CC-BY-4.0",
+    "localOnly": true,
+    "redistribution": "never_commit_audio",
+    "revision": "70bb2e84b976b7e960aa89f1c648e09c59f894dd",
+    "roleAllocation": {
+      "development": "validation rows 0-99",
+      "heldOut": "validation rows 100-199, never used for arm selection"
+    }
+  },
+  "distributionState": "LOCAL_ONLY",
+  "fixtureManifestId": "qwen3-asr-bounded-optimization/macos-m4/fleurs-v1",
+  "fixtures": [
+    {
+      "annotations": {
+        "numericEvents": [],
+        "terminology": []
+      },
+      "audio": {
+        "bytes": 1648044,
+        "durationSeconds": 51.5,
+        "relativePath": "held_out-clean-mandarin.wav",
+        "sha256": "3265ef5ffc358cd02b2ef18f0dce28d84649fddd68424d7d420f540685b50961"
+      },
+      "distributionState": "local_only",
+      "fixtureId": "held_out-clean-mandarin",
+      "fixtureRole": "held_out",
+      "freezeState": "FROZEN",
+      "licenseOrConsent": "CC-BY-4.0_LOCAL_ONLY",
+      "redistribution": "never_commit_audio",
+      "reference": {
+        "bytes": 594,
+        "relativePath": "held_out-clean-mandarin.txt",
+        "sha256": "a96d24b00e8d21ccbed6674d10ae8b900cc90dd4a94ff383c204b50852ee068f"
+      },
+      "scenario": "clean_near_field_mandarin",
+      "sourceRowIdentitySha256": "5df31c6d419b77379c677c7eb3358ef7335f6986a0862c8fb1675fc77335d820",
+      "sourceRows": [
+        {
+          "language": "cmn_hans_cn",
+          "rowIndex": 100,
+          "sourceId": 1557,
+          "split": "validation"
+        },
+        {
+          "language": "cmn_hans_cn",
+          "rowIndex": 101,
+          "sourceId": 1515,
+          "split": "validation"
+        },
+        {
+          "language": "cmn_hans_cn",
+          "rowIndex": 102,
+          "sourceId": 1614,
+          "split": "validation"
+        },
+        {
+          "language": "cmn_hans_cn",
+          "rowIndex": 103,
+          "sourceId": 1604,
+          "split": "validation"
+        }
+      ],
+      "transformation": "concat_with_250ms_silence_v1",
+      "useDisposition": "qwen3_single_variable_ranking"
+    },
+    {
+      "annotations": {
+        "numericEvents": [],
+        "terminology": []
+      },
+      "audio": {
+        "bytes": 1648044,
+        "durationSeconds": 51.5,
+        "relativePath": "held_out-far-field.wav",
+        "sha256": "6aacf0c8f88cd1b4f9d039bbadb0abaa30c7437d096aade2c512e06b493e2319"
+      },
+      "distributionState": "local_only",
+      "fixtureId": "held_out-far-field",
+      "fixtureRole": "held_out",
+      "freezeState": "FROZEN",
+      "licenseOrConsent": "CC-BY-4.0_LOCAL_ONLY",
+      "redistribution": "never_commit_audio",
+      "reference": {
+        "bytes": 594,
+        "relativePath": "held_out-far-field.txt",
+        "sha256": "a96d24b00e8d21ccbed6674d10ae8b900cc90dd4a94ff383c204b50852ee068f"
+      },
+      "scenario": "far_field_noisy_meeting",
+      "sourceRowIdentitySha256": "5df31c6d419b77379c677c7eb3358ef7335f6986a0862c8fb1675fc77335d820",
+      "sourceRows": [
+        {
+          "language": "cmn_hans_cn",
+          "rowIndex": 100,
+          "sourceId": 1557,
+          "split": "validation"
+        },
+        {
+          "language": "cmn_hans_cn",
+          "rowIndex": 101,
+          "sourceId": 1515,
+          "split": "validation"
+        },
+        {
+          "language": "cmn_hans_cn",
+          "rowIndex": 102,
+          "sourceId": 1614,
+          "split": "validation"
+        },
+        {
+          "language": "cmn_hans_cn",
+          "rowIndex": 103,
+          "sourceId": 1604,
+          "split": "validation"
+        }
+      ],
+      "transformation": "deterministic_echo_attenuation_noise_v1",
+      "useDisposition": "qwen3_single_variable_ranking"
+    },
+    {
+      "annotations": {
+        "numericEvents": [],
+        "terminology": []
+      },
+      "audio": {
+        "bytes": 3562284,
+        "durationSeconds": 111.32,
+        "relativePath": "held_out-code-switch.wav",
+        "sha256": "8cf9e787fbc161ca6ad25bb2a33f8e85e3bae81ee30bcb7a0aba51ee088bc841"
+      },
+      "distributionState": "local_only",
+      "fixtureId": "held_out-code-switch",
+      "fixtureRole": "held_out",
+      "freezeState": "FROZEN",
+      "licenseOrConsent": "CC-BY-4.0_LOCAL_ONLY",
+      "redistribution": "never_commit_audio",
+      "reference": {
+        "bytes": 1205,
+        "relativePath": "held_out-code-switch.txt",
+        "sha256": "5c5f51f3074a0b4ded5d27e73f7c5a965bf0c21edf86f30570a6fe3abb094517"
+      },
+      "scenario": "zh_en_code_switch",
+      "sourceRowIdentitySha256": "87cc0b3184d3c1152b4fce013a779237ffddb23a1b7b8baa1e2c51f900550857",
+      "sourceRows": [
+        {
+          "language": "cmn_hans_cn",
+          "rowIndex": 110,
+          "sourceId": 1634,
+          "split": "validation"
+        },
+        {
+          "language": "en_us",
+          "rowIndex": 110,
+          "sourceId": 1540,
+          "split": "validation"
+        },
+        {
+          "language": "cmn_hans_cn",
+          "rowIndex": 111,
+          "sourceId": 1619,
+          "split": "validation"
+        },
+        {
+          "language": "en_us",
+          "rowIndex": 111,
+          "sourceId": 1631,
+          "split": "validation"
+        },
+        {
+          "language": "cmn_hans_cn",
+          "rowIndex": 112,
+          "sourceId": 1646,
+          "split": "validation"
+        },
+        {
+          "language": "en_us",
+          "rowIndex": 112,
+          "sourceId": 1643,
+          "split": "validation"
+        },
+        {
+          "language": "cmn_hans_cn",
+          "rowIndex": 113,
+          "sourceId": 1587,
+          "split": "validation"
+        },
+        {
+          "language": "en_us",
+          "rowIndex": 113,
+          "sourceId": 1539,
+          "split": "validation"
+        },
+        {
+          "language": "cmn_hans_cn",
+          "rowIndex": 114,
+          "sourceId": 1518,
+          "split": "validation"
+        },
+        {
+          "language": "en_us",
+          "rowIndex": 114,
+          "sourceId": 1578,
+          "split": "validation"
+        },
+        {
+          "language": "cmn_hans_cn",
+          "rowIndex": 115,
+          "sourceId": 1536,
+          "split": "validation"
+        },
+        {
+          "language": "en_us",
+          "rowIndex": 115,
+          "sourceId": 1624,
+          "split": "validation"
+        }
+      ],
+      "transformation": "alternating_zh_en_utterances_v1",
+      "useDisposition": "qwen3_single_variable_ranking"
+    },
+    {
+      "annotations": {
+        "numericEvents": [
+          {
+            "expectedDisplay": "1978",
+            "expectedLexicalAlternatives": [
+              "1978",
+              "一九七八"
+            ]
+          },
+          {
+            "expectedDisplay": "1979",
+            "expectedLexicalAlternatives": [
+              "1979",
+              "一九七九"
+            ]
+          },
+          {
+            "expectedDisplay": "2010",
+            "expectedLexicalAlternatives": [
+              "2010",
+              "二零一零"
+            ]
+          },
+          {
+            "expectedDisplay": "1,400",
+            "expectedLexicalAlternatives": [
+              "1400",
+              "1,400",
+              "一千四百"
+            ]
+          },
+          {
+            "expectedDisplay": "2008",
+            "expectedLexicalAlternatives": [
+              "2008",
+              "二零零八"
+            ]
+          },
+          {
+            "expectedDisplay": "8%",
+            "expectedLexicalAlternatives": [
+              "8%",
+              "百分之八"
+            ]
+          }
+        ],
+        "terminology": [
+          {
+            "expectedAlternatives": [
+              "戴维营协议"
+            ]
+          },
+          {
+            "expectedAlternatives": [
+              "美中关系正常化"
+            ]
+          },
+          {
+            "expectedAlternatives": [
+              "伊朗人质危机"
+            ]
+          },
+          {
+            "expectedAlternatives": [
+              "苏联入侵阿富汗"
+            ]
+          }
+        ]
+      },
+      "audio": {
+        "bytes": 1365164,
+        "durationSeconds": 42.66,
+        "relativePath": "held_out-terminology-numbers.wav",
+        "sha256": "75865b1da7b197dd8f2195b4469cf338bbfa6c3547f47801f65cf321b640569d"
+      },
+      "distributionState": "local_only",
+      "fixtureId": "held_out-terminology-numbers",
+      "fixtureRole": "held_out",
+      "freezeState": "FROZEN",
+      "licenseOrConsent": "CC-BY-4.0_LOCAL_ONLY",
+      "redistribution": "never_commit_audio",
+      "reference": {
+        "bytes": 413,
+        "relativePath": "held_out-terminology-numbers.txt",
+        "sha256": "3065a0cc9fc9df13d6db51dd0253eb19434b89aeae4e2dd5cc39585199827108"
+      },
+      "scenario": "terminology_numbers",
+      "sourceRowIdentitySha256": "e815c025f7df36603c4692494d069de76414d19e4ef82d0812e5f1185ea8c68c",
+      "sourceRows": [
+        {
+          "language": "cmn_hans_cn",
+          "rowIndex": 103,
+          "sourceId": 1604,
+          "split": "validation"
+        },
+        {
+          "language": "cmn_hans_cn",
+          "rowIndex": 190,
+          "sourceId": 1520,
+          "split": "validation"
+        }
+      ],
+      "transformation": "priority_selected_fleurs_rows_v1",
+      "useDisposition": "qwen3_single_variable_ranking"
+    },
+    {
+      "annotations": {
+        "numericEvents": [],
+        "terminology": []
+      },
+      "audio": {
+        "bytes": 1721644,
+        "durationSeconds": 53.8,
+        "relativePath": "held_out-double-talk.wav",
+        "sha256": "5169d4b6ef3b678a6c45bb8f6cc4b1ac23a5b8f10e19731ac2259f2c31cdc716"
+      },
+      "distributionState": "local_only",
+      "fixtureId": "held_out-double-talk",
+      "fixtureRole": "held_out",
+      "freezeState": "FROZEN",
+      "licenseOrConsent": "CC-BY-4.0_LOCAL_ONLY",
+      "redistribution": "never_commit_audio",
+      "reference": {
+        "bytes": 999,
+        "relativePath": "held_out-double-talk.txt",
+        "sha256": "b0703aed02c7d4a276bef5bffe85b53a78daac34cb3557635718f78c98099f71"
+      },
+      "scenario": "system_microphone_double_talk",
+      "sourceRowIdentitySha256": "d544833f4a8daaba6fde606b00feb727788515d302655f13e335022154ee8f76",
+      "sourceRows": [
+        {
+          "language": "cmn_hans_cn",
+          "rowIndex": 120,
+          "sourceId": 1595,
+          "split": "validation"
+        },
+        {
+          "language": "cmn_hans_cn",
+          "rowIndex": 121,
+          "sourceId": 1584,
+          "split": "validation"
+        },
+        {
+          "language": "cmn_hans_cn",
+          "rowIndex": 122,
+          "sourceId": 1619,
+          "split": "validation"
+        },
+        {
+          "language": "cmn_hans_cn",
+          "rowIndex": 123,
+          "sourceId": 1586,
+          "split": "validation"
+        },
+        {
+          "language": "en_us",
+          "rowIndex": 120,
+          "sourceId": 1534,
+          "split": "validation"
+        },
+        {
+          "language": "en_us",
+          "rowIndex": 121,
+          "sourceId": 1590,
+          "split": "validation"
+        },
+        {
+          "language": "en_us",
+          "rowIndex": 122,
+          "sourceId": 1623,
+          "split": "validation"
+        },
+        {
+          "language": "en_us",
+          "rowIndex": 123,
+          "sourceId": 1582,
+          "split": "validation"
+        }
+      ],
+      "transformation": "paired_zh_en_dual_track_mix_v1",
+      "useDisposition": "qwen3_single_variable_ranking"
+    },
+    {
+      "annotations": {
+        "numericEvents": [],
+        "terminology": []
+      },
+      "audio": {
+        "bytes": 960044,
+        "durationSeconds": 30.0,
+        "relativePath": "held_out-non-speech.wav",
+        "sha256": "2623e7d29b6bc714f61a9b138f269e3a6fcd8129dc4026204205b182a143907f"
+      },
+      "distributionState": "local_only",
+      "fixtureId": "held_out-non-speech",
+      "fixtureRole": "held_out",
+      "freezeState": "FROZEN",
+      "licenseOrConsent": "CC-BY-4.0_LOCAL_ONLY",
+      "redistribution": "never_commit_audio",
+      "reference": {
+        "bytes": 1,
+        "relativePath": "held_out-non-speech.txt",
+        "sha256": "01ba4719c80b6fe911b091a7c05124b64eeece964e09c058ef8f9805daca546b"
+      },
+      "scenario": "non_speech",
+      "sourceRowIdentitySha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "sourceRows": [],
+      "transformation": "deterministic_keyboard_impulses_without_speech_v1",
+      "useDisposition": "qwen3_single_variable_ranking"
+    }
+  ],
+  "pcmFormat": {
+    "channels": 1,
+    "sampleRateHz": 16000,
+    "sampleWidthBytes": 2
+  },
+  "requiredHeldOutScenarios": [
+    "clean_near_field_mandarin",
+    "far_field_noisy_meeting",
+    "zh_en_code_switch",
+    "terminology_numbers",
+    "system_microphone_double_talk",
+    "non_speech"
+  ],
+  "schemaVersion": 2,
+  "sourceManifest": {
+    "path": "benchmark/desktop/live_caption/live_caption_fixtures.json",
+    "sha256": "31e63176c0af79fdd4fb5a5e1af3581c39c7c44ce95252d6b0a6e5a3ba1fcc22"
+  },
+  "status": "FROZEN"
+}

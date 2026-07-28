@@ -1,0 +1,71 @@
+{
+  "schemaVersion": 1,
+  "decisionId": "sensevoice-live-caption-u13-macos-m4-control",
+  "status": "PASS",
+  "developmentPosture": "DEVELOPMENT_ONLY",
+  "target": {
+    "modelIdentifier": "Mac16,10",
+    "os": "macOS 15.7.5",
+    "osBuild": "24G624",
+    "architecture": "arm64",
+    "cpu": "Apple M4",
+    "logicalCpuCount": 10,
+    "memoryBytes": 17179869184,
+    "buildMode": "debug"
+  },
+  "bindings": {
+    "contract": {
+      "path": "benchmark/desktop/live_caption/sensevoice_live_caption_contract.json",
+      "sha256": "f074af8f14f9256e3c269f16fd15e571367c6b9861062be538510be16ecc2297"
+    },
+    "fixtureManifest": {
+      "path": "benchmark/desktop/live_caption/live_caption_fixtures.json",
+      "sha256": "31e63176c0af79fdd4fb5a5e1af3581c39c7c44ce95252d6b0a6e5a3ba1fcc22"
+    },
+    "scorer": {
+      "path": "benchmark/desktop/asr_comparison/asr_scoring.py",
+      "sha256": "2b76fc02ff49a61e58c2633111dba82d9697ff1d4c5b772fba3b5c1e577b52a5"
+    },
+    "raw": {
+      "path": "benchmark/desktop/live_caption/evidence/macos/u13-control-raw-v2.json",
+      "sha256": "954c5e2f468f6b76b2701f01aa6be528a515e0a754548b9e0ee436da4d686c1a"
+    },
+    "flutterCaptureProbe": {
+      "path": "benchmark/desktop/live_caption/evidence/macos/u13-flutter-capture-probe.json",
+      "sha256": "f661803fae4b3ae58012abfd27724158e497f047b38f5488338edb0c2783baed"
+    },
+    "summary": {
+      "path": "benchmark/desktop/live_caption/evidence/macos/u13-control-summary-v2.json",
+      "sha256": "d879d1479dca6c2848ab0c61bf26e65f6a2abbd6e759b84566012102f580dbe8"
+    }
+  },
+  "control": {
+    "model": "sherpa-onnx-sense-voice-zh-en-ja-ko-yue-int8-2024-07-17",
+    "runtime": "sherpa-onnx-1.13.4-ort-1.27.0",
+    "provider": "cpu",
+    "threads": 2,
+    "concurrency": 1,
+    "decodingMethod": "greedy_search",
+    "language": "auto",
+    "useInverseTextNormalization": false,
+    "vad": "silero",
+    "vadThreshold": 0.5,
+    "minimumSpeechSeconds": 0.25,
+    "minimumSilenceSeconds": 0.5,
+    "maximumUtteranceSeconds": 15,
+    "publishesTokenPartials": false,
+    "publishesCompletedUtterancesOnly": true
+  },
+  "gates": {
+    "speechEndToVisibleP50Ms": 900.901,
+    "speechEndToVisibleP95Ms": 1492.201,
+    "maximumBacklogSeconds": 0.528,
+    "stabilitySeconds": 900,
+    "maximumUtteranceSeconds": 15,
+    "maximumAppRssBytes": 1318420480,
+    "uiLongFrameRate": 0.0,
+    "captureFrameLossDelta": 0
+  },
+  "productDisposition": "U13_CONTROL_ADMITTED_PENDING_U18_OPTIMIZATION_DECISION",
+  "degradationStrategy": "If the worker fails, emits invalid events, exceeds its bounded queue, or the target does not meet the local-processing floor, keep authority-track capture running and mark live draft unavailable."
+}

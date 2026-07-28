@@ -1,0 +1,1034 @@
+{
+  "dataset": {
+    "datasetCard": "https://huggingface.co/datasets/google/fleurs",
+    "id": "google/fleurs",
+    "license": "CC-BY-4.0",
+    "localOnly": true,
+    "redistribution": "never_commit_audio",
+    "revision": "70bb2e84b976b7e960aa89f1c648e09c59f894dd",
+    "roleAllocation": {
+      "development": "validation rows 0-99",
+      "heldOut": "validation rows 100-199, never used for arm selection"
+    }
+  },
+  "fixtureManifestId": "sensevoice-live-caption-fleurs-v1",
+  "fixtures": [
+    {
+      "audio": {
+        "bytes": 1092204,
+        "durationSeconds": 34.13,
+        "relativePath": "development-clean-mandarin.wav",
+        "sha256": "d0b43e1bcae5e1b14aacf13e8ff92b0dd603139e9ab0c76e8a04564479c4f913"
+      },
+      "distributionState": "local_only",
+      "fixtureId": "development-clean-mandarin",
+      "fixtureRole": "development",
+      "freezeState": "FROZEN",
+      "reference": {
+        "bytes": 340,
+        "relativePath": "development-clean-mandarin.txt",
+        "sha256": "a2ed18fcaee3bb98c741aa35ad316b50260aec208e1b89e3f42d3c7019144479"
+      },
+      "scenario": "clean_near_field_mandarin",
+      "sourceRowIdentitySha256": "e023cbf1a6882d37c163e2c2035e56c89e7419817ae634f8d3a4024efc9c43b3",
+      "sourceRows": [
+        {
+          "language": "cmn_hans_cn",
+          "rowIndex": 0,
+          "sourceId": 1579,
+          "split": "validation"
+        },
+        {
+          "language": "cmn_hans_cn",
+          "rowIndex": 1,
+          "sourceId": 1605,
+          "split": "validation"
+        },
+        {
+          "language": "cmn_hans_cn",
+          "rowIndex": 2,
+          "sourceId": 1581,
+          "split": "validation"
+        }
+      ],
+      "transformation": "concat_with_250ms_silence_v1"
+    },
+    {
+      "audio": {
+        "bytes": 1151404,
+        "durationSeconds": 35.98,
+        "relativePath": "development-clean-english.wav",
+        "sha256": "65fe0fc09f1d2f89afd71da542bbdd49237a561eafb66d21c300b734aea87168"
+      },
+      "distributionState": "local_only",
+      "fixtureId": "development-clean-english",
+      "fixtureRole": "development",
+      "freezeState": "FROZEN",
+      "reference": {
+        "bytes": 501,
+        "relativePath": "development-clean-english.txt",
+        "sha256": "602e69c7380f06ab6a072bfd32a475d62987b23e1d3426971ebe6ef3d17b4e8d"
+      },
+      "scenario": "clean_near_field_english",
+      "sourceRowIdentitySha256": "6263d7b8ac6ebcc33e1fd6d65fd4c7442d57bf138fbd68dc7b07cccd8542ac49",
+      "sourceRows": [
+        {
+          "language": "en_us",
+          "rowIndex": 0,
+          "sourceId": 1548,
+          "split": "validation"
+        },
+        {
+          "language": "en_us",
+          "rowIndex": 1,
+          "sourceId": 1620,
+          "split": "validation"
+        },
+        {
+          "language": "en_us",
+          "rowIndex": 2,
+          "sourceId": 1510,
+          "split": "validation"
+        },
+        {
+          "language": "en_us",
+          "rowIndex": 3,
+          "sourceId": 1578,
+          "split": "validation"
+        }
+      ],
+      "transformation": "concat_with_250ms_silence_v1"
+    },
+    {
+      "audio": {
+        "bytes": 1092204,
+        "durationSeconds": 34.13,
+        "relativePath": "development-far-field.wav",
+        "sha256": "2fc3793073a2a1f38fa8111604a29ae4cc396a5e9679884ad74faffb1a93bf11"
+      },
+      "distributionState": "local_only",
+      "fixtureId": "development-far-field",
+      "fixtureRole": "development",
+      "freezeState": "FROZEN",
+      "reference": {
+        "bytes": 340,
+        "relativePath": "development-far-field.txt",
+        "sha256": "a2ed18fcaee3bb98c741aa35ad316b50260aec208e1b89e3f42d3c7019144479"
+      },
+      "scenario": "far_field_noisy_meeting",
+      "sourceRowIdentitySha256": "e023cbf1a6882d37c163e2c2035e56c89e7419817ae634f8d3a4024efc9c43b3",
+      "sourceRows": [
+        {
+          "language": "cmn_hans_cn",
+          "rowIndex": 0,
+          "sourceId": 1579,
+          "split": "validation"
+        },
+        {
+          "language": "cmn_hans_cn",
+          "rowIndex": 1,
+          "sourceId": 1605,
+          "split": "validation"
+        },
+        {
+          "language": "cmn_hans_cn",
+          "rowIndex": 2,
+          "sourceId": 1581,
+          "split": "validation"
+        }
+      ],
+      "transformation": "deterministic_echo_attenuation_noise_v1"
+    },
+    {
+      "audio": {
+        "bytes": 4364204,
+        "durationSeconds": 136.38,
+        "relativePath": "development-code-switch.wav",
+        "sha256": "fcbe51aa10be7cc3f34d7e3ebf500b4ebe905215ff6ccbca1becf73e6f828fe2"
+      },
+      "distributionState": "local_only",
+      "fixtureId": "development-code-switch",
+      "fixtureRole": "development",
+      "freezeState": "FROZEN",
+      "reference": {
+        "bytes": 1421,
+        "relativePath": "development-code-switch.txt",
+        "sha256": "4c1d31efaae11504f95098631aba64667b8e8aa67f97f29467a76b51a8deb855"
+      },
+      "scenario": "zh_en_code_switch",
+      "sourceRowIdentitySha256": "010b64a8fd44595224da6298f1df64ab04c698fcd4fc04218136534bef00cf8b",
+      "sourceRows": [
+        {
+          "language": "cmn_hans_cn",
+          "rowIndex": 10,
+          "sourceId": 1640,
+          "split": "validation"
+        },
+        {
+          "language": "en_us",
+          "rowIndex": 10,
+          "sourceId": 1560,
+          "split": "validation"
+        },
+        {
+          "language": "cmn_hans_cn",
+          "rowIndex": 11,
+          "sourceId": 1554,
+          "split": "validation"
+        },
+        {
+          "language": "en_us",
+          "rowIndex": 11,
+          "sourceId": 1536,
+          "split": "validation"
+        },
+        {
+          "language": "cmn_hans_cn",
+          "rowIndex": 12,
+          "sourceId": 1577,
+          "split": "validation"
+        },
+        {
+          "language": "en_us",
+          "rowIndex": 12,
+          "sourceId": 1619,
+          "split": "validation"
+        },
+        {
+          "language": "cmn_hans_cn",
+          "rowIndex": 13,
+          "sourceId": 1574,
+          "split": "validation"
+        },
+        {
+          "language": "en_us",
+          "rowIndex": 13,
+          "sourceId": 1598,
+          "split": "validation"
+        },
+        {
+          "language": "cmn_hans_cn",
+          "rowIndex": 14,
+          "sourceId": 1591,
+          "split": "validation"
+        },
+        {
+          "language": "en_us",
+          "rowIndex": 14,
+          "sourceId": 1549,
+          "split": "validation"
+        },
+        {
+          "language": "cmn_hans_cn",
+          "rowIndex": 15,
+          "sourceId": 1606,
+          "split": "validation"
+        },
+        {
+          "language": "en_us",
+          "rowIndex": 15,
+          "sourceId": 1583,
+          "split": "validation"
+        }
+      ],
+      "transformation": "alternating_zh_en_utterances_v1"
+    },
+    {
+      "audio": {
+        "bytes": 1545324,
+        "durationSeconds": 48.29,
+        "relativePath": "development-terminology-numbers.wav",
+        "sha256": "2e70dc92a951233128b808760458f0cfdf60c85bf98b1b9da3a111a2d55a2483"
+      },
+      "distributionState": "local_only",
+      "fixtureId": "development-terminology-numbers",
+      "fixtureRole": "development",
+      "freezeState": "FROZEN",
+      "reference": {
+        "bytes": 522,
+        "relativePath": "development-terminology-numbers.txt",
+        "sha256": "6a3e73d179e8b909c49d4d8b58b59928f4eec3128bef1db12f09de5804e2c740"
+      },
+      "scenario": "terminology_numbers",
+      "sourceRowIdentitySha256": "09016a63a42159b412e199d60fe593ea0b9e2902b550780a01ab450efa9ee02c",
+      "sourceRows": [
+        {
+          "language": "cmn_hans_cn",
+          "rowIndex": 32,
+          "sourceId": 1520,
+          "split": "validation"
+        },
+        {
+          "language": "cmn_hans_cn",
+          "rowIndex": 20,
+          "sourceId": 1556,
+          "split": "validation"
+        },
+        {
+          "language": "cmn_hans_cn",
+          "rowIndex": 27,
+          "sourceId": 1626,
+          "split": "validation"
+        }
+      ],
+      "transformation": "priority_selected_fleurs_rows_v1"
+    },
+    {
+      "audio": {
+        "bytes": 1151404,
+        "durationSeconds": 35.98,
+        "relativePath": "development-keyboard-noise.wav",
+        "sha256": "3e94e4bef66af1324e210c7f7dc5fbdc7faf1ee20919e0a7f8c7b2c41cf26a20"
+      },
+      "distributionState": "local_only",
+      "fixtureId": "development-keyboard-noise",
+      "fixtureRole": "development",
+      "freezeState": "FROZEN",
+      "reference": {
+        "bytes": 501,
+        "relativePath": "development-keyboard-noise.txt",
+        "sha256": "602e69c7380f06ab6a072bfd32a475d62987b23e1d3426971ebe6ef3d17b4e8d"
+      },
+      "scenario": "keyboard_noise",
+      "sourceRowIdentitySha256": "6263d7b8ac6ebcc33e1fd6d65fd4c7442d57bf138fbd68dc7b07cccd8542ac49",
+      "sourceRows": [
+        {
+          "language": "en_us",
+          "rowIndex": 0,
+          "sourceId": 1548,
+          "split": "validation"
+        },
+        {
+          "language": "en_us",
+          "rowIndex": 1,
+          "sourceId": 1620,
+          "split": "validation"
+        },
+        {
+          "language": "en_us",
+          "rowIndex": 2,
+          "sourceId": 1510,
+          "split": "validation"
+        },
+        {
+          "language": "en_us",
+          "rowIndex": 3,
+          "sourceId": 1578,
+          "split": "validation"
+        }
+      ],
+      "transformation": "deterministic_keyboard_impulse_overlay_v1"
+    },
+    {
+      "audio": {
+        "bytes": 2475244,
+        "durationSeconds": 77.35,
+        "relativePath": "development-long-utterance.wav",
+        "sha256": "ff08eea2399aabba395560c2d477d216b7c2e164511884c2711a58bbec5c435b"
+      },
+      "distributionState": "local_only",
+      "fixtureId": "development-long-utterance",
+      "fixtureRole": "development",
+      "freezeState": "FROZEN",
+      "reference": {
+        "bytes": 602,
+        "relativePath": "development-long-utterance.txt",
+        "sha256": "1bdb95d38011d42771164bbb5da40a068eaaa18370693e494d7dd7f3e8b36d04"
+      },
+      "scenario": "long_utterance",
+      "sourceRowIdentitySha256": "29185340a0d0da4c340d3f1b9b22b0901e5845d81f28eb249aeaef247c373a06",
+      "sourceRows": [
+        {
+          "language": "cmn_hans_cn",
+          "rowIndex": 61,
+          "sourceId": 1568,
+          "split": "validation"
+        },
+        {
+          "language": "cmn_hans_cn",
+          "rowIndex": 28,
+          "sourceId": 1620,
+          "split": "validation"
+        },
+        {
+          "language": "en_us",
+          "rowIndex": 48,
+          "sourceId": 1527,
+          "split": "validation"
+        }
+      ],
+      "transformation": "longest_source_rows_v1"
+    },
+    {
+      "audio": {
+        "bytes": 537004,
+        "durationSeconds": 16.78,
+        "relativePath": "development-short-confirmation.wav",
+        "sha256": "9684d909e553ac735d5b8205bcf680921cd6c5c86bbfc8c69f9df6ed43a91bd7"
+      },
+      "distributionState": "local_only",
+      "fixtureId": "development-short-confirmation",
+      "fixtureRole": "development",
+      "freezeState": "FROZEN",
+      "reference": {
+        "bytes": 219,
+        "relativePath": "development-short-confirmation.txt",
+        "sha256": "321f33ae58444e66d9fe75a9579ee51f819102cc1ee1030b6aa1bdba8b4dc8dc"
+      },
+      "scenario": "short_confirmation",
+      "sourceRowIdentitySha256": "8a30a348b99f55188550b68f6fec40c4f996fc16833a89aa01a98a6837db4b33",
+      "sourceRows": [
+        {
+          "language": "cmn_hans_cn",
+          "rowIndex": 87,
+          "sourceId": 1577,
+          "split": "validation"
+        },
+        {
+          "language": "en_us",
+          "rowIndex": 28,
+          "sourceId": 1607,
+          "split": "validation"
+        },
+        {
+          "language": "cmn_hans_cn",
+          "rowIndex": 60,
+          "sourceId": 1648,
+          "split": "validation"
+        },
+        {
+          "language": "en_us",
+          "rowIndex": 3,
+          "sourceId": 1578,
+          "split": "validation"
+        }
+      ],
+      "transformation": "shortest_source_rows_v1"
+    },
+    {
+      "audio": {
+        "bytes": 1196844,
+        "durationSeconds": 37.4,
+        "relativePath": "development-double-talk.wav",
+        "sha256": "2c7d287d8b3250d576bc52dbe15bd2094bcba4700b61092f309994583248a733"
+      },
+      "distributionState": "local_only",
+      "fixtureId": "development-double-talk",
+      "fixtureRole": "development",
+      "freezeState": "FROZEN",
+      "reference": {
+        "bytes": 926,
+        "relativePath": "development-double-talk.txt",
+        "sha256": "ec2052cb5344b1d515b416d1307d1573cd59d2a19b770305f05f5db565098a97"
+      },
+      "scenario": "system_microphone_double_talk",
+      "sourceRowIdentitySha256": "94346071b55a094653c2def6bc45b056519f2f0e41e16e4e8e0e09efbb8dc6f6",
+      "sourceRows": [
+        {
+          "language": "cmn_hans_cn",
+          "rowIndex": 20,
+          "sourceId": 1556,
+          "split": "validation"
+        },
+        {
+          "language": "cmn_hans_cn",
+          "rowIndex": 21,
+          "sourceId": 1560,
+          "split": "validation"
+        },
+        {
+          "language": "cmn_hans_cn",
+          "rowIndex": 22,
+          "sourceId": 1573,
+          "split": "validation"
+        },
+        {
+          "language": "cmn_hans_cn",
+          "rowIndex": 23,
+          "sourceId": 1636,
+          "split": "validation"
+        },
+        {
+          "language": "en_us",
+          "rowIndex": 20,
+          "sourceId": 1573,
+          "split": "validation"
+        },
+        {
+          "language": "en_us",
+          "rowIndex": 21,
+          "sourceId": 1629,
+          "split": "validation"
+        },
+        {
+          "language": "en_us",
+          "rowIndex": 22,
+          "sourceId": 1615,
+          "split": "validation"
+        },
+        {
+          "language": "en_us",
+          "rowIndex": 23,
+          "sourceId": 1560,
+          "split": "validation"
+        }
+      ],
+      "transformation": "paired_zh_en_dual_track_mix_v1"
+    },
+    {
+      "audio": {
+        "bytes": 960044,
+        "durationSeconds": 30.0,
+        "relativePath": "development-non-speech.wav",
+        "sha256": "2623e7d29b6bc714f61a9b138f269e3a6fcd8129dc4026204205b182a143907f"
+      },
+      "distributionState": "local_only",
+      "fixtureId": "development-non-speech",
+      "fixtureRole": "development",
+      "freezeState": "FROZEN",
+      "reference": {
+        "bytes": 1,
+        "relativePath": "development-non-speech.txt",
+        "sha256": "01ba4719c80b6fe911b091a7c05124b64eeece964e09c058ef8f9805daca546b"
+      },
+      "scenario": "non_speech",
+      "sourceRowIdentitySha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "sourceRows": [],
+      "transformation": "deterministic_keyboard_impulses_without_speech_v1"
+    },
+    {
+      "audio": {
+        "bytes": 1648044,
+        "durationSeconds": 51.5,
+        "relativePath": "held_out-clean-mandarin.wav",
+        "sha256": "3265ef5ffc358cd02b2ef18f0dce28d84649fddd68424d7d420f540685b50961"
+      },
+      "distributionState": "local_only",
+      "fixtureId": "held_out-clean-mandarin",
+      "fixtureRole": "held_out",
+      "freezeState": "FROZEN",
+      "reference": {
+        "bytes": 594,
+        "relativePath": "held_out-clean-mandarin.txt",
+        "sha256": "a96d24b00e8d21ccbed6674d10ae8b900cc90dd4a94ff383c204b50852ee068f"
+      },
+      "scenario": "clean_near_field_mandarin",
+      "sourceRowIdentitySha256": "5df31c6d419b77379c677c7eb3358ef7335f6986a0862c8fb1675fc77335d820",
+      "sourceRows": [
+        {
+          "language": "cmn_hans_cn",
+          "rowIndex": 100,
+          "sourceId": 1557,
+          "split": "validation"
+        },
+        {
+          "language": "cmn_hans_cn",
+          "rowIndex": 101,
+          "sourceId": 1515,
+          "split": "validation"
+        },
+        {
+          "language": "cmn_hans_cn",
+          "rowIndex": 102,
+          "sourceId": 1614,
+          "split": "validation"
+        },
+        {
+          "language": "cmn_hans_cn",
+          "rowIndex": 103,
+          "sourceId": 1604,
+          "split": "validation"
+        }
+      ],
+      "transformation": "concat_with_250ms_silence_v1"
+    },
+    {
+      "audio": {
+        "bytes": 1223084,
+        "durationSeconds": 38.22,
+        "relativePath": "held_out-clean-english.wav",
+        "sha256": "560b61febb022f62f3e1ac9cfc8f773c646e48790542f3945ad868cbda8cf076"
+      },
+      "distributionState": "local_only",
+      "fixtureId": "held_out-clean-english",
+      "fixtureRole": "held_out",
+      "freezeState": "FROZEN",
+      "reference": {
+        "bytes": 459,
+        "relativePath": "held_out-clean-english.txt",
+        "sha256": "b07e18fee33025e2e40b5bee55f1614e8661e04eed9654644158dd7c444c4a5c"
+      },
+      "scenario": "clean_near_field_english",
+      "sourceRowIdentitySha256": "bcbbfa3c141aeba2fb06acbad9a8ffe037327fc6729c36620c27e7e95bbfb255",
+      "sourceRows": [
+        {
+          "language": "en_us",
+          "rowIndex": 100,
+          "sourceId": 1577,
+          "split": "validation"
+        },
+        {
+          "language": "en_us",
+          "rowIndex": 101,
+          "sourceId": 1520,
+          "split": "validation"
+        },
+        {
+          "language": "en_us",
+          "rowIndex": 102,
+          "sourceId": 1542,
+          "split": "validation"
+        },
+        {
+          "language": "en_us",
+          "rowIndex": 103,
+          "sourceId": 1537,
+          "split": "validation"
+        }
+      ],
+      "transformation": "concat_with_250ms_silence_v1"
+    },
+    {
+      "audio": {
+        "bytes": 1648044,
+        "durationSeconds": 51.5,
+        "relativePath": "held_out-far-field.wav",
+        "sha256": "6aacf0c8f88cd1b4f9d039bbadb0abaa30c7437d096aade2c512e06b493e2319"
+      },
+      "distributionState": "local_only",
+      "fixtureId": "held_out-far-field",
+      "fixtureRole": "held_out",
+      "freezeState": "FROZEN",
+      "reference": {
+        "bytes": 594,
+        "relativePath": "held_out-far-field.txt",
+        "sha256": "a96d24b00e8d21ccbed6674d10ae8b900cc90dd4a94ff383c204b50852ee068f"
+      },
+      "scenario": "far_field_noisy_meeting",
+      "sourceRowIdentitySha256": "5df31c6d419b77379c677c7eb3358ef7335f6986a0862c8fb1675fc77335d820",
+      "sourceRows": [
+        {
+          "language": "cmn_hans_cn",
+          "rowIndex": 100,
+          "sourceId": 1557,
+          "split": "validation"
+        },
+        {
+          "language": "cmn_hans_cn",
+          "rowIndex": 101,
+          "sourceId": 1515,
+          "split": "validation"
+        },
+        {
+          "language": "cmn_hans_cn",
+          "rowIndex": 102,
+          "sourceId": 1614,
+          "split": "validation"
+        },
+        {
+          "language": "cmn_hans_cn",
+          "rowIndex": 103,
+          "sourceId": 1604,
+          "split": "validation"
+        }
+      ],
+      "transformation": "deterministic_echo_attenuation_noise_v1"
+    },
+    {
+      "audio": {
+        "bytes": 3562284,
+        "durationSeconds": 111.32,
+        "relativePath": "held_out-code-switch.wav",
+        "sha256": "8cf9e787fbc161ca6ad25bb2a33f8e85e3bae81ee30bcb7a0aba51ee088bc841"
+      },
+      "distributionState": "local_only",
+      "fixtureId": "held_out-code-switch",
+      "fixtureRole": "held_out",
+      "freezeState": "FROZEN",
+      "reference": {
+        "bytes": 1205,
+        "relativePath": "held_out-code-switch.txt",
+        "sha256": "5c5f51f3074a0b4ded5d27e73f7c5a965bf0c21edf86f30570a6fe3abb094517"
+      },
+      "scenario": "zh_en_code_switch",
+      "sourceRowIdentitySha256": "87cc0b3184d3c1152b4fce013a779237ffddb23a1b7b8baa1e2c51f900550857",
+      "sourceRows": [
+        {
+          "language": "cmn_hans_cn",
+          "rowIndex": 110,
+          "sourceId": 1634,
+          "split": "validation"
+        },
+        {
+          "language": "en_us",
+          "rowIndex": 110,
+          "sourceId": 1540,
+          "split": "validation"
+        },
+        {
+          "language": "cmn_hans_cn",
+          "rowIndex": 111,
+          "sourceId": 1619,
+          "split": "validation"
+        },
+        {
+          "language": "en_us",
+          "rowIndex": 111,
+          "sourceId": 1631,
+          "split": "validation"
+        },
+        {
+          "language": "cmn_hans_cn",
+          "rowIndex": 112,
+          "sourceId": 1646,
+          "split": "validation"
+        },
+        {
+          "language": "en_us",
+          "rowIndex": 112,
+          "sourceId": 1643,
+          "split": "validation"
+        },
+        {
+          "language": "cmn_hans_cn",
+          "rowIndex": 113,
+          "sourceId": 1587,
+          "split": "validation"
+        },
+        {
+          "language": "en_us",
+          "rowIndex": 113,
+          "sourceId": 1539,
+          "split": "validation"
+        },
+        {
+          "language": "cmn_hans_cn",
+          "rowIndex": 114,
+          "sourceId": 1518,
+          "split": "validation"
+        },
+        {
+          "language": "en_us",
+          "rowIndex": 114,
+          "sourceId": 1578,
+          "split": "validation"
+        },
+        {
+          "language": "cmn_hans_cn",
+          "rowIndex": 115,
+          "sourceId": 1536,
+          "split": "validation"
+        },
+        {
+          "language": "en_us",
+          "rowIndex": 115,
+          "sourceId": 1624,
+          "split": "validation"
+        }
+      ],
+      "transformation": "alternating_zh_en_utterances_v1"
+    },
+    {
+      "audio": {
+        "bytes": 1365164,
+        "durationSeconds": 42.66,
+        "relativePath": "held_out-terminology-numbers.wav",
+        "sha256": "75865b1da7b197dd8f2195b4469cf338bbfa6c3547f47801f65cf321b640569d"
+      },
+      "distributionState": "local_only",
+      "fixtureId": "held_out-terminology-numbers",
+      "fixtureRole": "held_out",
+      "freezeState": "FROZEN",
+      "reference": {
+        "bytes": 413,
+        "relativePath": "held_out-terminology-numbers.txt",
+        "sha256": "3065a0cc9fc9df13d6db51dd0253eb19434b89aeae4e2dd5cc39585199827108"
+      },
+      "scenario": "terminology_numbers",
+      "sourceRowIdentitySha256": "e815c025f7df36603c4692494d069de76414d19e4ef82d0812e5f1185ea8c68c",
+      "sourceRows": [
+        {
+          "language": "cmn_hans_cn",
+          "rowIndex": 103,
+          "sourceId": 1604,
+          "split": "validation"
+        },
+        {
+          "language": "cmn_hans_cn",
+          "rowIndex": 190,
+          "sourceId": 1520,
+          "split": "validation"
+        }
+      ],
+      "transformation": "priority_selected_fleurs_rows_v1"
+    },
+    {
+      "audio": {
+        "bytes": 1223084,
+        "durationSeconds": 38.22,
+        "relativePath": "held_out-keyboard-noise.wav",
+        "sha256": "5f9f80eef39781d06143d694eb1a58e2c0664a4ed2dbdbcbea06fbb25c458304"
+      },
+      "distributionState": "local_only",
+      "fixtureId": "held_out-keyboard-noise",
+      "fixtureRole": "held_out",
+      "freezeState": "FROZEN",
+      "reference": {
+        "bytes": 459,
+        "relativePath": "held_out-keyboard-noise.txt",
+        "sha256": "b07e18fee33025e2e40b5bee55f1614e8661e04eed9654644158dd7c444c4a5c"
+      },
+      "scenario": "keyboard_noise",
+      "sourceRowIdentitySha256": "bcbbfa3c141aeba2fb06acbad9a8ffe037327fc6729c36620c27e7e95bbfb255",
+      "sourceRows": [
+        {
+          "language": "en_us",
+          "rowIndex": 100,
+          "sourceId": 1577,
+          "split": "validation"
+        },
+        {
+          "language": "en_us",
+          "rowIndex": 101,
+          "sourceId": 1520,
+          "split": "validation"
+        },
+        {
+          "language": "en_us",
+          "rowIndex": 102,
+          "sourceId": 1542,
+          "split": "validation"
+        },
+        {
+          "language": "en_us",
+          "rowIndex": 103,
+          "sourceId": 1537,
+          "split": "validation"
+        }
+      ],
+      "transformation": "deterministic_keyboard_impulse_overlay_v1"
+    },
+    {
+      "audio": {
+        "bytes": 2230124,
+        "durationSeconds": 69.69,
+        "relativePath": "held_out-long-utterance.wav",
+        "sha256": "34cb39722da3411689d8079d54f864da86f4f4162aefb9ae8e48b025a1106567"
+      },
+      "distributionState": "local_only",
+      "fixtureId": "held_out-long-utterance",
+      "fixtureRole": "held_out",
+      "freezeState": "FROZEN",
+      "reference": {
+        "bytes": 641,
+        "relativePath": "held_out-long-utterance.txt",
+        "sha256": "f163d8c1f1ce42a36706f0e9e19f55233d20ee7b74f3f873332fd36ab749d23d"
+      },
+      "scenario": "long_utterance",
+      "sourceRowIdentitySha256": "56f006978280cc03a455580a28a8b4cb44e91abfb5fba00c27716b2138a400ca",
+      "sourceRows": [
+        {
+          "language": "cmn_hans_cn",
+          "rowIndex": 163,
+          "sourceId": 1620,
+          "split": "validation"
+        },
+        {
+          "language": "cmn_hans_cn",
+          "rowIndex": 138,
+          "sourceId": 1637,
+          "split": "validation"
+        },
+        {
+          "language": "cmn_hans_cn",
+          "rowIndex": 190,
+          "sourceId": 1520,
+          "split": "validation"
+        }
+      ],
+      "transformation": "longest_source_rows_v1"
+    },
+    {
+      "audio": {
+        "bytes": 475564,
+        "durationSeconds": 14.86,
+        "relativePath": "held_out-short-confirmation.wav",
+        "sha256": "4c7de3e1d660defb7b02584445db7bafd9b70ecef510bb34ac9aea8816c03e41"
+      },
+      "distributionState": "local_only",
+      "fixtureId": "held_out-short-confirmation",
+      "fixtureRole": "held_out",
+      "freezeState": "FROZEN",
+      "reference": {
+        "bytes": 182,
+        "relativePath": "held_out-short-confirmation.txt",
+        "sha256": "9a3d183d3bba08a40f6dba7a951db81a83dc13b8ebda15c84499a600c0fb4a25"
+      },
+      "scenario": "short_confirmation",
+      "sourceRowIdentitySha256": "c1f3e1fc43791f0a42e05b16353cecc7826639270cae532e76049ee9f5c2dc8c",
+      "sourceRows": [
+        {
+          "language": "en_us",
+          "rowIndex": 185,
+          "sourceId": 1554,
+          "split": "validation"
+        },
+        {
+          "language": "en_us",
+          "rowIndex": 188,
+          "sourceId": 1554,
+          "split": "validation"
+        },
+        {
+          "language": "cmn_hans_cn",
+          "rowIndex": 153,
+          "sourceId": 1552,
+          "split": "validation"
+        },
+        {
+          "language": "en_us",
+          "rowIndex": 100,
+          "sourceId": 1577,
+          "split": "validation"
+        }
+      ],
+      "transformation": "shortest_source_rows_v1"
+    },
+    {
+      "audio": {
+        "bytes": 1721644,
+        "durationSeconds": 53.8,
+        "relativePath": "held_out-double-talk.wav",
+        "sha256": "5169d4b6ef3b678a6c45bb8f6cc4b1ac23a5b8f10e19731ac2259f2c31cdc716"
+      },
+      "distributionState": "local_only",
+      "fixtureId": "held_out-double-talk",
+      "fixtureRole": "held_out",
+      "freezeState": "FROZEN",
+      "reference": {
+        "bytes": 999,
+        "relativePath": "held_out-double-talk.txt",
+        "sha256": "b0703aed02c7d4a276bef5bffe85b53a78daac34cb3557635718f78c98099f71"
+      },
+      "scenario": "system_microphone_double_talk",
+      "sourceRowIdentitySha256": "d544833f4a8daaba6fde606b00feb727788515d302655f13e335022154ee8f76",
+      "sourceRows": [
+        {
+          "language": "cmn_hans_cn",
+          "rowIndex": 120,
+          "sourceId": 1595,
+          "split": "validation"
+        },
+        {
+          "language": "cmn_hans_cn",
+          "rowIndex": 121,
+          "sourceId": 1584,
+          "split": "validation"
+        },
+        {
+          "language": "cmn_hans_cn",
+          "rowIndex": 122,
+          "sourceId": 1619,
+          "split": "validation"
+        },
+        {
+          "language": "cmn_hans_cn",
+          "rowIndex": 123,
+          "sourceId": 1586,
+          "split": "validation"
+        },
+        {
+          "language": "en_us",
+          "rowIndex": 120,
+          "sourceId": 1534,
+          "split": "validation"
+        },
+        {
+          "language": "en_us",
+          "rowIndex": 121,
+          "sourceId": 1590,
+          "split": "validation"
+        },
+        {
+          "language": "en_us",
+          "rowIndex": 122,
+          "sourceId": 1623,
+          "split": "validation"
+        },
+        {
+          "language": "en_us",
+          "rowIndex": 123,
+          "sourceId": 1582,
+          "split": "validation"
+        }
+      ],
+      "transformation": "paired_zh_en_dual_track_mix_v1"
+    },
+    {
+      "audio": {
+        "bytes": 960044,
+        "durationSeconds": 30.0,
+        "relativePath": "held_out-non-speech.wav",
+        "sha256": "2623e7d29b6bc714f61a9b138f269e3a6fcd8129dc4026204205b182a143907f"
+      },
+      "distributionState": "local_only",
+      "fixtureId": "held_out-non-speech",
+      "fixtureRole": "held_out",
+      "freezeState": "FROZEN",
+      "reference": {
+        "bytes": 1,
+        "relativePath": "held_out-non-speech.txt",
+        "sha256": "01ba4719c80b6fe911b091a7c05124b64eeece964e09c058ef8f9805daca546b"
+      },
+      "scenario": "non_speech",
+      "sourceRowIdentitySha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "sourceRows": [],
+      "transformation": "deterministic_keyboard_impulses_without_speech_v1"
+    },
+    {
+      "audio": {
+        "bytes": 28800044,
+        "durationSeconds": 900.0,
+        "relativePath": "stability-multiscene-15m.wav",
+        "sha256": "f861ee3a3d189b399aa62dbdb9e6e6a7c939b0a33819074e72211f3457b6eaed"
+      },
+      "distributionState": "local_only",
+      "fixtureId": "stability-multiscene-15m",
+      "fixtureRole": "stability",
+      "freezeState": "FROZEN",
+      "reference": {
+        "bytes": 14169,
+        "relativePath": "stability-multiscene-15m.txt",
+        "sha256": "7c5bad0e76f284de159e46ae6642717cb8434f8b11a93e485b6f2019511df021"
+      },
+      "scenario": "bounded_multiscene_replay",
+      "sourceRowIdentitySha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "sourceRows": [],
+      "transformation": "repeat_held_out_multiscene_to_exactly_900s_v1"
+    }
+  ],
+  "limitations": [
+    "FLEURS is read speech, not a captured meeting corpus.",
+    "Far-field, keyboard-noise, code-switch and double-talk scenarios are deterministic transformations.",
+    "The stability replay is repeated input and is excluded from quality ranking."
+  ],
+  "pcmFormat": {
+    "channels": 1,
+    "sampleRateHz": 16000,
+    "sampleWidthBytes": 2
+  },
+  "requiredScenarios": [
+    "clean_near_field_mandarin",
+    "clean_near_field_english",
+    "far_field_noisy_meeting",
+    "zh_en_code_switch",
+    "terminology_numbers",
+    "keyboard_noise",
+    "system_microphone_double_talk",
+    "long_utterance",
+    "short_confirmation",
+    "non_speech"
+  ],
+  "schemaVersion": 1,
+  "status": "FROZEN"
+}

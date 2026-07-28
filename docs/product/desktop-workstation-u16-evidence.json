@@ -1,0 +1,94 @@
+{
+  "schemaVersion": 1,
+  "unit": "U16",
+  "capturedAt": "2026-07-28",
+  "target": {
+    "platform": "macos",
+    "osVersion": "15.7.5",
+    "osBuild": "24G624",
+    "architecture": "arm64",
+    "cpu": "Apple M4",
+    "logicalCpuCount": 10,
+    "memoryGiB": 16,
+    "buildMode": "debug",
+    "developmentOnly": true
+  },
+  "status": "PASS_REMOTE_PROVIDER_SCOPE",
+  "scopeDecision": {
+    "decidedAt": "2026-07-28",
+    "localGenerativeModelRequired": false,
+    "reason": "The user explicitly chose remote preset or custom API providers because the target machine is not intended to run a local generative LLM.",
+    "productProviders": [
+      "deepseek",
+      "openai_compatible"
+    ],
+    "customEndpointPolicy": "REMOTE_HTTPS_ONLY"
+  },
+  "implemented": {
+    "providers": [
+      "deepseek",
+      "openai_compatible"
+    ],
+    "sharedRegistry": true,
+    "automaticFallback": false,
+    "maximumConcurrentRequestsPerProvider": 1,
+    "allProductProvidersRequirePerMeetingConsent": true,
+    "remoteHttpsRequired": true,
+    "userinfoRejected": true,
+    "redirectsRejected": true,
+    "responseBytesBounded": true,
+    "structuredOutputRequired": true,
+    "evidenceValidated": true,
+    "availabilityProbe": {
+      "remote": "CONFIGURATION_ONLY_ZERO_NETWORK_BEFORE_MEETING_CONSENT"
+    },
+    "secretStorage": "MACOS_KEYCHAIN_ONLY",
+    "plainSettingsStorage": "SQLITE_SCHEMA_V21"
+  },
+  "verification": {
+    "devCheck": {
+      "status": "PASS",
+      "steps": 21,
+      "command": "./tool/dev_check.sh",
+      "longRunningHistoricalGatesRerun": false
+    },
+    "flutterAnalyze": {
+      "status": "PASS",
+      "scope": [
+        "apps/desktop",
+        "packages/meeting_workflows",
+        "packages/meeting_storage"
+      ],
+      "issues": 0
+    },
+    "targetedTests": {
+      "status": "PASS",
+      "count": 25,
+      "maximumProbeMinutes": 30,
+      "includes": [
+        "provider registry and no fallback",
+        "shared meeting template catalog",
+        "remote consent before network",
+        "generic bounded HTTP contract harness",
+        "remote availability configuration check with zero network",
+        "HTTP/userinfo/IP endpoint rejection",
+        "3xx redirect rejection",
+        "response size rejection",
+        "live HTTP cancellation reports canceled",
+        "concurrent generation is bounded to one request",
+        "invalid evidence rejection",
+        "Keychain abstraction replacement and deletion",
+        "SQLite v20 to v21 migration",
+        "provider/model/location job snapshot",
+        "desktop widget regression"
+      ]
+    },
+    "macosDebugBuild": {
+      "status": "PASS",
+      "artifact": "apps/desktop/build/macos/Build/Products/Debug/voice2text_desktop.app"
+    },
+    "remoteNetworkUsed": false,
+    "localGenerativeModelSmokeRequired": false
+  },
+  "remainingGate": null
+}

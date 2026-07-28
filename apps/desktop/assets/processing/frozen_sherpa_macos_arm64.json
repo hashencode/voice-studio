@@ -3,7 +3,7 @@
   "setId": "sherpa-onnx-1.13.4-qwen3-asr-0.6b-int8-pyannote3",
   "platform": "macos",
   "architecture": "arm64",
-  "contentKey": "8321b9f7d7146bc2e30c6fc80faddcf536b1b8eb2f48e17970eb8f2a05900735",
+  "contentKey": "132c8ec9edb469d92fda07a7ed822f241b5176cab6b4f7c8610a4429aaf59e5d",
   "licenseDisposition": "PRODUCT_ELIGIBLE_WITH_PINNED_NOTICES_CONVERTER_LICENSE_REVIEW_REQUIRED",
   "distributionEligible": false,
   "requiresUserAcceptance": false,
@@ -28,6 +28,13 @@
       "source": "https://github.com/k2-fsa/sherpa-onnx/releases/download/speaker-recongition-models/3dspeaker_speech_eres2net_base_sv_zh-cn_3dspeaker_16k.onnx",
       "sha256": "1a331345f04805badbb495c775a6ddffcdd1a732567d5ec8b3d5749e3c7a5e4b",
       "bytes": 39593761,
+      "kind": "file"
+    },
+    {
+      "id": "silero-vad-model",
+      "source": "https://github.com/k2-fsa/sherpa-onnx/releases/download/asr-models/silero_vad.onnx",
+      "sha256": "9e2449e1087496d8d4caba907f23e0bd3f78d91fa552479bb9c23ac09cbb1fd6",
+      "bytes": 643854,
       "kind": "file"
     }
   ],
@@ -87,6 +94,13 @@
       "sha256": "bbc6dbeb9dce5b4ed0e839057137e9cba4bf05c5797277d36a80e22594414e14",
       "bytes": 328,
       "licenseSpdx": "Apache-2.0"
+    },
+    {
+      "relativePath": "asr/silero_vad.onnx",
+      "downloadId": "silero-vad-model",
+      "sha256": "9e2449e1087496d8d4caba907f23e0bd3f78d91fa552479bb9c23ac09cbb1fd6",
+      "bytes": 643854,
+      "licenseSpdx": "MIT"
     },
     {
       "relativePath": "diarization/segmentation.onnx",

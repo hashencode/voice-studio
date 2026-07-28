@@ -1,0 +1,17 @@
+name: desktop_sherpa_worker
+description: Isolated Sherpa native worker implementation for the desktop app.
+publish_to: none
+version: 0.1.0
+
+environment:
+  sdk: ^3.11.5
+
+resolution: workspace
+
+dependencies:
+  crypto: ^3.0.7
+  processing_contracts: any
+  sherpa_onnx: ^1.13.4
+
+dev_dependencies:
+  test: any

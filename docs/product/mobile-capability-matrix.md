@@ -1,6 +1,6 @@
 # 移动端能力矩阵
 
-更新时间：2026-07-26
+更新时间：2026-07-28
 
 本表描述当前仓库能够运行和验证的移动端能力，不把设计入口、历史实验或未来规划视为已交付。状态变更必须同时具备代码、自动化检查和相应真机证据。
 
@@ -9,8 +9,11 @@
 承接本地导入、长任务处理、密集复核、AI 纪要和导出；手机保持可靠采集端和
 可独立使用的移动核心。自动 confidence、解码热词、高级 ITN、GTCRN/AEC 与
 外接麦克风真机验收均为 `DEFERRED_NOT_PASSED`，不得描述为已交付。
-ASR-005 仅为 `USER_PRE_RELEASE_ACCEPTANCE_ONLY`，不进入开发任务、自动状态
-报告或阻塞列表；整体发布状态仍由其他未闭合发布门禁决定。
+移动端当前为 `DEVELOPMENT_ONLY`：生产签名、商店提交、正式升级、发布候选
+设备矩阵和数小时测试均暂停；开发验证上限为 30 分钟，既有两小时证据只作
+历史引用。ASR-005 的兼容历史字段仍为
+`USER_PRE_RELEASE_ACCEPTANCE_ONLY`，当前策略为 `RELEASE_SCOPE_PAUSED`，
+不进入开发任务、自动状态报告或阻塞列表。
 
 | 能力 | 当前状态 | 目标阶段 | 当前证据 | 明确边界 |
 | --- | --- | --- | --- | --- |
@@ -26,7 +29,7 @@ ASR-005 仅为 `USER_PRE_RELEASE_ACCEPTANCE_ONLY`，不进入开发任务、自�
 | 完整本地删除与系统向外分享 | 已实现，中/低端参考机通过 | S1-S2 | `deletion_pending` 幂等重试会清理主文件、staging/canonical、sidecar journal、导出及关联行；Xiaomi 与 EVA-AL10 均已通过只读目录失败注入、pending 保留、恢复后重试和全图零残留；两台设备的外部系统分享接收器均实际读取 9,621,036-byte 音频且 SHA-256 与源文件一致，EVA-AL10 还完整读取四种转写导出 | 当前中/低端物理设备覆盖已完成；该证据属于向外分享，不代表 REC-008 分享导入 |
 | 后台/锁屏可靠录音 | 中/低端参考机通过 | S1 | 前台服务在真机后台和锁屏期间持续写入，通知停止可在 Flutter 进程重建后提交完成记录；中端 Xiaomi 10S 已留存 7,266,560 ms/58,590,545-byte canonical 并完成播放，10 次连续短会话通过；低端 EVA-AL10 在锁屏状态由系统通知停止并保存 124,992 ms canonical，session/job 唯一且完成 | 当前中/低端设备门禁已完成 |
 | 会中重点与文字备注 | 已实现，Xiaomi 真机通过 | S2 | SQLite v17 `recording_annotations` 以稳定 session ID 保存多个时间点标记和单条备注；录音完成后通过 recording/session 关系进入统一会议时间线并可回跳音频。自动化通过；2026-07-24 Xiaomi 42,880 ms 录音写入 12,006 ms 标记和 28,006 ms 备注，`VAD_FAILED` 后强停/冷启动仍保留，点击时间线分别跳到 `00:12` 与 `00:28` | REC-010 的写入、保存、重开、失败保留和时间线回跳物理证据已完成；证据见 `benchmark/S2_PHYSICAL_EVIDENCE.md` |
-| 时间戳转写片段 | 结构化能力与生产分段契约已实现；独立准确率由用户发布前验收 | S2 Mobile Core | 生产 ASR 返回并事务持久化有序 start/end 片段；2026-07-25 Xiaomi 固定 clip 预测为 5/4 段，证据 SHA-256=`01b77e52dd6eadd048a6a2cd91952e7502ad9f6e856010b08d32923a4be1c0d7`；provisional 工程 P95=182 ms/18 边界 | `USER_PRE_RELEASE_ACCEPTANCE_ONLY`：参考为 provisional 且无独立 reviewer；仅由用户在发布前完成，不作为开发提醒或 blocker |
+| 时间戳转写片段 | 结构化能力与开发分段契约已实现；独立生产验收暂停 | S2 Mobile Core | 生产 ASR 返回并事务持久化有序 start/end 片段；2026-07-25 Xiaomi 固定 clip 预测为 5/4 段，证据 SHA-256=`01b77e52dd6eadd048a6a2cd91952e7502ad9f6e856010b08d32923a4be1c0d7`；provisional 工程 P95=182 ms/18 边界 | 兼容历史字段 `USER_PRE_RELEASE_ACCEPTANCE_ONLY`；当前为 `RELEASE_SCOPE_PAUSED`，不作为开发提醒或 blocker |
 | 离线标点与人工复核 | Mobile Core PASS，Xiaomi 参考机通过 | S2 Mobile Core | 自动标点设置按 attempt 传入真实 native 请求；72 MB CT-Transformer 按需加载。Xiaomi 完成关闭/开启标点对照；人工未复核/待复核/已复核三态、逐项确认和筛选可持久化 | 高级 ITN 与自动 confidence 为 `DEFERRED_NOT_PASSED`；生产 `confidence == null` 始终显示未知。Zipformer raw-score/热词实验不能转成移动产品能力 |
 | 播放、定位、编辑、搜索与导出 | 已实现，中端增量门禁通过 | S2 | Goo 会议工作区支持播放/暂停、拖动、±10 秒、倍速、二分高亮、片段跳转、手动滚动暂停跟随、稳定片段编辑、事务化多步 undo/redo、三态复核、文本/时间/状态组合搜索，以及 TXT/Markdown/JSON/SRT/VTT 全量或范围流式导出；3000 片段、Unicode、明暗主题、200% 字体和语义有自动化。Xiaomi M2102J2SC 在 TalkBack 绑定、200% 字体、深色横屏下通过复核集成流和 3000 片段远跳/状态更新/搜索/VTT 导出，范围 VTT 由独立系统接收器按 `text/vtt` 读取 75 bytes 并校验 SHA-256；EVA-AL10 的历史四格式证据仍有效 | 独立听审时间戳 P95 仍待发布门禁；当前会议搜索不含标题或说话人 |
 | 标题搜索与批量管理 | 已实现 | S2 | 首页支持当前分组内标题搜索；批量服务和 Goo UI 支持移动分组、软删除、永久删除、转写重试及 TXT/Markdown/JSON/SRT/VTT 导出，逐项保留 succeeded/skipped/failed 结果，危险删除二次确认，临时 ZIP/清单可安全分享并清理；混合状态、部分失败和恢复路径有自动化 | 说话人搜索依赖 S3 数据；当前批量“移动”是本地分组，不是云端文件夹或跨设备移动 |
@@ -49,5 +52,5 @@ ASR-005 仅为 `USER_PRE_RELEASE_ACCEPTANCE_ONLY`，不进入开发任务、自�
 - “部分实现”表示基础数据或入口存在，但用户闭环或可靠性门槛尚未完成。
 - “`DEFERRED_NOT_PASSED`”表示能力已从当前 Mobile Core 强制范围迁移，
   但历史失败或缺证结论仍有效；它不等于 PASS。
-- benchmark 中的显式 Live VAD profile 不构成移动端产品能力，也不得进入默认 smoke 或 release 矩阵。
+- benchmark 中的显式 Live VAD profile 不构成移动端产品能力，也不得进入默认 smoke；release 矩阵当前暂停。
 - S4 与 S5 只保留方向说明，不属于当前移动端基础计划的交付范围。

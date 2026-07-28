@@ -19,6 +19,8 @@ EXPECTED_DOCUMENTS = {
         "PRODUCT_IN_PROGRESS",
         "BLOCKED_BY_MACOS_CLOSURE",
         "USER_PRE_RELEASE_ACCEPTANCE_ONLY",
+        "DEVELOPMENT_ONLY",
+        "RELEASE_SCOPE_PAUSED",
     },
     "docs/product/mobile-capability-matrix.md": {
         DECISION_ID,
@@ -26,6 +28,8 @@ EXPECTED_DOCUMENTS = {
         "PRODUCT_IN_PROGRESS",
         "BLOCKED_BY_MACOS_CLOSURE",
         "USER_PRE_RELEASE_ACCEPTANCE_ONLY",
+        "DEVELOPMENT_ONLY",
+        "RELEASE_SCOPE_PAUSED",
     },
     "docs/product/s3-productization-status.md": {
         DECISION_ID,
@@ -37,6 +41,8 @@ EXPECTED_DOCUMENTS = {
         "PRODUCT_IN_PROGRESS",
         "BLOCKED_BY_MACOS_CLOSURE",
         "TARGET_SPECIFIC",
+        "DEVELOPMENT_ONLY",
+        "BLOCKED_BY_EXPANDED_MACOS_CLOSURE",
     },
 }
 TARGET_STATUSES = {
@@ -59,6 +65,25 @@ TARGET_STATUSES = {
     },
 }
 SHA256_PATTERN = re.compile(r"^[0-9a-f]{64}$")
+EXPANDED_CAPABILITY_STATUSES = {
+    "PLANNED",
+    "CONTRACT_FROZEN",
+    "IMPLEMENTATION_IN_PROGRESS",
+    "U13_CONTROL_PASS_PENDING_U18_PROFILE",
+    "U18_CONTROL_RETAINED_PASS",
+    "PASS",
+    "UNAVAILABLE",
+}
+EXPECTED_MACOS_DEVELOPMENT_TARGET = {
+    "modelIdentifier": "Mac16,10",
+    "os": "macOS 15.7.5",
+    "osBuild": "24G624",
+    "architecture": "arm64",
+    "cpu": "Apple M4",
+    "logicalCpuCount": 10,
+    "memoryBytes": 17179869184,
+    "buildMode": "debug",
+}
 FORBIDDEN_ASR005_PATTERNS = (
     re.compile(r"development blockers?[^.\n]*ASR-005", re.IGNORECASE),
     re.compile(r"ASR-005[^.\n]*development blockers?", re.IGNORECASE),
@@ -86,6 +111,156 @@ def _safe_path(value: Any, label: str) -> str:
     path = PurePosixPath(value)
     _require(not path.is_absolute() and ".." not in path.parts, f"{label} is unsafe")
     return value
+
+
+def _validate_u12_capture_evidence(evidence: dict[str, Any]) -> None:
+    _require(
+        evidence.get("schemaVersion") == 1
+        and evidence.get("status") == "PASS",
+        "U12 capture evidence is not PASS",
+    )
+    _require(
+        evidence.get("target") == EXPECTED_MACOS_DEVELOPMENT_TARGET,
+        "U12 capture evidence target drifted",
+    )
+    integration_build = _mapping(
+        evidence.get("integrationBuild"),
+        "U12 integration build",
+    )
+    crash_build = _mapping(
+        evidence.get("crashProbeBuild"),
+        "U12 crash probe build",
+    )
+    for label, build in (
+        ("integration", integration_build),
+        ("crash probe", crash_build),
+    ):
+        _require(
+            build.get("bundleIdentifier") == "com.voice2text.voice2textDesktop"
+            and build.get("signature") == "adhoc"
+            and build.get("teamIdentifier") is None
+            and isinstance(build.get("cdHash"), str)
+            and len(build["cdHash"]) == 40
+            and isinstance(build.get("executableSha256"), str)
+            and SHA256_PATTERN.fullmatch(build["executableSha256"]) is not None,
+            f"U12 {label} build binding is invalid",
+        )
+    database = _mapping(evidence.get("database"), "U12 database evidence")
+    _require(
+        database.get("schemaVersion") == 22
+        and database.get("minimumIndependentAuthorityAssetCount", 0) >= 6
+        and database.get("manifestAndChunkCommitAtomic") is True
+        and database.get("persistentCommandReceiptsIdempotent") is True,
+        "U12 database durability evidence is incomplete",
+    )
+    termination = _mapping(
+        evidence.get("actualProcessTermination"),
+        "U12 actual process termination",
+    )
+    stages = termination.get("stages")
+    _require(
+        termination.get("secondRecoveryIsIdempotent") is True
+        and isinstance(termination.get("maximumFirstRecoveryMs"), int)
+        and termination["maximumFirstRecoveryMs"] <= 30_000
+        and termination.get("invalidFinalizedChunks") == 0
+        and isinstance(stages, list)
+        and len(stages) == 3,
+        "U12 actual process termination evidence is incomplete",
+    )
+    expected_exit_codes = {
+        "during_write": 86,
+        "during_finalize": 87,
+        "after_journal": 88,
+    }
+    observed: set[str] = set()
+    for raw_stage in stages:
+        stage = _mapping(raw_stage, "U12 crash stage")
+        name = stage.get("stage")
+        _require(
+            name in expected_exit_codes
+            and name not in observed
+            and stage.get("status") == "PASS"
+            and stage.get("expectedExitCode") == expected_exit_codes[name]
+            and stage.get("observedExitCode") == expected_exit_codes[name]
+            and isinstance(stage.get("quarantinedTailChunks"), int)
+            and 0 <= stage["quarantinedTailChunks"] <= 2
+            and isinstance(stage.get("recoveryEvidenceSha256"), str)
+            and SHA256_PATTERN.fullmatch(stage["recoveryEvidenceSha256"]) is not None,
+            "U12 crash stage binding is invalid",
+        )
+        observed.add(name)
+    _require(
+        observed == set(expected_exit_codes),
+        "U12 crash stage coverage is incomplete",
+    )
+    decision = _mapping(evidence.get("decision"), "U12 decision")
+    _require(
+        decision.get("u12ImplementationGatePassed") is True
+        and decision.get("mobileImplementationChanged") is False
+        and decision.get("probeDurationBelowThirtyMinutes") is True,
+        "U12 implementation decision failed",
+    )
+
+
+def _validate_u13_live_caption_evidence(
+    summary: dict[str, Any],
+    decision: dict[str, Any],
+) -> None:
+    _require(
+        summary.get("schemaVersion") == 1
+        and summary.get("status") == "COMPLETE"
+        and summary.get("target") == EXPECTED_MACOS_DEVELOPMENT_TARGET,
+        "U13 live-caption summary is not target-bound COMPLETE evidence",
+    )
+    bindings = _mapping(summary.get("bindings"), "U13 summary bindings")
+    _require(
+        all(
+            isinstance(bindings.get(field), str)
+            and SHA256_PATTERN.fullmatch(bindings[field]) is not None
+            for field in (
+                "fixtureManifestSha256",
+                "scorerSha256",
+                "modelArchiveSha256",
+                "sileroVadSha256",
+                "rawSha256",
+                "flutterCaptureProbeSha256",
+            )
+        ),
+        "U13 live-caption summary bindings are incomplete",
+    )
+    latency = _mapping(summary.get("latency"), "U13 latency")
+    resources = _mapping(summary.get("resources"), "U13 resources")
+    stability = _mapping(summary.get("stability"), "U13 stability")
+    _require(
+        isinstance(latency.get("speechEndToVisibleP50Ms"), (int, float))
+        and latency["speechEndToVisibleP50Ms"] <= 1000
+        and isinstance(latency.get("speechEndToVisibleP95Ms"), (int, float))
+        and latency["speechEndToVisibleP95Ms"] <= 2000
+        and isinstance(latency.get("maximumBacklogSeconds"), (int, float))
+        and latency["maximumBacklogSeconds"] <= 10
+        and latency.get("measurement")
+        == "flutter_frame_timing_composed_with_worker_receipt"
+        and summary.get("captureFrameLossDelta") == 0,
+        "U13 live-caption latency or capture gates failed",
+    )
+    _require(
+        isinstance(resources.get("maximumAppRssBytes"), int)
+        and resources["maximumAppRssBytes"] <= 1610612736
+        and resources.get("uiLongFrameRate") == 0
+        and stability.get("durationSeconds") == 900.0
+        and stability.get("maximumUtteranceSeconds") <= 15
+        and stability.get("crashed") is False
+        and stability.get("oom") is False,
+        "U13 live-caption resource or stability gates failed",
+    )
+    _require(
+        decision.get("schemaVersion") == 1
+        and decision.get("status") == "PASS"
+        and decision.get("target") == EXPECTED_MACOS_DEVELOPMENT_TARGET
+        and decision.get("productDisposition")
+        == "U13_CONTROL_ADMITTED_PENDING_U18_OPTIMIZATION_DECISION",
+        "U13 live-caption machine decision is invalid",
+    )
 
 
 def validate_asr005_policy_text(text: str, label: str) -> None:
@@ -181,8 +356,329 @@ def _validate_qwen3_product_decision(
             "topP": 0.8,
             "seed": 42,
             "hotwords": "",
+            "segmentation": "official_silero_vad",
+            "vadThreshold": 0.2,
+            "minimumSpeechSeconds": 0.2,
+            "maximumSpeechSeconds": 12,
         },
         "macOS frozen engines disagree with machine decision",
+    )
+
+
+def _validate_expanded_desktop_capabilities(
+    manifest: dict[str, Any],
+    root: Path,
+) -> None:
+    targets = _mapping(manifest.get("targets"), "targets")
+    macos = _mapping(targets.get("macos"), "targets.macos")
+    _require(
+        macos.get("developmentReferenceTarget")
+        == EXPECTED_MACOS_DEVELOPMENT_TARGET,
+        "macOS development reference target drifted",
+    )
+    expanded = _mapping(
+        manifest.get("expandedDesktopCapabilities"),
+        "expandedDesktopCapabilities",
+    )
+    _require(expanded.get("contractVersion") == 1, "expanded contract version changed")
+    _require(expanded.get("developmentOnly") is True, "desktop must stay DEVELOPMENT_ONLY")
+    _require(
+        expanded.get("mobileImplementationRequired") is False
+        and expanded.get("mobileUiChangesAllowed") is False,
+        "desktop expansion cannot require mobile implementation or UI",
+    )
+    _require(
+        expanded.get("maximumProbeMinutes") == 30,
+        "expanded desktop probes must be bounded to 30 minutes",
+    )
+    expected_windows_status = "BLOCKED_BY_EXPANDED_MACOS_CLOSURE"
+    for name in ("capture", "liveCaption", "openAiProviders"):
+        capability = _mapping(expanded.get(name), f"expandedDesktopCapabilities.{name}")
+        _require(
+            capability.get("status") in EXPANDED_CAPABILITY_STATUSES,
+            f"{name} expanded capability status is invalid",
+        )
+        _require(
+            capability.get("windowsStatus") == expected_windows_status,
+            f"{name} cannot unlock Windows before expanded macOS closure",
+        )
+
+    capture = _mapping(expanded.get("capture"), "expandedDesktopCapabilities.capture")
+    _require(capture.get("capturesScreenPixels") is False, "capture cannot record screen pixels")
+    _require(
+        capture.get("applicationMinimumMacosVersion") == "13.0"
+        and capture.get("microphoneOnlyCaptureMinimumMacosVersion") == "13.0"
+        and capture.get("coreAudioTapApiMinimumMacosVersion") == "14.2"
+        and capture.get("localProcessingMinimumMacosVersion") == "15.5",
+        "capture minimum macOS contract changed",
+    )
+    _require(
+        capture.get("captureModes") == ["microphone_only", "dual_track"]
+        and capture.get("lowerVersionBehavior")
+        == "MICROPHONE_ONLY_WITH_EXPLICIT_WARNING",
+        "capture lower-version behavior changed",
+    )
+    for field in ("contractPath", "architecturePath", "evidencePath"):
+        relative = _safe_path(capture.get(field), f"capture.{field}")
+        _require((root / relative).is_file(), f"capture.{field} is missing")
+    evidence = json.loads(
+        (root / capture["evidencePath"]).read_text(encoding="utf-8")
+    )
+    _require(
+        evidence.get("target")
+        == {
+            key: EXPECTED_MACOS_DEVELOPMENT_TARGET[key]
+            for key in (
+                "os",
+                "osBuild",
+                "architecture",
+                "cpu",
+                "logicalCpuCount",
+                "memoryBytes",
+                "buildMode",
+            )
+        },
+        "capture evidence target does not match the macOS development reference target",
+    )
+    decision = _mapping(evidence.get("decision"), "capture evidence decision")
+    if capture.get("status") in {"CONTRACT_FROZEN", "PASS"}:
+        _require(
+            evidence.get("status") == "PASS"
+            and decision.get("captureContractFrozen") is True
+            and decision.get("u12Allowed") is True,
+            "completed capture capability lacks current physical evidence",
+        )
+        observations = evidence.get("observations")
+        _require(
+            isinstance(observations, list) and len(observations) == 1,
+            "completed capture capability requires one physical observation",
+        )
+        observation = _mapping(observations[0], "capture observation")
+        observation_path = root / _safe_path(
+            observation.get("path"),
+            "capture observation.path",
+        )
+        observation_digest = observation.get("sha256")
+        _require(
+            isinstance(observation_digest, str)
+            and SHA256_PATTERN.fullmatch(observation_digest) is not None
+            and observation_path.is_file(),
+            "capture observation binding is invalid",
+        )
+        observation_bytes = observation_path.read_bytes()
+        _require(
+            hashlib.sha256(observation_bytes).hexdigest() == observation_digest,
+            "capture observation hash mismatch",
+        )
+        physical = json.loads(observation_bytes)
+        physical_target = _mapping(physical.get("target"), "capture physical target")
+        physical_probe = _mapping(physical.get("probe"), "capture physical probe")
+        recovery = _mapping(physical.get("recovery"), "capture recovery")
+        physical_decision = _mapping(
+            physical.get("decision"),
+            "capture physical decision",
+        )
+        faults = recovery.get("faultInjection")
+        _require(
+            physical.get("status") == "PASS"
+            and physical.get("admissibleForDeclaredClosureTarget") is True
+            and physical_target
+            == EXPECTED_MACOS_DEVELOPMENT_TARGET
+            and physical_probe.get("requestedDurationSeconds") == 1200
+            and observation.get("durationSeconds") == 1200
+            and recovery.get("invalidFinalizedChunks") == 0
+            and isinstance(recovery.get("maximumRecoveryMs"), int)
+            and recovery["maximumRecoveryMs"] <= 30_000
+            and recovery.get("maximumTailChunksQuarantinedPerTrack") == 1
+            and physical_decision.get("chunksValid") is True
+            and physical_decision.get("recoveryValid") is True
+            and physical_decision.get("captureContractFrozen") is True
+            and physical_decision.get("u12Allowed") is True,
+            "capture physical evidence failed frozen gates",
+        )
+        _require(
+            isinstance(faults, list)
+            and {
+                fault.get("stage")
+                for fault in faults
+                if isinstance(fault, dict)
+                and fault.get("status") == "PASS"
+                and fault.get("idempotent") is True
+            }
+            == {"during_write", "during_finalize", "after_journal"},
+            "capture physical fault evidence is incomplete",
+        )
+        if capture.get("status") == "PASS":
+            u12_binding = _mapping(evidence.get("u12Evidence"), "capture U12 evidence")
+            u12_path = root / _safe_path(
+                u12_binding.get("path"),
+                "capture.u12Evidence.path",
+            )
+            u12_digest = u12_binding.get("sha256")
+            _require(
+                u12_binding.get("status") == "PASS"
+                and isinstance(u12_digest, str)
+                and SHA256_PATTERN.fullmatch(u12_digest) is not None
+                and u12_path.is_file(),
+                "capture PASS lacks U12 evidence",
+            )
+            u12_bytes = u12_path.read_bytes()
+            _require(
+                hashlib.sha256(u12_bytes).hexdigest() == u12_digest,
+                "capture U12 evidence hash mismatch",
+            )
+            _validate_u12_capture_evidence(json.loads(u12_bytes))
+            _require(
+                decision.get("u12ImplementationGatePassed") is True,
+                "capture PASS lacks U12 implementation decision",
+            )
+
+    live_caption = _mapping(
+        expanded.get("liveCaption"),
+        "expandedDesktopCapabilities.liveCaption",
+    )
+    _require(
+        live_caption.get("mode") == "VAD_SIMULATED_STREAMING"
+        and live_caption.get("authority") == "sensevoice_live_draft",
+        "live caption cannot claim token streaming or formal authority",
+    )
+    if live_caption.get("status") in {
+        "U13_CONTROL_PASS_PENDING_U18_PROFILE",
+        "U18_CONTROL_RETAINED_PASS",
+    }:
+        evidence_path = root / _safe_path(
+            live_caption.get("evidencePath"),
+            "liveCaption.evidencePath",
+        )
+        decision_path = root / _safe_path(
+            live_caption.get("decisionPath"),
+            "liveCaption.decisionPath",
+        )
+        evidence_digest = live_caption.get("evidenceSha256")
+        decision_digest = live_caption.get("decisionSha256")
+        _require(
+            evidence_path.is_file()
+            and decision_path.is_file()
+            and isinstance(evidence_digest, str)
+            and SHA256_PATTERN.fullmatch(evidence_digest) is not None
+            and isinstance(decision_digest, str)
+            and SHA256_PATTERN.fullmatch(decision_digest) is not None,
+            "U13 live-caption evidence binding is invalid",
+        )
+        evidence_bytes = evidence_path.read_bytes()
+        decision_bytes = decision_path.read_bytes()
+        _require(
+            hashlib.sha256(evidence_bytes).hexdigest() == evidence_digest
+            and hashlib.sha256(decision_bytes).hexdigest() == decision_digest,
+            "U13 live-caption evidence hash mismatch",
+        )
+        summary = json.loads(evidence_bytes)
+        live_decision = json.loads(decision_bytes)
+        if live_caption["status"] == "U13_CONTROL_PASS_PENDING_U18_PROFILE":
+            decision_summary = _mapping(
+                _mapping(
+                    live_decision.get("bindings"),
+                    "U13 decision bindings",
+                ).get("summary"),
+                "U13 decision summary binding",
+            )
+            _require(
+                decision_summary.get("path") == live_caption["evidencePath"]
+                and decision_summary.get("sha256") == evidence_digest,
+                "U13 decision does not bind the evaluated summary",
+            )
+            _validate_u13_live_caption_evidence(summary, live_decision)
+        else:
+            u18_decision = _mapping(
+                live_decision.get("decision"),
+                "U18 decision",
+            )
+            selected = _mapping(
+                live_decision.get("selectedProfile"),
+                "U18 selected profile",
+            )
+            u18_bindings = _mapping(
+                live_decision.get("bindings"),
+                "U18 bindings",
+            )
+            _require(
+                live_decision.get("schemaVersion") == 1
+                and live_decision.get("status") == "PASS"
+                and live_decision.get("target")
+                == EXPECTED_MACOS_DEVELOPMENT_TARGET
+                and u18_decision.get("status") == "CONTROL_RETAINED"
+                and u18_decision.get("selectedArm") == "control"
+                and selected.get("id") == "control"
+                and live_caption.get("selectedProfile") == "control"
+                and live_caption.get("screenedCandidate")
+                == u18_decision.get("screenedCandidate"),
+                "U18 control-retained decision is invalid",
+            )
+            for binding_name in (
+                "screeningRaw",
+                "screeningSummary",
+                "finalistRaw",
+                "finalistSummary",
+                "u13Raw",
+                "u13Decision",
+                "u13IntegrationProbe",
+            ):
+                binding = _mapping(
+                    u18_bindings.get(binding_name),
+                    f"U18 {binding_name} binding",
+                )
+                binding_path = root / _safe_path(
+                    binding.get("path"),
+                    f"U18 {binding_name}.path",
+                )
+                binding_sha = binding.get("sha256")
+                _require(
+                    binding_path.is_file()
+                    and isinstance(binding_sha, str)
+                    and SHA256_PATTERN.fullmatch(binding_sha) is not None
+                    and hashlib.sha256(binding_path.read_bytes()).hexdigest()
+                    == binding_sha,
+                    f"U18 {binding_name} binding is invalid",
+                )
+            u13_decision_binding = _mapping(
+                u18_bindings["u13Decision"],
+                "U18 U13 decision binding",
+            )
+            u13_decision = json.loads(
+                (
+                    root
+                    / _safe_path(
+                        u13_decision_binding["path"],
+                        "U18 u13Decision.path",
+                    )
+                ).read_text(encoding="utf-8")
+            )
+            u13_summary_binding = _mapping(
+                _mapping(
+                    u13_decision.get("bindings"),
+                    "U13 decision bindings",
+                ).get("summary"),
+                "U13 decision summary binding",
+            )
+            _require(
+                u13_summary_binding.get("path")
+                == live_caption["evidencePath"]
+                and u13_summary_binding.get("sha256") == evidence_digest,
+                "U18 retained control does not bind the U13 summary",
+            )
+            _validate_u13_live_caption_evidence(summary, u13_decision)
+    providers = _mapping(
+        expanded.get("openAiProviders"),
+        "expandedDesktopCapabilities.openAiProviders",
+    )
+    _require(
+        providers.get("providers")
+        == ["deepseek", "openai_compatible"]
+        and providers.get("localGenerativeModelRequired") is False
+        and providers.get("customEndpointPolicy") == "REMOTE_HTTPS_ONLY"
+        and providers.get("remoteConsent") == "PER_MEETING"
+        and providers.get("automaticFallback") is False,
+        "open AI provider security contract changed",
     )
 
 
@@ -347,6 +843,7 @@ def validate_scope_contract(
         evidence_contract.get("crossTargetPassInheritance") is False,
         "cross-target PASS inheritance is forbidden",
     )
+    _validate_expanded_desktop_capabilities(manifest, root)
 
     lan = _mapping(manifest.get("lanHandoff"), "lanHandoff")
     lan_status = lan.get("status")

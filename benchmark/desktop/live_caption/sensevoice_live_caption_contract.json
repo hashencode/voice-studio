@@ -1,0 +1,86 @@
+{
+  "schemaVersion": 1,
+  "contractId": "sensevoice-live-caption/macos-m4/control-v1",
+  "developmentPosture": "DEVELOPMENT_ONLY",
+  "maximumProbeMinutes": 30,
+  "target": {
+    "modelIdentifier": "Mac16,10",
+    "os": "macOS 15.7.5",
+    "osBuild": "24G624",
+    "architecture": "arm64",
+    "cpu": "Apple M4",
+    "logicalCpuCount": 10,
+    "memoryBytes": 17179869184,
+    "buildMode": "debug"
+  },
+  "inputs": {
+    "fixtureManifestPath": "benchmark/desktop/live_caption/live_caption_fixtures.json",
+    "fixtureManifestSha256": "31e63176c0af79fdd4fb5a5e1af3581c39c7c44ce95252d6b0a6e5a3ba1fcc22",
+    "scorerPath": "benchmark/desktop/asr_comparison/asr_scoring.py",
+    "scorerSha256": "2b76fc02ff49a61e58c2633111dba82d9697ff1d4c5b772fba3b5c1e577b52a5"
+  },
+  "runtime": {
+    "id": "sherpa-onnx-1.13.4-ort-1.27.0",
+    "minimumMacosVersion": "15.5",
+    "upstreamLibraries": {
+      "libonnxruntime.1.27.0.dylib": "a95d3599c1d8e76570648e97cc4375756955d0a699e01cba0a1e9cf6db5db305",
+      "libsherpa-onnx-c-api.dylib": "7710492d16eff9094543baf46a6edd15952da1b06d690e700735c9d1f691f104",
+      "libsherpa-onnx-cxx-api.dylib": "cedeb94d8d8dfc67519e18890019522c8237064d7774e0bd7f24416cc5f924d5"
+    },
+    "libraries": {
+      "libonnxruntime.1.27.0.dylib": "4e775caf88df147b54cce15fd333e1cfeb483a34b857f5adff31d69bed51d980",
+      "libsherpa-onnx-c-api.dylib": "22738bb7018133b1814713427cc8db630497392943cd4ac385ca1351f7dbfbe0",
+      "libsherpa-onnx-cxx-api.dylib": "a482d2c80407539c3000c6f7abefd7c351ee9d0be78b0a41d45def1866381c49"
+    }
+  },
+  "model": {
+    "id": "sherpa-onnx-sense-voice-zh-en-ja-ko-yue-int8-2024-07-17",
+    "source": "https://github.com/k2-fsa/sherpa-onnx/releases/download/asr-models/sherpa-onnx-sense-voice-zh-en-ja-ko-yue-2024-07-17.tar.bz2",
+    "archiveSha256": "f6b2a72ebcb1ac7a764d4cfccd886e6bcb2a95c4657c2199d0ba95ed4b9ea71a",
+    "license": "FunASR-Model-License-1.1",
+    "files": {
+      "model.int8.onnx": {
+        "sha256": "c71f0ce00bec95b07744e116345e33d8cbbe08cef896382cf907bf4b51a2cd51",
+        "bytes": 239233841
+      },
+      "tokens.txt": {
+        "sha256": "f449eb28dc567533d7fa59be34e2abca8784f771850c78a47fb731a31429a1dc",
+        "bytes": 315894
+      }
+    }
+  },
+  "vad": {
+    "id": "silero-vad-official",
+    "source": "https://github.com/k2-fsa/sherpa-onnx/releases/download/asr-models/silero_vad.onnx",
+    "sha256": "9e2449e1087496d8d4caba907f23e0bd3f78d91fa552479bb9c23ac09cbb1fd6",
+    "sampleRateHz": 16000,
+    "frameDurationMs": 100,
+    "windowSize": 512
+  },
+  "control": {
+    "provider": "cpu",
+    "threads": 2,
+    "concurrency": 1,
+    "decodingMethod": "greedy_search",
+    "language": "auto",
+    "useInverseTextNormalization": false,
+    "recognizerLifecycle": "resident_preloaded",
+    "vadThreshold": 0.5,
+    "minimumSpeechSeconds": 0.25,
+    "minimumSilenceSeconds": 0.5,
+    "maximumUtteranceSeconds": 15.0,
+    "publishesTokenPartials": false,
+    "publishesCompletedUtterancesOnly": true
+  },
+  "gates": {
+    "speechEndToVisibleP50Ms": 1000,
+    "speechEndToVisibleP95Ms": 2000,
+    "maximumBacklogSeconds": 10,
+    "maximumUtteranceSeconds": 15,
+    "minimumStabilityReplaySeconds": 900,
+    "maximumStabilityReplaySeconds": 1800,
+    "maximumAppRssBytes": 1610612736,
+    "maximumAdditionalCaptureFrameLoss": 0,
+    "maximumUiLongFrameRate": 0.01
+  }
+}

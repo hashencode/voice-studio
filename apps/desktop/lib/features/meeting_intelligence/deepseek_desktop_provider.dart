@@ -21,14 +21,23 @@ abstract interface class DesktopAiHttpTransport {
   });
 }
 
-class DesktopAiHttpsTransport implements DesktopAiHttpTransport {
-  const DesktopAiHttpsTransport({
+abstract interface class DesktopAiCancelableTransport {
+  Future<void> cancelActive();
+}
+
+class DesktopAiHttpsTransport
+    implements DesktopAiHttpTransport, DesktopAiCancelableTransport {
+  DesktopAiHttpsTransport({
     this.allowedHost = 'api.deepseek.com',
     this.maximumResponseBytes = 512 * 1024,
-  });
+    this.maximumConcurrentRequests = 1,
+  }) : assert(maximumConcurrentRequests > 0);
 
   final String allowedHost;
   final int maximumResponseBytes;
+  final int maximumConcurrentRequests;
+  final Set<HttpClient> _activeClients = <HttpClient>{};
+  final Set<HttpClient> _canceledClients = <HttpClient>{};
 
   @override
   Future<DesktopAiHttpResponse> post({
@@ -45,9 +54,16 @@ class DesktopAiHttpsTransport implements DesktopAiHttpTransport {
         '云端服务地址不受信任',
       );
     }
+    if (_activeClients.length >= maximumConcurrentRequests) {
+      throw const MeetingAiFailure(
+        MeetingAiFailureCode.serviceUnavailable,
+        '已有会议笔记生成请求正在进行',
+      );
+    }
     final client = HttpClient()
       ..connectionTimeout = const Duration(seconds: 10)
       ..idleTimeout = const Duration(seconds: 45);
+    _activeClients.add(client);
     try {
       final request = await client
           .postUrl(uri)
@@ -60,7 +76,7 @@ class DesktopAiHttpsTransport implements DesktopAiHttpTransport {
       final response = await request.close().timeout(
         const Duration(seconds: 45),
       );
-      if (response.isRedirect) {
+      if (response.statusCode >= 300 && response.statusCode < 400) {
         throw const MeetingAiFailure(
           MeetingAiFailureCode.networkUnavailable,
           '云端服务返回了不受信任的重定向',
@@ -88,24 +104,43 @@ class DesktopAiHttpsTransport implements DesktopAiHttpTransport {
         '云端请求超时，请稍后重试',
       );
     } on Object {
+      if (_canceledClients.remove(client)) {
+        throw const MeetingAiFailure(
+          MeetingAiFailureCode.canceled,
+          '会议笔记生成已取消',
+        );
+      }
       throw const MeetingAiFailure(
         MeetingAiFailureCode.networkUnavailable,
         '无法连接云端服务，请检查网络后重试',
       );
     } finally {
+      _activeClients.remove(client);
+      _canceledClients.remove(client);
+      client.close(force: true);
+    }
+  }
+
+  @override
+  Future<void> cancelActive() async {
+    final clients = _activeClients.toList(growable: false);
+    _activeClients.clear();
+    for (final client in clients) {
+      _canceledClients.add(client);
       client.close(force: true);
     }
   }
 }
 
-class DeepSeekDesktopMeetingAiProvider implements MeetingAiProviderPort {
+class DeepSeekDesktopMeetingAiProvider
+    implements MeetingAiExtendedProviderPort {
   DeepSeekDesktopMeetingAiProvider({
     required DesktopSecretStore secretStore,
-    DesktopAiHttpTransport transport = const DesktopAiHttpsTransport(),
+    DesktopAiHttpTransport? transport,
     this.modelId = 'deepseek-chat',
     Uri? endpoint,
   }) : _secretStore = secretStore,
-       _transport = transport,
+       _transport = transport ?? DesktopAiHttpsTransport(),
        endpoint =
            endpoint ?? Uri.parse('https://api.deepseek.com/chat/completions');
 
@@ -117,10 +152,40 @@ class DeepSeekDesktopMeetingAiProvider implements MeetingAiProviderPort {
   String get providerId => 'deepseek';
 
   @override
+  MeetingAiProviderDescriptor get descriptor =>
+      const MeetingAiProviderDescriptor(
+        providerId: 'deepseek',
+        displayName: 'DeepSeek',
+        processingLocation: MeetingAiProcessingLocation.cloudDirect,
+        requiresSecret: true,
+      );
+
+  @override
   final String modelId;
 
   @override
   Future<bool> isConfigured() => _secretStore.contains(providerId);
+
+  @override
+  Future<MeetingAiAvailability> probeAvailability() async {
+    if (!await isConfigured()) {
+      return const MeetingAiAvailability.unavailable(
+        MeetingAiFailure(
+          MeetingAiFailureCode.secretMissing,
+          '请先配置 DeepSeek 密钥',
+        ),
+      );
+    }
+    return const MeetingAiAvailability.available();
+  }
+
+  @override
+  Future<void> cancel() async {
+    final transport = _transport;
+    if (transport is DesktopAiCancelableTransport) {
+      await (transport as DesktopAiCancelableTransport).cancelActive();
+    }
+  }
 
   @override
   Future<MeetingAiOutput> generate(MeetingAiRequest request) async {

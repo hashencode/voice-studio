@@ -24,6 +24,7 @@ environment:
 workspace:
   - apps/desktop
   - packages/companion_protocol
+  - packages/desktop_sherpa_worker
   - packages/meeting_core
   - packages/meeting_storage
   - packages/processing_contracts

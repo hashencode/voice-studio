@@ -1,0 +1,71 @@
+{
+  "schemaVersion": 1,
+  "kind": "qwen3_u17_product_worker_smoke",
+  "status": "PASS",
+  "recordedAt": "2026-07-28T06:45:18Z",
+  "developmentPosture": "DEVELOPMENT_ONLY",
+  "target": {
+    "modelIdentifier": "Mac16,10",
+    "cpu": "Apple M4",
+    "memoryBytes": 17179869184,
+    "logicalCpuCount": 10,
+    "architecture": "arm64",
+    "os": "macOS 15.7.5",
+    "osBuild": "24G624",
+    "buildMode": "debug"
+  },
+  "bindings": {
+    "decisionSha256": "408e264bbb68fb30ad6d860f8ded69db4a50d09e29956c392c37c9ea3335750d",
+    "contractSha256": "4d733fea306dfa49dc9c1f517103011e60050a4581f9558c348fbafb93a209fe",
+    "fixtureManifestSha256": "c0ee7d2652bb8b3bbdf12fc77bdb98be0b10c125458efb19a9e326a4ddf665ce",
+    "workerSha256": "68ec0b7cca3df6b7d0a4ed6c7d12fe715c04b1f2eb2b8b0cb3025debb5a34c3f",
+    "onnxRuntimeSha256": "4e775caf88df147b54cce15fd333e1cfeb483a34b857f5adff31d69bed51d980",
+    "sherpaCApiSha256": "22738bb7018133b1814713427cc8db630497392943cd4ac385ca1351f7dbfbe0",
+    "sherpaCxxApiSha256": "a482d2c80407539c3000c6f7abefd7c351ee9d0be78b0a41d45def1866381c49",
+    "sourceFixtureId": "held_out-clean-mandarin",
+    "sourceSha256": "3265ef5ffc358cd02b2ef18f0dce28d84649fddd68424d7d420f540685b50961"
+  },
+  "profile": {
+    "runtime": "sherpa-onnx-1.13.4-ort-1.27.0",
+    "provider": "cpu",
+    "threads": 2,
+    "concurrency": 1,
+    "segmentation": "official_silero_vad",
+    "vadThreshold": 0.2,
+    "minimumSpeechSeconds": 0.2,
+    "maximumSpeechSeconds": 12,
+    "maxTotalLen": 512,
+    "maxNewTokens": 512,
+    "temperature": 0.000001,
+    "topP": 0.8,
+    "seed": 42,
+    "hotwords": ""
+  },
+  "result": {
+    "sourceDurationSeconds": 51.5,
+    "segmentCount": 4,
+    "segmentStartSeconds": [
+      3.768,
+      14.648,
+      29.72,
+      43.48
+    ],
+    "residentBytesAtResult": 2515910656,
+    "workerExitCode": 0,
+    "resultVersion": 2
+  },
+  "assertions": {
+    "compiledProductWorker": true,
+    "selectedProfileAccepted": true,
+    "fixedSegmentationRejectedByContractTests": true,
+    "nonEmptyTranscript": true,
+    "timestampsMonotonic": true,
+    "probeUnderThirtyMinutes": true
+  },
+  "privacy": {
+    "audioPublished": false,
+    "transcriptPublished": false,
+    "absolutePathsPublished": false,
+    "credentialsPublished": false
+  }
+}

@@ -24,6 +24,7 @@ class BuildCacheGuardTest(unittest.TestCase):
                 ".": 7.0,
                 "apps/desktop": 1.5,
                 "packages/companion_protocol": 0.5,
+                "packages/desktop_sherpa_worker": 0.5,
                 "packages/meeting_core": 0.5,
                 "packages/meeting_storage": 0.5,
                 "packages/meeting_workflows": 0.5,

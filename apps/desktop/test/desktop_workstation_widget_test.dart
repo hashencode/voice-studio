@@ -10,9 +10,12 @@ import 'package:voice2text_desktop/app/desktop_app.dart';
 import 'package:voice2text_desktop/app/desktop_workstation_model.dart';
 import 'package:voice2text_desktop/features/companion/desktop_companion_repository.dart';
 import 'package:voice2text_desktop/features/companion/desktop_companion_service.dart';
+import 'package:voice2text_desktop/features/capture/desktop_capture_controller.dart';
+import 'package:voice2text_desktop/features/capture/desktop_capture_view_model.dart';
 import 'package:voice2text_desktop/features/meetings/playback/desktop_meeting_playback.dart';
 import 'package:voice2text_desktop/features/processing/desktop_job.dart';
 import 'package:voice2text_desktop/features/security/desktop_disk_encryption.dart';
+import 'package:voice2text_desktop/features/settings/desktop_ai_provider_settings_repository.dart';
 
 void main() {
   testWidgets('library is the default responsive workstation section', (
@@ -27,7 +30,8 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('本机会议'), findsOneWidget);
-    expect(find.text('导入会议文件'), findsWidgets);
+    expect(find.text('开始会议'), findsOneWidget);
+    expect(find.text('导入文件'), findsOneWidget);
     expect(find.text('会议'), findsWidgets);
     expect(find.text('任务'), findsWidgets);
     expect(find.text('设置'), findsWidgets);
@@ -85,9 +89,37 @@ void main() {
     );
     expect(find.text('FileVault 磁盘加密未启用'), findsOneWidget);
     expect(find.textContaining('没有应用层整库加密'), findsOneWidget);
+    expect(find.text('检查配置'), findsOneWidget);
+    await tester.tap(find.text('配置'));
+    await tester.pumpAndSettle();
+    expect(find.text('DeepSeek'), findsOneWidget);
+    expect(find.text('开放接口'), findsOneWidget);
+    expect(find.text('Ollama'), findsNothing);
     await tester.sendKeyEvent(LogicalKeyboardKey.tab);
     await tester.sendKeyEvent(LogicalKeyboardKey.tab);
     expect(FocusManager.instance.primaryFocus, isNotNull);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('older macOS warns only when local processing is requested', (
+    tester,
+  ) async {
+    await tester.binding.setSurfaceSize(const Size(1280, 900));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+    final model = _WorkstationModel(
+      section: DesktopWorkstationSection.settings,
+      engineAvailable: false,
+      localProcessingSupported: false,
+    );
+    addTearDown(model.dispose);
+
+    await tester.pumpWidget(Voice2TextDesktopApp(homeModel: model));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('安装模型'));
+    await tester.pump();
+
+    expect(find.textContaining('本地离线转写需要 macOS 15.5'), findsOneWidget);
+    expect(model.installModelCalls, 0);
     expect(tester.takeException(), isNull);
   });
 
@@ -300,6 +332,8 @@ class _WorkstationModel extends ChangeNotifier
     this.companionInvite,
     this.companionPeers = const <DesktopCompanionPeer>[],
     this.companionHistory = const <DesktopCompanionTransferHistory>[],
+    this.engineAvailable = true,
+    this.localProcessingSupported = true,
   }) : playback = DesktopMeetingPlaybackController(port: _PlaybackPort());
 
   @override
@@ -310,6 +344,8 @@ class _WorkstationModel extends ChangeNotifier
   List<DesktopProcessingJob> jobs;
   @override
   final DesktopMeetingPlaybackController playback;
+  @override
+  final DesktopCaptureUiController captureController = _NoopCaptureController();
 
   @override
   bool get aiGenerating => false;
@@ -317,6 +353,11 @@ class _WorkstationModel extends ChangeNotifier
   String? get aiMessage => null;
   @override
   bool get aiSecretConfigured => false;
+  @override
+  DesktopAiProviderSettings get aiProviderSettings =>
+      DesktopAiProviderSettings.deepSeek;
+  @override
+  bool get aiProviderProbing => false;
   @override
   bool get companionListening => true;
   @override
@@ -336,7 +377,9 @@ class _WorkstationModel extends ChangeNotifier
   DesktopDiskEncryptionStatus get diskEncryptionStatus =>
       DesktopDiskEncryptionStatus.disabled;
   @override
-  bool get engineAvailable => true;
+  final bool engineAvailable;
+  @override
+  final bool localProcessingSupported;
   @override
   String get engineAvailabilityMessage => '已安装并验证';
   @override
@@ -385,6 +428,10 @@ class _WorkstationModel extends ChangeNotifier
   @override
   Future<void> deleteAiSecret() async {}
   @override
+  Future<void> configureAiProvider(DesktopAiProviderSettings settings) async {}
+  @override
+  Future<void> probeAiProvider() async {}
+  @override
   Future<String?> exportMeeting(MeetingWorkspaceExportFormat format) async =>
       null;
   @override
@@ -392,7 +439,11 @@ class _WorkstationModel extends ChangeNotifier
   @override
   Future<void> importMeeting() async {}
   @override
-  Future<void> installModels() async {}
+  Future<void> installModels() async {
+    installModelCalls += 1;
+  }
+
+  int installModelCalls = 0;
   @override
   Future<void> load() async {
     notifyListeners();
@@ -443,9 +494,40 @@ class _WorkstationModel extends ChangeNotifier
 
   @override
   void dispose() {
+    (captureController as _NoopCaptureController).dispose();
     playback.dispose();
     super.dispose();
   }
+}
+
+class _NoopCaptureController extends ChangeNotifier
+    implements DesktopCaptureUiController {
+  @override
+  DesktopCaptureViewModel value = const DesktopCaptureViewModel();
+
+  @override
+  Future<void> discardRecovered(String sessionId) async {}
+  @override
+  Future<void> keepRecovered(String sessionId) async {}
+  @override
+  Future<void> pause() async {}
+  @override
+  Future<void> preflight({bool requestPermissions = false}) async {}
+  @override
+  void reset() {}
+  @override
+  Future<void> resume() async {}
+  @override
+  Future<void> restartCaptions() async {}
+  @override
+  void selectMicrophone(String deviceId) {}
+  @override
+  void setCaptionEnabled(bool enabled) {}
+  @override
+  Future<void> start() async {}
+  @override
+  Future<MeetingHandoffOutcome?> stop({String displayName = '电脑会议'}) async =>
+      null;
 }
 
 class _PlaybackPort implements DesktopPlaybackPort {

@@ -12,7 +12,7 @@ test -f benchmark/desktop/environments/pyannote/uv.lock
 test -f benchmark/desktop/evidence/macos/funasr-paraformer.json
 test -f benchmark/desktop/evidence/macos/pyannote-community-1.json
 test -f benchmark/desktop/MACOS_ENGINE_SELECTION.md
-test -f apps/desktop/lib/features/processing/sherpa_desktop_processing_engine.dart
+test -f packages/desktop_sherpa_worker/lib/src/sherpa_desktop_processing_engine.dart
 test -f apps/desktop/lib/features/processing/sidecar/sidecar_process_client.dart
 test -f packages/processing_contracts/lib/src/sidecar_protocol.dart
 test -f apps/desktop/macos/Runner/Processing/README.md
@@ -47,6 +47,9 @@ assert "windows" not in contract
 PY
 
 python3 -m unittest discover -s benchmark/desktop -p 'test_*.py'
+python3 -m unittest \
+  benchmark.desktop.asr_comparison.test_evaluate_qwen3_optimization \
+  benchmark.desktop.asr_comparison.test_qwen3_optimization_driver
 python3 benchmark/desktop/validate_desktop_candidates.py \
   --contract benchmark/desktop/desktop_benchmark_contract.json \
   --candidates benchmark/desktop/desktop_model_candidates.json \
@@ -55,6 +58,7 @@ python3 benchmark/desktop/validate_macos_engine_selection.py \
   --candidates benchmark/desktop/desktop_model_candidates.json \
   --document benchmark/desktop/MACOS_ENGINE_SELECTION.md >/dev/null
 python3 -m py_compile \
+  benchmark/desktop/asr_comparison/qwen3_optimization_driver.py \
   benchmark/desktop/run_funasr_benchmark.py \
   apps/desktop/tool/processing_sidecar/launcher.py \
   apps/desktop/tool/processing_sidecar/worker.py \

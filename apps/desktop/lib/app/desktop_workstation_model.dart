@@ -3,8 +3,10 @@ import 'package:processing_contracts/processing_contracts.dart';
 
 import '../features/companion/desktop_companion_repository.dart';
 import '../features/companion/desktop_companion_service.dart';
+import '../features/capture/desktop_capture_controller.dart';
 import '../features/meetings/playback/desktop_meeting_playback.dart';
 import '../features/security/desktop_disk_encryption.dart';
+import '../features/settings/desktop_ai_provider_settings_repository.dart';
 import 'desktop_home_model.dart';
 
 enum DesktopWorkstationSection { library, tasks, companion, settings }
@@ -18,9 +20,12 @@ abstract interface class DesktopWorkstationModel implements DesktopHomeModel {
   bool get workspaceLoading;
   bool get processing;
   bool get installingModels;
+  bool get localProcessingSupported;
   double get modelInstallProgress;
   ModelAssetInstallStatus get modelInstallStatus;
   bool get aiSecretConfigured;
+  DesktopAiProviderSettings get aiProviderSettings;
+  bool get aiProviderProbing;
   bool get aiGenerating;
   String? get aiMessage;
   bool get companionListening;
@@ -32,6 +37,7 @@ abstract interface class DesktopWorkstationModel implements DesktopHomeModel {
   List<DesktopCompanionTransferHistory> get companionHistory;
   DesktopDiskEncryptionStatus get diskEncryptionStatus;
   DesktopMeetingPlaybackController get playback;
+  DesktopCaptureUiController get captureController;
 
   void selectSection(DesktopWorkstationSection section);
   void closeMeeting();
@@ -56,6 +62,8 @@ abstract interface class DesktopWorkstationModel implements DesktopHomeModel {
   Future<void> cancelProcessing();
   Future<void> replaceAiSecret(String secret);
   Future<void> deleteAiSecret();
+  Future<void> configureAiProvider(DesktopAiProviderSettings settings);
+  Future<void> probeAiProvider();
   Future<void> generateAiNotes({required bool consentGranted});
   Future<void> reviewInsight({
     required int insightId,

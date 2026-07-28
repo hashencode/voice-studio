@@ -1,97 +1,5 @@
+import '../meeting_intelligence/meeting_ai_provider.dart';
 import 'meeting_workspace_models.dart';
-
-enum MeetingAiConsent { denied, granted }
-
-enum MeetingAiFailureCode {
-  providerMissing,
-  secretMissing,
-  consentRequired,
-  invalidOutput,
-  networkUnavailable,
-  unauthorized,
-  rateLimited,
-  serviceUnavailable,
-  canceled,
-}
-
-class MeetingAiFailure implements Exception {
-  const MeetingAiFailure(this.code, this.message);
-
-  final MeetingAiFailureCode code;
-  final String message;
-
-  @override
-  String toString() => 'MeetingAiFailure(${code.name})';
-}
-
-class MeetingAiEvidence {
-  const MeetingAiEvidence({
-    required this.segmentId,
-    required this.startMs,
-    required this.endMs,
-  });
-
-  final int segmentId;
-  final int startMs;
-  final int endMs;
-}
-
-class MeetingAiInsight {
-  const MeetingAiInsight({
-    required this.kind,
-    required this.body,
-    required this.evidence,
-    this.actionOwner,
-    this.actionDueAtMs,
-  });
-
-  final String kind;
-  final String body;
-  final List<MeetingAiEvidence> evidence;
-  final String? actionOwner;
-  final int? actionDueAtMs;
-}
-
-class MeetingAiOutput {
-  const MeetingAiOutput({
-    required this.insights,
-    this.schemaVersion = 'meeting_intelligence_output/v1',
-    this.suggestedTitle,
-    this.meetingType,
-  });
-
-  final String schemaVersion;
-  final String? suggestedTitle;
-  final String? meetingType;
-  final List<MeetingAiInsight> insights;
-}
-
-class MeetingAiRequest {
-  const MeetingAiRequest({
-    required this.recordingId,
-    required this.generationId,
-    required this.consent,
-    required this.segments,
-    required this.meetingTitle,
-    this.templateId = 'general',
-  });
-
-  final int recordingId;
-  final int generationId;
-  final MeetingAiConsent consent;
-  final List<MeetingWorkspaceSegment> segments;
-  final String meetingTitle;
-  final String templateId;
-}
-
-abstract interface class MeetingAiProviderPort {
-  String get providerId;
-  String get modelId;
-
-  Future<bool> isConfigured();
-
-  Future<MeetingAiOutput> generate(MeetingAiRequest request);
-}
 
 class MeetingAiWorkflow {
   const MeetingAiWorkflow({required MeetingAiProviderPort? provider})
@@ -107,16 +15,18 @@ class MeetingAiWorkflow {
         '未配置会议智能提供商',
       );
     }
-    if (request.consent != MeetingAiConsent.granted) {
+    final descriptor = meetingAiDescriptorOf(provider);
+    if (descriptor.requiresMeetingConsent &&
+        request.consent != MeetingAiConsent.granted) {
       throw const MeetingAiFailure(
         MeetingAiFailureCode.consentRequired,
         '需要针对本次会议明确同意发送转写文本',
       );
     }
     if (!await provider.isConfigured()) {
-      throw const MeetingAiFailure(
+      throw MeetingAiFailure(
         MeetingAiFailureCode.secretMissing,
-        '请先在设置中输入云端密钥',
+        descriptor.requiresSecret ? '请先配置提供商密钥' : '提供商配置不完整',
       );
     }
     if (request.recordingId <= 0 ||

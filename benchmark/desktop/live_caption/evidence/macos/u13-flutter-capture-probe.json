@@ -1,0 +1,95 @@
+{
+  "schemaVersion": 1,
+  "kind": "sensevoice_live_caption_flutter_capture_probe",
+  "status": "COMPLETE",
+  "target": {
+    "modelIdentifier": "Mac16,10",
+    "os": "macOS 15.7.5",
+    "osBuild": "24G624",
+    "architecture": "arm64",
+    "cpu": "Apple M4",
+    "logicalCpuCount": 10,
+    "memoryBytes": 17179869184,
+    "buildMode": "debug"
+  },
+  "bindings": {
+    "contractSha256": "f074af8f14f9256e3c269f16fd15e571367c6b9861062be538510be16ecc2297",
+    "fixtureManifestSha256": "31e63176c0af79fdd4fb5a5e1af3581c39c7c44ce95252d6b0a6e5a3ba1fcc22",
+    "fixtureAudioSha256": "f861ee3a3d189b399aa62dbdb9e6e6a7c939b0a33819074e72211f3457b6eaed",
+    "workerExecutableSha256": "9a4a21f573313d458600d23e4266434ab4c7e0a9176e080a7d5496804af09d30"
+  },
+  "durationSeconds": 120,
+  "controlDurationSeconds": 60,
+  "concurrentDurationSeconds": 60,
+  "visibilityMeasurement": "flutter_frame_timing",
+  "flutterVisibility": {
+    "resultToVisibleMs": [
+      8.081,
+      13.792,
+      11.113,
+      17.111,
+      5.095,
+      13.093,
+      7.024,
+      14.96
+    ],
+    "speechEndToVisibleMs": [
+      768.514,
+      719.085,
+      777.691,
+      1111.37,
+      1471.172,
+      1011.028,
+      760.048,
+      777.243
+    ],
+    "sampleCount": 8
+  },
+  "uiFrames": {
+    "sampleCount": 10,
+    "longFrameCount": 0,
+    "longFrameRate": 0.0
+  },
+  "resourceSampling": {
+    "maximumFlutterAppRssBytes": 383025152,
+    "maximumWorkerRssBytes": 935395328,
+    "conservativeMaximumCombinedRssBytes": 1318420480
+  },
+  "captureControlMeasurement": "concurrent_native_capture",
+  "captureAccounting": {
+    "control": {
+      "sessionId": "session-control-hkt0mfl3y0",
+      "systemAudio": {
+        "observedFrames": 2920960,
+        "deliveredFrames": 2920960,
+        "committedFrames": 2920960,
+        "lostFrames": 0
+      },
+      "measurement": "native_callback_to_durable_chunk",
+      "schemaVersion": 1,
+      "microphone": {
+        "observedFrames": 2928000,
+        "committedFrames": 2928000,
+        "deliveredFrames": 2928000,
+        "lostFrames": 0
+      }
+    },
+    "concurrent": {
+      "sessionId": "session-caption-hkt0mfl3y0",
+      "systemAudio": {
+        "deliveredFrames": 2960384,
+        "observedFrames": 2960384,
+        "lostFrames": 0,
+        "committedFrames": 2960384
+      },
+      "measurement": "native_callback_to_durable_chunk",
+      "microphone": {
+        "lostFrames": 0,
+        "deliveredFrames": 2961600,
+        "committedFrames": 2961600,
+        "observedFrames": 2961600
+      },
+      "schemaVersion": 1
+    }
+  }
+}

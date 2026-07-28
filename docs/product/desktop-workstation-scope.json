@@ -1,7 +1,15 @@
 {
   "schemaVersion": 1,
   "decisionId": "DESKTOP-FIRST-MEETING-WORKSTATION-2026-07-26",
-  "updatedAt": "2026-07-27",
+  "updatedAt": "2026-07-28",
+  "developmentPosture": {
+    "status": "DEVELOPMENT_ONLY",
+    "productionReleasePlanningEnabled": false,
+    "multiHourTestGatesEnabled": false,
+    "maxRoutineProbeMinutes": 30,
+    "historicalLongRunEvidenceRetained": true,
+    "reactivationRequiresExplicitDecision": true
+  },
   "productDirection": {
     "workstation": "desktop",
     "mobileRole": "capture_and_independent_mobile_core",
@@ -36,6 +44,16 @@
       "status": "PRODUCT_IN_PROGRESS",
       "closureStatus": "NOT_RUN",
       "evidencePolicy": "TARGET_SPECIFIC",
+      "developmentReferenceTarget": {
+        "modelIdentifier": "Mac16,10",
+        "os": "macOS 15.7.5",
+        "osBuild": "24G624",
+        "architecture": "arm64",
+        "cpu": "Apple M4",
+        "logicalCpuCount": 10,
+        "memoryBytes": 17179869184,
+        "buildMode": "debug"
+      },
       "evidence": [
         {
           "path": "docs/product/desktop-workstation-u4-evidence.json",
@@ -63,7 +81,7 @@
         },
         {
           "path": "benchmark/desktop/asr_comparison/pc_qwen3_optimization_baseline.json",
-          "sha256": "8d76d303842cc59ca2a81d251614ad26f7e01b0200b27298339f55ac80b645a7"
+          "sha256": "3c0df3e19c61c5f6432b7a88bcdd523791459ffa40d0ba3a0d0fe7696a51bb83"
         }
       ],
       "firstRoundEngines": {
@@ -111,6 +129,68 @@
       "fixtureSha256"
     ]
   },
+  "expandedDesktopCapabilities": {
+    "contractVersion": 1,
+    "developmentOnly": true,
+    "mobileImplementationRequired": false,
+    "mobileUiChangesAllowed": false,
+    "maximumProbeMinutes": 30,
+    "capture": {
+      "status": "PASS",
+      "contractPath": "docs/contracts/desktop-capture-session-v1.schema.json",
+      "architecturePath": "docs/architecture/desktop-live-meeting-capture.md",
+      "evidencePath": "benchmark/desktop/capture/macos_capture_feasibility.json",
+      "applicationMinimumMacosVersion": "13.0",
+      "microphoneOnlyCaptureMinimumMacosVersion": "13.0",
+      "coreAudioTapApiMinimumMacosVersion": "14.2",
+      "localProcessingMinimumMacosVersion": "15.5",
+      "captureModes": [
+        "microphone_only",
+        "dual_track"
+      ],
+      "lowerVersionBehavior": "MICROPHONE_ONLY_WITH_EXPLICIT_WARNING",
+      "capturesScreenPixels": false,
+      "windowsStatus": "BLOCKED_BY_EXPANDED_MACOS_CLOSURE"
+    },
+    "liveCaption": {
+      "status": "U18_CONTROL_RETAINED_PASS",
+      "mode": "VAD_SIMULATED_STREAMING",
+      "authority": "sensevoice_live_draft",
+      "selectedProfile": "control",
+      "screenedCandidate": "vad-threshold-0.4",
+      "decisionPath": "benchmark/desktop/live_caption/evidence/sensevoice-optimization/macos/u18-decision.json",
+      "decisionSha256": "6f95c2c70cf36eac26ec0bdc208298e50dfd8d7344cba2623176f9eddb65f320",
+      "evidencePath": "benchmark/desktop/live_caption/evidence/macos/u13-control-summary-v2.json",
+      "evidenceSha256": "d879d1479dca6c2848ab0c61bf26e65f6a2abbd6e759b84566012102f580dbe8",
+      "handoffStatus": "U14_PASS",
+      "handoffSchemaVersion": 23,
+      "handoffEvidencePath": "benchmark/desktop/live_caption/evidence/handoff/macos/u14-handoff-smoke.json",
+      "handoffEvidenceSha256": "e1d76e6f0d77cd24554142f9236718847c6f3391d48b4f73c4794a2f6a77c2ce",
+      "windowsStatus": "BLOCKED_BY_EXPANDED_MACOS_CLOSURE"
+    },
+    "formalTranscription": {
+      "status": "U17_OPTIMIZATION_ADMITTED",
+      "authority": "qwen3_formal_transcript",
+      "selectedArm": "vad-max-speech-12",
+      "decisionPath": "benchmark/desktop/asr_comparison/evidence/qwen3-optimization/macos/u17-decision.json",
+      "decisionSha256": "408e264bbb68fb30ad6d860f8ded69db4a50d09e29956c392c37c9ea3335750d",
+      "fallbackArm": "control",
+      "windowsStatus": "BLOCKED_BY_EXPANDED_MACOS_CLOSURE"
+    },
+    "openAiProviders": {
+      "status": "PASS",
+      "providers": [
+        "deepseek",
+        "openai_compatible"
+      ],
+      "localGenerativeModelRequired": false,
+      "customEndpointPolicy": "REMOTE_HTTPS_ONLY",
+      "remoteConsent": "PER_MEETING",
+      "automaticFallback": false,
+      "evidencePath": "docs/product/desktop-workstation-u16-evidence.json",
+      "windowsStatus": "BLOCKED_BY_EXPANDED_MACOS_CLOSURE"
+    }
+  },
   "lanHandoff": {
     "status": "PASS_MACOS_ANDROID_LAN",
     "protocolSchema": "companion-media-transfer/v1",
@@ -140,7 +220,9 @@
         "DESKTOP-FIRST-MEETING-WORKSTATION-2026-07-26",
         "PRODUCT_IN_PROGRESS",
         "BLOCKED_BY_MACOS_CLOSURE",
-        "USER_PRE_RELEASE_ACCEPTANCE_ONLY"
+        "USER_PRE_RELEASE_ACCEPTANCE_ONLY",
+        "DEVELOPMENT_ONLY",
+        "RELEASE_SCOPE_PAUSED"
       ]
     },
     {
@@ -150,7 +232,9 @@
         "桌面主工作站",
         "PRODUCT_IN_PROGRESS",
         "BLOCKED_BY_MACOS_CLOSURE",
-        "USER_PRE_RELEASE_ACCEPTANCE_ONLY"
+        "USER_PRE_RELEASE_ACCEPTANCE_ONLY",
+        "DEVELOPMENT_ONLY",
+        "RELEASE_SCOPE_PAUSED"
       ]
     },
     {
@@ -167,7 +251,9 @@
         "DESKTOP-FIRST-MEETING-WORKSTATION-2026-07-26",
         "PRODUCT_IN_PROGRESS",
         "BLOCKED_BY_MACOS_CLOSURE",
-        "TARGET_SPECIFIC"
+        "TARGET_SPECIFIC",
+        "DEVELOPMENT_ONLY",
+        "BLOCKED_BY_EXPANDED_MACOS_CLOSURE"
       ]
     }
   ]

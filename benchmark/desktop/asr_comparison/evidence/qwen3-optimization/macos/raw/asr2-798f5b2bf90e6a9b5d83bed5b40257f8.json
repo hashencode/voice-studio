@@ -1,0 +1,114 @@
+{
+  "events": [
+    {
+      "candidateId": "sherpa-onnx-qwen3-asr-0.6B-int8-2026-03-25",
+      "processId": 20406,
+      "profileId": "fixed-resource",
+      "runtimeBindingState": "not_initialized",
+      "schemaVersion": 2,
+      "sourceSha256": "2623e7d29b6bc714f61a9b138f269e3a6fcd8129dc4026204205b182a143907f",
+      "type": "handshake"
+    },
+    {
+      "candidateId": "sherpa-onnx-qwen3-asr-0.6B-int8-2026-03-25",
+      "capabilities": {
+        "endpointing": false,
+        "hotwords": true,
+        "itn": false,
+        "partialResults": false,
+        "punctuation": true,
+        "seededGeneration": true,
+        "streaming": false,
+        "timestamps": false
+      },
+      "effectiveConfig": {
+        "diagnosticSegmentation": "fixed_15_seconds",
+        "hotwords": "",
+        "maxNewTokens": 256,
+        "maxSpeechSeconds": 20,
+        "maxTotalLen": 512,
+        "minSpeechSeconds": 0.2,
+        "numThreads": 2,
+        "provider": "cpu",
+        "seed": 42,
+        "segmentDurationSeconds": 15,
+        "temperature": 1e-06,
+        "topP": 0.8,
+        "vadThreshold": 0.2
+      },
+      "family": "qwen3_asr",
+      "modelFileSha256": {
+        "convFrontend": "d22dc4423e0940e49884e903d2ea2f7e5567c14fc1aed97e4e26d6b8f208ef9e",
+        "decoder": "4f6885be5959ae26af3089d38ee7972c5fafbeeb1cf8d5e76eab6d8b61ca5771",
+        "encoder": "60748d3e6744a57c9c91e1b17424a6c2990567e8adceb0783940c03ed98fa9d9",
+        "sileroVad": "9e2449e1087496d8d4caba907f23e0bd3f78d91fa552479bb9c23ac09cbb1fd6",
+        "tokenizer": "4aaf142ae42509d44653f1941e9add96deedae4c51557ae33cca1a96b83c42e4"
+      },
+      "profileId": "fixed-resource",
+      "schemaVersion": 2,
+      "type": "effectiveConfig"
+    },
+    {
+      "candidateId": "sherpa-onnx-qwen3-asr-0.6B-int8-2026-03-25",
+      "loadMilliseconds": 1125.107,
+      "residentBytes": 1690763264,
+      "schemaVersion": 2,
+      "type": "modelLoadComplete"
+    },
+    {
+      "candidateId": "sherpa-onnx-qwen3-asr-0.6B-int8-2026-03-25",
+      "decodeMilliseconds": 4925.148,
+      "durationSeconds": 30.0,
+      "ffiStringCopyMilliseconds": 0.002,
+      "jsonRepairAndDecodeMilliseconds": 0.028,
+      "loadMilliseconds": 1125.107,
+      "nativeResultFetchMilliseconds": 0.011,
+      "outputTokenCount": 0,
+      "profileId": "fixed-resource",
+      "residentBytes": 1206337536,
+      "resultConversionMilliseconds": 0.043,
+      "schemaVersion": 2,
+      "segmentCount": 2,
+      "segmentDurationsSeconds": [
+        15.0,
+        15.0
+      ],
+      "segmentStartSeconds": [
+        0.0,
+        15.0
+      ],
+      "segmentWallMilliseconds": [
+        2468.579,
+        2456.353
+      ],
+      "sourceSha256": "2623e7d29b6bc714f61a9b138f269e3a6fcd8129dc4026204205b182a143907f",
+      "text": "",
+      "timestamps": [],
+      "tokens": [],
+      "type": "result",
+      "vadMilliseconds": 0.001
+    },
+    {
+      "candidateId": "sherpa-onnx-qwen3-asr-0.6B-int8-2026-03-25",
+      "schemaVersion": 2,
+      "type": "unloadStart"
+    },
+    {
+      "candidateId": "sherpa-onnx-qwen3-asr-0.6B-int8-2026-03-25",
+      "residentBytes": 1206337536,
+      "schemaVersion": 2,
+      "type": "unloadComplete"
+    },
+    {
+      "candidateId": "sherpa-onnx-qwen3-asr-0.6B-int8-2026-03-25",
+      "profileId": "fixed-resource",
+      "residentBytesAfterSettle": 1206337536,
+      "schemaVersion": 2,
+      "temporaryArtifactsReleased": true,
+      "type": "complete"
+    }
+  ],
+  "runId": "asr2-798f5b2bf90e6a9b5d83bed5b40257f8",
+  "schemaVersion": 2,
+  "stderrSha256": "434c4c4706877302ec187171be45eab135e472fa9b8f6b82c032871a9f435b8f"
+}

@@ -151,6 +151,63 @@ class ScheduleTest(unittest.TestCase):
                 ],
             )
 
+    def test_non_speech_result_may_report_zero_vad_segments(self) -> None:
+        _validate_event(
+            {
+                "schemaVersion": 2,
+                "type": "result",
+                "candidateId": "fake-a",
+                "profileId": "fixed-resource",
+                "sourceSha256": "f" * 64,
+                "text": "",
+                "tokens": [],
+                "timestamps": [],
+                "durationSeconds": 30,
+                "loadMilliseconds": 1,
+                "decodeMilliseconds": 0,
+                "segmentCount": 0,
+                "segmentWallMilliseconds": [],
+            },
+            specification={
+                **matrix_item(),
+                "scenario": "non_speech",
+                "sourceSha256": "f" * 64,
+            },
+            observed_types=[
+                "handshake",
+                "effectiveConfig",
+                "modelLoadComplete",
+            ],
+        )
+
+        with self.assertRaisesRegex(OrchestrationError, "segment timings"):
+            _validate_event(
+                {
+                    "schemaVersion": 2,
+                    "type": "result",
+                    "candidateId": "fake-a",
+                    "profileId": "fixed-resource",
+                    "sourceSha256": "f" * 64,
+                    "text": "",
+                    "tokens": [],
+                    "timestamps": [],
+                    "durationSeconds": 30,
+                    "loadMilliseconds": 1,
+                    "decodeMilliseconds": 0,
+                    "segmentCount": 0,
+                    "segmentWallMilliseconds": [],
+                },
+                specification={
+                    **matrix_item(),
+                    "sourceSha256": "f" * 64,
+                },
+                observed_types=[
+                    "handshake",
+                    "effectiveConfig",
+                    "modelLoadComplete",
+                ],
+            )
+
     def test_unload_complete_requires_worker_resident_bytes(self) -> None:
         with self.assertRaises(OrchestrationError) as caught:
             _validate_event(

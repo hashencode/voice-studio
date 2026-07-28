@@ -5,8 +5,10 @@ import 'dart:math';
 import 'dart:typed_data';
 
 import 'package:crypto/crypto.dart';
+// ignore: depend_on_referenced_packages
 import 'package:sherpa_onnx/sherpa_onnx.dart' as sherpa;
-import 'package:voice2text_desktop/features/processing/qwen3_result.dart';
+// ignore: depend_on_referenced_packages
+import 'package:desktop_sherpa_worker/desktop_sherpa_worker.dart';
 
 import 'asr_benchmark/candidate_registry.dart';
 import 'asr_benchmark/effective_profile.dart';

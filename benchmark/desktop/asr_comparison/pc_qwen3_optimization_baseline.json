@@ -2,8 +2,8 @@
   "schemaVersion": 1,
   "kind": "pc_qwen3_asr_optimization_baseline",
   "baselineId": "pc-qwen3-asr-product-baseline-v1",
-  "baselineDate": "2026-07-27",
-  "sourceCommit": "a481f9dc360ad7e972f92eccd7e127fe73f145f3",
+  "baselineDate": "2026-07-28",
+  "sourceCommit": "327d96649a385a1ccf64369b22dd60d9bee11aff",
   "product": {
     "asrCandidateId": "sherpa-onnx-qwen3-asr-0.6B-int8-2026-03-25",
     "asrCandidateCount": 1,
@@ -20,14 +20,19 @@
       "temperature": 0.000001,
       "topP": 0.8,
       "seed": 42,
-      "hotwords": ""
+      "hotwords": "",
+      "segmentation": "official_silero_vad",
+      "vadThreshold": 0.2,
+      "minimumSpeechSeconds": 0.2,
+      "maximumSpeechSeconds": 12
     },
     "modelHashes": {
       "archive": "393f8a14e2f5fb96746aaab342997a40641001fbd5bf9592a080a8329178ee96",
       "convFrontend": "d22dc4423e0940e49884e903d2ea2f7e5567c14fc1aed97e4e26d6b8f208ef9e",
       "encoder": "60748d3e6744a57c9c91e1b17424a6c2990567e8adceb0783940c03ed98fa9d9",
       "decoder": "4f6885be5959ae26af3089d38ee7972c5fafbeeb1cf8d5e76eab6d8b61ca5771",
-      "tokenizerTree": "4aaf142ae42509d44653f1941e9add96deedae4c51557ae33cca1a96b83c42e4"
+      "tokenizerTree": "4aaf142ae42509d44653f1941e9add96deedae4c51557ae33cca1a96b83c42e4",
+      "sileroVad": "9e2449e1087496d8d4caba907f23e0bd3f78d91fa552479bb9c23ac09cbb1fd6"
     }
   },
   "quality": {
@@ -44,12 +49,23 @@
     "officialAudioBestNativeDiagnosticP95Rtf": 0.124266,
     "nativeOrt127OverOrt1244MedianRatio": 2.061,
     "sileroOverFixed15ControlledMedianPairRatio": 1.002547,
-    "resultConversionShare": 0.00000701087
+    "resultConversionShare": 0.00000701087,
+    "u17ControlErrorRate": 0.2253808683994966,
+    "u17SelectedErrorRate": 0.20060493405331767,
+    "u17ControlNonTargetErrorRate": 0.2675416883362502,
+    "u17SelectedNonTargetErrorRate": 0.24011786969430668,
+    "u17SelectedRtf": 0.20678328970088256,
+    "u17SelectedP95SegmentLatencyMs": 5130.81,
+    "u17SelectedPeakRssBytes": 2808102912,
+    "u17SelectedRetainedRssBytes": 1555972096
   },
   "optimizationCandidate": {
-    "runtimeLaneId": "native-sherpa-onnx-1.13.4-ort-1.24.4-macos-arm64",
-    "productEligible": false,
-    "reason": "diagnostic lane requires product quality, stability, memory, packaging, signing, cancellation, and cleanup validation"
+    "status": "OPTIMIZATION_ADMITTED",
+    "selectedArm": "vad-max-speech-12",
+    "runtimeLaneId": "sherpa-onnx-dart-1.13.4-ort-1.27.0-macos-arm64",
+    "productEligible": true,
+    "fallbackArm": "control",
+    "reason": "quality gate passed; selected arm has the lowest admitted error rate"
   },
   "license": {
     "upstreamSpdx": "Apache-2.0",
@@ -84,6 +100,26 @@
     {
       "path": "qwen3_m4_development_freeze.json",
       "sha256": "19407cd9985a68f9cd30ce6e5620aa4b2412fdf55eb4161cd3ced11e21bdbcd9"
+    },
+    {
+      "path": "evidence/qwen3-optimization/macos/matrix.json",
+      "sha256": "c18227ceaef08922dcdff761e56d7792d6bb8f9d79183cd9ea500deed8d3ac76"
+    },
+    {
+      "path": "evidence/qwen3-optimization/macos/u17-raw-manifest.json",
+      "sha256": "2e18866017ccf97e2331e3dbec042d1e536145ede741da4f4fb2c2086dabdb01"
+    },
+    {
+      "path": "evidence/qwen3-optimization/macos/u17-summary.json",
+      "sha256": "aacac87d2418f12e467f06d639fbd3a72b922de3d01eecb8e2f2a6ebf06c61f8"
+    },
+    {
+      "path": "evidence/qwen3-optimization/macos/u17-decision.json",
+      "sha256": "408e264bbb68fb30ad6d860f8ded69db4a50d09e29956c392c37c9ea3335750d"
+    },
+    {
+      "path": "evidence/qwen3-optimization/macos/u17-product-worker-smoke.json",
+      "sha256": "059c1bc8644e94824ee90e6ffd2b108f6938afedbaa72891ac14f645a5eddf0d"
     }
   ],
   "privacy": {

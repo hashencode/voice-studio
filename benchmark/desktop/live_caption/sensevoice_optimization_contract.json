@@ -1,0 +1,184 @@
+{
+  "schemaVersion": 1,
+  "contractId": "sensevoice-live-caption-optimization/macos-m4/v1",
+  "developmentPosture": "DEVELOPMENT_ONLY",
+  "maximumProbeMinutes": 30,
+  "target": {
+    "modelIdentifier": "Mac16,10",
+    "os": "macOS 15.7.5",
+    "osBuild": "24G624",
+    "architecture": "arm64",
+    "cpu": "Apple M4",
+    "logicalCpuCount": 10,
+    "memoryBytes": 17179869184,
+    "buildMode": "debug"
+  },
+  "inputs": {
+    "u13ContractPath": "benchmark/desktop/live_caption/sensevoice_live_caption_contract.json",
+    "u13ContractSha256": "f074af8f14f9256e3c269f16fd15e571367c6b9861062be538510be16ecc2297",
+    "u13DecisionPath": "benchmark/desktop/live_caption/evidence/macos/u13-control-decision.json",
+    "u13DecisionSha256": "98c4c77dccf3d3db0e2171cec3216d5da29144db66ad78ff4b6518c63c7eb93e",
+    "fixtureManifestPath": "benchmark/desktop/live_caption/sensevoice_optimization_fixtures.json",
+    "fixtureManifestSha256": "f602b0a933327ec99f2604ce7af4fa823320aabde7ed9acb3364459fbce87ee3",
+    "scorerPath": "benchmark/desktop/asr_comparison/asr_scoring.py",
+    "scorerSha256": "2b76fc02ff49a61e58c2633111dba82d9697ff1d4c5b772fba3b5c1e577b52a5"
+  },
+  "screening": {
+    "fixtureRole": "development",
+    "warmupFixtureId": "development-short-confirmation",
+    "warmupRuns": 1,
+    "measuredRuns": 1,
+    "replayRealtime": false
+  },
+  "finalist": {
+    "qualityFixtureRole": "held_out",
+    "stabilityFixtureId": "stability-multiscene-15m",
+    "stabilityReplaySeconds": 900,
+    "replayRealtime": true
+  },
+  "runtimes": {
+    "sherpa-onnx-1.13.4-ort-1.27.0": {
+      "archiveSha256": "809ab5d0c77bd8f358364a244e6ab17f2afecf9779eb9fd436fa469c3ff5375c",
+      "libraries": {
+        "libonnxruntime.1.27.0.dylib": "4e775caf88df147b54cce15fd333e1cfeb483a34b857f5adff31d69bed51d980",
+        "libsherpa-onnx-c-api.dylib": "22738bb7018133b1814713427cc8db630497392943cd4ac385ca1351f7dbfbe0",
+        "libsherpa-onnx-cxx-api.dylib": "a482d2c80407539c3000c6f7abefd7c351ee9d0be78b0a41d45def1866381c49"
+      }
+    },
+    "sherpa-onnx-1.13.4-ort-1.24.4": {
+      "archiveSha256": "cb4198f8dee474d16e3ff98a4cd2448e3a9a10195a4809e13b738934beab4aad",
+      "libraries": {
+        "libonnxruntime.1.24.4.dylib": "6c057f7597518368fead4be5f4246824750148b67eccf98c912db64209d8b164",
+        "libsherpa-onnx-c-api.dylib": "7452470ad7539908c8de6ab53cc9d63e93d28277de746d91a4d1e2469f223f27",
+        "libsherpa-onnx-cxx-api.dylib": "6626f3da46e99d1220427fc1de999255556766a149fbcd2268c5138d48a56b87"
+      }
+    }
+  },
+  "models": {
+    "sensevoice-int8-2024-07-17": {
+      "source": "https://github.com/k2-fsa/sherpa-onnx/releases/download/asr-models/sherpa-onnx-sense-voice-zh-en-ja-ko-yue-2024-07-17.tar.bz2",
+      "archiveSha256": "f6b2a72ebcb1ac7a764d4cfccd886e6bcb2a95c4657c2199d0ba95ed4b9ea71a",
+      "modelSha256": "c71f0ce00bec95b07744e116345e33d8cbbe08cef896382cf907bf4b51a2cd51",
+      "tokensSha256": "f449eb28dc567533d7fa59be34e2abca8784f771850c78a47fb731a31429a1dc",
+      "licenseDisposition": "LOCAL_DEVELOPMENT_BENCHMARK_ONLY",
+      "promotionEligible": true
+    },
+    "sensevoice-int8-2025-09-09": {
+      "source": "https://github.com/k2-fsa/sherpa-onnx/releases/download/asr-models/sherpa-onnx-sense-voice-zh-en-ja-ko-yue-int8-2025-09-09.tar.bz2",
+      "archiveSha256": "7305f7905bfcf77fa0b39388a313f3da35c68d971661a65475b56fb2162c8e63",
+      "modelSha256": "12ca1a2ae7ecf3e0019ef2822307ee0b5cadc9196569e379b4c4026f8205276d",
+      "tokensSha256": "f449eb28dc567533d7fa59be34e2abca8784f771850c78a47fb731a31429a1dc",
+      "licenseDisposition": "UNRESOLVED_UPSTREAM_LICENSE",
+      "promotionEligible": false
+    }
+  },
+  "control": {
+    "runtime": "sherpa-onnx-1.13.4-ort-1.27.0",
+    "model": "sensevoice-int8-2024-07-17",
+    "provider": "cpu",
+    "threads": 2,
+    "concurrency": 1,
+    "decodingMethod": "greedy_search",
+    "language": "auto",
+    "useInverseTextNormalization": false,
+    "recognizerLifecycle": "resident_preloaded",
+    "vadThreshold": 0.5,
+    "minimumSpeechSeconds": 0.25,
+    "minimumSilenceSeconds": 0.5,
+    "maximumUtteranceSeconds": 15.0,
+    "publishesTokenPartials": false,
+    "publishesCompletedUtterancesOnly": true
+  },
+  "arms": [
+    {
+      "id": "runtime-ort-1.24.4",
+      "baseArmId": "control",
+      "variable": "runtime",
+      "value": "sherpa-onnx-1.13.4-ort-1.24.4"
+    },
+    {
+      "id": "model-2025-09-09",
+      "baseArmId": "control",
+      "variable": "model",
+      "value": "sensevoice-int8-2025-09-09"
+    },
+    {
+      "id": "itn-true",
+      "baseArmId": "control",
+      "variable": "useInverseTextNormalization",
+      "value": true
+    },
+    {
+      "id": "language-zh",
+      "baseArmId": "control",
+      "variable": "language",
+      "value": "zh"
+    },
+    {
+      "id": "language-en",
+      "baseArmId": "control",
+      "variable": "language",
+      "value": "en"
+    },
+    {
+      "id": "threads-1",
+      "baseArmId": "control",
+      "variable": "threads",
+      "value": 1
+    },
+    {
+      "id": "threads-3",
+      "baseArmId": "control",
+      "variable": "threads",
+      "value": 3
+    },
+    {
+      "id": "vad-threshold-0.4",
+      "baseArmId": "control",
+      "variable": "vadThreshold",
+      "value": 0.4
+    },
+    {
+      "id": "vad-threshold-0.6",
+      "baseArmId": "control",
+      "variable": "vadThreshold",
+      "value": 0.6
+    },
+    {
+      "id": "vad-min-speech-0.15",
+      "baseArmId": "control",
+      "variable": "minimumSpeechSeconds",
+      "value": 0.15
+    },
+    {
+      "id": "vad-min-silence-0.35",
+      "baseArmId": "control",
+      "variable": "minimumSilenceSeconds",
+      "value": 0.35
+    },
+    {
+      "id": "vad-min-silence-0.7",
+      "baseArmId": "control",
+      "variable": "minimumSilenceSeconds",
+      "value": 0.7
+    },
+    {
+      "id": "vad-max-utterance-12",
+      "baseArmId": "control",
+      "variable": "maximumUtteranceSeconds",
+      "value": 12.0
+    }
+  ],
+  "promotion": {
+    "minimumRelativeLatencyImprovement": 0.15,
+    "minimumAbsoluteErrorRateImprovement": 0.005,
+    "maximumNonTargetErrorRateRegression": 0.003,
+    "maximumCodeSwitchErrorRateRegression": 0.003,
+    "maximumRssRelativeRegression": 0.1,
+    "requireNumericSemanticNonRegression": true,
+    "requireShortConfirmationDetected": true,
+    "maximumUtteranceSeconds": 15,
+    "maximumBacklogSeconds": 10,
+    "maximumCaptureFrameLossDelta": 0
+  }
+}

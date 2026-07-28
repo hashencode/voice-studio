@@ -2,6 +2,14 @@
   "schemaVersion": 1,
   "decisionId": "S2-MOBILE-CORE-2026-07-25",
   "effectiveDate": "2026-07-25",
+  "developmentPosture": {
+    "status": "DEVELOPMENT_ONLY",
+    "productionReleasePlanningEnabled": false,
+    "multiHourTestGatesEnabled": false,
+    "maxRoutineProbeMinutes": 30,
+    "historicalLongRunEvidenceRetained": true,
+    "reactivationRequiresExplicitDecision": true
+  },
   "legacyS2Conclusion": "BLOCKED_NOT_RELEASE_READY",
   "productionMobileAsr": "paraformer-zh",
   "originalS2BaselineIds": [

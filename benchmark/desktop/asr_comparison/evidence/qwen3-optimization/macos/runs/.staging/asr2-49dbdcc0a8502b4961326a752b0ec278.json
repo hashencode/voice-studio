@@ -1,0 +1,16 @@
+{
+  "bindingSha256": "4ef0787d724e036561f68b4797bad6df940540fd5209dd3a52b045f20d70274b",
+  "complete": false,
+  "diagnosticSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "disposition": "TIMEOUT",
+  "runId": "asr2-49dbdcc0a8502b4961326a752b0ec278",
+  "schemaVersion": 2,
+  "temporaryArtifactsReleased": true,
+  "termination": {
+    "descendantProcessesGone": true,
+    "killSent": false,
+    "observedDescendantCount": 0,
+    "processGroupGone": true,
+    "termSent": true
+  }
+}

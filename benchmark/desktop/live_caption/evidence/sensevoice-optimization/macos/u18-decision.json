@@ -1,0 +1,289 @@
+{
+  "bindings": {
+    "contract": {
+      "path": "benchmark/desktop/live_caption/sensevoice_optimization_contract.json",
+      "sha256": "93fd9f1a46a9c7eef740fab19ec7e2a2ac15201318478d7a26ac2ea1b2f56651"
+    },
+    "finalistRaw": {
+      "path": "benchmark/desktop/live_caption/evidence/sensevoice-optimization/macos/finalist-raw.json",
+      "sha256": "0809c3eb3646326e1719a084359c0c921b3bea9a7471231b4304e99310090498"
+    },
+    "finalistSummary": {
+      "path": "benchmark/desktop/live_caption/evidence/sensevoice-optimization/macos/finalist-summary.json",
+      "sha256": "d05eb9a8a0f79836463436211765c47283d3cac776f6d838d29fe4327a54d18b"
+    },
+    "fixtureManifest": {
+      "path": "benchmark/desktop/live_caption/sensevoice_optimization_fixtures.json",
+      "sha256": "f602b0a933327ec99f2604ce7af4fa823320aabde7ed9acb3364459fbce87ee3"
+    },
+    "screeningRaw": {
+      "path": "benchmark/desktop/live_caption/evidence/sensevoice-optimization/macos/screening-raw.json",
+      "sha256": "0971d9eb7125268dea8934226dddf3dc406080e032b68bc89d6fcdd902ec4152"
+    },
+    "screeningSummary": {
+      "path": "benchmark/desktop/live_caption/evidence/sensevoice-optimization/macos/screening-summary.json",
+      "sha256": "044d406fec793ec3852a0d84f90f87869b8e7d44502d6ffdfdb625b2209031eb"
+    },
+    "u13Decision": {
+      "path": "benchmark/desktop/live_caption/evidence/macos/u13-control-decision.json",
+      "sha256": "98c4c77dccf3d3db0e2171cec3216d5da29144db66ad78ff4b6518c63c7eb93e"
+    },
+    "u13IntegrationProbe": {
+      "path": "benchmark/desktop/live_caption/evidence/macos/u13-flutter-capture-probe.json",
+      "sha256": "f661803fae4b3ae58012abfd27724158e497f047b38f5488338edb0c2783baed"
+    },
+    "u13Raw": {
+      "path": "benchmark/desktop/live_caption/evidence/macos/u13-control-raw-v2.json",
+      "sha256": "954c5e2f468f6b76b2701f01aa6be528a515e0a754548b9e0ee436da4d686c1a"
+    }
+  },
+  "contractId": "sensevoice-live-caption-optimization/macos-m4/v1",
+  "controlMetrics": {
+    "codeSwitchErrorRate": 0.1723096215230278,
+    "completeInputConsumed": true,
+    "errorRate": 0.30054234163653126,
+    "hallucinated": false,
+    "id": "control",
+    "itnEventAccuracy": 0.0,
+    "maximumBacklogSeconds": 0.528,
+    "maximumRssBytes": 879935488,
+    "maximumUtteranceSeconds": 15.0,
+    "nonTargetErrorRate": 0.30530871590138137,
+    "numericEventAccuracy": 1.0,
+    "shortConfirmationDetected": true,
+    "terminologyRecall": 0.75,
+    "warmUtteranceP95Ms": 841.294
+  },
+  "decision": {
+    "comparison": {
+      "codeSwitchRegression": -0.024509803921568624,
+      "latencyGain": -0.033589922191291054,
+      "nonTargetRegression": 0.0068331111434952185,
+      "qualityGain": -0.005285854507377952,
+      "rssRegression": 0.0850168506898542
+    },
+    "gates": {
+      "codeSwitchNonRegression": true,
+      "completeInputConsumed": true,
+      "maximumBacklogBounded": true,
+      "maximumUtteranceBounded": true,
+      "nonSpeechClean": true,
+      "nonTargetNonRegression": false,
+      "numericSemanticNonRegression": true,
+      "promotionEligibleModel": true,
+      "qualityOrLatencyImprovement": false,
+      "rssBounded": true,
+      "shortConfirmationDetected": true,
+      "workerExitedCleanly": true
+    },
+    "reason": "screened candidate failed held-out or bounded stability guardrails",
+    "screenedCandidate": "vad-threshold-0.4",
+    "selectedArm": "control",
+    "status": "CONTROL_RETAINED"
+  },
+  "developmentPosture": "DEVELOPMENT_ONLY",
+  "fallbackProfile": {
+    "config": {
+      "concurrency": 1,
+      "decodingMethod": "greedy_search",
+      "language": "auto",
+      "maximumUtteranceSeconds": 15.0,
+      "minimumSilenceSeconds": 0.5,
+      "minimumSpeechSeconds": 0.25,
+      "model": "sensevoice-int8-2024-07-17",
+      "provider": "cpu",
+      "publishesCompletedUtterancesOnly": true,
+      "publishesTokenPartials": false,
+      "recognizerLifecycle": "resident_preloaded",
+      "runtime": "sherpa-onnx-1.13.4-ort-1.27.0",
+      "threads": 2,
+      "useInverseTextNormalization": false,
+      "vadThreshold": 0.5
+    },
+    "id": "control"
+  },
+  "finalistMetrics": {
+    "baseArmId": "control",
+    "bindings": {
+      "modelArchiveSha256": "f6b2a72ebcb1ac7a764d4cfccd886e6bcb2a95c4657c2199d0ba95ed4b9ea71a",
+      "modelSha256": "c71f0ce00bec95b07744e116345e33d8cbbe08cef896382cf907bf4b51a2cd51",
+      "runtimeArchiveSha256": "809ab5d0c77bd8f358364a244e6ab17f2afecf9779eb9fd436fa469c3ff5375c",
+      "tokensSha256": "f449eb28dc567533d7fa59be34e2abca8784f771850c78a47fb731a31429a1dc",
+      "workerSha256": "bc6e88af40fe43e4733c1d15062e1abeb9a37ef7848d5ae246eabf4494b91b78"
+    },
+    "changedVariable": "vadThreshold",
+    "codeSwitchErrorRate": 0.1477998176014592,
+    "coldLoadMs": 346.647,
+    "completeInputConsumed": true,
+    "effectiveConfig": {
+      "concurrency": 1,
+      "decodingMethod": "greedy_search",
+      "language": "auto",
+      "maximumUtteranceSeconds": 15.0,
+      "minimumSilenceSeconds": 0.5,
+      "minimumSpeechSeconds": 0.25,
+      "model": "sensevoice-int8-2024-07-17",
+      "provider": "cpu",
+      "publishesCompletedUtterancesOnly": true,
+      "publishesTokenPartials": false,
+      "recognizerLifecycle": "resident_preloaded",
+      "runtime": "sherpa-onnx-1.13.4-ort-1.27.0",
+      "threads": 2,
+      "useInverseTextNormalization": false,
+      "vadThreshold": 0.4
+    },
+    "errorRate": 0.3058281961439092,
+    "hallucinated": false,
+    "id": "vad-threshold-0.4",
+    "itnEventAccuracy": 0.0,
+    "maximumBacklogSeconds": 0.528,
+    "maximumRssBytes": 954744832,
+    "maximumUtteranceSeconds": 15.0,
+    "nonTargetErrorRate": 0.3121418270448766,
+    "numericEventAccuracy": 1.0,
+    "probeDurationSeconds": 933.030897,
+    "retainedRssBytesAfterWorkerExit": 0,
+    "scenarioMetrics": [
+      {
+        "errorRate": 0.17010309278350516,
+        "itnEventAccuracy": null,
+        "numericEventAccuracy": null,
+        "scenario": "clean_near_field_mandarin",
+        "terminologyRecall": null,
+        "utteranceCount": 7
+      },
+      {
+        "errorRate": 0.24096385542168675,
+        "itnEventAccuracy": null,
+        "numericEventAccuracy": null,
+        "scenario": "clean_near_field_english",
+        "terminologyRecall": null,
+        "utteranceCount": 4
+      },
+      {
+        "errorRate": 0.32989690721649484,
+        "itnEventAccuracy": null,
+        "numericEventAccuracy": null,
+        "scenario": "far_field_noisy_meeting",
+        "terminologyRecall": null,
+        "utteranceCount": 7
+      },
+      {
+        "errorRate": 0.14868804664723032,
+        "itnEventAccuracy": null,
+        "numericEventAccuracy": null,
+        "scenario": "zh_en_code_switch",
+        "terminologyRecall": null,
+        "utteranceCount": 16
+      },
+      {
+        "errorRate": 0.2553191489361702,
+        "itnEventAccuracy": 0.0,
+        "numericEventAccuracy": 1.0,
+        "scenario": "terminology_numbers",
+        "terminologyRecall": 0.75,
+        "utteranceCount": 5
+      },
+      {
+        "errorRate": 0.21195652173913043,
+        "itnEventAccuracy": null,
+        "numericEventAccuracy": null,
+        "scenario": "keyboard_noise",
+        "terminologyRecall": null,
+        "utteranceCount": 6
+      },
+      {
+        "errorRate": 0.16748768472906403,
+        "itnEventAccuracy": null,
+        "numericEventAccuracy": null,
+        "scenario": "long_utterance",
+        "terminologyRecall": null,
+        "utteranceCount": 10
+      },
+      {
+        "errorRate": 0.6666666666666666,
+        "itnEventAccuracy": null,
+        "numericEventAccuracy": null,
+        "scenario": "short_confirmation",
+        "terminologyRecall": null,
+        "utteranceCount": 2
+      },
+      {
+        "errorRate": 0.5613718411552346,
+        "itnEventAccuracy": null,
+        "numericEventAccuracy": null,
+        "scenario": "system_microphone_double_talk",
+        "terminologyRecall": null,
+        "utteranceCount": 5
+      },
+      {
+        "errorRate": 0.0,
+        "itnEventAccuracy": null,
+        "numericEventAccuracy": null,
+        "scenario": "non_speech",
+        "terminologyRecall": null,
+        "utteranceCount": 2
+      },
+      {
+        "errorRate": 0.4456420492348636,
+        "itnEventAccuracy": null,
+        "numericEventAccuracy": null,
+        "scenario": "bounded_multiscene_replay",
+        "terminologyRecall": null,
+        "utteranceCount": 102
+      }
+    ],
+    "shortConfirmationDetected": true,
+    "speechEndToDriverP50Ms": 968.685,
+    "speechEndToDriverP95Ms": 2728.275,
+    "terminologyRecall": 0.75,
+    "warmUtteranceP50Ms": 330.505,
+    "warmUtteranceP95Ms": 869.553,
+    "workerCpuSeconds": 287.45,
+    "workerCpuSecondsPerAudioSecond": 0.20506217139759017
+  },
+  "kind": "sensevoice_live_caption_optimization_decision",
+  "privacy": {
+    "absolutePathsPublished": false,
+    "audioPublished": false,
+    "credentialsPublished": false,
+    "modelFilesPublished": false
+  },
+  "schemaVersion": 1,
+  "screeningSelection": {
+    "reason": "quality gate passed; held-out/stability validation required",
+    "selectedArm": "vad-threshold-0.4",
+    "status": "OPTIMIZATION_SCREENED_IN"
+  },
+  "selectedProfile": {
+    "config": {
+      "concurrency": 1,
+      "decodingMethod": "greedy_search",
+      "language": "auto",
+      "maximumUtteranceSeconds": 15.0,
+      "minimumSilenceSeconds": 0.5,
+      "minimumSpeechSeconds": 0.25,
+      "model": "sensevoice-int8-2024-07-17",
+      "provider": "cpu",
+      "publishesCompletedUtterancesOnly": true,
+      "publishesTokenPartials": false,
+      "recognizerLifecycle": "resident_preloaded",
+      "runtime": "sherpa-onnx-1.13.4-ort-1.27.0",
+      "threads": 2,
+      "useInverseTextNormalization": false,
+      "vadThreshold": 0.5
+    },
+    "id": "control"
+  },
+  "status": "PASS",
+  "target": {
+    "architecture": "arm64",
+    "buildMode": "debug",
+    "cpu": "Apple M4",
+    "logicalCpuCount": 10,
+    "memoryBytes": 17179869184,
+    "modelIdentifier": "Mac16,10",
+    "os": "macOS 15.7.5",
+    "osBuild": "24G624"
+  }
+}

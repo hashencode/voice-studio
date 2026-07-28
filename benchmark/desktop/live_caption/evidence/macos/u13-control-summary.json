@@ -1,0 +1,172 @@
+{
+  "bindings": {
+    "fixtureManifestSha256": "31e63176c0af79fdd4fb5a5e1af3581c39c7c44ce95252d6b0a6e5a3ba1fcc22",
+    "modelArchiveSha256": "f6b2a72ebcb1ac7a764d4cfccd886e6bcb2a95c4657c2199d0ba95ed4b9ea71a",
+    "rawSha256": "fd835b3fefb13332e8624b736af5719a786e4872ea9528904c35a957b6e2846f",
+    "scorerSha256": "2b76fc02ff49a61e58c2633111dba82d9697ff1d4c5b772fba3b5c1e577b52a5",
+    "sileroVadSha256": "9e2449e1087496d8d4caba907f23e0bd3f78d91fa552479bb9c23ac09cbb1fd6"
+  },
+  "captureFrameLossDelta": null,
+  "contractId": "sensevoice-live-caption/macos-m4/control-v1",
+  "effectiveConfig": {
+    "concurrency": 1,
+    "decodingMethod": "greedy_search",
+    "language": "auto",
+    "maximumUtteranceSeconds": 15.0,
+    "minimumSilenceSeconds": 0.5,
+    "minimumSpeechSeconds": 0.25,
+    "provider": "cpu",
+    "publishesCompletedUtterancesOnly": true,
+    "publishesTokenPartials": false,
+    "recognizerLifecycle": "resident_preloaded",
+    "threads": 2,
+    "useInverseTextNormalization": false,
+    "vadThreshold": 0.5
+  },
+  "invalidWorkerEventCount": 0,
+  "latency": {
+    "maximumBacklogSeconds": 0.528,
+    "measurement": "driver_jsonl_receipt_not_flutter_frame",
+    "speechEndToVisibleP50Ms": 851.97,
+    "speechEndToVisibleP95Ms": 1203.053
+  },
+  "missingInputs": [
+    "flutter_visibility_measurement",
+    "concurrent_capture_frame_control"
+  ],
+  "quality": [
+    {
+      "cer": 0.17010309278350516,
+      "completeInputConsumed": true,
+      "errorRate": 0.17010309278350516,
+      "fixtureId": "held_out-clean-mandarin",
+      "hallucinationLexicalCharactersPerMinute": null,
+      "offsetsValid": true,
+      "scenario": "clean_near_field_mandarin",
+      "utteranceCount": 6,
+      "wer": 0.13793103448275862
+    },
+    {
+      "cer": 0.20108695652173914,
+      "completeInputConsumed": true,
+      "errorRate": 0.20108695652173914,
+      "fixtureId": "held_out-clean-english",
+      "hallucinationLexicalCharactersPerMinute": null,
+      "offsetsValid": true,
+      "scenario": "clean_near_field_english",
+      "utteranceCount": 4,
+      "wer": 0.24096385542168675
+    },
+    {
+      "cer": 0.35051546391752575,
+      "completeInputConsumed": true,
+      "errorRate": 0.35051546391752575,
+      "fixtureId": "held_out-far-field",
+      "hallucinationLexicalCharactersPerMinute": null,
+      "offsetsValid": true,
+      "scenario": "far_field_noisy_meeting",
+      "utteranceCount": 6,
+      "wer": 0.3390804597701149
+    },
+    {
+      "cer": 0.18221574344023322,
+      "completeInputConsumed": true,
+      "errorRate": 0.18221574344023322,
+      "fixtureId": "held_out-code-switch",
+      "hallucinationLexicalCharactersPerMinute": null,
+      "offsetsValid": true,
+      "scenario": "zh_en_code_switch",
+      "utteranceCount": 13,
+      "wer": 0.13138686131386862
+    },
+    {
+      "cer": 0.2553191489361702,
+      "completeInputConsumed": true,
+      "errorRate": 0.2553191489361702,
+      "fixtureId": "held_out-terminology-numbers",
+      "hallucinationLexicalCharactersPerMinute": null,
+      "offsetsValid": true,
+      "scenario": "terminology_numbers",
+      "utteranceCount": 4,
+      "wer": 0.29508196721311475
+    },
+    {
+      "cer": 0.22826086956521738,
+      "completeInputConsumed": true,
+      "errorRate": 0.22826086956521738,
+      "fixtureId": "held_out-keyboard-noise",
+      "hallucinationLexicalCharactersPerMinute": null,
+      "offsetsValid": true,
+      "scenario": "keyboard_noise",
+      "utteranceCount": 6,
+      "wer": 0.3132530120481928
+    },
+    {
+      "cer": 0.1724137931034483,
+      "completeInputConsumed": true,
+      "errorRate": 0.1724137931034483,
+      "fixtureId": "held_out-long-utterance",
+      "hallucinationLexicalCharactersPerMinute": null,
+      "offsetsValid": true,
+      "scenario": "long_utterance",
+      "utteranceCount": 11,
+      "wer": 0.17894736842105263
+    },
+    {
+      "cer": 0.5263157894736842,
+      "completeInputConsumed": true,
+      "errorRate": 0.5263157894736842,
+      "fixtureId": "held_out-short-confirmation",
+      "hallucinationLexicalCharactersPerMinute": null,
+      "offsetsValid": true,
+      "scenario": "short_confirmation",
+      "utteranceCount": 3,
+      "wer": 0.5227272727272727
+    },
+    {
+      "cer": 0.5613718411552346,
+      "completeInputConsumed": true,
+      "errorRate": 0.5613718411552346,
+      "fixtureId": "held_out-double-talk",
+      "hallucinationLexicalCharactersPerMinute": null,
+      "offsetsValid": true,
+      "scenario": "system_microphone_double_talk",
+      "utteranceCount": 5,
+      "wer": 0.7148936170212766
+    },
+    {
+      "cer": null,
+      "completeInputConsumed": true,
+      "errorRate": 0.0,
+      "fixtureId": "held_out-non-speech",
+      "hallucinationLexicalCharactersPerMinute": 0.0,
+      "offsetsValid": true,
+      "scenario": "non_speech",
+      "utteranceCount": 1,
+      "wer": null
+    }
+  ],
+  "resources": {
+    "maximumAppRssBytes": 1025114112,
+    "uiLongFrameRate": null
+  },
+  "schemaVersion": 1,
+  "stability": {
+    "crashed": false,
+    "durationSeconds": 900.0,
+    "maximumUtteranceSeconds": 19.317999999999984,
+    "oom": false
+  },
+  "status": "BLOCKED",
+  "target": {
+    "architecture": "arm64",
+    "buildMode": "debug",
+    "cpu": "Apple M4",
+    "logicalCpuCount": 10,
+    "memoryBytes": 17179869184,
+    "modelIdentifier": "Mac16,10",
+    "os": "macOS 15.7.5",
+    "osBuild": "24G624"
+  },
+  "tokenPartialCount": 0
+}

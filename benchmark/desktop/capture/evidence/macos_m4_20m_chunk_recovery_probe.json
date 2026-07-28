@@ -1,0 +1,99 @@
+{
+  "schemaVersion": 1,
+  "evidenceId": "MACOS-CAPTURE-U11-M4-20M-2026-07-28T015450Z",
+  "status": "PASS",
+  "admissibleForDeclaredClosureTarget": true,
+  "target": {
+    "modelIdentifier": "Mac16,10",
+    "os": "macOS 15.7.5",
+    "osBuild": "24G624",
+    "architecture": "arm64",
+    "cpu": "Apple M4",
+    "logicalCpuCount": 10,
+    "memoryBytes": 17179869184,
+    "buildMode": "debug"
+  },
+  "build": {
+    "bundleIdentifier": "com.voice2text.voice2textDesktop",
+    "signature": "adhoc",
+    "teamIdentifier": null,
+    "cdHash": "9aa0f038711ad29f12fef8d95f99da2ba7a81aee",
+    "executableSha256": "ec2e4db489b9b9c770ec532a4c88569e230c151c52ba2eebd2c7d2ee5feec79a"
+  },
+  "permissions": {
+    "systemAudio": "granted",
+    "microphone": "granted",
+    "screenPixelsRequested": false
+  },
+  "probe": {
+    "startedAtUtc": "2026-07-28T01:54:50Z",
+    "finishedAtUtc": "2026-07-28T02:14:51Z",
+    "requestedDurationSeconds": 1200,
+    "durationLimitSeconds": 1800,
+    "captureTimelineMs": 1199750,
+    "pauseMilliseconds": 250,
+    "storageBytes": 704747557,
+    "rawProbeOutputSha256": "87b754e2e9b615e88db6ebea227ff4d4f3c94e2a33627fef7f6e07011e4aa6a1",
+    "systemAudio": {
+      "api": "Core Audio process tap",
+      "sampleRate": 48000,
+      "channels": 2,
+      "observedFrames": 57596416,
+      "finalizedChunkCount": 240,
+      "minimumChunkDurationMs": 4459,
+      "maximumChunkDurationMs": 5003
+    },
+    "microphone": {
+      "api": "AVAudioEngine.inputNode",
+      "sampleRate": 48000,
+      "channels": 1,
+      "observedFrames": 57585600,
+      "finalizedChunkCount": 240,
+      "minimumChunkDurationMs": 4700,
+      "maximumChunkDurationMs": 5000
+    }
+  },
+  "recovery": {
+    "completedSessionRecoveryMs": 326,
+    "maximumRecoveryMs": 326,
+    "invalidFinalizedChunks": 0,
+    "maximumTailChunksQuarantinedPerTrack": 1,
+    "faultInjection": [
+      {
+        "stage": "during_write",
+        "status": "PASS",
+        "firstRecoveryMs": 4,
+        "secondRecoveryMs": 1,
+        "quarantinedTailChunks": 2,
+        "quarantinedTailChunksPerTrack": 1,
+        "idempotent": true
+      },
+      {
+        "stage": "during_finalize",
+        "status": "PASS",
+        "firstRecoveryMs": 3,
+        "secondRecoveryMs": 1,
+        "quarantinedTailChunks": 2,
+        "quarantinedTailChunksPerTrack": 1,
+        "idempotent": true
+      },
+      {
+        "stage": "after_journal",
+        "status": "PASS",
+        "firstRecoveryMs": 3,
+        "secondRecoveryMs": 1,
+        "quarantinedTailChunks": 0,
+        "quarantinedTailChunksPerTrack": 0,
+        "idempotent": true
+      }
+    ]
+  },
+  "decision": {
+    "chunksValid": true,
+    "recoveryValid": true,
+    "withinThirtyMinuteLimit": true,
+    "withinThirtySecondRecoveryLimit": true,
+    "captureContractFrozen": true,
+    "u12Allowed": true
+  }
+}

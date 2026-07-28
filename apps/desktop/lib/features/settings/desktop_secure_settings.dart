@@ -14,6 +14,8 @@ class DesktopSecureSettings {
     ),
   }) : _store = KeychainDesktopSecretStore(storage: storage);
 
+  DesktopSecureSettings.withStore(DesktopSecretStore store) : _store = store;
+
   final DesktopSecretStore _store;
 
   Future<bool> hasProviderSecret(String providerId) =>

@@ -1,0 +1,156 @@
+{
+  "schemaVersion": 1,
+  "unit": "U15",
+  "capturedAt": "2026-07-28",
+  "target": {
+    "platform": "macos",
+    "osVersion": "15.7.5",
+    "osBuild": "24G624",
+    "modelIdentifier": "Mac16,10",
+    "architecture": "arm64",
+    "cpu": "Apple M4",
+    "logicalCpuCount": 10,
+    "memoryGiB": 16,
+    "buildMode": "debug",
+    "developmentOnly": true
+  },
+  "status": "PASS",
+  "implemented": {
+    "libraryPrimaryAction": "start_meeting",
+    "librarySecondaryAction": "import_file",
+    "preflight": true,
+    "sharedWindowMenuController": true,
+    "singleStopFinalization": true,
+    "recordingMeters": true,
+    "captionFailureIsolation": true,
+    "captionRestart": true,
+    "partialCaptureState": true,
+    "perSessionRecovery": true,
+    "recoveryTimelineUsesLastSafeChunk": true,
+    "recoveryRebuildsDisposableSpoolFromValidatedAuthorityChunks": true,
+    "committedPartialCaptureIsNotReofferedAfterRestart": true,
+    "microphoneOnlyFallbackMacos13To14_1": true,
+    "microphoneOnlyIsExpectedAuthorityNotPartialCapture": true,
+    "debugForcedMicrophoneOnlyPath": true,
+    "selectedMicrophoneBoundToCoreAudioDevice": true,
+    "mainWindowCloseKeepsApplicationAlive": true,
+    "systemSleepSafelyPausesCapture": true,
+    "systemSleepPausesUiClockAndCaptionPolling": true,
+    "systemWakeRequiresExplicitResume": true,
+    "reducedMotionDisablesPageLoadingAnimation": true,
+    "boundedPermissionRequestWaitSeconds": 15
+  },
+  "verification": {
+    "devCheck": {
+      "status": "PASS",
+      "steps": 21,
+      "command": "./tool/dev_check.sh",
+      "longRunningHistoricalGatesRerun": false
+    },
+    "desktopTargetedTests": {
+        "status": "PASS",
+        "count": 24,
+      "includes": [
+        "preflight denied, missing-device, low-disk and missing-model states",
+        "200 percent text scale",
+        "shared window and menu pause, resume and stop controller",
+        "concurrent stop finalizes exactly once",
+        "selected microphone is forwarded to native capture",
+        "native sleep freezes UI elapsed time and requires explicit wake resume",
+        "sleep and wake interruption is a VoiceOver live region",
+        "window close lifecycle preserves the recording process",
+        "partial capture and caption degradation",
+        "keyboard shortcut and stop confirmation",
+          "per-session recovery keep and confirmed delete",
+          "stale recovery timeline advances to the last safe chunk",
+          "committed partial capture is terminal for recovery scanning",
+          "microphone-only preflight, authority journal, recovery and workspace states"
+        ]
+      },
+      "pythonScopeAndRuntimeTests": {
+        "status": "PASS",
+        "count": 24
+      },
+    "macosInteractionIntegrationTest": {
+      "status": "PASS",
+      "path": "apps/desktop/integration_test/macos_recording_interaction_test.dart"
+    },
+    "macosDebugBuild": {
+      "status": "PASS",
+      "artifact": "apps/desktop/build/macos/Build/Products/Debug/voice2text_desktop.app"
+    },
+    "runtimeFloorContract": {
+        "status": "PASS",
+        "application": "13.0",
+        "microphoneOnlyCapture": "13.0",
+        "coreAudioTap": "14.2",
+        "localProcessing": "15.5"
+      },
+      "physicalUiSmoke": {
+        "status": "PASS",
+        "libraryAndPreflightVisible": true,
+        "defaultInputObserved": "外置麦克风",
+        "preFixDualTrackStartPauseResumeStopHandoff": "PASS",
+        "preFixWindowCloseKeptCaptureAlive": "PASS",
+        "finalDebugInterruptedRecovery": {
+          "status": "PASS",
+          "sessionId": "session-1785241264361-adff527b68bac424",
+          "validatedAuthorityChunks": 9,
+          "lastSafeTimelineMs": 44100,
+          "staleJournalTimelineMsBeforeRepair": 19104,
+          "emptySpoolBytesBeforeRepair": 0,
+          "rebuiltSpoolBytes": 1411200,
+          "materializedWavBytes": 1411244,
+          "materializedWavSha256": "8932cdebc5fbb845062032be6adbe6b2528afb19d761693f3dfdd313eda6c55d",
+          "recordingId": 2,
+          "formalJobStatus": "pending",
+          "formalJobStage": "queued",
+          "restartDoesNotReofferCommittedRecovery": true
+        },
+        "priorRealDualTrackHandoffEvidence": "benchmark/desktop/live_caption/evidence/handoff/macos/u14-handoff-smoke.json",
+        "finalDebugDualTrackStop": {
+          "status": "PASS",
+          "sessionId": "session-1785242764676-c2e48ba60bcfb938",
+          "captureMode": "dual_track",
+          "timelineMs": 80066,
+          "authorityChunks": 35,
+          "captionSpoolBytes": 5443200,
+          "captionSpoolSha256": "6693b54e3b844d6a03358d0f1f806a66d46b3d9d56205ec898c1cd109283902f",
+          "materializedWavBytes": 5443244,
+          "materializedWavSha256": "44317cff8db1f54a9ff17149be5f921e32abbeee606f0cdc1c4ea150500f1abc",
+          "recordingId": 3,
+          "formalJobStatus": "pending",
+          "formalJobStage": "queued",
+          "partialCapture": false,
+          "systemTrackAuthorityChunks": 0,
+          "systemTrackSilenceReason": "No system-audio source was playing during this bounded final stop smoke; the prior real dual-track handoff evidence covers non-empty system-audio capture."
+        },
+        "debugForcedMicrophoneOnly": {
+          "status": "PASS_NOT_LOWER_OS_EVIDENCE",
+          "sessionId": "session-1785243222274-3aa4f355ee280848",
+          "captureMode": "microphone_only",
+          "timelineMs": 26959,
+          "authorityChunks": 6,
+          "captionSpoolBytes": 860800,
+          "captionSpoolSha256": "b20c7e6749d2a0d3d453ead6b0924df65d1d09fba43c93185fa5e1c436331c80",
+          "materializedWavBytes": 860844,
+          "materializedWavSha256": "172e7233c0d6cd2b2153b94438902413c75447fcc7a5eca0a698a2a66a0829ad",
+          "recordingId": 4,
+          "formalJobStatus": "pending",
+          "formalJobStage": "queued",
+          "partialCapture": false,
+          "onlyMicrophoneAuthorityTrack": true,
+          "preflightExplainsCompatibilityMode": true,
+          "workspaceExplainsMicrophoneOnlyRecording": true
+        },
+        "detail": "On the Apple M4 target, the final Debug build physically passed interrupted recovery, bounded dual-track stop/finalization, and the DEBUG-forced microphone-only compatibility path. Recovery rebuilt an empty disposable spool from nine hash-validated authority chunks and did not reoffer the committed partial capture after restart. The final dual-track smoke had no active system-audio source, so its system authority track was empty; non-empty real system-audio capture remains covered by the prior U14 handoff evidence."
+      },
+      "lowerOsPhysicalEvidence": {
+        "status": "NOT_RUN_NO_LOWER_OS_HOST",
+        "debugForcedPathOnCurrentM4": "PASS_NOT_LOWER_OS_EVIDENCE",
+        "notClaimedAsMacos13Or14_1Evidence": true
+      }
+    },
+    "remainingGate": null,
+    "remainingRisk": "No U15 implementation gate remains on the current Apple M4 target. A real macOS 13.x/14.1 host remains a separate lower-version evidence gap and is not claimed by the DEBUG-forced path."
+  }

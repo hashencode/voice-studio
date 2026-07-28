@@ -1,0 +1,77 @@
+{
+  "schemaVersion": 1,
+  "evidenceId": "MACOS-CAPTURE-U11-M4-SMOKE-2026-07-27T235524Z",
+  "status": "PASS_SHORT_SMOKE_SAME_TARGET",
+  "admissibleForDeclaredClosureTarget": true,
+  "target": {
+    "os": "macOS 15.7.5",
+    "osBuild": "24G624",
+    "architecture": "arm64",
+    "cpu": "Apple M4",
+    "logicalCpuCount": 10,
+    "memoryBytes": 17179869184,
+    "buildMode": "debug"
+  },
+  "build": {
+    "bundleIdentifier": "com.voice2text.voice2textDesktop",
+    "signature": "adhoc",
+    "teamIdentifier": null,
+    "cdHash": "1aed564ef126cc8e307ec3864e93de6400392983",
+    "executableSha256": "27e51db4a9825e81a2a66472ad1f992a4ed1331fca220441baa0357a1430835d"
+  },
+  "permissions": {
+    "systemAudio": "granted",
+    "microphone": "granted",
+    "screenPixelsRequested": false
+  },
+  "devices": {
+    "defaultInput": {
+      "name": "外置麦克风",
+      "sampleRate": 48000,
+      "channels": 1
+    },
+    "defaultOutput": {
+      "name": "外置耳机",
+      "sampleRate": 48000,
+      "channels": 2
+    }
+  },
+  "playbackFixture": {
+    "path": "assets/sherpa/wav/test.wav",
+    "sha256": "ad12c2ee3b2d60ad5214d22e8a3e9002f1bad9c61f60c4b404ee206d60a66ded",
+    "player": "/usr/bin/afplay"
+  },
+  "probe": {
+    "startedAtUtc": "2026-07-27T23:55:24Z",
+    "finishedAtUtc": "2026-07-27T23:55:27Z",
+    "durationLimitSeconds": 10,
+    "pauseMilliseconds": 250,
+    "lifecycle": [
+      "start",
+      "pause",
+      "resume",
+      "stop"
+    ],
+    "systemAudio": {
+      "api": "Core Audio process tap",
+      "sampleRate": 48000,
+      "channels": 2,
+      "observedFrames": 146944,
+      "startAttempts": 1
+    },
+    "microphone": {
+      "api": "AVAudioEngine.inputNode",
+      "sampleRate": 48000,
+      "channels": 1,
+      "observedFrames": 144000
+    }
+  },
+  "decision": {
+    "apiFeasibleOnObservedTarget": true,
+    "declaredTargetShortSmokePassed": true,
+    "u11Complete": false,
+    "failedGates": [
+      "TWENTY_TO_THIRTY_MINUTE_CHUNK_RECOVERY_PROBE_NOT_RUN"
+    ]
+  }
+}

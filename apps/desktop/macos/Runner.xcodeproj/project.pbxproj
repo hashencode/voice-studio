@@ -29,6 +29,12 @@
 		33CC11132044BFA00003C045 /* MainFlutterWindow.swift in Sources */ = {isa = PBXBuildFile; fileRef = 33CC11122044BFA00003C045 /* MainFlutterWindow.swift */; };
 		A10000012026072600000001 /* SecureLocalImportPlugin.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000022026072600000002 /* SecureLocalImportPlugin.swift */; };
 		B10000012026072600000001 /* CompanionDiscoveryPlugin.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000022026072600000002 /* CompanionDiscoveryPlugin.swift */; };
+		C10000012026072800000001 /* DesktopCapturePlugin.swift in Sources */ = {isa = PBXBuildFile; fileRef = C10000022026072800000001 /* DesktopCapturePlugin.swift */; };
+		C10000012026072800000002 /* CoreAudioProcessTapCapture.swift in Sources */ = {isa = PBXBuildFile; fileRef = C10000022026072800000002 /* CoreAudioProcessTapCapture.swift */; };
+		C10000012026072800000003 /* MicrophoneCapture.swift in Sources */ = {isa = PBXBuildFile; fileRef = C10000022026072800000003 /* MicrophoneCapture.swift */; };
+		C10000012026072800000004 /* CaptureChunkJournal.swift in Sources */ = {isa = PBXBuildFile; fileRef = C10000022026072800000004 /* CaptureChunkJournal.swift */; };
+		C10000012026072800000005 /* CaptureDiskMonitor.swift in Sources */ = {isa = PBXBuildFile; fileRef = C10000022026072800000005 /* CaptureDiskMonitor.swift */; };
+		C10000012026072800000006 /* RecordingMenuBarController.swift in Sources */ = {isa = PBXBuildFile; fileRef = C10000022026072800000006 /* RecordingMenuBarController.swift */; };
 		796F10CAC5631B4FE491A9ED /* Pods_RunnerTests.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 161A0229A3F1915C55727DBB /* Pods_RunnerTests.framework */; };
 		F993FBF7C066E80A72EF6E99 /* Pods_Runner.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = FD7B60474402E4EC541B5BA5 /* Pods_Runner.framework */; };
 /* End PBXBuildFile section */
@@ -77,6 +83,12 @@
 		33CC11122044BFA00003C045 /* MainFlutterWindow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MainFlutterWindow.swift; sourceTree = "<group>"; };
 		A10000022026072600000002 /* SecureLocalImportPlugin.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SecureLocalImportPlugin.swift; sourceTree = "<group>"; };
 		B10000022026072600000002 /* CompanionDiscoveryPlugin.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Companion/CompanionDiscoveryPlugin.swift; sourceTree = "<group>"; };
+		C10000022026072800000001 /* DesktopCapturePlugin.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Capture/DesktopCapturePlugin.swift; sourceTree = "<group>"; };
+		C10000022026072800000002 /* CoreAudioProcessTapCapture.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Capture/CoreAudioProcessTapCapture.swift; sourceTree = "<group>"; };
+		C10000022026072800000003 /* MicrophoneCapture.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Capture/MicrophoneCapture.swift; sourceTree = "<group>"; };
+		C10000022026072800000004 /* CaptureChunkJournal.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Capture/CaptureChunkJournal.swift; sourceTree = "<group>"; };
+		C10000022026072800000005 /* CaptureDiskMonitor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Capture/CaptureDiskMonitor.swift; sourceTree = "<group>"; };
+		C10000022026072800000006 /* RecordingMenuBarController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Capture/RecordingMenuBarController.swift; sourceTree = "<group>"; };
 		33CEB47222A05771004F2AC0 /* Flutter-Debug.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = "Flutter-Debug.xcconfig"; sourceTree = "<group>"; };
 		33CEB47422A05771004F2AC0 /* Flutter-Release.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = "Flutter-Release.xcconfig"; sourceTree = "<group>"; };
 		33CEB47722A0578A004F2AC0 /* Flutter-Generated.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; name = "Flutter-Generated.xcconfig"; path = "ephemeral/Flutter-Generated.xcconfig"; sourceTree = "<group>"; };
@@ -183,6 +195,12 @@
 				33CC11122044BFA00003C045 /* MainFlutterWindow.swift */,
 				A10000022026072600000002 /* SecureLocalImportPlugin.swift */,
 				B10000022026072600000002 /* CompanionDiscoveryPlugin.swift */,
+				C10000022026072800000001 /* DesktopCapturePlugin.swift */,
+				C10000022026072800000002 /* CoreAudioProcessTapCapture.swift */,
+				C10000022026072800000003 /* MicrophoneCapture.swift */,
+				C10000022026072800000004 /* CaptureChunkJournal.swift */,
+				C10000022026072800000005 /* CaptureDiskMonitor.swift */,
+				C10000022026072800000006 /* RecordingMenuBarController.swift */,
 				33E51913231747F40026EE4D /* DebugProfile.entitlements */,
 				33E51914231749380026EE4D /* Release.entitlements */,
 				33CC11242044D66E0003C045 /* Resources */,
@@ -438,7 +456,7 @@
 			inputFileListPaths = (
 			);
 			inputPaths = (
-				"$(SRCROOT)/../tool/desktop_sherpa_worker.dart",
+				"$(SRCROOT)/../../../packages/desktop_sherpa_worker",
 				"$(SRCROOT)/../tool/native_process_group_launcher.c",
 				"$(SRCROOT)/../tool/build_native_worker.sh",
 			);
@@ -447,11 +465,15 @@
 			);
 			outputPaths = (
 				"$(TARGET_BUILD_DIR)/$(UNLOCALIZED_RESOURCES_FOLDER_PATH)/Processing/desktop_sherpa_worker",
+				"$(TARGET_BUILD_DIR)/$(UNLOCALIZED_RESOURCES_FOLDER_PATH)/Processing/desktop_sensevoice_caption_worker",
 				"$(TARGET_BUILD_DIR)/$(UNLOCALIZED_RESOURCES_FOLDER_PATH)/Processing/native_process_group_launcher",
+				"$(TARGET_BUILD_DIR)/$(FRAMEWORKS_FOLDER_PATH)/libonnxruntime.1.27.0.dylib",
+				"$(TARGET_BUILD_DIR)/$(FRAMEWORKS_FOLDER_PATH)/libsherpa-onnx-c-api.dylib",
+				"$(TARGET_BUILD_DIR)/$(FRAMEWORKS_FOLDER_PATH)/libsherpa-onnx-cxx-api.dylib",
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 			shellPath = /bin/bash;
-			shellScript = "DART_BIN=\"$FLUTTER_ROOT/bin/cache/dart-sdk/bin/dart\" \"$SRCROOT/../tool/build_native_worker.sh\" \"$TARGET_BUILD_DIR/$UNLOCALIZED_RESOURCES_FOLDER_PATH/Processing\"\n";
+			shellScript = "DART_BIN=\"$FLUTTER_ROOT/bin/cache/dart-sdk/bin/dart\" \"$SRCROOT/../tool/build_native_worker.sh\" \"$TARGET_BUILD_DIR/$UNLOCALIZED_RESOURCES_FOLDER_PATH/Processing\" \"$TARGET_BUILD_DIR/$FRAMEWORKS_FOLDER_PATH\"\n";
 			showEnvVarsInLog = 0;
 		};
 /* End PBXShellScriptBuildPhase section */
@@ -472,6 +494,12 @@
 				33CC11132044BFA00003C045 /* MainFlutterWindow.swift in Sources */,
 				A10000012026072600000001 /* SecureLocalImportPlugin.swift in Sources */,
 				B10000012026072600000001 /* CompanionDiscoveryPlugin.swift in Sources */,
+				C10000012026072800000001 /* DesktopCapturePlugin.swift in Sources */,
+				C10000012026072800000002 /* CoreAudioProcessTapCapture.swift in Sources */,
+				C10000012026072800000003 /* MicrophoneCapture.swift in Sources */,
+				C10000012026072800000004 /* CaptureChunkJournal.swift in Sources */,
+				C10000012026072800000005 /* CaptureDiskMonitor.swift in Sources */,
+				C10000012026072800000006 /* RecordingMenuBarController.swift in Sources */,
 				33CC10F12044A3C60003C045 /* AppDelegate.swift in Sources */,
 				335BBD1B22A9A15E00E9071D /* GeneratedPluginRegistrant.swift in Sources */,
 			);
@@ -591,7 +619,7 @@
 				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
 				GCC_WARN_UNUSED_FUNCTION = YES;
 				GCC_WARN_UNUSED_VARIABLE = YES;
-				MACOSX_DEPLOYMENT_TARGET = 10.15;
+				MACOSX_DEPLOYMENT_TARGET = 13.0;
 				MTL_ENABLE_DEBUG_INFO = NO;
 				SDKROOT = macosx;
 				SWIFT_COMPILATION_MODE = wholemodule;
@@ -673,7 +701,7 @@
 				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
 				GCC_WARN_UNUSED_FUNCTION = YES;
 				GCC_WARN_UNUSED_VARIABLE = YES;
-				MACOSX_DEPLOYMENT_TARGET = 10.15;
+				MACOSX_DEPLOYMENT_TARGET = 13.0;
 				MTL_ENABLE_DEBUG_INFO = YES;
 				ONLY_ACTIVE_ARCH = YES;
 				SDKROOT = macosx;
@@ -723,7 +751,7 @@
 				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
 				GCC_WARN_UNUSED_FUNCTION = YES;
 				GCC_WARN_UNUSED_VARIABLE = YES;
-				MACOSX_DEPLOYMENT_TARGET = 10.15;
+				MACOSX_DEPLOYMENT_TARGET = 13.0;
 				MTL_ENABLE_DEBUG_INFO = NO;
 				SDKROOT = macosx;
 				SWIFT_COMPILATION_MODE = wholemodule;

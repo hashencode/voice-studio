@@ -48,8 +48,11 @@ python3 tool/validate_s3_productization_scope.py
 echo "[9/21] Desktop workstation truth contract"
 python3 -m unittest tool/test_validate_desktop_workstation_scope.py
 python3 tool/validate_desktop_workstation_scope.py
+dart run apps/desktop/tool/desktop_capture_probe.dart \
+  benchmark/desktop/capture/macos_capture_feasibility.json
 
 echo "[macOS prerequisite] Rebuild desktop product artifact"
+python3 tool/build_cache_guard.py
 (
   cd apps/desktop
   flutter build macos --debug
@@ -58,7 +61,9 @@ echo "[macOS prerequisite] Rebuild desktop product artifact"
 echo "[10/21] macOS workstation closure contract"
 python3 -m unittest \
   tool/test_macos_artifact_hash.py \
+  tool/test_validate_macos_runtime_floor.py \
   tool/test_validate_macos_closure.py
+python3 tool/validate_macos_runtime_floor.py
 python3 tool/validate_macos_closure.py
 
 echo "[11/21] Desktop foundation contract"
@@ -69,18 +74,24 @@ echo "[12/21] Desktop benchmark contract"
 
 echo "[13/21] Shared Dart workspace contract"
 dart pub workspace list
+python3 tool/build_cache_guard.py
 dart test \
   packages/companion_protocol \
+  packages/desktop_sherpa_worker \
   packages/meeting_core \
   packages/processing_contracts \
   packages/meeting_workflows
+python3 tool/build_cache_guard.py
 flutter test packages/meeting_storage/test
+python3 tool/build_cache_guard.py
 flutter test apps/desktop/test
 
 echo "[14/21] Flutter analyze"
+python3 tool/build_cache_guard.py
 flutter analyze
 
 echo "[15/21] Flutter test"
+python3 tool/build_cache_guard.py
 flutter test
 
 echo "[16/21] Timestamp fixture contract"
@@ -136,6 +147,7 @@ test -f android/app/src/androidTest/java/com/voice2text/app/test/ShareReceiverAc
 
 if [[ "$WITH_BUILD" == "true" ]]; then
   echo "[21/21] Flutter build apk --debug"
+  python3 tool/build_cache_guard.py
   flutter build apk --debug
 else
   echo "[21/21] Skipped build (pass --with-build to enable)"

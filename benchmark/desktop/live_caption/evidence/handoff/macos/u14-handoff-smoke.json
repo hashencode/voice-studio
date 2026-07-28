@@ -1,0 +1,77 @@
+{
+  "schemaVersion": 1,
+  "unit": "U14",
+  "developmentPosture": "DEVELOPMENT_ONLY",
+  "status": "PASS_NON_ADMISSIBLE_SHORT",
+  "recordedAtUtc": "2026-07-28T07:42:34Z",
+  "target": {
+    "modelIdentifier": "Mac16,10",
+    "chip": "Apple M4",
+    "memoryGiB": 16,
+    "macosVersion": "15.7.5",
+    "macosBuild": "24G624",
+    "architecture": "arm64"
+  },
+  "scope": {
+    "probeDurationSeconds": 10,
+    "historicalLongEvidenceRerun": false,
+    "purpose": "Bounded native spool and resident worker handoff smoke only",
+    "productionReleaseEvidence": false
+  },
+  "capture": {
+    "systemAudioSource": "afplay fixed SenseVoice zh.wav fixture",
+    "microphoneSource": "user-authorized external headset microphone",
+    "status": "PASS_NON_ADMISSIBLE_SHORT",
+    "captureTimelineMs": 9750,
+    "pauseMilliseconds": 250,
+    "systemFinalizedChunkCount": 3,
+    "microphoneFinalizedChunkCount": 2,
+    "maximumRecoveryMs": 6,
+    "faultInjectionPassed": true,
+    "captureEvidenceSha256": "7f1d12cbf16fb6d189569841c02432ff4510e729a669f0151df430d7aa5eef03",
+    "debugExecutableSha256": "e8391c4ccf11d5c0fa02a236709483f9e2eab4d959d57810e2951798753bea92"
+  },
+  "spool": {
+    "format": "s16le",
+    "sampleRate": 16000,
+    "channels": 1,
+    "frameDurationMs": 100,
+    "frameBytes": 3200,
+    "bytes": 310400,
+    "frames": 97,
+    "durationSeconds": 9.7,
+    "frameAligned": true,
+    "sha256": "6939fc07edd4880e337abcb06b2ccaf27133acab2d0322d11f3b7441881fbaeb"
+  },
+  "worker": {
+    "protocol": "sensevoice-live-caption-worker/v1",
+    "executableSha256": "3b791ff8418232a02b74f85e628422cd4fd0f8f64faedb39170fd34d00337a68",
+    "modelSha256": "c71f0ce00bec95b07744e116345e33d8cbbe08cef896382cf907bf4b51a2cd51",
+    "vadSha256": "9e2449e1087496d8d4caba907f23e0bd3f78d91fa552479bb9c23ac09cbb1fd6",
+    "profile": "U18_CONTROL_RETAINED",
+    "modelLoadMs": 479.953,
+    "utteranceCount": 2,
+    "finalOffsetBytes": 310400,
+    "backlogBytes": 0,
+    "sequenceContiguous": true,
+    "offsetMonotonic": true,
+    "residentBytesFinal": 603602944
+  },
+  "authorityChecks": {
+    "separateSystemAndMicrophoneChunks": true,
+    "captionSpoolDisposable": true,
+    "captionWorkerReadOnly": true,
+    "flutterPcmTransport": false,
+    "draftSource": "sensevoice_live_draft",
+    "formalSource": "qwen3_post_meeting",
+    "partialFormalSwitchesActive": false,
+    "humanRevisionRequiresReconciliation": true
+  },
+  "provenance": {
+    "excludedFirstAttempt": {
+      "reason": "No system audio was playing, so the existing dual-track U11 gate correctly rejected the short probe.",
+      "permissionFailure": false,
+      "spoolFailure": false
+    }
+  }
+}

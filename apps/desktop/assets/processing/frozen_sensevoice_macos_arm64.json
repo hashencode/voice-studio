@@ -1,0 +1,43 @@
+{
+  "schemaVersion": 1,
+  "setId": "sensevoice-live-caption-macos-arm64-2024-07-17-int8",
+  "platform": "macos",
+  "architecture": "arm64",
+  "developmentPosture": "DEVELOPMENT_ONLY",
+  "status": "PASS",
+  "distributionEligible": false,
+  "developmentEligible": true,
+  "licenseDisposition": "LOCAL_DEVELOPMENT_BENCHMARK_ONLY",
+  "model": {
+    "source": "https://github.com/k2-fsa/sherpa-onnx/releases/download/asr-models/sherpa-onnx-sense-voice-zh-en-ja-ko-yue-2024-07-17.tar.bz2",
+    "archiveSha256": "f6b2a72ebcb1ac7a764d4cfccd886e6bcb2a95c4657c2199d0ba95ed4b9ea71a",
+    "modelRelativePath": "model.int8.onnx",
+    "modelSha256": "c71f0ce00bec95b07744e116345e33d8cbbe08cef896382cf907bf4b51a2cd51",
+    "tokensRelativePath": "tokens.txt",
+    "tokensSha256": "f449eb28dc567533d7fa59be34e2abca8784f771850c78a47fb731a31429a1dc"
+  },
+  "vad": {
+    "source": "https://github.com/k2-fsa/sherpa-onnx/releases/download/asr-models/silero_vad.onnx",
+    "sha256": "9e2449e1087496d8d4caba907f23e0bd3f78d91fa552479bb9c23ac09cbb1fd6"
+  },
+  "control": {
+    "runtime": "sherpa-onnx-1.13.4-ort-1.27.0",
+    "provider": "cpu",
+    "threads": 2,
+    "concurrency": 1,
+    "decodingMethod": "greedy_search",
+    "language": "auto",
+    "useInverseTextNormalization": false,
+    "maximumUtteranceSeconds": 15,
+    "publishesTokenPartials": false
+  },
+  "machineDecision": {
+    "status": "PASS",
+    "target": "Mac16,10/Apple M4/macOS 15.7.5 (24G624)",
+    "decisionPath": "benchmark/desktop/live_caption/evidence/sensevoice-optimization/macos/u18-decision.json",
+    "decisionSha256": "6f95c2c70cf36eac26ec0bdc208298e50dfd8d7344cba2623176f9eddb65f320",
+    "evidencePath": "benchmark/desktop/live_caption/evidence/macos/u13-control-summary-v2.json",
+    "evidenceSha256": "d879d1479dca6c2848ab0c61bf26e65f6a2abbd6e759b84566012102f580dbe8",
+    "productDisposition": "U18_CONTROL_RETAINED"
+  }
+}

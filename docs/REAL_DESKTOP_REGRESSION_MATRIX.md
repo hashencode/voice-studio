@@ -1,5 +1,10 @@
 # Real desktop regression matrix
 
+This matrix records the historical U4-U9 Apple M2 closure baseline. The current
+U11-U18 and expanded-closure development reference target is Mac mini
+`Mac16,10` / Apple M4 (10 cores) / 16 GiB / macOS 15.7.5 (24G624); historical
+M2 PASS does not transfer to the current M4 target.
+
 Decision: `DESKTOP-FIRST-MEETING-WORKSTATION-2026-07-26`
 
 This matrix records target-specific physical macOS evidence. It does not transfer

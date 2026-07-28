@@ -1,0 +1,2700 @@
+{
+  "contractId": "qwen3-asr-bounded-optimization/macos-m4/v1",
+  "contractSha256": "4d733fea306dfa49dc9c1f517103011e60050a4581f9558c348fbafb93a209fe",
+  "developmentPosture": "DEVELOPMENT_ONLY",
+  "kind": "qwen3_optimization_raw_manifest",
+  "runCount": 168,
+  "runs": [
+    {
+      "profileId": "fixed-resource",
+      "run": {
+        "path": "benchmark/desktop/asr_comparison/evidence/qwen3-optimization/macos/runs/asr2-56a4e66120f7304c33165c7ab812668a.json",
+        "sha256": "3b3e265c8fa354f9ded859809f0315536d0f9e7b03b3a798d029541bf47de497"
+      },
+      "runId": "asr2-56a4e66120f7304c33165c7ab812668a",
+      "scenario": "clean_near_field_mandarin",
+      "scheduleOrder": 24,
+      "warmup": true,
+      "workerOutput": {
+        "documentSha256": "6b2b145a96d777577a219b061e002701c8ca1f05863629acf1479761f082258a",
+        "path": "benchmark/desktop/asr_comparison/evidence/qwen3-optimization/macos/raw/asr2-56a4e66120f7304c33165c7ab812668a.json",
+        "semanticResultSha256": "4f485738b199822e6ea5c858151bf1a92326bfd33a47aacfedfa449d39a8d721"
+      }
+    },
+    {
+      "profileId": "fixed-resource",
+      "run": {
+        "path": "benchmark/desktop/asr_comparison/evidence/qwen3-optimization/macos/runs/asr2-99a7bab1a3a1faaca09cee5993259d85.json",
+        "sha256": "69aaff4908ff4920d760f21573da41de87c76334bc604f6fb30730275c770b1f"
+      },
+      "runId": "asr2-99a7bab1a3a1faaca09cee5993259d85",
+      "scenario": "far_field_noisy_meeting",
+      "scheduleOrder": 25,
+      "warmup": true,
+      "workerOutput": {
+        "documentSha256": "a2eaca2f305e01f566004dac6101d5cde784a3b205aefc2eeb8cddb8a51e2530",
+        "path": "benchmark/desktop/asr_comparison/evidence/qwen3-optimization/macos/raw/asr2-99a7bab1a3a1faaca09cee5993259d85.json",
+        "semanticResultSha256": "c183bad726f42d782a02d6e02ff79adcd336f5ca31e57be513bf18ddd6e15e40"
+      }
+    },
+    {
+      "profileId": "fixed-resource",
+      "run": {
+        "path": "benchmark/desktop/asr_comparison/evidence/qwen3-optimization/macos/runs/asr2-a8838a36d81403c3c4a0a62b331fbd88.json",
+        "sha256": "24d508ce040ec20e5e77a9c25a7f2d2d723d189788356fd30221f5553f102a55"
+      },
+      "runId": "asr2-a8838a36d81403c3c4a0a62b331fbd88",
+      "scenario": "zh_en_code_switch",
+      "scheduleOrder": 26,
+      "warmup": true,
+      "workerOutput": {
+        "documentSha256": "359b000fa162fa30acbe5adfe4873cf9734730e53107e33932817dcd29e151b5",
+        "path": "benchmark/desktop/asr_comparison/evidence/qwen3-optimization/macos/raw/asr2-a8838a36d81403c3c4a0a62b331fbd88.json",
+        "semanticResultSha256": "fc02e1792cc25701739d17bf34d477667468c46bedd8fe216f803bf11f56edda"
+      }
+    },
+    {
+      "profileId": "fixed-resource",
+      "run": {
+        "path": "benchmark/desktop/asr_comparison/evidence/qwen3-optimization/macos/runs/asr2-c3366688c3fcf48d40abcf7bb605e2fe.json",
+        "sha256": "5ea23d13288b2592cb616d9fd31cf9a1cca56d7cf0374e606d15db6c1f5e1c7e"
+      },
+      "runId": "asr2-c3366688c3fcf48d40abcf7bb605e2fe",
+      "scenario": "terminology_numbers",
+      "scheduleOrder": 27,
+      "warmup": true,
+      "workerOutput": {
+        "documentSha256": "cfbd3849680819bc529f92ed8e8ffe56be01a14e65968e3b6ab9bf167bccb6d2",
+        "path": "benchmark/desktop/asr_comparison/evidence/qwen3-optimization/macos/raw/asr2-c3366688c3fcf48d40abcf7bb605e2fe.json",
+        "semanticResultSha256": "8cca5084605fe842ae75eb1340322f749bec765a6c9cbd16b7f45f6298a0a481"
+      }
+    },
+    {
+      "profileId": "fixed-resource",
+      "run": {
+        "path": "benchmark/desktop/asr_comparison/evidence/qwen3-optimization/macos/runs/asr2-974158e172dcf04cd960f8f16bc5314d.json",
+        "sha256": "8186e34bb2a8ad9c5ab08db7465b56c6f43f0fd20db675346858ee6ca362c6cb"
+      },
+      "runId": "asr2-974158e172dcf04cd960f8f16bc5314d",
+      "scenario": "system_microphone_double_talk",
+      "scheduleOrder": 28,
+      "warmup": true,
+      "workerOutput": {
+        "documentSha256": "13dde96095faefc4f330f282a82d8c59dcfc28c99a5ec716464dc9eac985144f",
+        "path": "benchmark/desktop/asr_comparison/evidence/qwen3-optimization/macos/raw/asr2-974158e172dcf04cd960f8f16bc5314d.json",
+        "semanticResultSha256": "423534c754dc22499d4028bdf540559b14fb3de4a6ff9a67e1993e7338df0268"
+      }
+    },
+    {
+      "profileId": "fixed-resource",
+      "run": {
+        "path": "benchmark/desktop/asr_comparison/evidence/qwen3-optimization/macos/runs/asr2-41e6dbba33f131f8141b94c27ce22861.json",
+        "sha256": "2956adbf1ecb979e093da2bcb72556a7a38071c960cd5dabeb8f379dc37ff2d1"
+      },
+      "runId": "asr2-41e6dbba33f131f8141b94c27ce22861",
+      "scenario": "non_speech",
+      "scheduleOrder": 29,
+      "warmup": true,
+      "workerOutput": {
+        "documentSha256": "0262311cc57c794b5a2cc08d82cb7773c653ea05713dfe6356979c3c33c3e476",
+        "path": "benchmark/desktop/asr_comparison/evidence/qwen3-optimization/macos/raw/asr2-41e6dbba33f131f8141b94c27ce22861.json",
+        "semanticResultSha256": "242c23dfb054315679234a6603a60ed6f77473d05078699932fc1345509342ea"
+      }
+    },
+    {
+      "profileId": "fixed-resource",
+      "run": {
+        "path": "benchmark/desktop/asr_comparison/evidence/qwen3-optimization/macos/runs/asr2-2f959556fa1601623cdf8e60407d1a47.json",
+        "sha256": "9bbad495d1e2f639c335d2b6caba5e8594f282f37e20ab7a57f6d8ad50ca13d2"
+      },
+      "runId": "asr2-2f959556fa1601623cdf8e60407d1a47",
+      "scenario": "clean_near_field_mandarin",
+      "scheduleOrder": 30,
+      "warmup": false,
+      "workerOutput": {
+        "documentSha256": "b89914343c1e3014cd4915dab1218fbc5da11a00d12368cd814b6e00405e9c6d",
+        "path": "benchmark/desktop/asr_comparison/evidence/qwen3-optimization/macos/raw/asr2-2f959556fa1601623cdf8e60407d1a47.json",
+        "semanticResultSha256": "4f485738b199822e6ea5c858151bf1a92326bfd33a47aacfedfa449d39a8d721"
+      }
+    },
+    {
+      "profileId": "fixed-resource",
+      "run": {
+        "path": "benchmark/desktop/asr_comparison/evidence/qwen3-optimization/macos/runs/asr2-3b24d85790d17ed1fc3282d30b90bf52.json",
+        "sha256": "7469615c73d0ff34b9aefbd7cef30de759ab7c10c3f4c65bb72b41c0a8a686fe"
+      },
+      "runId": "asr2-3b24d85790d17ed1fc3282d30b90bf52",
+      "scenario": "far_field_noisy_meeting",
+      "scheduleOrder": 31,
+      "warmup": false,
+      "workerOutput": {
+        "documentSha256": "bf476b647e4acdf69440307ea28fefabc0a6ee6c2d3e4b6c7e9388b97825d8c7",
+        "path": "benchmark/desktop/asr_comparison/evidence/qwen3-optimization/macos/raw/asr2-3b24d85790d17ed1fc3282d30b90bf52.json",
+        "semanticResultSha256": "c183bad726f42d782a02d6e02ff79adcd336f5ca31e57be513bf18ddd6e15e40"
+      }
+    },
+    {
+      "profileId": "fixed-resource",
+      "run": {
+        "path": "benchmark/desktop/asr_comparison/evidence/qwen3-optimization/macos/runs/asr2-6d4dd1a00ab11e94f5aaec98884a6086.json",
+        "sha256": "c2cd93d6d0143867aa03cc1b3240264cd4b6bbef112cb22b3c8a1fe57b213f6d"
+      },
+      "runId": "asr2-6d4dd1a00ab11e94f5aaec98884a6086",
+      "scenario": "zh_en_code_switch",
+      "scheduleOrder": 32,
+      "warmup": false,
+      "workerOutput": {
+        "documentSha256": "9a317a2527832f1164b2210325d9f06cbcd24b6ddb3fc6c509713f8a01845885",
+        "path": "benchmark/desktop/asr_comparison/evidence/qwen3-optimization/macos/raw/asr2-6d4dd1a00ab11e94f5aaec98884a6086.json",
+        "semanticResultSha256": "fc02e1792cc25701739d17bf34d477667468c46bedd8fe216f803bf11f56edda"
+      }
+    },
+    {
+      "profileId": "fixed-resource",
+      "run": {
+        "path": "benchmark/desktop/asr_comparison/evidence/qwen3-optimization/macos/runs/asr2-c42e0ff6b1bf9ae4e21704312cd97340.json",
+        "sha256": "ff92dac4e0a659a2e74a39ef8365016ba35d1c168a7dc16d3d8348de3ca13009"
+      },
+      "runId": "asr2-c42e0ff6b1bf9ae4e21704312cd97340",
+      "scenario": "terminology_numbers",
+      "scheduleOrder": 33,
+      "warmup": false,
+      "workerOutput": {
+        "documentSha256": "04132f7ebbaf2f41cc78409175ffbcf15f478e937af8b3e440a92f9c18567f4f",
+        "path": "benchmark/desktop/asr_comparison/evidence/qwen3-optimization/macos/raw/asr2-c42e0ff6b1bf9ae4e21704312cd97340.json",
+        "semanticResultSha256": "8cca5084605fe842ae75eb1340322f749bec765a6c9cbd16b7f45f6298a0a481"
+      }
+    },
+    {
+      "profileId": "fixed-resource",
+      "run": {
+        "path": "benchmark/desktop/asr_comparison/evidence/qwen3-optimization/macos/runs/asr2-aee43492107d4491e3c1dd9309570efc.json",
+        "sha256": "ebd42bc61542f6eac597716179502804e68e5f61fe6c6fa236ac4c334e24769e"
+      },
+      "runId": "asr2-aee43492107d4491e3c1dd9309570efc",
+      "scenario": "system_microphone_double_talk",
+      "scheduleOrder": 34,
+      "warmup": false,
+      "workerOutput": {
+        "documentSha256": "15676015e8ebbff8384e3df31066b75e562aedc97a26c8b0c1d1e5dcca81e060",
+        "path": "benchmark/desktop/asr_comparison/evidence/qwen3-optimization/macos/raw/asr2-aee43492107d4491e3c1dd9309570efc.json",
+        "semanticResultSha256": "423534c754dc22499d4028bdf540559b14fb3de4a6ff9a67e1993e7338df0268"
+      }
+    },
+    {
+      "profileId": "fixed-resource",
+      "run": {
+        "path": "benchmark/desktop/asr_comparison/evidence/qwen3-optimization/macos/runs/asr2-a36f483ff89abbbf245a556848b2329e.json",
+        "sha256": "f34b62c91ffa72c853c8865e96f9e46a2a1887a6c4fb3288cfcee8e451833662"
+      },
+      "runId": "asr2-a36f483ff89abbbf245a556848b2329e",
+      "scenario": "non_speech",
+      "scheduleOrder": 35,
+      "warmup": false,
+      "workerOutput": {
+        "documentSha256": "2b88e96e938cf5b9aeb32fd8be734b58f507322f000b9d431cfb7a3dec2bea29",
+        "path": "benchmark/desktop/asr_comparison/evidence/qwen3-optimization/macos/raw/asr2-a36f483ff89abbbf245a556848b2329e.json",
+        "semanticResultSha256": "242c23dfb054315679234a6603a60ed6f77473d05078699932fc1345509342ea"
+      }
+    },
+    {
+      "profileId": "fixed-resource",
+      "run": {
+        "path": "benchmark/desktop/asr_comparison/evidence/qwen3-optimization/macos/runs/asr2-c40d9b414e4b5a04fb56e71ab74d2b05.json",
+        "sha256": "f2240a357b0e9ed0620be661dd8fa9e92b0931dd619659114f8e81cfb206c6ed"
+      },
+      "runId": "asr2-c40d9b414e4b5a04fb56e71ab74d2b05",
+      "scenario": "clean_near_field_mandarin",
+      "scheduleOrder": 36,
+      "warmup": false,
+      "workerOutput": {
+        "documentSha256": "efaa359cc232f1a9148cadb054d3a3e7ab560bceaa327952439815ec342ee6e0",
+        "path": "benchmark/desktop/asr_comparison/evidence/qwen3-optimization/macos/raw/asr2-c40d9b414e4b5a04fb56e71ab74d2b05.json",
+        "semanticResultSha256": "4f485738b199822e6ea5c858151bf1a92326bfd33a47aacfedfa449d39a8d721"
+      }
+    },
+    {
+      "profileId": "fixed-resource",
+      "run": {
+        "path": "benchmark/desktop/asr_comparison/evidence/qwen3-optimization/macos/runs/asr2-d41cad4fb5969d2c0d0d195d67ccba57.json",
+        "sha256": "d9088d67cf381c5f293e29c612e39c6cedede4d090ce8f575ef57fa63eec9dde"
+      },
+      "runId": "asr2-d41cad4fb5969d2c0d0d195d67ccba57",
+      "scenario": "far_field_noisy_meeting",
+      "scheduleOrder": 37,
+      "warmup": false,
+      "workerOutput": {
+        "documentSha256": "78e5ffc9caa542aa76fd7998d8d3cabb30a65b07f774201afa56b960486d8c6b",
+        "path": "benchmark/desktop/asr_comparison/evidence/qwen3-optimization/macos/raw/asr2-d41cad4fb5969d2c0d0d195d67ccba57.json",
+        "semanticResultSha256": "c183bad726f42d782a02d6e02ff79adcd336f5ca31e57be513bf18ddd6e15e40"
+      }
+    },
+    {
+      "profileId": "fixed-resource",
+      "run": {
+        "path": "benchmark/desktop/asr_comparison/evidence/qwen3-optimization/macos/runs/asr2-d430df1faa9182003a7d4884bf722380.json",
+        "sha256": "06936e7dd9de4412e99d3a7a9669d6a31ed9b72fa51aa004f1242202346c78ef"
+      },
+      "runId": "asr2-d430df1faa9182003a7d4884bf722380",
+      "scenario": "zh_en_code_switch",
+      "scheduleOrder": 38,
+      "warmup": false,
+      "workerOutput": {
+        "documentSha256": "98b6488d265f390b802c4396c9e0c0129e63a7816817c3bc0d16f277082dd3e5",
+        "path": "benchmark/desktop/asr_comparison/evidence/qwen3-optimization/macos/raw/asr2-d430df1faa9182003a7d4884bf722380.json",
+        "semanticResultSha256": "fc02e1792cc25701739d17bf34d477667468c46bedd8fe216f803bf11f56edda"
+      }
+    },
+    {
+      "profileId": "fixed-resource",
+      "run": {
+        "path": "benchmark/desktop/asr_comparison/evidence/qwen3-optimization/macos/runs/asr2-6bbe4d735ee4ad8bf1db6309dd796361.json",
+        "sha256": "174ffd46f4c8b41c8d92091eef0ddcccfa006363badf6cab6616665f8c467cf4"
+      },
+      "runId": "asr2-6bbe4d735ee4ad8bf1db6309dd796361",
+      "scenario": "terminology_numbers",
+      "scheduleOrder": 39,
+      "warmup": false,
+      "workerOutput": {
+        "documentSha256": "820953ef314e546fbb5c06656721fc00fb25d936c172b319c6c5bad4f545be0b",
+        "path": "benchmark/desktop/asr_comparison/evidence/qwen3-optimization/macos/raw/asr2-6bbe4d735ee4ad8bf1db6309dd796361.json",
+        "semanticResultSha256": "8cca5084605fe842ae75eb1340322f749bec765a6c9cbd16b7f45f6298a0a481"
+      }
+    },
+    {
+      "profileId": "fixed-resource",
+      "run": {
+        "path": "benchmark/desktop/asr_comparison/evidence/qwen3-optimization/macos/runs/asr2-034fb55413232e50a7ad8b94e6e9f0bc.json",
+        "sha256": "4dd08066f36195f14911b9e368bf3fa307fc734fbd71c641621181a2e55a42bd"
+      },
+      "runId": "asr2-034fb55413232e50a7ad8b94e6e9f0bc",
+      "scenario": "system_microphone_double_talk",
+      "scheduleOrder": 40,
+      "warmup": false,
+      "workerOutput": {
+        "documentSha256": "75a6797f7f7b7e6fca38705f47a2159c76ec602ddac47d38daf8c12773a38df9",
+        "path": "benchmark/desktop/asr_comparison/evidence/qwen3-optimization/macos/raw/asr2-034fb55413232e50a7ad8b94e6e9f0bc.json",
+        "semanticResultSha256": "423534c754dc22499d4028bdf540559b14fb3de4a6ff9a67e1993e7338df0268"
+      }
+    },
+    {
+      "profileId": "fixed-resource",
+      "run": {
+        "path": "benchmark/desktop/asr_comparison/evidence/qwen3-optimization/macos/runs/asr2-0715b095585d1981fb4ece8b7f800fe4.json",
+        "sha256": "623e537fdf87636a2faf1923b46b0bfd55119b57c8754c8460ca5bb5932d0105"
+      },
+      "runId": "asr2-0715b095585d1981fb4ece8b7f800fe4",
+      "scenario": "non_speech",
+      "scheduleOrder": 41,
+      "warmup": false,
+      "workerOutput": {
+        "documentSha256": "1ae314df4c679d8614846c6e4aa7fac102f95221c38a98abb3b0574104adc505",
+        "path": "benchmark/desktop/asr_comparison/evidence/qwen3-optimization/macos/raw/asr2-0715b095585d1981fb4ece8b7f800fe4.json",
+        "semanticResultSha256": "242c23dfb054315679234a6603a60ed6f77473d05078699932fc1345509342ea"
+      }
+    },
+    {
+      "profileId": "fixed-resource",
+      "run": {
+        "path": "benchmark/desktop/asr_comparison/evidence/qwen3-optimization/macos/runs/asr2-ad2c72f8caeb4567b9d24ec4058f7066.json",
+        "sha256": "676633901d16e12976ad41f73c272c15f300dfb5f687b8dd8f7a3b92a528541b"
+      },
+      "runId": "asr2-ad2c72f8caeb4567b9d24ec4058f7066",
+      "scenario": "clean_near_field_mandarin",
+      "scheduleOrder": 42,
+      "warmup": false,
+      "workerOutput": {
+        "documentSha256": "d25987926dc90843585c00ccbded128e378ad4047ffd419331bc5c15891baa5c",
+        "path": "benchmark/desktop/asr_comparison/evidence/qwen3-optimization/macos/raw/asr2-ad2c72f8caeb4567b9d24ec4058f7066.json",
+        "semanticResultSha256": "4f485738b199822e6ea5c858151bf1a92326bfd33a47aacfedfa449d39a8d721"
+      }
+    },
+    {
+      "profileId": "fixed-resource",
+      "run": {
+        "path": "benchmark/desktop/asr_comparison/evidence/qwen3-optimization/macos/runs/asr2-c1c879ead660bda779c8055f2244679e.json",
+        "sha256": "7f2c59c82b065c0e542eb935168201ddcbbf11ff2440a0225f805a489cae2bcd"
+      },
+      "runId": "asr2-c1c879ead660bda779c8055f2244679e",
+      "scenario": "far_field_noisy_meeting",
+      "scheduleOrder": 43,
+      "warmup": false,
+      "workerOutput": {
+        "documentSha256": "14c10b2aa9d0fe02b75ddbddaf2b2003354dcd80f17ddf820b711ceedd8923f6",
+        "path": "benchmark/desktop/asr_comparison/evidence/qwen3-optimization/macos/raw/asr2-c1c879ead660bda779c8055f2244679e.json",
+        "semanticResultSha256": "c183bad726f42d782a02d6e02ff79adcd336f5ca31e57be513bf18ddd6e15e40"
+      }
+    },
+    {
+      "profileId": "fixed-resource",
+      "run": {
+        "path": "benchmark/desktop/asr_comparison/evidence/qwen3-optimization/macos/runs/asr2-32a9aed1000770c8ec497c73db5b40ee.json",
+        "sha256": "9b57f55298ccdaf73a133cbd955a454655481e8ab6dbf81eff422fc880fd8feb"
+      },
+      "runId": "asr2-32a9aed1000770c8ec497c73db5b40ee",
+      "scenario": "zh_en_code_switch",
+      "scheduleOrder": 44,
+      "warmup": false,
+      "workerOutput": {
+        "documentSha256": "d2bfcafcb0c81da43519e06b09cb38767d5e86926572a2236d6d9d261f34066e",
+        "path": "benchmark/desktop/asr_comparison/evidence/qwen3-optimization/macos/raw/asr2-32a9aed1000770c8ec497c73db5b40ee.json",
+        "semanticResultSha256": "fc02e1792cc25701739d17bf34d477667468c46bedd8fe216f803bf11f56edda"
+      }
+    },
+    {
+      "profileId": "fixed-resource",
+      "run": {
+        "path": "benchmark/desktop/asr_comparison/evidence/qwen3-optimization/macos/runs/asr2-d19d6694f03c4db1d42f3f3d29457e15.json",
+        "sha256": "f763ba0fd971910607dab1ce3938f370e4054eb28e1a76d19364db9d92c90927"
+      },
+      "runId": "asr2-d19d6694f03c4db1d42f3f3d29457e15",
+      "scenario": "terminology_numbers",
+      "scheduleOrder": 45,
+      "warmup": false,
+      "workerOutput": {
+        "documentSha256": "c4d12506ce6d63d207b8196ac72fad6555ec41c2bc3314740d922950972cda3d",
+        "path": "benchmark/desktop/asr_comparison/evidence/qwen3-optimization/macos/raw/asr2-d19d6694f03c4db1d42f3f3d29457e15.json",
+        "semanticResultSha256": "8cca5084605fe842ae75eb1340322f749bec765a6c9cbd16b7f45f6298a0a481"
+      }
+    },
+    {
+      "profileId": "fixed-resource",
+      "run": {
+        "path": "benchmark/desktop/asr_comparison/evidence/qwen3-optimization/macos/runs/asr2-49fd8323e536edbc9946aafc3361d55a.json",
+        "sha256": "f33d7401a6a9bed4fc187c57321fa49efc9f1426fed6e8a589fcc1b744ccb8c8"
+      },
+      "runId": "asr2-49fd8323e536edbc9946aafc3361d55a",
+      "scenario": "system_microphone_double_talk",
+      "scheduleOrder": 46,
+      "warmup": false,
+      "workerOutput": {
+        "documentSha256": "0e6c64d19b57ab981b1ec5e369fff84fca1581270ac74f27fd5c6dcb4e333568",
+        "path": "benchmark/desktop/asr_comparison/evidence/qwen3-optimization/macos/raw/asr2-49fd8323e536edbc9946aafc3361d55a.json",
+        "semanticResultSha256": "423534c754dc22499d4028bdf540559b14fb3de4a6ff9a67e1993e7338df0268"
+      }
+    },
+    {
+      "profileId": "fixed-resource",
+      "run": {
+        "path": "benchmark/desktop/asr_comparison/evidence/qwen3-optimization/macos/runs/asr2-136994c61200cf9567539f2cd1320191.json",
+        "sha256": "f680880370476260b00801777e6b05e35769e3496dcac76300fdc3657de48229"
+      },
+      "runId": "asr2-136994c61200cf9567539f2cd1320191",
+      "scenario": "non_speech",
+      "scheduleOrder": 47,
+      "warmup": false,
+      "workerOutput": {
+        "documentSha256": "4e699b335d7b3b71fe065e025b5eab0822d2ee9047aa720ed3026503bb52ffe3",
+        "path": "benchmark/desktop/asr_comparison/evidence/qwen3-optimization/macos/raw/asr2-136994c61200cf9567539f2cd1320191.json",
+        "semanticResultSha256": "242c23dfb054315679234a6603a60ed6f77473d05078699932fc1345509342ea"
+      }
+    },
+    {
+      "profileId": "fixed-resource",
+      "run": {
+        "path": "benchmark/desktop/asr_comparison/evidence/qwen3-optimization/macos/runs/asr2-56562797af5908657d53ab5114220816.json",
+        "sha256": "a1829ce1b972b41f805089fe6ea0c28cf68b97d9c08a0829d45b645de2ecc59b"
+      },
+      "runId": "asr2-56562797af5908657d53ab5114220816",
+      "scenario": "clean_near_field_mandarin",
+      "scheduleOrder": 48,
+      "warmup": true,
+      "workerOutput": {
+        "documentSha256": "05f383ac95acb48980731b9c96bc6075d932cfab50bb11498fddcfa7a60b561f",
+        "path": "benchmark/desktop/asr_comparison/evidence/qwen3-optimization/macos/raw/asr2-56562797af5908657d53ab5114220816.json",
+        "semanticResultSha256": "5feee7d79bef8e4c82a7ad2e9ac1b640357bb835c15e9ed089481818001859fe"
+      }
+    },
+    {
+      "profileId": "fixed-resource",
+      "run": {
+        "path": "benchmark/desktop/asr_comparison/evidence/qwen3-optimization/macos/runs/asr2-2b56f6f6119f1aab8c0876915d06047f.json",
+        "sha256": "afe0679b883af4c6ee856e377903791fbdf9062322edeab68a3b84417982c1f7"
+      },
+      "runId": "asr2-2b56f6f6119f1aab8c0876915d06047f",
+      "scenario": "far_field_noisy_meeting",
+      "scheduleOrder": 49,
+      "warmup": true,
+      "workerOutput": {
+        "documentSha256": "c516f7c01fd47a559a513f65752ba39d5f85115cf53550c4800ecd068717a266",
+        "path": "benchmark/desktop/asr_comparison/evidence/qwen3-optimization/macos/raw/asr2-2b56f6f6119f1aab8c0876915d06047f.json",
+        "semanticResultSha256": "4fd63d3c85bd67e32e38a4572ccd73304d7164cb1bdb32957e1248b92958380d"
+      }
+    },
+    {
+      "profileId": "fixed-resource",
+      "run": {
+        "path": "benchmark/desktop/asr_comparison/evidence/qwen3-optimization/macos/runs/asr2-1310db58ec56a50b8029323ac3022472.json",
+        "sha256": "92febc218d99aee9b22dac72e4ef712c3639318bb831ef64ee265e1067e44fa4"
+      },
+      "runId": "asr2-1310db58ec56a50b8029323ac3022472",
+      "scenario": "zh_en_code_switch",
+      "scheduleOrder": 50,
+      "warmup": true,
+      "workerOutput": {
+        "documentSha256": "2b62e79a4ee10a912ca0772b713fae4b927fa9a38af15bf3e8e197d25e16e5ae",
+        "path": "benchmark/desktop/asr_comparison/evidence/qwen3-optimization/macos/raw/asr2-1310db58ec56a50b8029323ac3022472.json",
+        "semanticResultSha256": "344306b71a92faa4ed1558dd9746c79cae8e546e80517a8ff1404f063bb1e36d"
+      }
+    },
+    {
+      "profileId": "fixed-resource",
+      "run": {
+        "path": "benchmark/desktop/asr_comparison/evidence/qwen3-optimization/macos/runs/asr2-4549e5463910221dbba33f19b829e6ff.json",
+        "sha256": "4afd7e09f3fa9328f61d4bdaf9098a1c07fb2dbf473c902269608de3e95c03a2"
+      },
+      "runId": "asr2-4549e5463910221dbba33f19b829e6ff",
+      "scenario": "terminology_numbers",
+      "scheduleOrder": 51,
+      "warmup": true,
+      "workerOutput": {
+        "documentSha256": "171996fb0ea2c0e59600a020f443161207970f891b9880cd0cf7b930227dc423",
+        "path": "benchmark/desktop/asr_comparison/evidence/qwen3-optimization/macos/raw/asr2-4549e5463910221dbba33f19b829e6ff.json",
+        "semanticResultSha256": "501cc79fa6d85484b9c8bb8227b3b3d109f365addf599bb2caee10b169b9dffd"
+      }
+    },
+    {
+      "profileId": "fixed-resource",
+      "run": {
+        "path": "benchmark/desktop/asr_comparison/evidence/qwen3-optimization/macos/runs/asr2-5e1c95ad165263fbeb4a59fe141a59ec.json",
+        "sha256": "a0ede287d4de2c7e039ff5b1de24df8577043fa7d65d4e925e1bba875689358c"
+      },
+      "runId": "asr2-5e1c95ad165263fbeb4a59fe141a59ec",
+      "scenario": "system_microphone_double_talk",
+      "scheduleOrder": 52,
+      "warmup": true,
+      "workerOutput": {
+        "documentSha256": "b996d2e50dfd48314b769ed765028505cc8bd4e4730974da6206ccc4581fe937",
+        "path": "benchmark/desktop/asr_comparison/evidence/qwen3-optimization/macos/raw/asr2-5e1c95ad165263fbeb4a59fe141a59ec.json",
+        "semanticResultSha256": "5461a316c170507d8822b349081db5cf8d18f1be44b11b3df055f340fe75e155"
+      }
+    },
+    {
+      "profileId": "fixed-resource",
+      "run": {
+        "path": "benchmark/desktop/asr_comparison/evidence/qwen3-optimization/macos/runs/asr2-ff9f0aa745dca11aa734a118543b46b8.json",
+        "sha256": "724cbd5c5156c1b6481e71cb6a41faf5dbf9ac6d64fdd88933e6cae56dcbe366"
+      },
+      "runId": "asr2-ff9f0aa745dca11aa734a118543b46b8",
+      "scenario": "non_speech",
+      "scheduleOrder": 53,
+      "warmup": true,
+      "workerOutput": {
+        "documentSha256": "ad8fa05c34e8e5ce6ca2c61cfe826d793d34a68686d4a247d33c2714a230415f",
+        "path": "benchmark/desktop/asr_comparison/evidence/qwen3-optimization/macos/raw/asr2-ff9f0aa745dca11aa734a118543b46b8.json",
+        "semanticResultSha256": "242c23dfb054315679234a6603a60ed6f77473d05078699932fc1345509342ea"
+      }
+    },
+    {
+      "profileId": "fixed-resource",
+      "run": {
+        "path": "benchmark/desktop/asr_comparison/evidence/qwen3-optimization/macos/runs/asr2-9abc1b608f6a08e3f7295b8aeda45660.json",
+        "sha256": "dbf70851ed8ad0e3851301e6287df59d870a4a63be68e725ddc72c3b320381f5"
+      },
+      "runId": "asr2-9abc1b608f6a08e3f7295b8aeda45660",
+      "scenario": "clean_near_field_mandarin",
+      "scheduleOrder": 54,
+      "warmup": false,
+      "workerOutput": {
+        "documentSha256": "364fff17f2656d346db41719b7419bff0896b740a4bf79ab35c787aa87e72084",
+        "path": "benchmark/desktop/asr_comparison/evidence/qwen3-optimization/macos/raw/asr2-9abc1b608f6a08e3f7295b8aeda45660.json",
+        "semanticResultSha256": "5feee7d79bef8e4c82a7ad2e9ac1b640357bb835c15e9ed089481818001859fe"
+      }
+    },
+    {
+      "profileId": "fixed-resource",
+      "run": {
+        "path": "benchmark/desktop/asr_comparison/evidence/qwen3-optimization/macos/runs/asr2-47f9f35a44c03851f3866244f7ba197c.json",
+        "sha256": "594403392cdcc129d8edf91f4d0ba78c87b8e7d8d0b14533f90be497a0a9710c"
+      },
+      "runId": "asr2-47f9f35a44c03851f3866244f7ba197c",
+      "scenario": "far_field_noisy_meeting",
+      "scheduleOrder": 55,
+      "warmup": false,
+      "workerOutput": {
+        "documentSha256": "14c8520db302d91448688c063ce9433379d1a087fefd6459a49b95d739af5eec",
+        "path": "benchmark/desktop/asr_comparison/evidence/qwen3-optimization/macos/raw/asr2-47f9f35a44c03851f3866244f7ba197c.json",
+        "semanticResultSha256": "4fd63d3c85bd67e32e38a4572ccd73304d7164cb1bdb32957e1248b92958380d"
+      }
+    },
+    {
+      "profileId": "fixed-resource",
+      "run": {
+        "path": "benchmark/desktop/asr_comparison/evidence/qwen3-optimization/macos/runs/asr2-f7929c6b0f3714eeda150c7c44d1b0e1.json",
+        "sha256": "a19b5ef40e38f219325a0867eb597047e76f22c5e256cfaf4e87e2bb0fe22826"
+      },
+      "runId": "asr2-f7929c6b0f3714eeda150c7c44d1b0e1",
+      "scenario": "zh_en_code_switch",
+      "scheduleOrder": 56,
+      "warmup": false,
+      "workerOutput": {
+        "documentSha256": "619afd85622963f1a38585d3877e2968880a9cd48135d45abf4ab6d362f0822b",
+        "path": "benchmark/desktop/asr_comparison/evidence/qwen3-optimization/macos/raw/asr2-f7929c6b0f3714eeda150c7c44d1b0e1.json",
+        "semanticResultSha256": "344306b71a92faa4ed1558dd9746c79cae8e546e80517a8ff1404f063bb1e36d"
+      }
+    },
+    {
+      "profileId": "fixed-resource",
+      "run": {
+        "path": "benchmark/desktop/asr_comparison/evidence/qwen3-optimization/macos/runs/asr2-781f2c59d8c4fb6b64026d87f0aa71cc.json",
+        "sha256": "89e4bb82083ed690506b184a70312b8314f9cc023afcc2ad51c65cbb082d9c8e"
+      },
+      "runId": "asr2-781f2c59d8c4fb6b64026d87f0aa71cc",
+      "scenario": "terminology_numbers",
+      "scheduleOrder": 57,
+      "warmup": false,
+      "workerOutput": {
+        "documentSha256": "de818f1bdf10d26599131e8a84099503cc1738315ab4028667f96e3c136e75d4",
+        "path": "benchmark/desktop/asr_comparison/evidence/qwen3-optimization/macos/raw/asr2-781f2c59d8c4fb6b64026d87f0aa71cc.json",
+        "semanticResultSha256": "501cc79fa6d85484b9c8bb8227b3b3d109f365addf599bb2caee10b169b9dffd"
+      }
+    },
+    {
+      "profileId": "fixed-resource",
+      "run": {
+        "path": "benchmark/desktop/asr_comparison/evidence/qwen3-optimization/macos/runs/asr2-04cb67ce1d5c6eec789b580121cfbb5a.json",
+        "sha256": "1ad76829236801e4d6af7dd73a52bf10a1588ac0698c3c6ff6ebf9e4d1849b86"
+      },
+      "runId": "asr2-04cb67ce1d5c6eec789b580121cfbb5a",
+      "scenario": "system_microphone_double_talk",
+      "scheduleOrder": 58,
+      "warmup": false,
+      "workerOutput": {
+        "documentSha256": "d3abc9b8c8c6dbc08f9d41ccfc892881af1908cd98cc9ea4b971a80f3ead348e",
+        "path": "benchmark/desktop/asr_comparison/evidence/qwen3-optimization/macos/raw/asr2-04cb67ce1d5c6eec789b580121cfbb5a.json",
+        "semanticResultSha256": "5461a316c170507d8822b349081db5cf8d18f1be44b11b3df055f340fe75e155"
+      }
+    },
+    {
+      "profileId": "fixed-resource",
+      "run": {
+        "path": "benchmark/desktop/asr_comparison/evidence/qwen3-optimization/macos/runs/asr2-c90755c0f19201ace510b6125e45365a.json",
+        "sha256": "c8f716c200c101431309dd45acdd8012ee56e6baa08d87002d75424660d7ef19"
+      },
+      "runId": "asr2-c90755c0f19201ace510b6125e45365a",
+      "scenario": "non_speech",
+      "scheduleOrder": 59,
+      "warmup": false,
+      "workerOutput": {
+        "documentSha256": "7ca4f32db72e054c7c5ad1a836bf02d41b1138d40fbbb2a5f9e0584fc4fd0404",
+        "path": "benchmark/desktop/asr_comparison/evidence/qwen3-optimization/macos/raw/asr2-c90755c0f19201ace510b6125e45365a.json",
+        "semanticResultSha256": "242c23dfb054315679234a6603a60ed6f77473d05078699932fc1345509342ea"
+      }
+    },
+    {
+      "profileId": "fixed-resource",
+      "run": {
+        "path": "benchmark/desktop/asr_comparison/evidence/qwen3-optimization/macos/runs/asr2-031f00fdd8f4416500ccc65dea6770c2.json",
+        "sha256": "1ea0b10affd341ad825bcab5cdfb20a45ca12aeac03368de93be4e5699570fc4"
+      },
+      "runId": "asr2-031f00fdd8f4416500ccc65dea6770c2",
+      "scenario": "clean_near_field_mandarin",
+      "scheduleOrder": 60,
+      "warmup": false,
+      "workerOutput": {
+        "documentSha256": "6c60334488ab04817554bad609e7484945728bf466cd6413e9eb5657cd19e630",
+        "path": "benchmark/desktop/asr_comparison/evidence/qwen3-optimization/macos/raw/asr2-031f00fdd8f4416500ccc65dea6770c2.json",
+        "semanticResultSha256": "5feee7d79bef8e4c82a7ad2e9ac1b640357bb835c15e9ed089481818001859fe"
+      }
+    },
+    {
+      "profileId": "fixed-resource",
+      "run": {
+        "path": "benchmark/desktop/asr_comparison/evidence/qwen3-optimization/macos/runs/asr2-80db94f55b0d5be4e76850052abceb93.json",
+        "sha256": "f1b9f453e56cbdbd962e3259e3b33ee0744a13077a056f7b71fee22573b3c198"
+      },
+      "runId": "asr2-80db94f55b0d5be4e76850052abceb93",
+      "scenario": "far_field_noisy_meeting",
+      "scheduleOrder": 61,
+      "warmup": false,
+      "workerOutput": {
+        "documentSha256": "2286d77c152a81425cc9055a673e21da5ca13e289a598d493f1b8804288ae519",
+        "path": "benchmark/desktop/asr_comparison/evidence/qwen3-optimization/macos/raw/asr2-80db94f55b0d5be4e76850052abceb93.json",
+        "semanticResultSha256": "4fd63d3c85bd67e32e38a4572ccd73304d7164cb1bdb32957e1248b92958380d"
+      }
+    },
+    {
+      "profileId": "fixed-resource",
+      "run": {
+        "path": "benchmark/desktop/asr_comparison/evidence/qwen3-optimization/macos/runs/asr2-8ba2ca7b04e44e8015052f7b90c39791.json",
+        "sha256": "f44d9680bf49986e2b74a9ac99dd561967a46aacddb08b8a970e63da1cdc6b40"
+      },
+      "runId": "asr2-8ba2ca7b04e44e8015052f7b90c39791",
+      "scenario": "zh_en_code_switch",
+      "scheduleOrder": 62,
+      "warmup": false,
+      "workerOutput": {
+        "documentSha256": "6dcc5c87f3e494a1637c368f9021d78b3887a34793518c428255189f151b900a",
+        "path": "benchmark/desktop/asr_comparison/evidence/qwen3-optimization/macos/raw/asr2-8ba2ca7b04e44e8015052f7b90c39791.json",
+        "semanticResultSha256": "344306b71a92faa4ed1558dd9746c79cae8e546e80517a8ff1404f063bb1e36d"
+      }
+    },
+    {
+      "profileId": "fixed-resource",
+      "run": {
+        "path": "benchmark/desktop/asr_comparison/evidence/qwen3-optimization/macos/runs/asr2-d6036bbcf6c20c849f27aa7cc07533af.json",
+        "sha256": "e780221cf1b7031d7d45928b6207afff3022642c7a2854002785ca95d13d5d28"
+      },
+      "runId": "asr2-d6036bbcf6c20c849f27aa7cc07533af",
+      "scenario": "terminology_numbers",
+      "scheduleOrder": 63,
+      "warmup": false,
+      "workerOutput": {
+        "documentSha256": "4cfe4ce8ecbff18e667ba05aee464dcc7969ae5d11d594e1a4f2e64255b08512",
+        "path": "benchmark/desktop/asr_comparison/evidence/qwen3-optimization/macos/raw/asr2-d6036bbcf6c20c849f27aa7cc07533af.json",
+        "semanticResultSha256": "501cc79fa6d85484b9c8bb8227b3b3d109f365addf599bb2caee10b169b9dffd"
+      }
+    },
+    {
+      "profileId": "fixed-resource",
+      "run": {
+        "path": "benchmark/desktop/asr_comparison/evidence/qwen3-optimization/macos/runs/asr2-3376d073c7a883b250c99a6090926e67.json",
+        "sha256": "d1d828a9108cdd9767c5a3386538339d44cc61c909ff10ea4882087b0897f997"
+      },
+      "runId": "asr2-3376d073c7a883b250c99a6090926e67",
+      "scenario": "system_microphone_double_talk",
+      "scheduleOrder": 64,
+      "warmup": false,
+      "workerOutput": {
+        "documentSha256": "1b5835d0a2b94d43a12cd82e7a9eca78ecdc089446beb0240a6218268d4e1c40",
+        "path": "benchmark/desktop/asr_comparison/evidence/qwen3-optimization/macos/raw/asr2-3376d073c7a883b250c99a6090926e67.json",
+        "semanticResultSha256": "5461a316c170507d8822b349081db5cf8d18f1be44b11b3df055f340fe75e155"
+      }
+    },
+    {
+      "profileId": "fixed-resource",
+      "run": {
+        "path": "benchmark/desktop/asr_comparison/evidence/qwen3-optimization/macos/runs/asr2-c02531318005caf654f149408f979024.json",
+        "sha256": "a026df9db056039374ffae56cb5f1e25fa38571fb78bf83f8658d5b3a8bffc17"
+      },
+      "runId": "asr2-c02531318005caf654f149408f979024",
+      "scenario": "non_speech",
+      "scheduleOrder": 65,
+      "warmup": false,
+      "workerOutput": {
+        "documentSha256": "91cc70b5bf7b29ecc6cfd6e411f5a9649a45172ae63c5b82fc00fa9158da4ade",
+        "path": "benchmark/desktop/asr_comparison/evidence/qwen3-optimization/macos/raw/asr2-c02531318005caf654f149408f979024.json",
+        "semanticResultSha256": "242c23dfb054315679234a6603a60ed6f77473d05078699932fc1345509342ea"
+      }
+    },
+    {
+      "profileId": "fixed-resource",
+      "run": {
+        "path": "benchmark/desktop/asr_comparison/evidence/qwen3-optimization/macos/runs/asr2-00b2df2ff50e9f942dd77695271b7ff2.json",
+        "sha256": "f1e9b470da6a423d861ffcd6c18101cf311efde2a2f156234fb10c2534f86482"
+      },
+      "runId": "asr2-00b2df2ff50e9f942dd77695271b7ff2",
+      "scenario": "clean_near_field_mandarin",
+      "scheduleOrder": 66,
+      "warmup": false,
+      "workerOutput": {
+        "documentSha256": "c180e0ed252bea919ca1b8dfad2bba827584ee801de4ed4e520fe563ee75efbc",
+        "path": "benchmark/desktop/asr_comparison/evidence/qwen3-optimization/macos/raw/asr2-00b2df2ff50e9f942dd77695271b7ff2.json",
+        "semanticResultSha256": "5feee7d79bef8e4c82a7ad2e9ac1b640357bb835c15e9ed089481818001859fe"
+      }
+    },
+    {
+      "profileId": "fixed-resource",
+      "run": {
+        "path": "benchmark/desktop/asr_comparison/evidence/qwen3-optimization/macos/runs/asr2-b4dac464f5b7301fa6363c89f80f8f53.json",
+        "sha256": "7aef50792198d18cbea8d49b2719bc898d6523d3e3ba9ed663498d6976e6d88d"
+      },
+      "runId": "asr2-b4dac464f5b7301fa6363c89f80f8f53",
+      "scenario": "far_field_noisy_meeting",
+      "scheduleOrder": 67,
+      "warmup": false,
+      "workerOutput": {
+        "documentSha256": "9993da9227bb5425a004db92eaf63b5c2847f35ff05ba87d87230dcba1f40aee",
+        "path": "benchmark/desktop/asr_comparison/evidence/qwen3-optimization/macos/raw/asr2-b4dac464f5b7301fa6363c89f80f8f53.json",
+        "semanticResultSha256": "4fd63d3c85bd67e32e38a4572ccd73304d7164cb1bdb32957e1248b92958380d"
+      }
+    },
+    {
+      "profileId": "fixed-resource",
+      "run": {
+        "path": "benchmark/desktop/asr_comparison/evidence/qwen3-optimization/macos/runs/asr2-ec0e5f478771822bf2dbf24b80d90699.json",
+        "sha256": "f1c14b70635bda678227c088282763d677e95a52823832cc55a2b89261ea41fc"
+      },
+      "runId": "asr2-ec0e5f478771822bf2dbf24b80d90699",
+      "scenario": "zh_en_code_switch",
+      "scheduleOrder": 68,
+      "warmup": false,
+      "workerOutput": {
+        "documentSha256": "f04ce5bfefecc94710b425395efff36c23a79c26c8ae752cd6f16287a731c01e",
+        "path": "benchmark/desktop/asr_comparison/evidence/qwen3-optimization/macos/raw/asr2-ec0e5f478771822bf2dbf24b80d90699.json",
+        "semanticResultSha256": "344306b71a92faa4ed1558dd9746c79cae8e546e80517a8ff1404f063bb1e36d"
+      }
+    },
+    {
+      "profileId": "fixed-resource",
+      "run": {
+        "path": "benchmark/desktop/asr_comparison/evidence/qwen3-optimization/macos/runs/asr2-6cd6ec3921032cb1172446f96f2d6238.json",
+        "sha256": "ce36dd8ab8e14eb60d66caba2d7ae16e9624c064b149201cc78770707de6c0eb"
+      },
+      "runId": "asr2-6cd6ec3921032cb1172446f96f2d6238",
+      "scenario": "terminology_numbers",
+      "scheduleOrder": 69,
+      "warmup": false,
+      "workerOutput": {
+        "documentSha256": "db66ac9becbbd239bd5dba2b7bdea62b83663c6fe05d843321d0b1ca55451c5a",
+        "path": "benchmark/desktop/asr_comparison/evidence/qwen3-optimization/macos/raw/asr2-6cd6ec3921032cb1172446f96f2d6238.json",
+        "semanticResultSha256": "501cc79fa6d85484b9c8bb8227b3b3d109f365addf599bb2caee10b169b9dffd"
+      }
+    },
+    {
+      "profileId": "fixed-resource",
+      "run": {
+        "path": "benchmark/desktop/asr_comparison/evidence/qwen3-optimization/macos/runs/asr2-5246ca454c130b47adda9a6f9c98bf62.json",
+        "sha256": "b832278b887101f12fa0f4a0b7346371e56aee30c3c64ed214c12b66c347286a"
+      },
+      "runId": "asr2-5246ca454c130b47adda9a6f9c98bf62",
+      "scenario": "system_microphone_double_talk",
+      "scheduleOrder": 70,
+      "warmup": false,
+      "workerOutput": {
+        "documentSha256": "15cfba11d14ca770ae207f3310e89db74575d114253fc70ea86c87737fdebfda",
+        "path": "benchmark/desktop/asr_comparison/evidence/qwen3-optimization/macos/raw/asr2-5246ca454c130b47adda9a6f9c98bf62.json",
+        "semanticResultSha256": "5461a316c170507d8822b349081db5cf8d18f1be44b11b3df055f340fe75e155"
+      }
+    },
+    {
+      "profileId": "fixed-resource",
+      "run": {
+        "path": "benchmark/desktop/asr_comparison/evidence/qwen3-optimization/macos/runs/asr2-e52e96bc6e30520b7ad961a6efae72bb.json",
+        "sha256": "935c99594add9e163dda2067caef83188ad7b2c06d0eb7dd6a786bca7adf8957"
+      },
+      "runId": "asr2-e52e96bc6e30520b7ad961a6efae72bb",
+      "scenario": "non_speech",
+      "scheduleOrder": 71,
+      "warmup": false,
+      "workerOutput": {
+        "documentSha256": "0b84b9bf8f0c4b2c6c68c568adaa787ad1282c1370df73483cda717a32a8a1ac",
+        "path": "benchmark/desktop/asr_comparison/evidence/qwen3-optimization/macos/raw/asr2-e52e96bc6e30520b7ad961a6efae72bb.json",
+        "semanticResultSha256": "242c23dfb054315679234a6603a60ed6f77473d05078699932fc1345509342ea"
+      }
+    },
+    {
+      "profileId": "fixed-resource",
+      "run": {
+        "path": "benchmark/desktop/asr_comparison/evidence/qwen3-optimization/macos/runs/asr2-e3afd1ed8e41e25ee59935165925c548.json",
+        "sha256": "29a4664c9347451910009ddd666271197bc9045f67ff52db99e909630d3d0c32"
+      },
+      "runId": "asr2-e3afd1ed8e41e25ee59935165925c548",
+      "scenario": "clean_near_field_mandarin",
+      "scheduleOrder": 72,
+      "warmup": true,
+      "workerOutput": {
+        "documentSha256": "83b2e1ec4bc907692bb0730b972de834aaca5976e1dfd988dd4c569977cecbc5",
+        "path": "benchmark/desktop/asr_comparison/evidence/qwen3-optimization/macos/raw/asr2-e3afd1ed8e41e25ee59935165925c548.json",
+        "semanticResultSha256": "c2da6bbf7aef3f706bf41b2ba7c5329d07fd031dafc2817837e06f4c435a67e3"
+      }
+    },
+    {
+      "profileId": "fixed-resource",
+      "run": {
+        "path": "benchmark/desktop/asr_comparison/evidence/qwen3-optimization/macos/runs/asr2-4620c153e05f84d9244feea94ad86fe0.json",
+        "sha256": "a78d9ccacc8ebff2d5e988138fbe53b34ff6ea829361bb501c06a899dc218a83"
+      },
+      "runId": "asr2-4620c153e05f84d9244feea94ad86fe0",
+      "scenario": "far_field_noisy_meeting",
+      "scheduleOrder": 73,
+      "warmup": true,
+      "workerOutput": {
+        "documentSha256": "ec373d99ad4b07e3e17baaf4ee1783f9110b15b55f8c0e4d21e9d2b9911ed140",
+        "path": "benchmark/desktop/asr_comparison/evidence/qwen3-optimization/macos/raw/asr2-4620c153e05f84d9244feea94ad86fe0.json",
+        "semanticResultSha256": "dfeabbdfa0b01eef0a450db072c2650050e634355a9bf1dd3b826fd65ae486df"
+      }
+    },
+    {
+      "profileId": "fixed-resource",
+      "run": {
+        "path": "benchmark/desktop/asr_comparison/evidence/qwen3-optimization/macos/runs/asr2-229e9be1f9be9aec90ce699e58d14ebb.json",
+        "sha256": "49e914988bf23005cfff3066ac32856bf19f91d25142f31ae64cdf1c4e12bc5b"
+      },
+      "runId": "asr2-229e9be1f9be9aec90ce699e58d14ebb",
+      "scenario": "zh_en_code_switch",
+      "scheduleOrder": 74,
+      "warmup": true,
+      "workerOutput": {
+        "documentSha256": "0fce2347d557ac500c1c5e87175ffd1040ae663aaf86a9d2336ad8d8cb85cd8d",
+        "path": "benchmark/desktop/asr_comparison/evidence/qwen3-optimization/macos/raw/asr2-229e9be1f9be9aec90ce699e58d14ebb.json",
+        "semanticResultSha256": "b076ecffce4142b2256bc0458d53e4c24fa7130dfd17afe65f403d55f0efe78d"
+      }
+    },
+    {
+      "profileId": "fixed-resource",
+      "run": {
+        "path": "benchmark/desktop/asr_comparison/evidence/qwen3-optimization/macos/runs/asr2-34e1a058875492872da5572a79b71a0d.json",
+        "sha256": "4a706995a9faa18557ae2db2e8970158490d4d16de794842c298f302ad94cf49"
+      },
+      "runId": "asr2-34e1a058875492872da5572a79b71a0d",
+      "scenario": "terminology_numbers",
+      "scheduleOrder": 75,
+      "warmup": true,
+      "workerOutput": {
+        "documentSha256": "9d59af73728201f6b2f105469c355c15a6b0a3a586280bb7a2d785f500ce30e5",
+        "path": "benchmark/desktop/asr_comparison/evidence/qwen3-optimization/macos/raw/asr2-34e1a058875492872da5572a79b71a0d.json",
+        "semanticResultSha256": "a4e5f4d96af8c4666d894e5591726732cf6f96bfdb1e81c97c3fcfb5b4ce2a76"
+      }
+    },
+    {
+      "profileId": "fixed-resource",
+      "run": {
+        "path": "benchmark/desktop/asr_comparison/evidence/qwen3-optimization/macos/runs/asr2-d4c8df48e2d7ce717eedcbabc632f134.json",
+        "sha256": "d771d818ae0517f664e79b750801602ef5458c1b58926498520e16a6d1757a5c"
+      },
+      "runId": "asr2-d4c8df48e2d7ce717eedcbabc632f134",
+      "scenario": "system_microphone_double_talk",
+      "scheduleOrder": 76,
+      "warmup": true,
+      "workerOutput": {
+        "documentSha256": "6976261c75c4e944e891d137eff17ba27369b12064a6ee8fb61b2683702f1bf7",
+        "path": "benchmark/desktop/asr_comparison/evidence/qwen3-optimization/macos/raw/asr2-d4c8df48e2d7ce717eedcbabc632f134.json",
+        "semanticResultSha256": "06863f9d9a953cffb2c75e9fd5163f094546a89c99da6d3587ce328c0c020347"
+      }
+    },
+    {
+      "profileId": "fixed-resource",
+      "run": {
+        "path": "benchmark/desktop/asr_comparison/evidence/qwen3-optimization/macos/runs/asr2-aba3cae47d93f9bcd6f08a6f81daaa4e.json",
+        "sha256": "12c969d9f440fb42fc2eb436c9062cb3032927d8f9ba4fdeb70a138c2feef318"
+      },
+      "runId": "asr2-aba3cae47d93f9bcd6f08a6f81daaa4e",
+      "scenario": "non_speech",
+      "scheduleOrder": 77,
+      "warmup": true,
+      "workerOutput": {
+        "documentSha256": "77a67ddecb9127799971325d36a1dfca31c7992a9f457455a9dd906ac1846b4e",
+        "path": "benchmark/desktop/asr_comparison/evidence/qwen3-optimization/macos/raw/asr2-aba3cae47d93f9bcd6f08a6f81daaa4e.json",
+        "semanticResultSha256": "242c23dfb054315679234a6603a60ed6f77473d05078699932fc1345509342ea"
+      }
+    },
+    {
+      "profileId": "fixed-resource",
+      "run": {
+        "path": "benchmark/desktop/asr_comparison/evidence/qwen3-optimization/macos/runs/asr2-3cd81b782902de2cd648ad91f10f0492.json",
+        "sha256": "72ac154192d80b8d68400bb14506d4605190d75b58a49148e0ff7c72c37ced45"
+      },
+      "runId": "asr2-3cd81b782902de2cd648ad91f10f0492",
+      "scenario": "clean_near_field_mandarin",
+      "scheduleOrder": 78,
+      "warmup": false,
+      "workerOutput": {
+        "documentSha256": "1ef50eb7f8ce8f8cf642f8f0f5640e0b6222a8b6951ffd2841b805798489fc60",
+        "path": "benchmark/desktop/asr_comparison/evidence/qwen3-optimization/macos/raw/asr2-3cd81b782902de2cd648ad91f10f0492.json",
+        "semanticResultSha256": "c2da6bbf7aef3f706bf41b2ba7c5329d07fd031dafc2817837e06f4c435a67e3"
+      }
+    },
+    {
+      "profileId": "fixed-resource",
+      "run": {
+        "path": "benchmark/desktop/asr_comparison/evidence/qwen3-optimization/macos/runs/asr2-45f0396dc954e888f626075df5154266.json",
+        "sha256": "8220b2a0be29798fbeabcc4ee3adb54589bdc0a378ddb3e56ebf4cc8ac9ad591"
+      },
+      "runId": "asr2-45f0396dc954e888f626075df5154266",
+      "scenario": "far_field_noisy_meeting",
+      "scheduleOrder": 79,
+      "warmup": false,
+      "workerOutput": {
+        "documentSha256": "8af7768e467d0ebfff6e76f97944ab9b905022199034b3dd6c01645ab25fbb9a",
+        "path": "benchmark/desktop/asr_comparison/evidence/qwen3-optimization/macos/raw/asr2-45f0396dc954e888f626075df5154266.json",
+        "semanticResultSha256": "dfeabbdfa0b01eef0a450db072c2650050e634355a9bf1dd3b826fd65ae486df"
+      }
+    },
+    {
+      "profileId": "fixed-resource",
+      "run": {
+        "path": "benchmark/desktop/asr_comparison/evidence/qwen3-optimization/macos/runs/asr2-673af3d3425305f1a98703c59c71b493.json",
+        "sha256": "746ab5dcda014ef7a8f87f3776a4a952042d5f71c6898b50327f0a984abbe344"
+      },
+      "runId": "asr2-673af3d3425305f1a98703c59c71b493",
+      "scenario": "zh_en_code_switch",
+      "scheduleOrder": 80,
+      "warmup": false,
+      "workerOutput": {
+        "documentSha256": "963604f637f243dbe3c75a23e2b693194738f63ae3ccffdfc81b249d83216aa3",
+        "path": "benchmark/desktop/asr_comparison/evidence/qwen3-optimization/macos/raw/asr2-673af3d3425305f1a98703c59c71b493.json",
+        "semanticResultSha256": "b076ecffce4142b2256bc0458d53e4c24fa7130dfd17afe65f403d55f0efe78d"
+      }
+    },
+    {
+      "profileId": "fixed-resource",
+      "run": {
+        "path": "benchmark/desktop/asr_comparison/evidence/qwen3-optimization/macos/runs/asr2-c38fc666d8830a3c0376d3cd053a8666.json",
+        "sha256": "1db8f8df75cddb1703dedcc8a150932a20982cea1896ef05e53440049e06295e"
+      },
+      "runId": "asr2-c38fc666d8830a3c0376d3cd053a8666",
+      "scenario": "terminology_numbers",
+      "scheduleOrder": 81,
+      "warmup": false,
+      "workerOutput": {
+        "documentSha256": "5569f490f8dad1a51751a08fab5e8a03deff68dd9a4606a22dbb9d7fc7090d04",
+        "path": "benchmark/desktop/asr_comparison/evidence/qwen3-optimization/macos/raw/asr2-c38fc666d8830a3c0376d3cd053a8666.json",
+        "semanticResultSha256": "a4e5f4d96af8c4666d894e5591726732cf6f96bfdb1e81c97c3fcfb5b4ce2a76"
+      }
+    },
+    {
+      "profileId": "fixed-resource",
+      "run": {
+        "path": "benchmark/desktop/asr_comparison/evidence/qwen3-optimization/macos/runs/asr2-67274305d08a47bd769b61021b915306.json",
+        "sha256": "fa31b408d60082d0e21fcd9ec3ca0d929c62df007ff00d59000f2bd56d7b098f"
+      },
+      "runId": "asr2-67274305d08a47bd769b61021b915306",
+      "scenario": "system_microphone_double_talk",
+      "scheduleOrder": 82,
+      "warmup": false,
+      "workerOutput": {
+        "documentSha256": "7d20db38353f3b0aa7237fd663dc220bac16e7563a31782d6bf41f85a086fd08",
+        "path": "benchmark/desktop/asr_comparison/evidence/qwen3-optimization/macos/raw/asr2-67274305d08a47bd769b61021b915306.json",
+        "semanticResultSha256": "06863f9d9a953cffb2c75e9fd5163f094546a89c99da6d3587ce328c0c020347"
+      }
+    },
+    {
+      "profileId": "fixed-resource",
+      "run": {
+        "path": "benchmark/desktop/asr_comparison/evidence/qwen3-optimization/macos/runs/asr2-cf3018c1e49a7a6f99cfe62b90d3092e.json",
+        "sha256": "28edb37e468c0709d50992eac98c7bbcb9f790c87fbf2abcf405634d45ad5939"
+      },
+      "runId": "asr2-cf3018c1e49a7a6f99cfe62b90d3092e",
+      "scenario": "non_speech",
+      "scheduleOrder": 83,
+      "warmup": false,
+      "workerOutput": {
+        "documentSha256": "942115b102e150447017384a35938ef0754c36f72db01718b60165010a166593",
+        "path": "benchmark/desktop/asr_comparison/evidence/qwen3-optimization/macos/raw/asr2-cf3018c1e49a7a6f99cfe62b90d3092e.json",
+        "semanticResultSha256": "242c23dfb054315679234a6603a60ed6f77473d05078699932fc1345509342ea"
+      }
+    },
+    {
+      "profileId": "fixed-resource",
+      "run": {
+        "path": "benchmark/desktop/asr_comparison/evidence/qwen3-optimization/macos/runs/asr2-5f57d2591c7b502303339b912e5b7897.json",
+        "sha256": "e33e2d33a1ce2355870be8a8a6c59d4b7a0b5656855c0417caff43f2f35f49fb"
+      },
+      "runId": "asr2-5f57d2591c7b502303339b912e5b7897",
+      "scenario": "clean_near_field_mandarin",
+      "scheduleOrder": 84,
+      "warmup": false,
+      "workerOutput": {
+        "documentSha256": "94e238049b8812fce393c4cd2559ef69668c568b850fb84bfcc85a6a920fb430",
+        "path": "benchmark/desktop/asr_comparison/evidence/qwen3-optimization/macos/raw/asr2-5f57d2591c7b502303339b912e5b7897.json",
+        "semanticResultSha256": "c2da6bbf7aef3f706bf41b2ba7c5329d07fd031dafc2817837e06f4c435a67e3"
+      }
+    },
+    {
+      "profileId": "fixed-resource",
+      "run": {
+        "path": "benchmark/desktop/asr_comparison/evidence/qwen3-optimization/macos/runs/asr2-4b868c738cecfd3b4b852cce26d5e65a.json",
+        "sha256": "3fd9e20b695cdb3e4fd087c8799f4fcf29e312b5a9cac4c17ca98671c0e4a6b4"
+      },
+      "runId": "asr2-4b868c738cecfd3b4b852cce26d5e65a",
+      "scenario": "far_field_noisy_meeting",
+      "scheduleOrder": 85,
+      "warmup": false,
+      "workerOutput": {
+        "documentSha256": "826fbd66a4d7522a763222930b00ef3d4fa69d81c952aefcb87ec17c80f8ed70",
+        "path": "benchmark/desktop/asr_comparison/evidence/qwen3-optimization/macos/raw/asr2-4b868c738cecfd3b4b852cce26d5e65a.json",
+        "semanticResultSha256": "dfeabbdfa0b01eef0a450db072c2650050e634355a9bf1dd3b826fd65ae486df"
+      }
+    },
+    {
+      "profileId": "fixed-resource",
+      "run": {
+        "path": "benchmark/desktop/asr_comparison/evidence/qwen3-optimization/macos/runs/asr2-a26600ee01b1c78f62deae21680e880b.json",
+        "sha256": "2d2a7da33612c5046d13b26c9ecf263134832053ff5ea1647a50e6aacbf0e152"
+      },
+      "runId": "asr2-a26600ee01b1c78f62deae21680e880b",
+      "scenario": "zh_en_code_switch",
+      "scheduleOrder": 86,
+      "warmup": false,
+      "workerOutput": {
+        "documentSha256": "ccb683ca032f0ef2aeb16fd339f4d0677839d8fcfcb59fcc705bcc7e6f26d334",
+        "path": "benchmark/desktop/asr_comparison/evidence/qwen3-optimization/macos/raw/asr2-a26600ee01b1c78f62deae21680e880b.json",
+        "semanticResultSha256": "b076ecffce4142b2256bc0458d53e4c24fa7130dfd17afe65f403d55f0efe78d"
+      }
+    },
+    {
+      "profileId": "fixed-resource",
+      "run": {
+        "path": "benchmark/desktop/asr_comparison/evidence/qwen3-optimization/macos/runs/asr2-bc7efcbd62b9e2b5dd2fd8e447d9e31d.json",
+        "sha256": "59d9f34d1ad0e66b630b6ba463794251fac4031078bfe735d031ff1f3abe05f3"
+      },
+      "runId": "asr2-bc7efcbd62b9e2b5dd2fd8e447d9e31d",
+      "scenario": "terminology_numbers",
+      "scheduleOrder": 87,
+      "warmup": false,
+      "workerOutput": {
+        "documentSha256": "ff79ad166d0464f527557402ed6fdacdfcfc13551646d4d21df2ebb01d1ae5c8",
+        "path": "benchmark/desktop/asr_comparison/evidence/qwen3-optimization/macos/raw/asr2-bc7efcbd62b9e2b5dd2fd8e447d9e31d.json",
+        "semanticResultSha256": "a4e5f4d96af8c4666d894e5591726732cf6f96bfdb1e81c97c3fcfb5b4ce2a76"
+      }
+    },
+    {
+      "profileId": "fixed-resource",
+      "run": {
+        "path": "benchmark/desktop/asr_comparison/evidence/qwen3-optimization/macos/runs/asr2-40fb616446b6fbcebf420fd1c7007684.json",
+        "sha256": "c7490623ca918765b89885d34df945a0363c64ff3f5b12f53a5a20e695fe53e8"
+      },
+      "runId": "asr2-40fb616446b6fbcebf420fd1c7007684",
+      "scenario": "system_microphone_double_talk",
+      "scheduleOrder": 88,
+      "warmup": false,
+      "workerOutput": {
+        "documentSha256": "47701194889e38be08abea497eda953e33fa7c3b595222378b8da6a729b3c079",
+        "path": "benchmark/desktop/asr_comparison/evidence/qwen3-optimization/macos/raw/asr2-40fb616446b6fbcebf420fd1c7007684.json",
+        "semanticResultSha256": "06863f9d9a953cffb2c75e9fd5163f094546a89c99da6d3587ce328c0c020347"
+      }
+    },
+    {
+      "profileId": "fixed-resource",
+      "run": {
+        "path": "benchmark/desktop/asr_comparison/evidence/qwen3-optimization/macos/runs/asr2-f03f78674d98e2ce28dd4aee6ae45e99.json",
+        "sha256": "b9c9673fde1f64bb8ad3ce69efe8eacff9ed08e151b467eaf79324e4072f989a"
+      },
+      "runId": "asr2-f03f78674d98e2ce28dd4aee6ae45e99",
+      "scenario": "non_speech",
+      "scheduleOrder": 89,
+      "warmup": false,
+      "workerOutput": {
+        "documentSha256": "f3fd0516b9d3ae2806ee2c4b08e9a364db55f48ee07a5e048f3fc9ee262a7aad",
+        "path": "benchmark/desktop/asr_comparison/evidence/qwen3-optimization/macos/raw/asr2-f03f78674d98e2ce28dd4aee6ae45e99.json",
+        "semanticResultSha256": "242c23dfb054315679234a6603a60ed6f77473d05078699932fc1345509342ea"
+      }
+    },
+    {
+      "profileId": "fixed-resource",
+      "run": {
+        "path": "benchmark/desktop/asr_comparison/evidence/qwen3-optimization/macos/runs/asr2-be72b0886db9654bb07d6d9d28181a54.json",
+        "sha256": "e491daf46a64a42ad3dbf47093bad7fcd865a99af89825610622aab7003e2b27"
+      },
+      "runId": "asr2-be72b0886db9654bb07d6d9d28181a54",
+      "scenario": "clean_near_field_mandarin",
+      "scheduleOrder": 90,
+      "warmup": false,
+      "workerOutput": {
+        "documentSha256": "8b2af1678c46ee40cbd077e0574c44c232cc953b2075ade7d64e63b10adaca2d",
+        "path": "benchmark/desktop/asr_comparison/evidence/qwen3-optimization/macos/raw/asr2-be72b0886db9654bb07d6d9d28181a54.json",
+        "semanticResultSha256": "c2da6bbf7aef3f706bf41b2ba7c5329d07fd031dafc2817837e06f4c435a67e3"
+      }
+    },
+    {
+      "profileId": "fixed-resource",
+      "run": {
+        "path": "benchmark/desktop/asr_comparison/evidence/qwen3-optimization/macos/runs/asr2-2c56f9a2f7ee355554048df13738b20c.json",
+        "sha256": "770ef0734fe4e4c002d3422c31dfcbd2f103c3983ce59b1a3a4370c22da029a0"
+      },
+      "runId": "asr2-2c56f9a2f7ee355554048df13738b20c",
+      "scenario": "far_field_noisy_meeting",
+      "scheduleOrder": 91,
+      "warmup": false,
+      "workerOutput": {
+        "documentSha256": "cafc19276ff41c7d5c61e1ee52dc596e8c7be70cb4bd045c2713fdf4582d29fa",
+        "path": "benchmark/desktop/asr_comparison/evidence/qwen3-optimization/macos/raw/asr2-2c56f9a2f7ee355554048df13738b20c.json",
+        "semanticResultSha256": "dfeabbdfa0b01eef0a450db072c2650050e634355a9bf1dd3b826fd65ae486df"
+      }
+    },
+    {
+      "profileId": "fixed-resource",
+      "run": {
+        "path": "benchmark/desktop/asr_comparison/evidence/qwen3-optimization/macos/runs/asr2-6b2e9843534fb6061ef4dba9b696f139.json",
+        "sha256": "5e96b0f6b238c5855e9b0d5a059c2ab41fc81fd566052a465ccf1b4acd6182c5"
+      },
+      "runId": "asr2-6b2e9843534fb6061ef4dba9b696f139",
+      "scenario": "zh_en_code_switch",
+      "scheduleOrder": 92,
+      "warmup": false,
+      "workerOutput": {
+        "documentSha256": "df861224e818c6102777bf7e116f1ea916800bcd6aef3586961cd2ae646e0827",
+        "path": "benchmark/desktop/asr_comparison/evidence/qwen3-optimization/macos/raw/asr2-6b2e9843534fb6061ef4dba9b696f139.json",
+        "semanticResultSha256": "b076ecffce4142b2256bc0458d53e4c24fa7130dfd17afe65f403d55f0efe78d"
+      }
+    },
+    {
+      "profileId": "fixed-resource",
+      "run": {
+        "path": "benchmark/desktop/asr_comparison/evidence/qwen3-optimization/macos/runs/asr2-ecbcc1c265c01454103b7dc8e6bc80c0.json",
+        "sha256": "63eaec6df2ad96ae3ce0542abbf9c1af71e9a00d502f19812e60c3fc9eb4647f"
+      },
+      "runId": "asr2-ecbcc1c265c01454103b7dc8e6bc80c0",
+      "scenario": "terminology_numbers",
+      "scheduleOrder": 93,
+      "warmup": false,
+      "workerOutput": {
+        "documentSha256": "670db423ba322dc11890c0d2953400f11faf596926f8f986747a3b8c7054c4be",
+        "path": "benchmark/desktop/asr_comparison/evidence/qwen3-optimization/macos/raw/asr2-ecbcc1c265c01454103b7dc8e6bc80c0.json",
+        "semanticResultSha256": "a4e5f4d96af8c4666d894e5591726732cf6f96bfdb1e81c97c3fcfb5b4ce2a76"
+      }
+    },
+    {
+      "profileId": "fixed-resource",
+      "run": {
+        "path": "benchmark/desktop/asr_comparison/evidence/qwen3-optimization/macos/runs/asr2-30988826fba08278281b409e8dd658df.json",
+        "sha256": "89755dabc13f03789172dff0a399413ed578abbefc4c58c5dccae0408e220445"
+      },
+      "runId": "asr2-30988826fba08278281b409e8dd658df",
+      "scenario": "system_microphone_double_talk",
+      "scheduleOrder": 94,
+      "warmup": false,
+      "workerOutput": {
+        "documentSha256": "a02b8b78bc68a9a4a27c66983b739703738946d355f724457c2ba1cfa9e6796d",
+        "path": "benchmark/desktop/asr_comparison/evidence/qwen3-optimization/macos/raw/asr2-30988826fba08278281b409e8dd658df.json",
+        "semanticResultSha256": "06863f9d9a953cffb2c75e9fd5163f094546a89c99da6d3587ce328c0c020347"
+      }
+    },
+    {
+      "profileId": "fixed-resource",
+      "run": {
+        "path": "benchmark/desktop/asr_comparison/evidence/qwen3-optimization/macos/runs/asr2-8d93b8fc1a626fe35c6fd34b20daca1e.json",
+        "sha256": "4d3856db1be1bb0b4d9e318ce237fce8efad382218d552bf469a12fcc4b0e3c2"
+      },
+      "runId": "asr2-8d93b8fc1a626fe35c6fd34b20daca1e",
+      "scenario": "non_speech",
+      "scheduleOrder": 95,
+      "warmup": false,
+      "workerOutput": {
+        "documentSha256": "734c2d4eed116b4d947c72390e8142cf774ecdd6a74d35224316664fa8a753f0",
+        "path": "benchmark/desktop/asr_comparison/evidence/qwen3-optimization/macos/raw/asr2-8d93b8fc1a626fe35c6fd34b20daca1e.json",
+        "semanticResultSha256": "242c23dfb054315679234a6603a60ed6f77473d05078699932fc1345509342ea"
+      }
+    },
+    {
+      "profileId": "fixed-resource",
+      "run": {
+        "path": "benchmark/desktop/asr_comparison/evidence/qwen3-optimization/macos/runs/asr2-ebaa7967e5644f2ef0f8b2b1ce7264ca.json",
+        "sha256": "c1c7f5b373d7af5a37f92c2c66f87f8ef8206fe419116c90a49d908ff2e8b873"
+      },
+      "runId": "asr2-ebaa7967e5644f2ef0f8b2b1ce7264ca",
+      "scenario": "clean_near_field_mandarin",
+      "scheduleOrder": 96,
+      "warmup": true,
+      "workerOutput": {
+        "documentSha256": "a60b947b8d258ff2deeb81ccb9e9d9f3aa7a70a1263590259302c2f6a929a04c",
+        "path": "benchmark/desktop/asr_comparison/evidence/qwen3-optimization/macos/raw/asr2-ebaa7967e5644f2ef0f8b2b1ce7264ca.json",
+        "semanticResultSha256": "11141ccb303e47ef4c741d48817d79c49cb4bd9f46dbb6efc3b364e59c5cd6ca"
+      }
+    },
+    {
+      "profileId": "fixed-resource",
+      "run": {
+        "path": "benchmark/desktop/asr_comparison/evidence/qwen3-optimization/macos/runs/asr2-5e8431e5c4182e4c4bb09e52b31813c9.json",
+        "sha256": "7ea4eb0eb62177885551ef108dfb8877546251e15323823b5e739e2e260b1e92"
+      },
+      "runId": "asr2-5e8431e5c4182e4c4bb09e52b31813c9",
+      "scenario": "far_field_noisy_meeting",
+      "scheduleOrder": 97,
+      "warmup": true,
+      "workerOutput": {
+        "documentSha256": "c6a46f1312f45ae00d18266384cb99fdd436137d2e2ab78ff9178a033738ddb2",
+        "path": "benchmark/desktop/asr_comparison/evidence/qwen3-optimization/macos/raw/asr2-5e8431e5c4182e4c4bb09e52b31813c9.json",
+        "semanticResultSha256": "9a85197248d5ff28f9e1041c1370d70f6a3260abb1aaa7cb84110a15f7e78d3e"
+      }
+    },
+    {
+      "profileId": "fixed-resource",
+      "run": {
+        "path": "benchmark/desktop/asr_comparison/evidence/qwen3-optimization/macos/runs/asr2-a17493be420540c20f95dafbf0b692c6.json",
+        "sha256": "90be5354e5066745366a5ca8cec037bf3a8e60fce7755ef6b4e3f9223a94fd24"
+      },
+      "runId": "asr2-a17493be420540c20f95dafbf0b692c6",
+      "scenario": "zh_en_code_switch",
+      "scheduleOrder": 98,
+      "warmup": true,
+      "workerOutput": {
+        "documentSha256": "1aa631984b0341edf9fb3d6babd8b1eb9857543b824e42364693fa5011573fcf",
+        "path": "benchmark/desktop/asr_comparison/evidence/qwen3-optimization/macos/raw/asr2-a17493be420540c20f95dafbf0b692c6.json",
+        "semanticResultSha256": "899d38b3df0f6b19f3a66be85ef53040dc634251ce62eea5984850804692d4f4"
+      }
+    },
+    {
+      "profileId": "fixed-resource",
+      "run": {
+        "path": "benchmark/desktop/asr_comparison/evidence/qwen3-optimization/macos/runs/asr2-098c5b133248feffbe7fe5afab9dfcda.json",
+        "sha256": "e9b877a912837fb710cdad298ba8d1a624291f0776a5be56aa3f962a6eb6fc4e"
+      },
+      "runId": "asr2-098c5b133248feffbe7fe5afab9dfcda",
+      "scenario": "terminology_numbers",
+      "scheduleOrder": 99,
+      "warmup": true,
+      "workerOutput": {
+        "documentSha256": "475352c0717ffc5655f8d758871ee8e68ef815531f83dfea2dbca3c9429da1e5",
+        "path": "benchmark/desktop/asr_comparison/evidence/qwen3-optimization/macos/raw/asr2-098c5b133248feffbe7fe5afab9dfcda.json",
+        "semanticResultSha256": "b369a6dbf9013ccf87bd4ef99acecf16f090b45dfb4459e518f00f0bed1dc940"
+      }
+    },
+    {
+      "profileId": "fixed-resource",
+      "run": {
+        "path": "benchmark/desktop/asr_comparison/evidence/qwen3-optimization/macos/runs/asr2-b9ea41c89ecb123070c8a726fcef96e9.json",
+        "sha256": "bb49a32f35bdcab84b33fbe74df4d751393307ac5faa3207ad628960e8438597"
+      },
+      "runId": "asr2-b9ea41c89ecb123070c8a726fcef96e9",
+      "scenario": "system_microphone_double_talk",
+      "scheduleOrder": 100,
+      "warmup": true,
+      "workerOutput": {
+        "documentSha256": "f840485e2c9a2b5ccfed248da77eebdde504b6f6325350a8a0ca01ec2e88bd1d",
+        "path": "benchmark/desktop/asr_comparison/evidence/qwen3-optimization/macos/raw/asr2-b9ea41c89ecb123070c8a726fcef96e9.json",
+        "semanticResultSha256": "06863f9d9a953cffb2c75e9fd5163f094546a89c99da6d3587ce328c0c020347"
+      }
+    },
+    {
+      "profileId": "fixed-resource",
+      "run": {
+        "path": "benchmark/desktop/asr_comparison/evidence/qwen3-optimization/macos/runs/asr2-2d8feb789edafd451a426650c390f7c3.json",
+        "sha256": "47965021820bf776091c1f84bb91134044e4d52742d6822c20832da238b93799"
+      },
+      "runId": "asr2-2d8feb789edafd451a426650c390f7c3",
+      "scenario": "non_speech",
+      "scheduleOrder": 101,
+      "warmup": true,
+      "workerOutput": {
+        "documentSha256": "cf814f88f1d048f2a791b848fb64dbde9a64d19d6c03287f77d096ae216097c7",
+        "path": "benchmark/desktop/asr_comparison/evidence/qwen3-optimization/macos/raw/asr2-2d8feb789edafd451a426650c390f7c3.json",
+        "semanticResultSha256": "242c23dfb054315679234a6603a60ed6f77473d05078699932fc1345509342ea"
+      }
+    },
+    {
+      "profileId": "fixed-resource",
+      "run": {
+        "path": "benchmark/desktop/asr_comparison/evidence/qwen3-optimization/macos/runs/asr2-a8d9e66422c331c64af404cac96a93ed.json",
+        "sha256": "ccf73690f5b57733cf63e407c27d69c6567ab8906edde40cc671072091fa468d"
+      },
+      "runId": "asr2-a8d9e66422c331c64af404cac96a93ed",
+      "scenario": "clean_near_field_mandarin",
+      "scheduleOrder": 102,
+      "warmup": false,
+      "workerOutput": {
+        "documentSha256": "c24e9541ec07970cbbbc73509ee41aa18ddbebe0cb0bc826021731552cbcfcd2",
+        "path": "benchmark/desktop/asr_comparison/evidence/qwen3-optimization/macos/raw/asr2-a8d9e66422c331c64af404cac96a93ed.json",
+        "semanticResultSha256": "11141ccb303e47ef4c741d48817d79c49cb4bd9f46dbb6efc3b364e59c5cd6ca"
+      }
+    },
+    {
+      "profileId": "fixed-resource",
+      "run": {
+        "path": "benchmark/desktop/asr_comparison/evidence/qwen3-optimization/macos/runs/asr2-4d3f1e3e38da29941f2f5edc45489537.json",
+        "sha256": "f8f8b741dff53b9ee32ab0baf474aaaa304ce34376d7234559fd7fc32b70564b"
+      },
+      "runId": "asr2-4d3f1e3e38da29941f2f5edc45489537",
+      "scenario": "far_field_noisy_meeting",
+      "scheduleOrder": 103,
+      "warmup": false,
+      "workerOutput": {
+        "documentSha256": "8c2751bd245c3a503c643c20450c681a6dac12e3887c676d8da3f880b7d17bba",
+        "path": "benchmark/desktop/asr_comparison/evidence/qwen3-optimization/macos/raw/asr2-4d3f1e3e38da29941f2f5edc45489537.json",
+        "semanticResultSha256": "9a85197248d5ff28f9e1041c1370d70f6a3260abb1aaa7cb84110a15f7e78d3e"
+      }
+    },
+    {
+      "profileId": "fixed-resource",
+      "run": {
+        "path": "benchmark/desktop/asr_comparison/evidence/qwen3-optimization/macos/runs/asr2-a29dcb4ac2a0cef0b343cf66f341cb7c.json",
+        "sha256": "ca9febf1719c58b3a7a57dcaaa56dbcb00e38564fbc1a2ef5c64b81b6123323c"
+      },
+      "runId": "asr2-a29dcb4ac2a0cef0b343cf66f341cb7c",
+      "scenario": "zh_en_code_switch",
+      "scheduleOrder": 104,
+      "warmup": false,
+      "workerOutput": {
+        "documentSha256": "be42573f2a25ed6ef6ae2291b4d118bbd88fa2bd45534c30b61ffd1a25473026",
+        "path": "benchmark/desktop/asr_comparison/evidence/qwen3-optimization/macos/raw/asr2-a29dcb4ac2a0cef0b343cf66f341cb7c.json",
+        "semanticResultSha256": "899d38b3df0f6b19f3a66be85ef53040dc634251ce62eea5984850804692d4f4"
+      }
+    },
+    {
+      "profileId": "fixed-resource",
+      "run": {
+        "path": "benchmark/desktop/asr_comparison/evidence/qwen3-optimization/macos/runs/asr2-3b81c4b5f99ece7918b6a597f3d9ffc2.json",
+        "sha256": "e92f9b855d3527803b14ba983c22f864c6381c2829a48a70a3902383431b16e7"
+      },
+      "runId": "asr2-3b81c4b5f99ece7918b6a597f3d9ffc2",
+      "scenario": "terminology_numbers",
+      "scheduleOrder": 105,
+      "warmup": false,
+      "workerOutput": {
+        "documentSha256": "fae721a23cee1e68f4dfd71acf91414d5d9f6c919759de03a13f7d0271279239",
+        "path": "benchmark/desktop/asr_comparison/evidence/qwen3-optimization/macos/raw/asr2-3b81c4b5f99ece7918b6a597f3d9ffc2.json",
+        "semanticResultSha256": "b369a6dbf9013ccf87bd4ef99acecf16f090b45dfb4459e518f00f0bed1dc940"
+      }
+    },
+    {
+      "profileId": "fixed-resource",
+      "run": {
+        "path": "benchmark/desktop/asr_comparison/evidence/qwen3-optimization/macos/runs/asr2-bbc845629b34c6ca2f0415528c285aaf.json",
+        "sha256": "431d402fe30098ee686820b3c79907707677974686c3fc7f6be961bd69b0c16f"
+      },
+      "runId": "asr2-bbc845629b34c6ca2f0415528c285aaf",
+      "scenario": "system_microphone_double_talk",
+      "scheduleOrder": 106,
+      "warmup": false,
+      "workerOutput": {
+        "documentSha256": "34feece08c77cd0b9fb3afc354f73c55d362002aa850b37c6a37c2e212d816ee",
+        "path": "benchmark/desktop/asr_comparison/evidence/qwen3-optimization/macos/raw/asr2-bbc845629b34c6ca2f0415528c285aaf.json",
+        "semanticResultSha256": "06863f9d9a953cffb2c75e9fd5163f094546a89c99da6d3587ce328c0c020347"
+      }
+    },
+    {
+      "profileId": "fixed-resource",
+      "run": {
+        "path": "benchmark/desktop/asr_comparison/evidence/qwen3-optimization/macos/runs/asr2-62fdaf246965da58b31494e6190b0682.json",
+        "sha256": "702aeb787e63f74ee6ef179c0c5b108fd85cb851a27c4ce2e8c12704169c28cf"
+      },
+      "runId": "asr2-62fdaf246965da58b31494e6190b0682",
+      "scenario": "non_speech",
+      "scheduleOrder": 107,
+      "warmup": false,
+      "workerOutput": {
+        "documentSha256": "016674a5916b54ac1cdb1c6f1f5a8aba6db5de910841f0fa26b18463c776f7c5",
+        "path": "benchmark/desktop/asr_comparison/evidence/qwen3-optimization/macos/raw/asr2-62fdaf246965da58b31494e6190b0682.json",
+        "semanticResultSha256": "242c23dfb054315679234a6603a60ed6f77473d05078699932fc1345509342ea"
+      }
+    },
+    {
+      "profileId": "fixed-resource",
+      "run": {
+        "path": "benchmark/desktop/asr_comparison/evidence/qwen3-optimization/macos/runs/asr2-8662b14ce4894f90b464f6e88e69c9b6.json",
+        "sha256": "d43a6ee1ff811751f9a6ec92cdde8f50ebe4ebda617cd94fdb73838a04356dae"
+      },
+      "runId": "asr2-8662b14ce4894f90b464f6e88e69c9b6",
+      "scenario": "clean_near_field_mandarin",
+      "scheduleOrder": 108,
+      "warmup": false,
+      "workerOutput": {
+        "documentSha256": "4ef7576f2a3693b758bb6a81ff13fe185dee39f30ab67ac424ab7bba2c174598",
+        "path": "benchmark/desktop/asr_comparison/evidence/qwen3-optimization/macos/raw/asr2-8662b14ce4894f90b464f6e88e69c9b6.json",
+        "semanticResultSha256": "11141ccb303e47ef4c741d48817d79c49cb4bd9f46dbb6efc3b364e59c5cd6ca"
+      }
+    },
+    {
+      "profileId": "fixed-resource",
+      "run": {
+        "path": "benchmark/desktop/asr_comparison/evidence/qwen3-optimization/macos/runs/asr2-3ddf1ad496af39c9fd5f8186ef2313a8.json",
+        "sha256": "9493bd6c0b366178ff87a1e8d983534f3ed6b288103db52013623db7b9b83c19"
+      },
+      "runId": "asr2-3ddf1ad496af39c9fd5f8186ef2313a8",
+      "scenario": "far_field_noisy_meeting",
+      "scheduleOrder": 109,
+      "warmup": false,
+      "workerOutput": {
+        "documentSha256": "37785c425ea0903812257d87ab8dfbb14d5bc7ff141d4d071d783c8a6a46a263",
+        "path": "benchmark/desktop/asr_comparison/evidence/qwen3-optimization/macos/raw/asr2-3ddf1ad496af39c9fd5f8186ef2313a8.json",
+        "semanticResultSha256": "9a85197248d5ff28f9e1041c1370d70f6a3260abb1aaa7cb84110a15f7e78d3e"
+      }
+    },
+    {
+      "profileId": "fixed-resource",
+      "run": {
+        "path": "benchmark/desktop/asr_comparison/evidence/qwen3-optimization/macos/runs/asr2-9714e0288e42ad73d300e1171bdb86cf.json",
+        "sha256": "e2fd0b82b02d72a57a9d83c75b278d1e1564cdeaa67dcaab0939d38274d51f84"
+      },
+      "runId": "asr2-9714e0288e42ad73d300e1171bdb86cf",
+      "scenario": "zh_en_code_switch",
+      "scheduleOrder": 110,
+      "warmup": false,
+      "workerOutput": {
+        "documentSha256": "439dff5a638773eb59ae885c160caceeedb1b4a6853de2c6b891fa86ca6e8c35",
+        "path": "benchmark/desktop/asr_comparison/evidence/qwen3-optimization/macos/raw/asr2-9714e0288e42ad73d300e1171bdb86cf.json",
+        "semanticResultSha256": "899d38b3df0f6b19f3a66be85ef53040dc634251ce62eea5984850804692d4f4"
+      }
+    },
+    {
+      "profileId": "fixed-resource",
+      "run": {
+        "path": "benchmark/desktop/asr_comparison/evidence/qwen3-optimization/macos/runs/asr2-346995805306cb235d723ef6087a22b3.json",
+        "sha256": "0f5f0be4dc788b16a36afb625bda459e6682bcc61b6ec8c86b92752cfd2b0a1a"
+      },
+      "runId": "asr2-346995805306cb235d723ef6087a22b3",
+      "scenario": "terminology_numbers",
+      "scheduleOrder": 111,
+      "warmup": false,
+      "workerOutput": {
+        "documentSha256": "188808333a0a778155b60b4257493a5ef70a586e9bd30a6c0975b0594ae69729",
+        "path": "benchmark/desktop/asr_comparison/evidence/qwen3-optimization/macos/raw/asr2-346995805306cb235d723ef6087a22b3.json",
+        "semanticResultSha256": "b369a6dbf9013ccf87bd4ef99acecf16f090b45dfb4459e518f00f0bed1dc940"
+      }
+    },
+    {
+      "profileId": "fixed-resource",
+      "run": {
+        "path": "benchmark/desktop/asr_comparison/evidence/qwen3-optimization/macos/runs/asr2-2603bac8a1be5aa92cad0ac560ffeac1.json",
+        "sha256": "60cbc40266d36c613dd95ac8c369dda48b4f6c70049fd08e0f7b4b188805da63"
+      },
+      "runId": "asr2-2603bac8a1be5aa92cad0ac560ffeac1",
+      "scenario": "system_microphone_double_talk",
+      "scheduleOrder": 112,
+      "warmup": false,
+      "workerOutput": {
+        "documentSha256": "5e33bba65b762f5676222641833f5872d5d0fe65a7767d6c5a6a3c3db46653ef",
+        "path": "benchmark/desktop/asr_comparison/evidence/qwen3-optimization/macos/raw/asr2-2603bac8a1be5aa92cad0ac560ffeac1.json",
+        "semanticResultSha256": "06863f9d9a953cffb2c75e9fd5163f094546a89c99da6d3587ce328c0c020347"
+      }
+    },
+    {
+      "profileId": "fixed-resource",
+      "run": {
+        "path": "benchmark/desktop/asr_comparison/evidence/qwen3-optimization/macos/runs/asr2-3111e6d33d80200936499705e752d34a.json",
+        "sha256": "67e696252838d02382689022eee6e2e5452016afc356419a6caae881a06569d1"
+      },
+      "runId": "asr2-3111e6d33d80200936499705e752d34a",
+      "scenario": "non_speech",
+      "scheduleOrder": 113,
+      "warmup": false,
+      "workerOutput": {
+        "documentSha256": "80fbf7cabefa5b1130c8bbad4f04343599757f740e67744690396397ce74acd5",
+        "path": "benchmark/desktop/asr_comparison/evidence/qwen3-optimization/macos/raw/asr2-3111e6d33d80200936499705e752d34a.json",
+        "semanticResultSha256": "242c23dfb054315679234a6603a60ed6f77473d05078699932fc1345509342ea"
+      }
+    },
+    {
+      "profileId": "fixed-resource",
+      "run": {
+        "path": "benchmark/desktop/asr_comparison/evidence/qwen3-optimization/macos/runs/asr2-09314f34b65149790eaed7c8acc1eff1.json",
+        "sha256": "5a6109865dabcce89639c0321aa8a060f7ec6ebbfdd4c9ed261b3fd8e4912c0c"
+      },
+      "runId": "asr2-09314f34b65149790eaed7c8acc1eff1",
+      "scenario": "clean_near_field_mandarin",
+      "scheduleOrder": 114,
+      "warmup": false,
+      "workerOutput": {
+        "documentSha256": "3001838c1d617a7afa5f07ae60caad61960a342bf521e0a00f44fc50e0434b4d",
+        "path": "benchmark/desktop/asr_comparison/evidence/qwen3-optimization/macos/raw/asr2-09314f34b65149790eaed7c8acc1eff1.json",
+        "semanticResultSha256": "11141ccb303e47ef4c741d48817d79c49cb4bd9f46dbb6efc3b364e59c5cd6ca"
+      }
+    },
+    {
+      "profileId": "fixed-resource",
+      "run": {
+        "path": "benchmark/desktop/asr_comparison/evidence/qwen3-optimization/macos/runs/asr2-8cd8414421c87707fc5f20f7a60845d5.json",
+        "sha256": "b71731c3cedd4f1d0039ab8d427889c107d99634b80af5917d7fe45b2242a293"
+      },
+      "runId": "asr2-8cd8414421c87707fc5f20f7a60845d5",
+      "scenario": "far_field_noisy_meeting",
+      "scheduleOrder": 115,
+      "warmup": false,
+      "workerOutput": {
+        "documentSha256": "26066566730d74788f937e2ba2016ddf384ceacd041fb00a863aa4cd169e13ef",
+        "path": "benchmark/desktop/asr_comparison/evidence/qwen3-optimization/macos/raw/asr2-8cd8414421c87707fc5f20f7a60845d5.json",
+        "semanticResultSha256": "9a85197248d5ff28f9e1041c1370d70f6a3260abb1aaa7cb84110a15f7e78d3e"
+      }
+    },
+    {
+      "profileId": "fixed-resource",
+      "run": {
+        "path": "benchmark/desktop/asr_comparison/evidence/qwen3-optimization/macos/runs/asr2-cf228014034d6d89eb943bcdc6162381.json",
+        "sha256": "1efd8379a717fe575c59e52ef45ed24745f28bab2f1468cd8ef970ab30006624"
+      },
+      "runId": "asr2-cf228014034d6d89eb943bcdc6162381",
+      "scenario": "zh_en_code_switch",
+      "scheduleOrder": 116,
+      "warmup": false,
+      "workerOutput": {
+        "documentSha256": "6305dac99e82dfc4018107cf5831af86f1569758125930697d96012339e51eee",
+        "path": "benchmark/desktop/asr_comparison/evidence/qwen3-optimization/macos/raw/asr2-cf228014034d6d89eb943bcdc6162381.json",
+        "semanticResultSha256": "899d38b3df0f6b19f3a66be85ef53040dc634251ce62eea5984850804692d4f4"
+      }
+    },
+    {
+      "profileId": "fixed-resource",
+      "run": {
+        "path": "benchmark/desktop/asr_comparison/evidence/qwen3-optimization/macos/runs/asr2-17f6b9f2326987eb8915e678411c478a.json",
+        "sha256": "939ff670e24095a7cda42bbfc6c42c591ebd526813d0e6d46d1b661375e7246c"
+      },
+      "runId": "asr2-17f6b9f2326987eb8915e678411c478a",
+      "scenario": "terminology_numbers",
+      "scheduleOrder": 117,
+      "warmup": false,
+      "workerOutput": {
+        "documentSha256": "921d81c3433ae3b6c29a36cd95ecf573036d456d2b8830a08669f523085a1db4",
+        "path": "benchmark/desktop/asr_comparison/evidence/qwen3-optimization/macos/raw/asr2-17f6b9f2326987eb8915e678411c478a.json",
+        "semanticResultSha256": "b369a6dbf9013ccf87bd4ef99acecf16f090b45dfb4459e518f00f0bed1dc940"
+      }
+    },
+    {
+      "profileId": "fixed-resource",
+      "run": {
+        "path": "benchmark/desktop/asr_comparison/evidence/qwen3-optimization/macos/runs/asr2-741643510b8a66ffb6d0a64d09dc29ba.json",
+        "sha256": "a2fbf1355e9dd05d8f42a44fa4ae27f3fb39ce97b9cf64fca72ec20008bd054b"
+      },
+      "runId": "asr2-741643510b8a66ffb6d0a64d09dc29ba",
+      "scenario": "system_microphone_double_talk",
+      "scheduleOrder": 118,
+      "warmup": false,
+      "workerOutput": {
+        "documentSha256": "dfafb09b617f5a3b2125b07d5130e291487540dfcc96c80f46524eaf72908573",
+        "path": "benchmark/desktop/asr_comparison/evidence/qwen3-optimization/macos/raw/asr2-741643510b8a66ffb6d0a64d09dc29ba.json",
+        "semanticResultSha256": "06863f9d9a953cffb2c75e9fd5163f094546a89c99da6d3587ce328c0c020347"
+      }
+    },
+    {
+      "profileId": "fixed-resource",
+      "run": {
+        "path": "benchmark/desktop/asr_comparison/evidence/qwen3-optimization/macos/runs/asr2-9d32ef1a8a04aa065e1809e473369a6b.json",
+        "sha256": "230f506d9de0f62c23aa51fe878970655eb1c4b84d204bef6893a1184f812ce4"
+      },
+      "runId": "asr2-9d32ef1a8a04aa065e1809e473369a6b",
+      "scenario": "non_speech",
+      "scheduleOrder": 119,
+      "warmup": false,
+      "workerOutput": {
+        "documentSha256": "fce792c080e91c098568945542a239eafd03de349f7af2fc521ef21a6b754f06",
+        "path": "benchmark/desktop/asr_comparison/evidence/qwen3-optimization/macos/raw/asr2-9d32ef1a8a04aa065e1809e473369a6b.json",
+        "semanticResultSha256": "242c23dfb054315679234a6603a60ed6f77473d05078699932fc1345509342ea"
+      }
+    },
+    {
+      "profileId": "fixed-resource",
+      "run": {
+        "path": "benchmark/desktop/asr_comparison/evidence/qwen3-optimization/macos/runs/asr2-72a90c52d5cae24796a4d526a616be80.json",
+        "sha256": "cfc8e1d1f2c2417b9f2da41376a0e0ffd2f38e45293f13dfc3c3cb35a5d5ba09"
+      },
+      "runId": "asr2-72a90c52d5cae24796a4d526a616be80",
+      "scenario": "clean_near_field_mandarin",
+      "scheduleOrder": 120,
+      "warmup": true,
+      "workerOutput": {
+        "documentSha256": "43c2c17beb956c6838cf61c7148f5ec3f901033933dcdd2f0a607194c86e0c68",
+        "path": "benchmark/desktop/asr_comparison/evidence/qwen3-optimization/macos/raw/asr2-72a90c52d5cae24796a4d526a616be80.json",
+        "semanticResultSha256": "11c81c85218f8063d4479278432e10d901cc443789a8813337182702fdf7a2e1"
+      }
+    },
+    {
+      "profileId": "fixed-resource",
+      "run": {
+        "path": "benchmark/desktop/asr_comparison/evidence/qwen3-optimization/macos/runs/asr2-314d6b82f843d14ec5c8637c21993f30.json",
+        "sha256": "a79e1915d1758af394a4cbce5f7fcaf427e44060049168503499ec95af9ebbf8"
+      },
+      "runId": "asr2-314d6b82f843d14ec5c8637c21993f30",
+      "scenario": "far_field_noisy_meeting",
+      "scheduleOrder": 121,
+      "warmup": true,
+      "workerOutput": {
+        "documentSha256": "4d676bddde8cd767227fdb7b694664f76c41daa4eee7004e4ebd22b695c35435",
+        "path": "benchmark/desktop/asr_comparison/evidence/qwen3-optimization/macos/raw/asr2-314d6b82f843d14ec5c8637c21993f30.json",
+        "semanticResultSha256": "85d7a199a36608c884d8e86fa41b6402c5fd124e73d0bd6f7ab0752fff9993ae"
+      }
+    },
+    {
+      "profileId": "fixed-resource",
+      "run": {
+        "path": "benchmark/desktop/asr_comparison/evidence/qwen3-optimization/macos/runs/asr2-0fe623971db4630fd6e0d8952952f22b.json",
+        "sha256": "ab52dbac087f97da8b5d17c722833f34b06b97bb4d697b9539a7e013598d1698"
+      },
+      "runId": "asr2-0fe623971db4630fd6e0d8952952f22b",
+      "scenario": "zh_en_code_switch",
+      "scheduleOrder": 122,
+      "warmup": true,
+      "workerOutput": {
+        "documentSha256": "e2b07ab73c1f2d2c39be0f5b85d49fb9aa833dc7899eb54bf886cd330f459b07",
+        "path": "benchmark/desktop/asr_comparison/evidence/qwen3-optimization/macos/raw/asr2-0fe623971db4630fd6e0d8952952f22b.json",
+        "semanticResultSha256": "57dcdf7ce1c510ec7ff721003c6df00c74ad016a95dd1b08b7ebd8921ca7eaeb"
+      }
+    },
+    {
+      "profileId": "fixed-resource",
+      "run": {
+        "path": "benchmark/desktop/asr_comparison/evidence/qwen3-optimization/macos/runs/asr2-44ffd5c6fb18143ed830de3d1bedf254.json",
+        "sha256": "4aae0b2cb33ef6e666be31a737b20065a2d1d33d8f5b0e493f8b9be16c0436d8"
+      },
+      "runId": "asr2-44ffd5c6fb18143ed830de3d1bedf254",
+      "scenario": "terminology_numbers",
+      "scheduleOrder": 123,
+      "warmup": true,
+      "workerOutput": {
+        "documentSha256": "8312090ae8e319265c0957f5d64192f17d46ea7e5c49122f889edc773d0ba92f",
+        "path": "benchmark/desktop/asr_comparison/evidence/qwen3-optimization/macos/raw/asr2-44ffd5c6fb18143ed830de3d1bedf254.json",
+        "semanticResultSha256": "549bdc10a85cb159508a7ed6592b1a6f2646e170e17d50eeb4df4da2c4332d43"
+      }
+    },
+    {
+      "profileId": "fixed-resource",
+      "run": {
+        "path": "benchmark/desktop/asr_comparison/evidence/qwen3-optimization/macos/runs/asr2-70823f435a9bc81958a350176e00c719.json",
+        "sha256": "2b7bc24d2031bd3c4a8195476a7cadaa89c783d03101dbd4f8018b6c9d092788"
+      },
+      "runId": "asr2-70823f435a9bc81958a350176e00c719",
+      "scenario": "system_microphone_double_talk",
+      "scheduleOrder": 124,
+      "warmup": true,
+      "workerOutput": {
+        "documentSha256": "8e1fe6b780aa5e848e668ae716c962472aad8dab73e82706b4686fcb535d2c9f",
+        "path": "benchmark/desktop/asr_comparison/evidence/qwen3-optimization/macos/raw/asr2-70823f435a9bc81958a350176e00c719.json",
+        "semanticResultSha256": "06863f9d9a953cffb2c75e9fd5163f094546a89c99da6d3587ce328c0c020347"
+      }
+    },
+    {
+      "profileId": "fixed-resource",
+      "run": {
+        "path": "benchmark/desktop/asr_comparison/evidence/qwen3-optimization/macos/runs/asr2-af96f9b3c86652c58c0270447baa7af2.json",
+        "sha256": "9e9077fd9c885da2012327d674d5144f3b6f82c451a78102503c46ebff09edd9"
+      },
+      "runId": "asr2-af96f9b3c86652c58c0270447baa7af2",
+      "scenario": "non_speech",
+      "scheduleOrder": 125,
+      "warmup": true,
+      "workerOutput": {
+        "documentSha256": "7c53a0fe8519665c36e46396bac33fe86074a5a2c7b1b4dc1d9a648891e114ca",
+        "path": "benchmark/desktop/asr_comparison/evidence/qwen3-optimization/macos/raw/asr2-af96f9b3c86652c58c0270447baa7af2.json",
+        "semanticResultSha256": "242c23dfb054315679234a6603a60ed6f77473d05078699932fc1345509342ea"
+      }
+    },
+    {
+      "profileId": "fixed-resource",
+      "run": {
+        "path": "benchmark/desktop/asr_comparison/evidence/qwen3-optimization/macos/runs/asr2-0b1e0782bcd9fa01d6f6b63a85ba414f.json",
+        "sha256": "9c4dcd495c09712706c75da121044bd474541d539d453781643bbed0778a35ec"
+      },
+      "runId": "asr2-0b1e0782bcd9fa01d6f6b63a85ba414f",
+      "scenario": "clean_near_field_mandarin",
+      "scheduleOrder": 126,
+      "warmup": false,
+      "workerOutput": {
+        "documentSha256": "afa32e590b46a40feb9a4b513ae4b7477f579e1c49780e35eb61a24bfcf8224c",
+        "path": "benchmark/desktop/asr_comparison/evidence/qwen3-optimization/macos/raw/asr2-0b1e0782bcd9fa01d6f6b63a85ba414f.json",
+        "semanticResultSha256": "11c81c85218f8063d4479278432e10d901cc443789a8813337182702fdf7a2e1"
+      }
+    },
+    {
+      "profileId": "fixed-resource",
+      "run": {
+        "path": "benchmark/desktop/asr_comparison/evidence/qwen3-optimization/macos/runs/asr2-54262298f6cf4b2ac46a8b735ef5f302.json",
+        "sha256": "627e87fb96954b45d4e6ac1e7117fbd3add804b2957c40a1ff42e344dc4b90f3"
+      },
+      "runId": "asr2-54262298f6cf4b2ac46a8b735ef5f302",
+      "scenario": "far_field_noisy_meeting",
+      "scheduleOrder": 127,
+      "warmup": false,
+      "workerOutput": {
+        "documentSha256": "358dba35c064aeef78d14d63433cb91aa2c8b135b0c14d5969cbbf3c26bbbc89",
+        "path": "benchmark/desktop/asr_comparison/evidence/qwen3-optimization/macos/raw/asr2-54262298f6cf4b2ac46a8b735ef5f302.json",
+        "semanticResultSha256": "85d7a199a36608c884d8e86fa41b6402c5fd124e73d0bd6f7ab0752fff9993ae"
+      }
+    },
+    {
+      "profileId": "fixed-resource",
+      "run": {
+        "path": "benchmark/desktop/asr_comparison/evidence/qwen3-optimization/macos/runs/asr2-7e889016f4507074ec9f52df90297b86.json",
+        "sha256": "5956468ffeab057eeb3148374a8d1d885c2d54d1b173ccbbef35fdbf6c82867b"
+      },
+      "runId": "asr2-7e889016f4507074ec9f52df90297b86",
+      "scenario": "zh_en_code_switch",
+      "scheduleOrder": 128,
+      "warmup": false,
+      "workerOutput": {
+        "documentSha256": "7fe514c96a9f85dc5230da9e8996490051cdc30c3c6f13f758fd0299faf43a23",
+        "path": "benchmark/desktop/asr_comparison/evidence/qwen3-optimization/macos/raw/asr2-7e889016f4507074ec9f52df90297b86.json",
+        "semanticResultSha256": "57dcdf7ce1c510ec7ff721003c6df00c74ad016a95dd1b08b7ebd8921ca7eaeb"
+      }
+    },
+    {
+      "profileId": "fixed-resource",
+      "run": {
+        "path": "benchmark/desktop/asr_comparison/evidence/qwen3-optimization/macos/runs/asr2-b40c98005820c434d7280abcf4a5fac1.json",
+        "sha256": "edc4db6c1a30ae874662e0813c85da3737e7252ad80a12295130992756ea625d"
+      },
+      "runId": "asr2-b40c98005820c434d7280abcf4a5fac1",
+      "scenario": "terminology_numbers",
+      "scheduleOrder": 129,
+      "warmup": false,
+      "workerOutput": {
+        "documentSha256": "d18367b35d3745a256f494c0b4e0d9ff5cc329415931d0ba196ca125396e73c6",
+        "path": "benchmark/desktop/asr_comparison/evidence/qwen3-optimization/macos/raw/asr2-b40c98005820c434d7280abcf4a5fac1.json",
+        "semanticResultSha256": "549bdc10a85cb159508a7ed6592b1a6f2646e170e17d50eeb4df4da2c4332d43"
+      }
+    },
+    {
+      "profileId": "fixed-resource",
+      "run": {
+        "path": "benchmark/desktop/asr_comparison/evidence/qwen3-optimization/macos/runs/asr2-2d57ca99ef97bc298bae963fefd76317.json",
+        "sha256": "7c9c93965dc6dca5e383069cc7e7c7257fff713a0ec19ca269cb0e4d2f15ad53"
+      },
+      "runId": "asr2-2d57ca99ef97bc298bae963fefd76317",
+      "scenario": "system_microphone_double_talk",
+      "scheduleOrder": 130,
+      "warmup": false,
+      "workerOutput": {
+        "documentSha256": "3daa37a73978ce04b2ecf661eb289ce4e5f76b04b5ad550b978cb480f3e8ddf1",
+        "path": "benchmark/desktop/asr_comparison/evidence/qwen3-optimization/macos/raw/asr2-2d57ca99ef97bc298bae963fefd76317.json",
+        "semanticResultSha256": "06863f9d9a953cffb2c75e9fd5163f094546a89c99da6d3587ce328c0c020347"
+      }
+    },
+    {
+      "profileId": "fixed-resource",
+      "run": {
+        "path": "benchmark/desktop/asr_comparison/evidence/qwen3-optimization/macos/runs/asr2-0c04d0159c96450d69a15615c9238596.json",
+        "sha256": "f38dfb87e2a928f68856a0763d076d304ebe6a2149196e5399403d70435deea1"
+      },
+      "runId": "asr2-0c04d0159c96450d69a15615c9238596",
+      "scenario": "non_speech",
+      "scheduleOrder": 131,
+      "warmup": false,
+      "workerOutput": {
+        "documentSha256": "1d41798aee46bc86a647c5654d86d3978f4cabd35e65842b89f96f91d861742d",
+        "path": "benchmark/desktop/asr_comparison/evidence/qwen3-optimization/macos/raw/asr2-0c04d0159c96450d69a15615c9238596.json",
+        "semanticResultSha256": "242c23dfb054315679234a6603a60ed6f77473d05078699932fc1345509342ea"
+      }
+    },
+    {
+      "profileId": "fixed-resource",
+      "run": {
+        "path": "benchmark/desktop/asr_comparison/evidence/qwen3-optimization/macos/runs/asr2-c40a6ab9094f3c8ab12fc5fed0f5a1f8.json",
+        "sha256": "5deb4a9282364ab99891c0299f2765726f005a666b511d4e7018591a611ced73"
+      },
+      "runId": "asr2-c40a6ab9094f3c8ab12fc5fed0f5a1f8",
+      "scenario": "clean_near_field_mandarin",
+      "scheduleOrder": 132,
+      "warmup": false,
+      "workerOutput": {
+        "documentSha256": "fccebdd55059a7af7c173598eb81fe0ea536fe70672141eebca45df0284da3e1",
+        "path": "benchmark/desktop/asr_comparison/evidence/qwen3-optimization/macos/raw/asr2-c40a6ab9094f3c8ab12fc5fed0f5a1f8.json",
+        "semanticResultSha256": "11c81c85218f8063d4479278432e10d901cc443789a8813337182702fdf7a2e1"
+      }
+    },
+    {
+      "profileId": "fixed-resource",
+      "run": {
+        "path": "benchmark/desktop/asr_comparison/evidence/qwen3-optimization/macos/runs/asr2-ca17e2b349a3c48c074de6f52e957872.json",
+        "sha256": "f6dd0010dfde1148cd48014152096d58f24a22c54b4d13dfa8af17c88d9479e2"
+      },
+      "runId": "asr2-ca17e2b349a3c48c074de6f52e957872",
+      "scenario": "far_field_noisy_meeting",
+      "scheduleOrder": 133,
+      "warmup": false,
+      "workerOutput": {
+        "documentSha256": "1386f74de2199e0f3ac630d84e982226b9be08999341aae4d1bbf7e4b524c771",
+        "path": "benchmark/desktop/asr_comparison/evidence/qwen3-optimization/macos/raw/asr2-ca17e2b349a3c48c074de6f52e957872.json",
+        "semanticResultSha256": "85d7a199a36608c884d8e86fa41b6402c5fd124e73d0bd6f7ab0752fff9993ae"
+      }
+    },
+    {
+      "profileId": "fixed-resource",
+      "run": {
+        "path": "benchmark/desktop/asr_comparison/evidence/qwen3-optimization/macos/runs/asr2-bd1b34da00a38c7b07f4f8b6991d4e47.json",
+        "sha256": "2306f541e64f68844ad70176c8c3f8a70c7f3007adb3a9d0be6c94543fb4bdb4"
+      },
+      "runId": "asr2-bd1b34da00a38c7b07f4f8b6991d4e47",
+      "scenario": "zh_en_code_switch",
+      "scheduleOrder": 134,
+      "warmup": false,
+      "workerOutput": {
+        "documentSha256": "6457dcf89eba13679fec32ddefeb81783fe87adedd1e3384bb6fa0a9e4522ad8",
+        "path": "benchmark/desktop/asr_comparison/evidence/qwen3-optimization/macos/raw/asr2-bd1b34da00a38c7b07f4f8b6991d4e47.json",
+        "semanticResultSha256": "57dcdf7ce1c510ec7ff721003c6df00c74ad016a95dd1b08b7ebd8921ca7eaeb"
+      }
+    },
+    {
+      "profileId": "fixed-resource",
+      "run": {
+        "path": "benchmark/desktop/asr_comparison/evidence/qwen3-optimization/macos/runs/asr2-9498518f0b49bb72dd07379b3987373e.json",
+        "sha256": "de290df5d42d2e75d7fb102983d5de90f0d1fd3c3bcd6fb976e6f47cc2c8f78f"
+      },
+      "runId": "asr2-9498518f0b49bb72dd07379b3987373e",
+      "scenario": "terminology_numbers",
+      "scheduleOrder": 135,
+      "warmup": false,
+      "workerOutput": {
+        "documentSha256": "e7d49a2f8bd27202f0ad317dc18f5508c2a0a95bc185830f128bd839992fa521",
+        "path": "benchmark/desktop/asr_comparison/evidence/qwen3-optimization/macos/raw/asr2-9498518f0b49bb72dd07379b3987373e.json",
+        "semanticResultSha256": "549bdc10a85cb159508a7ed6592b1a6f2646e170e17d50eeb4df4da2c4332d43"
+      }
+    },
+    {
+      "profileId": "fixed-resource",
+      "run": {
+        "path": "benchmark/desktop/asr_comparison/evidence/qwen3-optimization/macos/runs/asr2-34b15e991104fef8b11d4c28765115ee.json",
+        "sha256": "10c5dbbe9742731a9f853364a8257baa34a3da57b7ac7df4c55f174cf5e163c2"
+      },
+      "runId": "asr2-34b15e991104fef8b11d4c28765115ee",
+      "scenario": "system_microphone_double_talk",
+      "scheduleOrder": 136,
+      "warmup": false,
+      "workerOutput": {
+        "documentSha256": "541fbdcd42ef70cc93678cff213b3a9724d3a8131e172a812f54243392fd8cc8",
+        "path": "benchmark/desktop/asr_comparison/evidence/qwen3-optimization/macos/raw/asr2-34b15e991104fef8b11d4c28765115ee.json",
+        "semanticResultSha256": "06863f9d9a953cffb2c75e9fd5163f094546a89c99da6d3587ce328c0c020347"
+      }
+    },
+    {
+      "profileId": "fixed-resource",
+      "run": {
+        "path": "benchmark/desktop/asr_comparison/evidence/qwen3-optimization/macos/runs/asr2-dd9122e8d99e2d290d0afde2b17eafd7.json",
+        "sha256": "17f90ba544484ba2b70c45c112a527dcf6b769833a63a03e53c3f0d389ff4d29"
+      },
+      "runId": "asr2-dd9122e8d99e2d290d0afde2b17eafd7",
+      "scenario": "non_speech",
+      "scheduleOrder": 137,
+      "warmup": false,
+      "workerOutput": {
+        "documentSha256": "74718fd072f749f2f53948f37af0914741ad1cc86eb5fbaeb4fe53e4d6a07d4c",
+        "path": "benchmark/desktop/asr_comparison/evidence/qwen3-optimization/macos/raw/asr2-dd9122e8d99e2d290d0afde2b17eafd7.json",
+        "semanticResultSha256": "242c23dfb054315679234a6603a60ed6f77473d05078699932fc1345509342ea"
+      }
+    },
+    {
+      "profileId": "fixed-resource",
+      "run": {
+        "path": "benchmark/desktop/asr_comparison/evidence/qwen3-optimization/macos/runs/asr2-45432d557d26ad0593c55fb6a14a5db6.json",
+        "sha256": "3667e0b3a96858095f37f1ad9f1861dc7155f3cc8e5bfe39583f5fb6aa94992e"
+      },
+      "runId": "asr2-45432d557d26ad0593c55fb6a14a5db6",
+      "scenario": "clean_near_field_mandarin",
+      "scheduleOrder": 138,
+      "warmup": false,
+      "workerOutput": {
+        "documentSha256": "978b174fea784fb03e5027268d9e8e46d1257216ca09e1f52b490550c8f35457",
+        "path": "benchmark/desktop/asr_comparison/evidence/qwen3-optimization/macos/raw/asr2-45432d557d26ad0593c55fb6a14a5db6.json",
+        "semanticResultSha256": "11c81c85218f8063d4479278432e10d901cc443789a8813337182702fdf7a2e1"
+      }
+    },
+    {
+      "profileId": "fixed-resource",
+      "run": {
+        "path": "benchmark/desktop/asr_comparison/evidence/qwen3-optimization/macos/runs/asr2-8ec361fa9b0b0d917364ee41902c2228.json",
+        "sha256": "85200fdd503caf9a5d957f9ffdd606da96ba56dd623a749cb946aea3b582b8c8"
+      },
+      "runId": "asr2-8ec361fa9b0b0d917364ee41902c2228",
+      "scenario": "far_field_noisy_meeting",
+      "scheduleOrder": 139,
+      "warmup": false,
+      "workerOutput": {
+        "documentSha256": "009332a7b074d846ea96fba194b7d1e1a82ff2cc0458b74dccb05b1089d79603",
+        "path": "benchmark/desktop/asr_comparison/evidence/qwen3-optimization/macos/raw/asr2-8ec361fa9b0b0d917364ee41902c2228.json",
+        "semanticResultSha256": "85d7a199a36608c884d8e86fa41b6402c5fd124e73d0bd6f7ab0752fff9993ae"
+      }
+    },
+    {
+      "profileId": "fixed-resource",
+      "run": {
+        "path": "benchmark/desktop/asr_comparison/evidence/qwen3-optimization/macos/runs/asr2-e8965cfed730d52a932c5061cda0c6d3.json",
+        "sha256": "db93062dbb3521cd9a1c861ff349c72da1b4e23286812885032fd9de2d6e2fe0"
+      },
+      "runId": "asr2-e8965cfed730d52a932c5061cda0c6d3",
+      "scenario": "zh_en_code_switch",
+      "scheduleOrder": 140,
+      "warmup": false,
+      "workerOutput": {
+        "documentSha256": "1313bdbdfbfd6fb90d5d7197ca48076faec89fc697246bad9dac54f6391cc84c",
+        "path": "benchmark/desktop/asr_comparison/evidence/qwen3-optimization/macos/raw/asr2-e8965cfed730d52a932c5061cda0c6d3.json",
+        "semanticResultSha256": "57dcdf7ce1c510ec7ff721003c6df00c74ad016a95dd1b08b7ebd8921ca7eaeb"
+      }
+    },
+    {
+      "profileId": "fixed-resource",
+      "run": {
+        "path": "benchmark/desktop/asr_comparison/evidence/qwen3-optimization/macos/runs/asr2-20d5694ca11dee04f8f0f35a7862b500.json",
+        "sha256": "3fa8c00fbcc841714933e24c4305a11fac8f32fd9a88ae6c6bc12b9db6749e2b"
+      },
+      "runId": "asr2-20d5694ca11dee04f8f0f35a7862b500",
+      "scenario": "terminology_numbers",
+      "scheduleOrder": 141,
+      "warmup": false,
+      "workerOutput": {
+        "documentSha256": "e5dbb8397e5f5fa812dc52d6395a11c40155e207d0b9d4ae674a3fad3d8ebdba",
+        "path": "benchmark/desktop/asr_comparison/evidence/qwen3-optimization/macos/raw/asr2-20d5694ca11dee04f8f0f35a7862b500.json",
+        "semanticResultSha256": "549bdc10a85cb159508a7ed6592b1a6f2646e170e17d50eeb4df4da2c4332d43"
+      }
+    },
+    {
+      "profileId": "fixed-resource",
+      "run": {
+        "path": "benchmark/desktop/asr_comparison/evidence/qwen3-optimization/macos/runs/asr2-4d0af2416a77d4e43512acdc2c132512.json",
+        "sha256": "6555c48da6591a4dde976a035aefaf4c0a17d0c6b775b001c93b5b0d82974175"
+      },
+      "runId": "asr2-4d0af2416a77d4e43512acdc2c132512",
+      "scenario": "system_microphone_double_talk",
+      "scheduleOrder": 142,
+      "warmup": false,
+      "workerOutput": {
+        "documentSha256": "b705647f80ddcfbf68af50ea9ba7c9c4aff1e93f7c4d390e49a3f0558b68c055",
+        "path": "benchmark/desktop/asr_comparison/evidence/qwen3-optimization/macos/raw/asr2-4d0af2416a77d4e43512acdc2c132512.json",
+        "semanticResultSha256": "06863f9d9a953cffb2c75e9fd5163f094546a89c99da6d3587ce328c0c020347"
+      }
+    },
+    {
+      "profileId": "fixed-resource",
+      "run": {
+        "path": "benchmark/desktop/asr_comparison/evidence/qwen3-optimization/macos/runs/asr2-0801420eceb0da4064aa5d89d0652c58.json",
+        "sha256": "4f76028ac832699fde3a5bde31d5b21ed95efa8a4e3eec99c353f6eb94d5f559"
+      },
+      "runId": "asr2-0801420eceb0da4064aa5d89d0652c58",
+      "scenario": "non_speech",
+      "scheduleOrder": 143,
+      "warmup": false,
+      "workerOutput": {
+        "documentSha256": "7bf6e49c1a2fbe23e316fb35af5bac8c6337954dadadbffc5a9765cf21a10b48",
+        "path": "benchmark/desktop/asr_comparison/evidence/qwen3-optimization/macos/raw/asr2-0801420eceb0da4064aa5d89d0652c58.json",
+        "semanticResultSha256": "242c23dfb054315679234a6603a60ed6f77473d05078699932fc1345509342ea"
+      }
+    },
+    {
+      "profileId": "fixed-resource",
+      "run": {
+        "path": "benchmark/desktop/asr_comparison/evidence/qwen3-optimization/macos/runs/asr2-4146d7ea713aefde4b632795f19065dd.json",
+        "sha256": "e3a3a068ab928d970b2f79f0a1685e4c4cca0e0de1c8818e9d47aacb837f7f27"
+      },
+      "runId": "asr2-4146d7ea713aefde4b632795f19065dd",
+      "scenario": "clean_near_field_mandarin",
+      "scheduleOrder": 144,
+      "warmup": true,
+      "workerOutput": {
+        "documentSha256": "8e8d8e574c8f7abcd31e180d64f82379623e98cad29e2d8d9683b8c3fef901e9",
+        "path": "benchmark/desktop/asr_comparison/evidence/qwen3-optimization/macos/raw/asr2-4146d7ea713aefde4b632795f19065dd.json",
+        "semanticResultSha256": "5aa14cae0664e733a89e5b13377081e17c85cf2512a9e49662e290baf0709398"
+      }
+    },
+    {
+      "profileId": "fixed-resource",
+      "run": {
+        "path": "benchmark/desktop/asr_comparison/evidence/qwen3-optimization/macos/runs/asr2-6553197a0b7d59d2c57eaee721ba5665.json",
+        "sha256": "7d964f26edff65da88ec6523c49111efb48896176bc2221f143784e9b980af3a"
+      },
+      "runId": "asr2-6553197a0b7d59d2c57eaee721ba5665",
+      "scenario": "far_field_noisy_meeting",
+      "scheduleOrder": 145,
+      "warmup": true,
+      "workerOutput": {
+        "documentSha256": "f51353f9f9251ec530a08c3725a7242d9ae10359679ee9fec4e9081b18758f5a",
+        "path": "benchmark/desktop/asr_comparison/evidence/qwen3-optimization/macos/raw/asr2-6553197a0b7d59d2c57eaee721ba5665.json",
+        "semanticResultSha256": "380373417e723b69f916c27cd37fbda6a2f9059505438cec986da85bcb346df2"
+      }
+    },
+    {
+      "profileId": "fixed-resource",
+      "run": {
+        "path": "benchmark/desktop/asr_comparison/evidence/qwen3-optimization/macos/runs/asr2-a753358dbaf81ceefa0f92cec888dcfc.json",
+        "sha256": "f9f5bc637ccecb2663beb3083a49509830709ee756b37fc75d172240d590a326"
+      },
+      "runId": "asr2-a753358dbaf81ceefa0f92cec888dcfc",
+      "scenario": "zh_en_code_switch",
+      "scheduleOrder": 146,
+      "warmup": true,
+      "workerOutput": {
+        "documentSha256": "48f21bab0dc1ab9645b2bc8b5c1f817092c63e872a79599a5348a25c73c93919",
+        "path": "benchmark/desktop/asr_comparison/evidence/qwen3-optimization/macos/raw/asr2-a753358dbaf81ceefa0f92cec888dcfc.json",
+        "semanticResultSha256": "660e0d1839d874af5200e9470c146a98de0f8758fc0b42aaafd81dcb2455d2b6"
+      }
+    },
+    {
+      "profileId": "fixed-resource",
+      "run": {
+        "path": "benchmark/desktop/asr_comparison/evidence/qwen3-optimization/macos/runs/asr2-f96996c208356e375a8125a14d5f8f4f.json",
+        "sha256": "3dfb970a8508268c06724fdaf334d0441cca65d8f7061c14cc20d2f507769866"
+      },
+      "runId": "asr2-f96996c208356e375a8125a14d5f8f4f",
+      "scenario": "terminology_numbers",
+      "scheduleOrder": 147,
+      "warmup": true,
+      "workerOutput": {
+        "documentSha256": "89f4fd5f26907e79ae8ca1245e73ce675445b44f7d73dfe3ed2ef35029fe9ec0",
+        "path": "benchmark/desktop/asr_comparison/evidence/qwen3-optimization/macos/raw/asr2-f96996c208356e375a8125a14d5f8f4f.json",
+        "semanticResultSha256": "e214ef194a35230a1db0280621ff08dad597c65f4082097b3146423a964ecadf"
+      }
+    },
+    {
+      "profileId": "fixed-resource",
+      "run": {
+        "path": "benchmark/desktop/asr_comparison/evidence/qwen3-optimization/macos/runs/asr2-17ccb79b1b8c49040e05eddb58fb34b3.json",
+        "sha256": "3ff0b094a2e01a4bf862e63d60e338a5f5ec885f3f2109e6ee94a37eb82197a5"
+      },
+      "runId": "asr2-17ccb79b1b8c49040e05eddb58fb34b3",
+      "scenario": "system_microphone_double_talk",
+      "scheduleOrder": 148,
+      "warmup": true,
+      "workerOutput": {
+        "documentSha256": "a168855692f86c52162c65feb83900ba25a8c18c40b8e98eb053d8f1ad1591a3",
+        "path": "benchmark/desktop/asr_comparison/evidence/qwen3-optimization/macos/raw/asr2-17ccb79b1b8c49040e05eddb58fb34b3.json",
+        "semanticResultSha256": "88970a1252e8c8f156d6e9b06694dcd2ee5881fa2294712a246f74e1927038e6"
+      }
+    },
+    {
+      "profileId": "fixed-resource",
+      "run": {
+        "path": "benchmark/desktop/asr_comparison/evidence/qwen3-optimization/macos/runs/asr2-50485cdaac361724a6515cf76bb79d44.json",
+        "sha256": "c7b30ddea180d76323f28e840dbfa7288c53a599e0697a096a482239ede67b94"
+      },
+      "runId": "asr2-50485cdaac361724a6515cf76bb79d44",
+      "scenario": "non_speech",
+      "scheduleOrder": 149,
+      "warmup": true,
+      "workerOutput": {
+        "documentSha256": "f20a00dfdc34f767e97722af420d687727a25954e8c92e6a92eb6f659a02ef0f",
+        "path": "benchmark/desktop/asr_comparison/evidence/qwen3-optimization/macos/raw/asr2-50485cdaac361724a6515cf76bb79d44.json",
+        "semanticResultSha256": "242c23dfb054315679234a6603a60ed6f77473d05078699932fc1345509342ea"
+      }
+    },
+    {
+      "profileId": "fixed-resource",
+      "run": {
+        "path": "benchmark/desktop/asr_comparison/evidence/qwen3-optimization/macos/runs/asr2-2c5eb5026d24366afa6f80cef301ade7.json",
+        "sha256": "52292055763fd578c065053a99c2a7c267ede9cddaba6b9c94052fe60a3cc5f9"
+      },
+      "runId": "asr2-2c5eb5026d24366afa6f80cef301ade7",
+      "scenario": "clean_near_field_mandarin",
+      "scheduleOrder": 150,
+      "warmup": false,
+      "workerOutput": {
+        "documentSha256": "1f264974c1c7ba4019dd5a41a74ba62f03493acaa934140d01349524a66c366c",
+        "path": "benchmark/desktop/asr_comparison/evidence/qwen3-optimization/macos/raw/asr2-2c5eb5026d24366afa6f80cef301ade7.json",
+        "semanticResultSha256": "5aa14cae0664e733a89e5b13377081e17c85cf2512a9e49662e290baf0709398"
+      }
+    },
+    {
+      "profileId": "fixed-resource",
+      "run": {
+        "path": "benchmark/desktop/asr_comparison/evidence/qwen3-optimization/macos/runs/asr2-e10e196589c0a5a20e8e417f1adc2dc9.json",
+        "sha256": "031628530e9f9d27457c6f0a71b9a04f63db3a7ebf597f8090cd3e775ddbd525"
+      },
+      "runId": "asr2-e10e196589c0a5a20e8e417f1adc2dc9",
+      "scenario": "far_field_noisy_meeting",
+      "scheduleOrder": 151,
+      "warmup": false,
+      "workerOutput": {
+        "documentSha256": "31cbc4125c0bc072fe8813beca64fd6b21de35e021f8ef469d6a52d88966439b",
+        "path": "benchmark/desktop/asr_comparison/evidence/qwen3-optimization/macos/raw/asr2-e10e196589c0a5a20e8e417f1adc2dc9.json",
+        "semanticResultSha256": "380373417e723b69f916c27cd37fbda6a2f9059505438cec986da85bcb346df2"
+      }
+    },
+    {
+      "profileId": "fixed-resource",
+      "run": {
+        "path": "benchmark/desktop/asr_comparison/evidence/qwen3-optimization/macos/runs/asr2-9bc325ffd30bee005afaba2435bdede0.json",
+        "sha256": "16567ad343f5aab39932bc3c3c4797a94ad59704f6d463188ed005d809e567b3"
+      },
+      "runId": "asr2-9bc325ffd30bee005afaba2435bdede0",
+      "scenario": "zh_en_code_switch",
+      "scheduleOrder": 152,
+      "warmup": false,
+      "workerOutput": {
+        "documentSha256": "5c4c81d96eaf2cf1f32b6d5240c3df09c770dee5f32a465dfeb1023ebd75e9d9",
+        "path": "benchmark/desktop/asr_comparison/evidence/qwen3-optimization/macos/raw/asr2-9bc325ffd30bee005afaba2435bdede0.json",
+        "semanticResultSha256": "660e0d1839d874af5200e9470c146a98de0f8758fc0b42aaafd81dcb2455d2b6"
+      }
+    },
+    {
+      "profileId": "fixed-resource",
+      "run": {
+        "path": "benchmark/desktop/asr_comparison/evidence/qwen3-optimization/macos/runs/asr2-fd347bffe1c547f0f3dbe0c49cd4f387.json",
+        "sha256": "83a00c91b21bee5247f772db6e94292b219ffa02e192ff9b02e4d9800b883845"
+      },
+      "runId": "asr2-fd347bffe1c547f0f3dbe0c49cd4f387",
+      "scenario": "terminology_numbers",
+      "scheduleOrder": 153,
+      "warmup": false,
+      "workerOutput": {
+        "documentSha256": "51b2e3dd978f4e684ef152682fb465e1fe1242821ae4f388efbf1d6f880ec27f",
+        "path": "benchmark/desktop/asr_comparison/evidence/qwen3-optimization/macos/raw/asr2-fd347bffe1c547f0f3dbe0c49cd4f387.json",
+        "semanticResultSha256": "e214ef194a35230a1db0280621ff08dad597c65f4082097b3146423a964ecadf"
+      }
+    },
+    {
+      "profileId": "fixed-resource",
+      "run": {
+        "path": "benchmark/desktop/asr_comparison/evidence/qwen3-optimization/macos/runs/asr2-8071df12378f602c993f6df1ab5cbeb4.json",
+        "sha256": "d609bfc0cbfa9182fe4aa56e11a8ba23658bd8ddcafb5e9b07170cfc3ee51627"
+      },
+      "runId": "asr2-8071df12378f602c993f6df1ab5cbeb4",
+      "scenario": "system_microphone_double_talk",
+      "scheduleOrder": 154,
+      "warmup": false,
+      "workerOutput": {
+        "documentSha256": "44c6dc2ed25df03e94597b8e80c9130997362f08eec5961c3480d7d061851b00",
+        "path": "benchmark/desktop/asr_comparison/evidence/qwen3-optimization/macos/raw/asr2-8071df12378f602c993f6df1ab5cbeb4.json",
+        "semanticResultSha256": "88970a1252e8c8f156d6e9b06694dcd2ee5881fa2294712a246f74e1927038e6"
+      }
+    },
+    {
+      "profileId": "fixed-resource",
+      "run": {
+        "path": "benchmark/desktop/asr_comparison/evidence/qwen3-optimization/macos/runs/asr2-3ef297af0618b7e91615ecd7fdd2e0f2.json",
+        "sha256": "2bbf1f87355fcd2ae2e35a7fc2f5b1db57f02a9f29f26ba3814755399c9571a4"
+      },
+      "runId": "asr2-3ef297af0618b7e91615ecd7fdd2e0f2",
+      "scenario": "non_speech",
+      "scheduleOrder": 155,
+      "warmup": false,
+      "workerOutput": {
+        "documentSha256": "762112629d6792bdabe7683025707b8406a68254d60cdc5e847665414ebf42e0",
+        "path": "benchmark/desktop/asr_comparison/evidence/qwen3-optimization/macos/raw/asr2-3ef297af0618b7e91615ecd7fdd2e0f2.json",
+        "semanticResultSha256": "242c23dfb054315679234a6603a60ed6f77473d05078699932fc1345509342ea"
+      }
+    },
+    {
+      "profileId": "fixed-resource",
+      "run": {
+        "path": "benchmark/desktop/asr_comparison/evidence/qwen3-optimization/macos/runs/asr2-3a35282625339814427f68a013c02c6f.json",
+        "sha256": "408917e759c290af9622ce14a7c2c27d22397c7bc585bb49fd18a02cd24291ac"
+      },
+      "runId": "asr2-3a35282625339814427f68a013c02c6f",
+      "scenario": "clean_near_field_mandarin",
+      "scheduleOrder": 156,
+      "warmup": false,
+      "workerOutput": {
+        "documentSha256": "1f3c38c669c36a018a3fb0199f2c6b90bc4dd394207d03a8df5a9fca25aeb0e0",
+        "path": "benchmark/desktop/asr_comparison/evidence/qwen3-optimization/macos/raw/asr2-3a35282625339814427f68a013c02c6f.json",
+        "semanticResultSha256": "5aa14cae0664e733a89e5b13377081e17c85cf2512a9e49662e290baf0709398"
+      }
+    },
+    {
+      "profileId": "fixed-resource",
+      "run": {
+        "path": "benchmark/desktop/asr_comparison/evidence/qwen3-optimization/macos/runs/asr2-9dc72d0c4bda9c4a1a735d534c4dfdf8.json",
+        "sha256": "d5a36d47b9b444b25b049c39d273350533e85729bbe1453f3b5dce203c161b19"
+      },
+      "runId": "asr2-9dc72d0c4bda9c4a1a735d534c4dfdf8",
+      "scenario": "far_field_noisy_meeting",
+      "scheduleOrder": 157,
+      "warmup": false,
+      "workerOutput": {
+        "documentSha256": "f05f174cffb0498d4449c628bedde45f20d7c0bff27147ded3e36fc1be1afac4",
+        "path": "benchmark/desktop/asr_comparison/evidence/qwen3-optimization/macos/raw/asr2-9dc72d0c4bda9c4a1a735d534c4dfdf8.json",
+        "semanticResultSha256": "380373417e723b69f916c27cd37fbda6a2f9059505438cec986da85bcb346df2"
+      }
+    },
+    {
+      "profileId": "fixed-resource",
+      "run": {
+        "path": "benchmark/desktop/asr_comparison/evidence/qwen3-optimization/macos/runs/asr2-3da9740f22f8414221dcb015f609b24a.json",
+        "sha256": "e68a7b0cd6cd3c096f1b21d59359bdd836973e96569dd0c55ee3eddc18adfd47"
+      },
+      "runId": "asr2-3da9740f22f8414221dcb015f609b24a",
+      "scenario": "zh_en_code_switch",
+      "scheduleOrder": 158,
+      "warmup": false,
+      "workerOutput": {
+        "documentSha256": "14e3bfed7e3e6b3fe48f9a607540e8dba5540d942b03c6c4e8a77371386921c6",
+        "path": "benchmark/desktop/asr_comparison/evidence/qwen3-optimization/macos/raw/asr2-3da9740f22f8414221dcb015f609b24a.json",
+        "semanticResultSha256": "660e0d1839d874af5200e9470c146a98de0f8758fc0b42aaafd81dcb2455d2b6"
+      }
+    },
+    {
+      "profileId": "fixed-resource",
+      "run": {
+        "path": "benchmark/desktop/asr_comparison/evidence/qwen3-optimization/macos/runs/asr2-b0f5b1226a401383518386e91323ca93.json",
+        "sha256": "60ea8ebaca22474d90d52653d180cc3201798ddb2314966637e619cdfde0581a"
+      },
+      "runId": "asr2-b0f5b1226a401383518386e91323ca93",
+      "scenario": "terminology_numbers",
+      "scheduleOrder": 159,
+      "warmup": false,
+      "workerOutput": {
+        "documentSha256": "df6b6d8662e1186bcd0d8bebf12072763643f5a83a20f5b42f251cb92142f265",
+        "path": "benchmark/desktop/asr_comparison/evidence/qwen3-optimization/macos/raw/asr2-b0f5b1226a401383518386e91323ca93.json",
+        "semanticResultSha256": "e214ef194a35230a1db0280621ff08dad597c65f4082097b3146423a964ecadf"
+      }
+    },
+    {
+      "profileId": "fixed-resource",
+      "run": {
+        "path": "benchmark/desktop/asr_comparison/evidence/qwen3-optimization/macos/runs/asr2-e39b770b6a4c90aa2b590208bc43be5d.json",
+        "sha256": "22ef7ed919b1e6917eb7a072aff4002fc40515903f819639d042a750d71d4972"
+      },
+      "runId": "asr2-e39b770b6a4c90aa2b590208bc43be5d",
+      "scenario": "system_microphone_double_talk",
+      "scheduleOrder": 160,
+      "warmup": false,
+      "workerOutput": {
+        "documentSha256": "b49122c12b281fde7cd6fad1f832616349412636a728842819a3ab74de18d7f2",
+        "path": "benchmark/desktop/asr_comparison/evidence/qwen3-optimization/macos/raw/asr2-e39b770b6a4c90aa2b590208bc43be5d.json",
+        "semanticResultSha256": "88970a1252e8c8f156d6e9b06694dcd2ee5881fa2294712a246f74e1927038e6"
+      }
+    },
+    {
+      "profileId": "fixed-resource",
+      "run": {
+        "path": "benchmark/desktop/asr_comparison/evidence/qwen3-optimization/macos/runs/asr2-0eeeca5be55e47a9e4d99163fcc89564.json",
+        "sha256": "0804b1fe01c82300b0e430a7f871d1e675fcc1a8fd00b8e9832956482745ba9b"
+      },
+      "runId": "asr2-0eeeca5be55e47a9e4d99163fcc89564",
+      "scenario": "non_speech",
+      "scheduleOrder": 161,
+      "warmup": false,
+      "workerOutput": {
+        "documentSha256": "e6dff3390ec358d5fa0c564b5ef131940dc6832dd61429578ae130427feea0fb",
+        "path": "benchmark/desktop/asr_comparison/evidence/qwen3-optimization/macos/raw/asr2-0eeeca5be55e47a9e4d99163fcc89564.json",
+        "semanticResultSha256": "242c23dfb054315679234a6603a60ed6f77473d05078699932fc1345509342ea"
+      }
+    },
+    {
+      "profileId": "fixed-resource",
+      "run": {
+        "path": "benchmark/desktop/asr_comparison/evidence/qwen3-optimization/macos/runs/asr2-32f4516aed1e49d5698896ab226886b7.json",
+        "sha256": "9eccf180cc6354bdfe4643a29d56f8b66053ac22b0f9924699414d9c332244c1"
+      },
+      "runId": "asr2-32f4516aed1e49d5698896ab226886b7",
+      "scenario": "clean_near_field_mandarin",
+      "scheduleOrder": 162,
+      "warmup": false,
+      "workerOutput": {
+        "documentSha256": "d0a64947c9a08c7f58d27f96f61c9998a07a15926ef81326e4d49c5d32c9fe17",
+        "path": "benchmark/desktop/asr_comparison/evidence/qwen3-optimization/macos/raw/asr2-32f4516aed1e49d5698896ab226886b7.json",
+        "semanticResultSha256": "5aa14cae0664e733a89e5b13377081e17c85cf2512a9e49662e290baf0709398"
+      }
+    },
+    {
+      "profileId": "fixed-resource",
+      "run": {
+        "path": "benchmark/desktop/asr_comparison/evidence/qwen3-optimization/macos/runs/asr2-d9b2a1baa976b1500fa67dde7fc67025.json",
+        "sha256": "1f93a3b47e829f2023a1508617dc46411b12ecfe562affd013297fa79b735713"
+      },
+      "runId": "asr2-d9b2a1baa976b1500fa67dde7fc67025",
+      "scenario": "far_field_noisy_meeting",
+      "scheduleOrder": 163,
+      "warmup": false,
+      "workerOutput": {
+        "documentSha256": "905d0a47d811de01221f93a428e1ac0bdb13af21b4f5e4fc6499eab4fa4945ea",
+        "path": "benchmark/desktop/asr_comparison/evidence/qwen3-optimization/macos/raw/asr2-d9b2a1baa976b1500fa67dde7fc67025.json",
+        "semanticResultSha256": "380373417e723b69f916c27cd37fbda6a2f9059505438cec986da85bcb346df2"
+      }
+    },
+    {
+      "profileId": "fixed-resource",
+      "run": {
+        "path": "benchmark/desktop/asr_comparison/evidence/qwen3-optimization/macos/runs/asr2-f33dbaab1b38a52121426826a0398901.json",
+        "sha256": "9440c41568ff164f0639d3a761f7bd6badeca743d57ab2773a47ff411cbcec98"
+      },
+      "runId": "asr2-f33dbaab1b38a52121426826a0398901",
+      "scenario": "zh_en_code_switch",
+      "scheduleOrder": 164,
+      "warmup": false,
+      "workerOutput": {
+        "documentSha256": "9359eac93c7a450add98c104321056cd13021505987e4a09e20d3b96e333d394",
+        "path": "benchmark/desktop/asr_comparison/evidence/qwen3-optimization/macos/raw/asr2-f33dbaab1b38a52121426826a0398901.json",
+        "semanticResultSha256": "660e0d1839d874af5200e9470c146a98de0f8758fc0b42aaafd81dcb2455d2b6"
+      }
+    },
+    {
+      "profileId": "fixed-resource",
+      "run": {
+        "path": "benchmark/desktop/asr_comparison/evidence/qwen3-optimization/macos/runs/asr2-a2328879f8bbc21cdf32bcaa519ea149.json",
+        "sha256": "e5ea742c9aa41466fef55c246f7c104709ee88cb2b6078f81f7eb98982cdafea"
+      },
+      "runId": "asr2-a2328879f8bbc21cdf32bcaa519ea149",
+      "scenario": "terminology_numbers",
+      "scheduleOrder": 165,
+      "warmup": false,
+      "workerOutput": {
+        "documentSha256": "dc12d9ec341865409a404a2582690806fe1cc60589fa5fcf13500374ad9692c3",
+        "path": "benchmark/desktop/asr_comparison/evidence/qwen3-optimization/macos/raw/asr2-a2328879f8bbc21cdf32bcaa519ea149.json",
+        "semanticResultSha256": "e214ef194a35230a1db0280621ff08dad597c65f4082097b3146423a964ecadf"
+      }
+    },
+    {
+      "profileId": "fixed-resource",
+      "run": {
+        "path": "benchmark/desktop/asr_comparison/evidence/qwen3-optimization/macos/runs/asr2-8a5279a8683a51d3bc36f35497bc3428.json",
+        "sha256": "d471948bbd7f0c5efab9387b4f48e602771f8754e910dd195d58f3d7ab6daef6"
+      },
+      "runId": "asr2-8a5279a8683a51d3bc36f35497bc3428",
+      "scenario": "system_microphone_double_talk",
+      "scheduleOrder": 166,
+      "warmup": false,
+      "workerOutput": {
+        "documentSha256": "8e77026645edaacecf867644c93a8c8285b2c93f4aabc4db39e310c0a5cb515c",
+        "path": "benchmark/desktop/asr_comparison/evidence/qwen3-optimization/macos/raw/asr2-8a5279a8683a51d3bc36f35497bc3428.json",
+        "semanticResultSha256": "88970a1252e8c8f156d6e9b06694dcd2ee5881fa2294712a246f74e1927038e6"
+      }
+    },
+    {
+      "profileId": "fixed-resource",
+      "run": {
+        "path": "benchmark/desktop/asr_comparison/evidence/qwen3-optimization/macos/runs/asr2-c283c16725c4f496458b2ff8e2d3c248.json",
+        "sha256": "3ae31e85c7db9d2efb4f5f859d0fa35ce29c61a39d8989b8a8a48ba74deb215c"
+      },
+      "runId": "asr2-c283c16725c4f496458b2ff8e2d3c248",
+      "scenario": "non_speech",
+      "scheduleOrder": 167,
+      "warmup": false,
+      "workerOutput": {
+        "documentSha256": "3b1970d62c625a154ed3196d460174da81b949729ae050a9ca3220e4bc9c2a96",
+        "path": "benchmark/desktop/asr_comparison/evidence/qwen3-optimization/macos/raw/asr2-c283c16725c4f496458b2ff8e2d3c248.json",
+        "semanticResultSha256": "242c23dfb054315679234a6603a60ed6f77473d05078699932fc1345509342ea"
+      }
+    },
+    {
+      "profileId": "fixed-resource",
+      "run": {
+        "path": "benchmark/desktop/asr_comparison/evidence/qwen3-optimization/macos/runs/asr2-c5dd78e026826de00b42e1437e418478.json",
+        "sha256": "ae34fa71bb30d58bd67e4436dde1f35772e0fb83d29d9420ddf6293efce3ace7"
+      },
+      "runId": "asr2-c5dd78e026826de00b42e1437e418478",
+      "scenario": "clean_near_field_mandarin",
+      "scheduleOrder": 168,
+      "warmup": true,
+      "workerOutput": {
+        "documentSha256": "b6c5ad00000b255240acc9cba2b87bc9a44fe9decd0465530ce6a975d4ae02ba",
+        "path": "benchmark/desktop/asr_comparison/evidence/qwen3-optimization/macos/raw/asr2-c5dd78e026826de00b42e1437e418478.json",
+        "semanticResultSha256": "5aa14cae0664e733a89e5b13377081e17c85cf2512a9e49662e290baf0709398"
+      }
+    },
+    {
+      "profileId": "fixed-resource",
+      "run": {
+        "path": "benchmark/desktop/asr_comparison/evidence/qwen3-optimization/macos/runs/asr2-61336382feecb8e160eebfd597f610d8.json",
+        "sha256": "57f1d2b1c8cf16c4c3d85b645d654ba5c4f558d443cf6125bdd97c3fb2504b5a"
+      },
+      "runId": "asr2-61336382feecb8e160eebfd597f610d8",
+      "scenario": "far_field_noisy_meeting",
+      "scheduleOrder": 169,
+      "warmup": true,
+      "workerOutput": {
+        "documentSha256": "cd6dafbfa3f697ba0c465499d97492666bfd40de4f6daba0378bcd713afa877c",
+        "path": "benchmark/desktop/asr_comparison/evidence/qwen3-optimization/macos/raw/asr2-61336382feecb8e160eebfd597f610d8.json",
+        "semanticResultSha256": "380373417e723b69f916c27cd37fbda6a2f9059505438cec986da85bcb346df2"
+      }
+    },
+    {
+      "profileId": "fixed-resource",
+      "run": {
+        "path": "benchmark/desktop/asr_comparison/evidence/qwen3-optimization/macos/runs/asr2-a74cc13377b49a71fd214f09ae483131.json",
+        "sha256": "cf38de8071cf6984049515ef1ef5f46677aebc97f949dd512106994a2ee166e1"
+      },
+      "runId": "asr2-a74cc13377b49a71fd214f09ae483131",
+      "scenario": "zh_en_code_switch",
+      "scheduleOrder": 170,
+      "warmup": true,
+      "workerOutput": {
+        "documentSha256": "c265b10c63209450769a3ab023aa590c275f053dcfe07c1175b7cedc05c73f29",
+        "path": "benchmark/desktop/asr_comparison/evidence/qwen3-optimization/macos/raw/asr2-a74cc13377b49a71fd214f09ae483131.json",
+        "semanticResultSha256": "660e0d1839d874af5200e9470c146a98de0f8758fc0b42aaafd81dcb2455d2b6"
+      }
+    },
+    {
+      "profileId": "fixed-resource",
+      "run": {
+        "path": "benchmark/desktop/asr_comparison/evidence/qwen3-optimization/macos/runs/asr2-ae78b32ce3a128f162c2fb3ae845e36a.json",
+        "sha256": "586ea0d4a5bf1224a9ea5677b1e25469790a20e61a5fa5c6811de1a7cbcdbd9b"
+      },
+      "runId": "asr2-ae78b32ce3a128f162c2fb3ae845e36a",
+      "scenario": "terminology_numbers",
+      "scheduleOrder": 171,
+      "warmup": true,
+      "workerOutput": {
+        "documentSha256": "6dd617025642086475c3a946462a242d7d4db3063d5da36d2b1b8b566b6bb5a9",
+        "path": "benchmark/desktop/asr_comparison/evidence/qwen3-optimization/macos/raw/asr2-ae78b32ce3a128f162c2fb3ae845e36a.json",
+        "semanticResultSha256": "e214ef194a35230a1db0280621ff08dad597c65f4082097b3146423a964ecadf"
+      }
+    },
+    {
+      "profileId": "fixed-resource",
+      "run": {
+        "path": "benchmark/desktop/asr_comparison/evidence/qwen3-optimization/macos/runs/asr2-3116a3fe331b774f4f09ce30d8f3f848.json",
+        "sha256": "207e7a8c52c4f98a79049548b25af88915c4780c1bad1681f040a022862f746d"
+      },
+      "runId": "asr2-3116a3fe331b774f4f09ce30d8f3f848",
+      "scenario": "system_microphone_double_talk",
+      "scheduleOrder": 172,
+      "warmup": true,
+      "workerOutput": {
+        "documentSha256": "2161fea975b821ecba3ecc7a741c646fb983b110ebe47e40e78389f21516b6aa",
+        "path": "benchmark/desktop/asr_comparison/evidence/qwen3-optimization/macos/raw/asr2-3116a3fe331b774f4f09ce30d8f3f848.json",
+        "semanticResultSha256": "88970a1252e8c8f156d6e9b06694dcd2ee5881fa2294712a246f74e1927038e6"
+      }
+    },
+    {
+      "profileId": "fixed-resource",
+      "run": {
+        "path": "benchmark/desktop/asr_comparison/evidence/qwen3-optimization/macos/runs/asr2-798f5b2bf90e6a9b5d83bed5b40257f8.json",
+        "sha256": "1508fa9399c8290700afe5ce7f336a801e7ae0561c37a4757074090c5cb7be7e"
+      },
+      "runId": "asr2-798f5b2bf90e6a9b5d83bed5b40257f8",
+      "scenario": "non_speech",
+      "scheduleOrder": 173,
+      "warmup": true,
+      "workerOutput": {
+        "documentSha256": "f8e2a7732e135b656029c821b8255e0e301a21978b8a8ed36baaceaea42d1033",
+        "path": "benchmark/desktop/asr_comparison/evidence/qwen3-optimization/macos/raw/asr2-798f5b2bf90e6a9b5d83bed5b40257f8.json",
+        "semanticResultSha256": "242c23dfb054315679234a6603a60ed6f77473d05078699932fc1345509342ea"
+      }
+    },
+    {
+      "profileId": "fixed-resource",
+      "run": {
+        "path": "benchmark/desktop/asr_comparison/evidence/qwen3-optimization/macos/runs/asr2-1a80ad4c03ca9c6eda3b0410aa9babb9.json",
+        "sha256": "e0e783c640474f5c4e2a4fde501d3463801ebfafa34b2e2b86ade19e42e9be08"
+      },
+      "runId": "asr2-1a80ad4c03ca9c6eda3b0410aa9babb9",
+      "scenario": "clean_near_field_mandarin",
+      "scheduleOrder": 174,
+      "warmup": false,
+      "workerOutput": {
+        "documentSha256": "d9fd4d1f9675e23d10f60cf563f7b5502d4e80cc55288f9bd080ce1e2c3e14cc",
+        "path": "benchmark/desktop/asr_comparison/evidence/qwen3-optimization/macos/raw/asr2-1a80ad4c03ca9c6eda3b0410aa9babb9.json",
+        "semanticResultSha256": "5aa14cae0664e733a89e5b13377081e17c85cf2512a9e49662e290baf0709398"
+      }
+    },
+    {
+      "profileId": "fixed-resource",
+      "run": {
+        "path": "benchmark/desktop/asr_comparison/evidence/qwen3-optimization/macos/runs/asr2-48f7ee90b5cfc77d1fbd44be852cadfa.json",
+        "sha256": "248de8e1ac5e13148229b3d1905833e3427512d8dcdf115693da9afff820f41d"
+      },
+      "runId": "asr2-48f7ee90b5cfc77d1fbd44be852cadfa",
+      "scenario": "far_field_noisy_meeting",
+      "scheduleOrder": 175,
+      "warmup": false,
+      "workerOutput": {
+        "documentSha256": "9033f542f58d0c5497c66e8c01f30b0b5247af7a6e526203c1ed898f80b758a6",
+        "path": "benchmark/desktop/asr_comparison/evidence/qwen3-optimization/macos/raw/asr2-48f7ee90b5cfc77d1fbd44be852cadfa.json",
+        "semanticResultSha256": "380373417e723b69f916c27cd37fbda6a2f9059505438cec986da85bcb346df2"
+      }
+    },
+    {
+      "profileId": "fixed-resource",
+      "run": {
+        "path": "benchmark/desktop/asr_comparison/evidence/qwen3-optimization/macos/runs/asr2-4ae3f9097e3705f48cc08b5b2601daaf.json",
+        "sha256": "e630efdad5dda9f9148b9816f2284f78633c0151ecf1aace74a9f70a77b0241b"
+      },
+      "runId": "asr2-4ae3f9097e3705f48cc08b5b2601daaf",
+      "scenario": "zh_en_code_switch",
+      "scheduleOrder": 176,
+      "warmup": false,
+      "workerOutput": {
+        "documentSha256": "c328f700f216c355fd74a3b46a582057c9fbb50e223967a00f8e79d8603a5d83",
+        "path": "benchmark/desktop/asr_comparison/evidence/qwen3-optimization/macos/raw/asr2-4ae3f9097e3705f48cc08b5b2601daaf.json",
+        "semanticResultSha256": "660e0d1839d874af5200e9470c146a98de0f8758fc0b42aaafd81dcb2455d2b6"
+      }
+    },
+    {
+      "profileId": "fixed-resource",
+      "run": {
+        "path": "benchmark/desktop/asr_comparison/evidence/qwen3-optimization/macos/runs/asr2-4edba8ccb1e930d4fceb65c70d35180e.json",
+        "sha256": "50d0d29a8c839df02b6a56936494bd2fa00e06b02788b3cd4aab04e8b2015ce9"
+      },
+      "runId": "asr2-4edba8ccb1e930d4fceb65c70d35180e",
+      "scenario": "terminology_numbers",
+      "scheduleOrder": 177,
+      "warmup": false,
+      "workerOutput": {
+        "documentSha256": "7555f1f52b37f042d724fe75adfd16b5f66ad496deb839739a9f8e1bdc5a7265",
+        "path": "benchmark/desktop/asr_comparison/evidence/qwen3-optimization/macos/raw/asr2-4edba8ccb1e930d4fceb65c70d35180e.json",
+        "semanticResultSha256": "e214ef194a35230a1db0280621ff08dad597c65f4082097b3146423a964ecadf"
+      }
+    },
+    {
+      "profileId": "fixed-resource",
+      "run": {
+        "path": "benchmark/desktop/asr_comparison/evidence/qwen3-optimization/macos/runs/asr2-1ce27139c599f6b64902219d8b7d37d2.json",
+        "sha256": "2d40378aed531047a8664e1257c2415120b691939f9e97388bd3b73a92c6aae4"
+      },
+      "runId": "asr2-1ce27139c599f6b64902219d8b7d37d2",
+      "scenario": "system_microphone_double_talk",
+      "scheduleOrder": 178,
+      "warmup": false,
+      "workerOutput": {
+        "documentSha256": "64fa0353e6b9cd2d25a1e95a261f3b486d054fc7d3406deca4542b36d6e42160",
+        "path": "benchmark/desktop/asr_comparison/evidence/qwen3-optimization/macos/raw/asr2-1ce27139c599f6b64902219d8b7d37d2.json",
+        "semanticResultSha256": "88970a1252e8c8f156d6e9b06694dcd2ee5881fa2294712a246f74e1927038e6"
+      }
+    },
+    {
+      "profileId": "fixed-resource",
+      "run": {
+        "path": "benchmark/desktop/asr_comparison/evidence/qwen3-optimization/macos/runs/asr2-0d810b868ff10d5d33df97b83fec99cc.json",
+        "sha256": "abbae91f1f1cb23a0311e4d7d5a172c018d0665a2f260ce782ee5d607e1ae7d5"
+      },
+      "runId": "asr2-0d810b868ff10d5d33df97b83fec99cc",
+      "scenario": "non_speech",
+      "scheduleOrder": 179,
+      "warmup": false,
+      "workerOutput": {
+        "documentSha256": "6ce1b916e485ef383fc4e6c3d67dcef17e4bf53d4a03d70d0c19ce3c107f4390",
+        "path": "benchmark/desktop/asr_comparison/evidence/qwen3-optimization/macos/raw/asr2-0d810b868ff10d5d33df97b83fec99cc.json",
+        "semanticResultSha256": "242c23dfb054315679234a6603a60ed6f77473d05078699932fc1345509342ea"
+      }
+    },
+    {
+      "profileId": "fixed-resource",
+      "run": {
+        "path": "benchmark/desktop/asr_comparison/evidence/qwen3-optimization/macos/runs/asr2-9a23298f866fd327e54bd19527dacbb5.json",
+        "sha256": "5958a1c0328bca555ee231bc4d6b5661952462a1a6da2d29e2ea716da1e09b1f"
+      },
+      "runId": "asr2-9a23298f866fd327e54bd19527dacbb5",
+      "scenario": "clean_near_field_mandarin",
+      "scheduleOrder": 180,
+      "warmup": false,
+      "workerOutput": {
+        "documentSha256": "85cab698ca1c8ce6bdc9ef101f9cd08e55cd6bd04387f601741d2cf0e221bc1e",
+        "path": "benchmark/desktop/asr_comparison/evidence/qwen3-optimization/macos/raw/asr2-9a23298f866fd327e54bd19527dacbb5.json",
+        "semanticResultSha256": "5aa14cae0664e733a89e5b13377081e17c85cf2512a9e49662e290baf0709398"
+      }
+    },
+    {
+      "profileId": "fixed-resource",
+      "run": {
+        "path": "benchmark/desktop/asr_comparison/evidence/qwen3-optimization/macos/runs/asr2-82627f0dc777a87bcdcdf6d4a1a1cc1d.json",
+        "sha256": "b698cc46767097f3606d99c4ce0a6f11111fd5c376f5083b53492188244fa450"
+      },
+      "runId": "asr2-82627f0dc777a87bcdcdf6d4a1a1cc1d",
+      "scenario": "far_field_noisy_meeting",
+      "scheduleOrder": 181,
+      "warmup": false,
+      "workerOutput": {
+        "documentSha256": "281ecbf671ca80e6d77a348863a6f25bfe38c7a2f23634f54b0383c63e2fc98e",
+        "path": "benchmark/desktop/asr_comparison/evidence/qwen3-optimization/macos/raw/asr2-82627f0dc777a87bcdcdf6d4a1a1cc1d.json",
+        "semanticResultSha256": "380373417e723b69f916c27cd37fbda6a2f9059505438cec986da85bcb346df2"
+      }
+    },
+    {
+      "profileId": "fixed-resource",
+      "run": {
+        "path": "benchmark/desktop/asr_comparison/evidence/qwen3-optimization/macos/runs/asr2-dad2602de5208acee8520e9eb5706187.json",
+        "sha256": "c127dd20a9f7a8577cc7116442dcd9faa36ce4217151b909a3fa79f9ae09f205"
+      },
+      "runId": "asr2-dad2602de5208acee8520e9eb5706187",
+      "scenario": "zh_en_code_switch",
+      "scheduleOrder": 182,
+      "warmup": false,
+      "workerOutput": {
+        "documentSha256": "f7092d9e3e8826a5ddc6084a361bd8d865773b6d7dad7cfe7d6cf9119692ef79",
+        "path": "benchmark/desktop/asr_comparison/evidence/qwen3-optimization/macos/raw/asr2-dad2602de5208acee8520e9eb5706187.json",
+        "semanticResultSha256": "660e0d1839d874af5200e9470c146a98de0f8758fc0b42aaafd81dcb2455d2b6"
+      }
+    },
+    {
+      "profileId": "fixed-resource",
+      "run": {
+        "path": "benchmark/desktop/asr_comparison/evidence/qwen3-optimization/macos/runs/asr2-a4e8ee52e4215fcee53c981bafe0d945.json",
+        "sha256": "bfa170199631fd077a8ab9c4c6307ee6b45e4b9e6a3b4523e1d6452754aa7dc4"
+      },
+      "runId": "asr2-a4e8ee52e4215fcee53c981bafe0d945",
+      "scenario": "terminology_numbers",
+      "scheduleOrder": 183,
+      "warmup": false,
+      "workerOutput": {
+        "documentSha256": "61e6ce0a9e4625f0998f2146b59a5e911ee2b58751067038883f0f9a808c7740",
+        "path": "benchmark/desktop/asr_comparison/evidence/qwen3-optimization/macos/raw/asr2-a4e8ee52e4215fcee53c981bafe0d945.json",
+        "semanticResultSha256": "e214ef194a35230a1db0280621ff08dad597c65f4082097b3146423a964ecadf"
+      }
+    },
+    {
+      "profileId": "fixed-resource",
+      "run": {
+        "path": "benchmark/desktop/asr_comparison/evidence/qwen3-optimization/macos/runs/asr2-4814c2ab05aaa0f0965b68c3893270ca.json",
+        "sha256": "a024beddbe8a4deb873fc10134990d0da48cb6182f967b820798af5f06041131"
+      },
+      "runId": "asr2-4814c2ab05aaa0f0965b68c3893270ca",
+      "scenario": "system_microphone_double_talk",
+      "scheduleOrder": 184,
+      "warmup": false,
+      "workerOutput": {
+        "documentSha256": "9ffeaf400cca032e9d9906b4bbd14d78bb33cb968a44a19c3f255e01772bf9cf",
+        "path": "benchmark/desktop/asr_comparison/evidence/qwen3-optimization/macos/raw/asr2-4814c2ab05aaa0f0965b68c3893270ca.json",
+        "semanticResultSha256": "88970a1252e8c8f156d6e9b06694dcd2ee5881fa2294712a246f74e1927038e6"
+      }
+    },
+    {
+      "profileId": "fixed-resource",
+      "run": {
+        "path": "benchmark/desktop/asr_comparison/evidence/qwen3-optimization/macos/runs/asr2-500614b5c112b1fcc2236e16b0a54c76.json",
+        "sha256": "7d1a897116eecc70b38552feeff17c3f07aeec33ecc837c5c6989f5884da8bfd"
+      },
+      "runId": "asr2-500614b5c112b1fcc2236e16b0a54c76",
+      "scenario": "non_speech",
+      "scheduleOrder": 185,
+      "warmup": false,
+      "workerOutput": {
+        "documentSha256": "d3b455b4e4ffe5ccff7d768f2aa95987996ccd4c1ac5f67b2a571a708e71bace",
+        "path": "benchmark/desktop/asr_comparison/evidence/qwen3-optimization/macos/raw/asr2-500614b5c112b1fcc2236e16b0a54c76.json",
+        "semanticResultSha256": "242c23dfb054315679234a6603a60ed6f77473d05078699932fc1345509342ea"
+      }
+    },
+    {
+      "profileId": "fixed-resource",
+      "run": {
+        "path": "benchmark/desktop/asr_comparison/evidence/qwen3-optimization/macos/runs/asr2-6a47a16931747dd194ef1529275fbb03.json",
+        "sha256": "ad09f0df79e78e769a8e4643550347c06531f346f12ef9192c5c9e4891cba665"
+      },
+      "runId": "asr2-6a47a16931747dd194ef1529275fbb03",
+      "scenario": "clean_near_field_mandarin",
+      "scheduleOrder": 186,
+      "warmup": false,
+      "workerOutput": {
+        "documentSha256": "f2f7ddc7f004dfdc8506d2b1f9dbf32b19b300b97efc79de9f5f638c100462a6",
+        "path": "benchmark/desktop/asr_comparison/evidence/qwen3-optimization/macos/raw/asr2-6a47a16931747dd194ef1529275fbb03.json",
+        "semanticResultSha256": "5aa14cae0664e733a89e5b13377081e17c85cf2512a9e49662e290baf0709398"
+      }
+    },
+    {
+      "profileId": "fixed-resource",
+      "run": {
+        "path": "benchmark/desktop/asr_comparison/evidence/qwen3-optimization/macos/runs/asr2-4fa247be0f29cfedaee873ef8af59a34.json",
+        "sha256": "c47e7a0dabcd2ce8382edd62928a3bcb646b0c3bf541f3bb295dd701b01059ed"
+      },
+      "runId": "asr2-4fa247be0f29cfedaee873ef8af59a34",
+      "scenario": "far_field_noisy_meeting",
+      "scheduleOrder": 187,
+      "warmup": false,
+      "workerOutput": {
+        "documentSha256": "83fca7e92bb7cf0c0f3fbb3cc28d7e4c7e6fe1a6d59f424e3f49e5f76224f728",
+        "path": "benchmark/desktop/asr_comparison/evidence/qwen3-optimization/macos/raw/asr2-4fa247be0f29cfedaee873ef8af59a34.json",
+        "semanticResultSha256": "380373417e723b69f916c27cd37fbda6a2f9059505438cec986da85bcb346df2"
+      }
+    },
+    {
+      "profileId": "fixed-resource",
+      "run": {
+        "path": "benchmark/desktop/asr_comparison/evidence/qwen3-optimization/macos/runs/asr2-8facfb00c0a2936cfae7757238c74b9a.json",
+        "sha256": "970a38572774d99db58782e69f76a38c2784a2f9f8c15440e835802df1b11a2c"
+      },
+      "runId": "asr2-8facfb00c0a2936cfae7757238c74b9a",
+      "scenario": "zh_en_code_switch",
+      "scheduleOrder": 188,
+      "warmup": false,
+      "workerOutput": {
+        "documentSha256": "0d3686f3e877883cb24f2862365a4d797f77685b1359ff30a4a3a52e25f7566b",
+        "path": "benchmark/desktop/asr_comparison/evidence/qwen3-optimization/macos/raw/asr2-8facfb00c0a2936cfae7757238c74b9a.json",
+        "semanticResultSha256": "660e0d1839d874af5200e9470c146a98de0f8758fc0b42aaafd81dcb2455d2b6"
+      }
+    },
+    {
+      "profileId": "fixed-resource",
+      "run": {
+        "path": "benchmark/desktop/asr_comparison/evidence/qwen3-optimization/macos/runs/asr2-ca475d349178da12592a374a2ff63ed8.json",
+        "sha256": "6e25dc34ec3a053fe7227e72e0986d83e85112a5ada880dee64f14734c0f245f"
+      },
+      "runId": "asr2-ca475d349178da12592a374a2ff63ed8",
+      "scenario": "terminology_numbers",
+      "scheduleOrder": 189,
+      "warmup": false,
+      "workerOutput": {
+        "documentSha256": "9b52cd05ce3763b0c17c28777b21ba09f9f8cbc815f7c369f8d5018500c19304",
+        "path": "benchmark/desktop/asr_comparison/evidence/qwen3-optimization/macos/raw/asr2-ca475d349178da12592a374a2ff63ed8.json",
+        "semanticResultSha256": "e214ef194a35230a1db0280621ff08dad597c65f4082097b3146423a964ecadf"
+      }
+    },
+    {
+      "profileId": "fixed-resource",
+      "run": {
+        "path": "benchmark/desktop/asr_comparison/evidence/qwen3-optimization/macos/runs/asr2-67d2a44c252c683bdc36ae23037b7682.json",
+        "sha256": "40d04d623517da9f88254e74a8722049e05f7b978ac9359f5ced2075d4e82c50"
+      },
+      "runId": "asr2-67d2a44c252c683bdc36ae23037b7682",
+      "scenario": "system_microphone_double_talk",
+      "scheduleOrder": 190,
+      "warmup": false,
+      "workerOutput": {
+        "documentSha256": "fd71905194aabc819d3033d5aadaefc8b74b0ec88c4a2f745fec70fee3a24888",
+        "path": "benchmark/desktop/asr_comparison/evidence/qwen3-optimization/macos/raw/asr2-67d2a44c252c683bdc36ae23037b7682.json",
+        "semanticResultSha256": "88970a1252e8c8f156d6e9b06694dcd2ee5881fa2294712a246f74e1927038e6"
+      }
+    },
+    {
+      "profileId": "fixed-resource",
+      "run": {
+        "path": "benchmark/desktop/asr_comparison/evidence/qwen3-optimization/macos/runs/asr2-ce57b93769588ea2c38bffa0ba44ca20.json",
+        "sha256": "d59362d355398d9963ca304c5507333ac1709f04027c62eb3f396e716ddf316a"
+      },
+      "runId": "asr2-ce57b93769588ea2c38bffa0ba44ca20",
+      "scenario": "non_speech",
+      "scheduleOrder": 191,
+      "warmup": false,
+      "workerOutput": {
+        "documentSha256": "27eea7cc8c0ad0c5ec9a05e4960189e4af65907562a2ef7bea2fd6abdc28ca39",
+        "path": "benchmark/desktop/asr_comparison/evidence/qwen3-optimization/macos/raw/asr2-ce57b93769588ea2c38bffa0ba44ca20.json",
+        "semanticResultSha256": "242c23dfb054315679234a6603a60ed6f77473d05078699932fc1345509342ea"
+      }
+    }
+  ],
+  "schemaVersion": 1,
+  "status": "COMPLETE",
+  "temporaryArtifactsClean": true
+}

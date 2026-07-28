@@ -1,0 +1,122 @@
+{
+  "schemaVersion": 1,
+  "evidenceId": "MACOS-CAPTURE-U12-M4-FAULT-MATRIX-2026-07-28",
+  "status": "PASS",
+  "target": {
+    "modelIdentifier": "Mac16,10",
+    "os": "macOS 15.7.5",
+    "osBuild": "24G624",
+    "architecture": "arm64",
+    "cpu": "Apple M4",
+    "logicalCpuCount": 10,
+    "memoryBytes": 17179869184,
+    "buildMode": "debug"
+  },
+  "integrationBuild": {
+    "bundleIdentifier": "com.voice2text.voice2textDesktop",
+    "signature": "adhoc",
+    "teamIdentifier": null,
+    "cdHash": "4304bf85105cd177040d173e60b5c66a8c7ab38f",
+    "executableSha256": "2a1b110bc06e6396a7202c0b95de434506167205bce7cf2606d9cf6864546515"
+  },
+  "crashProbeBuild": {
+    "bundleIdentifier": "com.voice2text.voice2textDesktop",
+    "signature": "adhoc",
+    "teamIdentifier": null,
+    "cdHash": "8cd200d110f8875a05f2e03f8012d2cd04415dd7",
+    "executableSha256": "ae8032dd60905c2f1d1a377b2c1fe09e7f0570884872f02f674f7ac9a4352366"
+  },
+  "command": "cd apps/desktop && flutter test integration_test/macos_capture_recovery_test.dart -d macos",
+  "playbackFixture": {
+    "path": "assets/sherpa/wav/test.wav",
+    "sha256": "ad12c2ee3b2d60ad5214d22e8a3e9002f1bad9c61f60c4b404ee206d60a66ded",
+    "launchedOutsideExcludedAppProcess": true
+  },
+  "scenarios": [
+    {
+      "id": "normal_stop_duplicate",
+      "status": "PASS",
+      "assertions": [
+        "dual_authority_caf_assets_exist",
+        "all_authority_assets_have_caf_magic",
+        "duplicate_stop_returns_same_recording_id"
+      ]
+    },
+    {
+      "id": "microphone_disconnect",
+      "status": "PASS",
+      "assertions": [
+        "system_track_continues",
+        "microphone_track_unhealthy",
+        "device_event_persisted",
+        "partial_recording_committed"
+      ]
+    },
+    {
+      "id": "runtime_disk_low",
+      "status": "PASS",
+      "assertions": [
+        "both_tracks_safely_finalized",
+        "disk_low_event_persisted",
+        "partial_recording_committed"
+      ]
+    },
+    {
+      "id": "dual_track_failure",
+      "status": "PASS",
+      "assertions": [
+        "native_state_failed",
+        "journal_recovery_preserves_partial_capture",
+        "no_authority_file_deleted"
+      ]
+    }
+  ],
+  "database": {
+    "schemaVersion": 22,
+    "normalAndPartialRecordingCount": 3,
+    "minimumIndependentAuthorityAssetCount": 6,
+    "manifestAndChunkCommitAtomic": true,
+    "persistentCommandReceiptsIdempotent": true
+  },
+  "actualProcessTermination": {
+    "runId": "m4actual1",
+    "secondRecoveryIsIdempotent": true,
+    "maximumFirstRecoveryMs": 2,
+    "maximumSecondRecoveryMs": 1,
+    "invalidFinalizedChunks": 0,
+    "stages": [
+      {
+        "stage": "during_write",
+        "expectedExitCode": 86,
+        "observedExitCode": 86,
+        "finalizedChunkCount": 0,
+        "quarantinedTailChunks": 1,
+        "recoveryEvidenceSha256": "ec44890eca845df90ad1ecda0479d45a72e48ade8442a7d8446528a0c1602fd6",
+        "status": "PASS"
+      },
+      {
+        "stage": "during_finalize",
+        "expectedExitCode": 87,
+        "observedExitCode": 87,
+        "finalizedChunkCount": 0,
+        "quarantinedTailChunks": 2,
+        "recoveryEvidenceSha256": "1685283bb0e6f7dbf2a09b0ac7ba5d1298c5cc61a82619d26f594f1fe012a4f3",
+        "status": "PASS"
+      },
+      {
+        "stage": "after_journal",
+        "expectedExitCode": 88,
+        "observedExitCode": 88,
+        "finalizedChunkCount": 1,
+        "quarantinedTailChunks": 1,
+        "recoveryEvidenceSha256": "2330c92bb6fd2d5ad8bd3e31ec597518d1b12ab79952df4a45aa9d93e4bb21ec",
+        "status": "PASS"
+      }
+    ]
+  },
+  "decision": {
+    "u12ImplementationGatePassed": true,
+    "mobileImplementationChanged": false,
+    "probeDurationBelowThirtyMinutes": true
+  }
+}

@@ -9,6 +9,8 @@ from pathlib import Path
 from tool.validate_desktop_workstation_scope import (
     DEFAULT_MANIFEST,
     _validate_qwen3_product_decision,
+    _validate_u12_capture_evidence,
+    _validate_u13_live_caption_evidence,
     validate_asr005_policy_text,
     validate_scope_contract,
 )
@@ -143,6 +145,109 @@ class DesktopWorkstationScopeTest(unittest.TestCase):
         manifest["lanHandoff"]["evidence"]["sha256"] = "0" * 64
 
         with self.assertRaisesRegex(ValueError, "LAN PASS evidence hash mismatch"):
+            self._validate_mutation(manifest)
+
+    def test_desktop_expansion_cannot_require_mobile_product_changes(self) -> None:
+        manifest = copy.deepcopy(self.manifest)
+        manifest["expandedDesktopCapabilities"]["mobileUiChangesAllowed"] = True
+
+        with self.assertRaisesRegex(ValueError, "mobile implementation or UI"):
+            self._validate_mutation(manifest)
+
+    def test_expanded_windows_capabilities_stay_blocked(self) -> None:
+        manifest = copy.deepcopy(self.manifest)
+        manifest["expandedDesktopCapabilities"]["capture"]["windowsStatus"] = "PLANNED"
+
+        with self.assertRaisesRegex(ValueError, "cannot unlock Windows"):
+            self._validate_mutation(manifest)
+
+    def test_macos_development_reference_target_cannot_drift(self) -> None:
+        manifest = copy.deepcopy(self.manifest)
+        manifest["targets"]["macos"]["developmentReferenceTarget"]["cpu"] = (
+            "Apple M2"
+        )
+
+        with self.assertRaisesRegex(ValueError, "reference target drifted"):
+            self._validate_mutation(manifest)
+
+    def test_capture_cannot_claim_completion_without_physical_evidence(self) -> None:
+        manifest = copy.deepcopy(self.manifest)
+        manifest["expandedDesktopCapabilities"]["capture"]["evidencePath"] = (
+            "benchmark/desktop/capture/evidence/macos_m4_dual_track_smoke.json"
+        )
+
+        with self.assertRaisesRegex(ValueError, "physical evidence"):
+            self._validate_mutation(manifest)
+
+    def test_capture_cannot_use_screen_recording_as_audio_fallback(self) -> None:
+        manifest = copy.deepcopy(self.manifest)
+        manifest["expandedDesktopCapabilities"]["capture"]["capturesScreenPixels"] = True
+
+        with self.assertRaisesRegex(ValueError, "screen pixels"):
+            self._validate_mutation(manifest)
+
+    def test_capture_pass_requires_all_actual_process_termination_stages(self) -> None:
+        feasibility = json.loads(
+            Path(
+                "benchmark/desktop/capture/macos_capture_feasibility.json"
+            ).read_text(encoding="utf-8")
+        )
+        binding = feasibility["u12Evidence"]
+        evidence = json.loads(Path(binding["path"]).read_text(encoding="utf-8"))
+        evidence["actualProcessTermination"]["stages"].pop()
+
+        with self.assertRaisesRegex(ValueError, "termination evidence"):
+            _validate_u12_capture_evidence(evidence)
+
+    def test_u13_live_caption_evidence_is_target_bound(self) -> None:
+        capability = self.manifest["expandedDesktopCapabilities"]["liveCaption"]
+        summary = json.loads(
+            Path(capability["evidencePath"]).read_text(encoding="utf-8")
+        )
+        decision = json.loads(
+            Path(capability["decisionPath"]).read_text(encoding="utf-8")
+        )
+        summary["target"]["cpu"] = "Apple M2"
+
+        with self.assertRaisesRegex(ValueError, "target-bound"):
+            _validate_u13_live_caption_evidence(summary, decision)
+
+    def test_u13_live_caption_cannot_hide_capture_loss(self) -> None:
+        capability = self.manifest["expandedDesktopCapabilities"]["liveCaption"]
+        summary = json.loads(
+            Path(capability["evidencePath"]).read_text(encoding="utf-8")
+        )
+        decision = json.loads(
+            Path(capability["decisionPath"]).read_text(encoding="utf-8")
+        )
+        summary["captureFrameLossDelta"] = 1
+
+        with self.assertRaisesRegex(ValueError, "capture gates"):
+            _validate_u13_live_caption_evidence(summary, decision)
+
+    def test_macos_capability_floors_cannot_collapse_to_one_version(self) -> None:
+        manifest = copy.deepcopy(self.manifest)
+        manifest["expandedDesktopCapabilities"]["capture"][
+            "applicationMinimumMacosVersion"
+        ] = "15.5"
+
+        with self.assertRaisesRegex(ValueError, "minimum macOS contract"):
+            self._validate_mutation(manifest)
+
+    def test_macos_13_microphone_fallback_cannot_silently_disappear(self) -> None:
+        manifest = copy.deepcopy(self.manifest)
+        manifest["expandedDesktopCapabilities"]["capture"][
+            "lowerVersionBehavior"
+        ] = "BLOCK_ALL_CAPTURE"
+
+        with self.assertRaisesRegex(ValueError, "lower-version behavior"):
+            self._validate_mutation(manifest)
+
+    def test_routine_probe_limit_cannot_exceed_thirty_minutes(self) -> None:
+        manifest = copy.deepcopy(self.manifest)
+        manifest["expandedDesktopCapabilities"]["maximumProbeMinutes"] = 31
+
+        with self.assertRaisesRegex(ValueError, "30 minutes"):
             self._validate_mutation(manifest)
 
     def test_vertical_slice_runner_uses_only_qwen3_product_arguments(self) -> None:

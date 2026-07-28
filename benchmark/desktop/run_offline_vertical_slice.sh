@@ -18,6 +18,7 @@ dart run apps/desktop/tool/offline_vertical_slice.dart \
   --encoder "$MODEL/encoder.int8.onnx" \
   --decoder "$MODEL/decoder.int8.onnx" \
   --tokenizer "$MODEL/tokenizer" \
+  --vad "$MODEL/silero_vad.onnx" \
   --segmentation \
   "$SPEAKER/models/sherpa-onnx-pyannote-segmentation-3-0/model.onnx" \
   --embedding \

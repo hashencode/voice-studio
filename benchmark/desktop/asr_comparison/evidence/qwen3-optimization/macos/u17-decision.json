@@ -1,0 +1,89 @@
+{
+  "bindings": {
+    "contract": {
+      "path": "benchmark/desktop/asr_comparison/qwen3_optimization_contract.json",
+      "sha256": "4d733fea306dfa49dc9c1f517103011e60050a4581f9558c348fbafb93a209fe"
+    },
+    "fixtureManifest": {
+      "path": "benchmark/desktop/asr_comparison/qwen3_optimization_fixtures.json",
+      "sha256": "c0ee7d2652bb8b3bbdf12fc77bdb98be0b10c125458efb19a9e326a4ddf665ce"
+    },
+    "matrix": {
+      "path": "benchmark/desktop/asr_comparison/evidence/qwen3-optimization/macos/matrix.json",
+      "sha256": "c18227ceaef08922dcdff761e56d7792d6bb8f9d79183cd9ea500deed8d3ac76"
+    },
+    "rawManifest": {
+      "path": "benchmark/desktop/asr_comparison/evidence/qwen3-optimization/macos/u17-raw-manifest.json",
+      "sha256": "2e18866017ccf97e2331e3dbec042d1e536145ede741da4f4fb2c2086dabdb01"
+    },
+    "scoringContract": {
+      "path": "benchmark/desktop/asr_comparison/scoring_contract.json",
+      "sha256": "4ff8a22f5a1184fb0cf09e6c9f30427fe6e7171827c7db98c9640c5a8108dbf7"
+    },
+    "summary": {
+      "path": "benchmark/desktop/asr_comparison/evidence/qwen3-optimization/macos/u17-summary.json",
+      "sha256": "aacac87d2418f12e467f06d639fbd3a72b922de3d01eecb8e2f2a6ebf06c61f8"
+    }
+  },
+  "contractId": "qwen3-asr-bounded-optimization/macos-m4/v1",
+  "decision": {
+    "reason": "quality gate passed",
+    "selectedArm": "vad-max-speech-12",
+    "status": "OPTIMIZATION_ADMITTED"
+  },
+  "developmentPosture": "DEVELOPMENT_ONLY",
+  "fallbackProfile": {
+    "config": {
+      "concurrency": 1,
+      "hotwords": "",
+      "maxNewTokens": 512,
+      "maxSpeechSeconds": 20,
+      "maxTotalLen": 512,
+      "minSpeechSeconds": 0.2,
+      "provider": "cpu",
+      "runtime": "sherpa-onnx-1.13.4-ort-1.27.0",
+      "runtimeSha256": "809ab5d0c77bd8f358364a244e6ab17f2afecf9779eb9fd436fa469c3ff5375c",
+      "seed": 42,
+      "segmentDurationSeconds": 15,
+      "segmentation": "fixed",
+      "temperature": 1e-06,
+      "threads": 2,
+      "topP": 0.8,
+      "vadThreshold": 0.2
+    },
+    "id": "control"
+  },
+  "kind": "qwen3_optimization_decision",
+  "schemaVersion": 1,
+  "selectedProfile": {
+    "config": {
+      "concurrency": 1,
+      "hotwords": "",
+      "maxNewTokens": 512,
+      "maxSpeechSeconds": 12,
+      "maxTotalLen": 512,
+      "minSpeechSeconds": 0.2,
+      "provider": "cpu",
+      "runtime": "sherpa-onnx-1.13.4-ort-1.27.0",
+      "runtimeSha256": "809ab5d0c77bd8f358364a244e6ab17f2afecf9779eb9fd436fa469c3ff5375c",
+      "seed": 42,
+      "segmentDurationSeconds": 15,
+      "segmentation": "official_silero_vad",
+      "temperature": 1e-06,
+      "threads": 2,
+      "topP": 0.8,
+      "vadThreshold": 0.2
+    },
+    "id": "vad-max-speech-12"
+  },
+  "status": "PASS",
+  "target": {
+    "architecture": "arm64",
+    "buildMode": "debug",
+    "cpu": "Apple M4",
+    "logicalCpuCount": 10,
+    "memoryBytes": 17179869184,
+    "os": "macOS 15.7.5",
+    "osBuild": "24G624"
+  }
+}

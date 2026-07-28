@@ -17,7 +17,10 @@ except ModuleNotFoundError:
 ROOT = Path(__file__).resolve().parents[1]
 DEFAULT_EVIDENCE = ROOT / "docs/product/desktop-workstation-u9-evidence.json"
 DEFAULT_SCOPE = ROOT / "docs/product/desktop-workstation-scope.json"
-EXPECTED_TARGET = {
+# This validator preserves the superseded U9 evidence contract. The current
+# U11-U18/expanded-closure reference target is enforced by
+# validate_desktop_workstation_scope.py and is Apple M4.
+HISTORICAL_U9_TARGET = {
     "operatingSystem": "macos",
     "operatingSystemVersion": "15.7.5",
     "architecture": "arm64",
@@ -100,8 +103,8 @@ def validate_macos_closure(
     _require(evidence.get("status") == "PASS", "U9 evidence is not PASS")
     _require(evidence.get("target") == "macos", "U9 evidence is not macOS")
     _require(
-        evidence.get("targetFingerprint") == EXPECTED_TARGET,
-        "target fingerprint mismatch",
+        evidence.get("targetFingerprint") == HISTORICAL_U9_TARGET,
+        "historical target fingerprint mismatch",
     )
 
     bindings = evidence.get("evidenceBindings")

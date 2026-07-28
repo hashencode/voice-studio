@@ -45,6 +45,23 @@ API and future pairing secrets use macOS Keychain through the secure-storage ada
 
 The root workspace has one lockfile for the mobile app, desktop app, and shared packages. U4 resolves real FFI SQLite, file selection, playback, secure storage, Sherpa runtime, and Goo component dependencies without adding an unsupported override.
 
-Sherpa 1.13.4 currently ships its macOS arm64 runtime with a macOS 15.5 deployment requirement. The desktop target therefore declares macOS 15.5 as its minimum for this plan; the first evidence target remains Apple Silicon / Apple M2 / 16 GiB / macOS 15.7.5. Other targets remain unverified.
+The workstation launch target is macOS 13.0. Sherpa 1.13.4's packaged
+`libonnxruntime.1.27.0.dylib` still requires macOS 15.5, so it is no longer
+linked into the main app process: it is embedded solely for the isolated worker
+and local model installation/processing is gated at invocation on macOS 15.5.
+Microphone-only capture is available from the macOS 13.0 application floor.
+Core Audio process-tap capture is independently gated at macOS 14.2; macOS
+13.0–14.1 users see an explicit warning and may continue without system audio.
+A clean
+Debug Mach-O audit binds the main executable, debug dylib, App.framework and
+process-group launcher to 13.0 and confirms that the launch dependency graph
+contains no Sherpa/ONNX library. This is a build-contract result; runtime smoke
+on macOS 13.x and 14.x remains unverified; the microphone-only path has a
+bounded Debug simulation on the current reference target but not lower-OS
+target-specific evidence. Historical U4-U9 evidence was
+produced on Apple M2; the current U11-U18 and expanded-closure reference target
+is Mac mini `Mac16,10` / Apple M4 (10 cores) / 16 GiB / macOS 15.7.5 (24G624).
+Historical M2 PASS does not replace current M4 evidence. Other targets remain
+unverified.
 
 The desktop v1 operational envelope is frozen at: 4 GiB source bytes, four hours of media, 2 GiB decoded PCM, 200,000 output segments, 20 active queued jobs, one concurrent engine, a 2.25× temporary-storage multiplier, and 2 GiB free after import. Import rejects queue, source-size, duration, and free-space violations without leaving a queued recording or staging artifact.

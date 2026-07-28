@@ -1,0 +1,1878 @@
+{
+  "arms": [
+    {
+      "baseArmId": null,
+      "bindings": {
+        "modelArchiveSha256": "f6b2a72ebcb1ac7a764d4cfccd886e6bcb2a95c4657c2199d0ba95ed4b9ea71a",
+        "modelSha256": "c71f0ce00bec95b07744e116345e33d8cbbe08cef896382cf907bf4b51a2cd51",
+        "runtimeArchiveSha256": "809ab5d0c77bd8f358364a244e6ab17f2afecf9779eb9fd436fa469c3ff5375c",
+        "tokensSha256": "f449eb28dc567533d7fa59be34e2abca8784f771850c78a47fb731a31429a1dc",
+        "workerSha256": "bc6e88af40fe43e4733c1d15062e1abeb9a37ef7848d5ae246eabf4494b91b78"
+      },
+      "changedVariable": null,
+      "codeSwitchErrorRate": 0.08650658905327835,
+      "coldLoadMs": 1024.219,
+      "completeInputConsumed": true,
+      "effectiveConfig": {
+        "concurrency": 1,
+        "decodingMethod": "greedy_search",
+        "language": "auto",
+        "maximumUtteranceSeconds": 15.0,
+        "minimumSilenceSeconds": 0.5,
+        "minimumSpeechSeconds": 0.25,
+        "model": "sensevoice-int8-2024-07-17",
+        "provider": "cpu",
+        "publishesCompletedUtterancesOnly": true,
+        "publishesTokenPartials": false,
+        "recognizerLifecycle": "resident_preloaded",
+        "runtime": "sherpa-onnx-1.13.4-ort-1.27.0",
+        "threads": 2,
+        "useInverseTextNormalization": false,
+        "vadThreshold": 0.5
+      },
+      "errorRate": 0.3296807560986605,
+      "hallucinated": false,
+      "id": "control",
+      "itnEventAccuracy": 0.0,
+      "maximumBacklogSeconds": 0.528,
+      "maximumRssBytes": 670957568,
+      "maximumUtteranceSeconds": 15.0,
+      "nonTargetErrorRate": 0.34384406698526204,
+      "numericEventAccuracy": 0.875,
+      "probeDurationSeconds": 31.45543,
+      "retainedRssBytesAfterWorkerExit": 0,
+      "scenarioMetrics": [
+        {
+          "errorRate": 0.02857142857142857,
+          "itnEventAccuracy": null,
+          "numericEventAccuracy": null,
+          "scenario": "clean_near_field_mandarin",
+          "terminologyRecall": null,
+          "utteranceCount": 4
+        },
+        {
+          "errorRate": 0.22784810126582278,
+          "itnEventAccuracy": null,
+          "numericEventAccuracy": null,
+          "scenario": "clean_near_field_english",
+          "terminologyRecall": null,
+          "utteranceCount": 3
+        },
+        {
+          "errorRate": 0.11428571428571428,
+          "itnEventAccuracy": null,
+          "numericEventAccuracy": null,
+          "scenario": "far_field_noisy_meeting",
+          "terminologyRecall": null,
+          "utteranceCount": 4
+        },
+        {
+          "errorRate": 0.06921241050119331,
+          "itnEventAccuracy": null,
+          "numericEventAccuracy": null,
+          "scenario": "zh_en_code_switch",
+          "terminologyRecall": null,
+          "utteranceCount": 19
+        },
+        {
+          "errorRate": 0.21637426900584794,
+          "itnEventAccuracy": 0.0,
+          "numericEventAccuracy": 0.875,
+          "scenario": "terminology_numbers",
+          "terminologyRecall": 0.75,
+          "utteranceCount": 5
+        },
+        {
+          "errorRate": 0.6381418092909535,
+          "itnEventAccuracy": null,
+          "numericEventAccuracy": null,
+          "scenario": "keyboard_noise",
+          "terminologyRecall": null,
+          "utteranceCount": 3
+        },
+        {
+          "errorRate": 0.1103202846975089,
+          "itnEventAccuracy": null,
+          "numericEventAccuracy": null,
+          "scenario": "long_utterance",
+          "terminologyRecall": null,
+          "utteranceCount": 11
+        },
+        {
+          "errorRate": 0.782258064516129,
+          "itnEventAccuracy": null,
+          "numericEventAccuracy": null,
+          "scenario": "short_confirmation",
+          "terminologyRecall": null,
+          "utteranceCount": 2
+        },
+        {
+          "errorRate": 0.780114722753346,
+          "itnEventAccuracy": null,
+          "numericEventAccuracy": null,
+          "scenario": "system_microphone_double_talk",
+          "terminologyRecall": null,
+          "utteranceCount": 4
+        },
+        {
+          "errorRate": 0.0,
+          "itnEventAccuracy": null,
+          "numericEventAccuracy": null,
+          "scenario": "non_speech",
+          "terminologyRecall": null,
+          "utteranceCount": 2
+        }
+      ],
+      "shortConfirmationDetected": true,
+      "speechEndToDriverP50Ms": null,
+      "speechEndToDriverP95Ms": null,
+      "terminologyRecall": 0.75,
+      "warmUtteranceP50Ms": 280.947,
+      "warmUtteranceP95Ms": 859.472,
+      "workerCpuSeconds": 42.7,
+      "workerCpuSecondsPerAudioSecond": 0.08778421939887342
+    },
+    {
+      "baseArmId": "control",
+      "bindings": {
+        "modelArchiveSha256": "f6b2a72ebcb1ac7a764d4cfccd886e6bcb2a95c4657c2199d0ba95ed4b9ea71a",
+        "modelSha256": "c71f0ce00bec95b07744e116345e33d8cbbe08cef896382cf907bf4b51a2cd51",
+        "runtimeArchiveSha256": "cb4198f8dee474d16e3ff98a4cd2448e3a9a10195a4809e13b738934beab4aad",
+        "tokensSha256": "f449eb28dc567533d7fa59be34e2abca8784f771850c78a47fb731a31429a1dc",
+        "workerSha256": "bc6e88af40fe43e4733c1d15062e1abeb9a37ef7848d5ae246eabf4494b91b78"
+      },
+      "changedVariable": "runtime",
+      "codeSwitchErrorRate": 0.08650658905327835,
+      "coldLoadMs": 384.545,
+      "completeInputConsumed": true,
+      "effectiveConfig": {
+        "concurrency": 1,
+        "decodingMethod": "greedy_search",
+        "language": "auto",
+        "maximumUtteranceSeconds": 15.0,
+        "minimumSilenceSeconds": 0.5,
+        "minimumSpeechSeconds": 0.25,
+        "model": "sensevoice-int8-2024-07-17",
+        "provider": "cpu",
+        "publishesCompletedUtterancesOnly": true,
+        "publishesTokenPartials": false,
+        "recognizerLifecycle": "resident_preloaded",
+        "runtime": "sherpa-onnx-1.13.4-ort-1.24.4",
+        "threads": 2,
+        "useInverseTextNormalization": false,
+        "vadThreshold": 0.5
+      },
+      "errorRate": 0.3296807560986605,
+      "hallucinated": false,
+      "id": "runtime-ort-1.24.4",
+      "itnEventAccuracy": 0.0,
+      "maximumBacklogSeconds": 0.528,
+      "maximumRssBytes": 874971136,
+      "maximumUtteranceSeconds": 15.0,
+      "nonTargetErrorRate": 0.34384406698526204,
+      "numericEventAccuracy": 0.875,
+      "probeDurationSeconds": 15.662685,
+      "retainedRssBytesAfterWorkerExit": 0,
+      "scenarioMetrics": [
+        {
+          "errorRate": 0.02857142857142857,
+          "itnEventAccuracy": null,
+          "numericEventAccuracy": null,
+          "scenario": "clean_near_field_mandarin",
+          "terminologyRecall": null,
+          "utteranceCount": 4
+        },
+        {
+          "errorRate": 0.22784810126582278,
+          "itnEventAccuracy": null,
+          "numericEventAccuracy": null,
+          "scenario": "clean_near_field_english",
+          "terminologyRecall": null,
+          "utteranceCount": 3
+        },
+        {
+          "errorRate": 0.11428571428571428,
+          "itnEventAccuracy": null,
+          "numericEventAccuracy": null,
+          "scenario": "far_field_noisy_meeting",
+          "terminologyRecall": null,
+          "utteranceCount": 4
+        },
+        {
+          "errorRate": 0.06921241050119331,
+          "itnEventAccuracy": null,
+          "numericEventAccuracy": null,
+          "scenario": "zh_en_code_switch",
+          "terminologyRecall": null,
+          "utteranceCount": 19
+        },
+        {
+          "errorRate": 0.21637426900584794,
+          "itnEventAccuracy": 0.0,
+          "numericEventAccuracy": 0.875,
+          "scenario": "terminology_numbers",
+          "terminologyRecall": 0.75,
+          "utteranceCount": 5
+        },
+        {
+          "errorRate": 0.6381418092909535,
+          "itnEventAccuracy": null,
+          "numericEventAccuracy": null,
+          "scenario": "keyboard_noise",
+          "terminologyRecall": null,
+          "utteranceCount": 3
+        },
+        {
+          "errorRate": 0.1103202846975089,
+          "itnEventAccuracy": null,
+          "numericEventAccuracy": null,
+          "scenario": "long_utterance",
+          "terminologyRecall": null,
+          "utteranceCount": 11
+        },
+        {
+          "errorRate": 0.782258064516129,
+          "itnEventAccuracy": null,
+          "numericEventAccuracy": null,
+          "scenario": "short_confirmation",
+          "terminologyRecall": null,
+          "utteranceCount": 2
+        },
+        {
+          "errorRate": 0.780114722753346,
+          "itnEventAccuracy": null,
+          "numericEventAccuracy": null,
+          "scenario": "system_microphone_double_talk",
+          "terminologyRecall": null,
+          "utteranceCount": 4
+        },
+        {
+          "errorRate": 0.0,
+          "itnEventAccuracy": null,
+          "numericEventAccuracy": null,
+          "scenario": "non_speech",
+          "terminologyRecall": null,
+          "utteranceCount": 2
+        }
+      ],
+      "shortConfirmationDetected": true,
+      "speechEndToDriverP50Ms": null,
+      "speechEndToDriverP95Ms": null,
+      "terminologyRecall": 0.75,
+      "warmUtteranceP50Ms": 74.001,
+      "warmUtteranceP95Ms": 208.995,
+      "workerCpuSeconds": 13.51,
+      "workerCpuSecondsPerAudioSecond": 0.02777435138357798
+    },
+    {
+      "baseArmId": "control",
+      "bindings": {
+        "modelArchiveSha256": "7305f7905bfcf77fa0b39388a313f3da35c68d971661a65475b56fb2162c8e63",
+        "modelSha256": "12ca1a2ae7ecf3e0019ef2822307ee0b5cadc9196569e379b4c4026f8205276d",
+        "runtimeArchiveSha256": "809ab5d0c77bd8f358364a244e6ab17f2afecf9779eb9fd436fa469c3ff5375c",
+        "tokensSha256": "f449eb28dc567533d7fa59be34e2abca8784f771850c78a47fb731a31429a1dc",
+        "workerSha256": "bc6e88af40fe43e4733c1d15062e1abeb9a37ef7848d5ae246eabf4494b91b78"
+      },
+      "changedVariable": "model",
+      "codeSwitchErrorRate": 0.20573611447974774,
+      "coldLoadMs": 327.566,
+      "completeInputConsumed": true,
+      "effectiveConfig": {
+        "concurrency": 1,
+        "decodingMethod": "greedy_search",
+        "language": "auto",
+        "maximumUtteranceSeconds": 15.0,
+        "minimumSilenceSeconds": 0.5,
+        "minimumSpeechSeconds": 0.25,
+        "model": "sensevoice-int8-2025-09-09",
+        "provider": "cpu",
+        "publishesCompletedUtterancesOnly": true,
+        "publishesTokenPartials": false,
+        "recognizerLifecycle": "resident_preloaded",
+        "runtime": "sherpa-onnx-1.13.4-ort-1.27.0",
+        "threads": 2,
+        "useInverseTextNormalization": false,
+        "vadThreshold": 0.5
+      },
+      "errorRate": 0.364482396641036,
+      "hallucinated": true,
+      "id": "model-2025-09-09",
+      "itnEventAccuracy": 0.0,
+      "maximumBacklogSeconds": 0.528,
+      "maximumRssBytes": 689995776,
+      "maximumUtteranceSeconds": 15.0,
+      "nonTargetErrorRate": 0.3822649184433877,
+      "numericEventAccuracy": 0.875,
+      "probeDurationSeconds": 24.745467,
+      "retainedRssBytesAfterWorkerExit": 0,
+      "scenarioMetrics": [
+        {
+          "errorRate": 0.05714285714285714,
+          "itnEventAccuracy": null,
+          "numericEventAccuracy": null,
+          "scenario": "clean_near_field_mandarin",
+          "terminologyRecall": null,
+          "utteranceCount": 4
+        },
+        {
+          "errorRate": 0.4177215189873418,
+          "itnEventAccuracy": null,
+          "numericEventAccuracy": null,
+          "scenario": "clean_near_field_english",
+          "terminologyRecall": null,
+          "utteranceCount": 3
+        },
+        {
+          "errorRate": 0.10476190476190476,
+          "itnEventAccuracy": null,
+          "numericEventAccuracy": null,
+          "scenario": "far_field_noisy_meeting",
+          "terminologyRecall": null,
+          "utteranceCount": 4
+        },
+        {
+          "errorRate": 0.15274463007159905,
+          "itnEventAccuracy": null,
+          "numericEventAccuracy": null,
+          "scenario": "zh_en_code_switch",
+          "terminologyRecall": null,
+          "utteranceCount": 19
+        },
+        {
+          "errorRate": 0.2222222222222222,
+          "itnEventAccuracy": 0.0,
+          "numericEventAccuracy": 0.875,
+          "scenario": "terminology_numbers",
+          "terminologyRecall": 0.25,
+          "utteranceCount": 5
+        },
+        {
+          "errorRate": 0.6210268948655256,
+          "itnEventAccuracy": null,
+          "numericEventAccuracy": null,
+          "scenario": "keyboard_noise",
+          "terminologyRecall": null,
+          "utteranceCount": 3
+        },
+        {
+          "errorRate": 0.1423487544483986,
+          "itnEventAccuracy": null,
+          "numericEventAccuracy": null,
+          "scenario": "long_utterance",
+          "terminologyRecall": null,
+          "utteranceCount": 11
+        },
+        {
+          "errorRate": 0.782258064516129,
+          "itnEventAccuracy": null,
+          "numericEventAccuracy": null,
+          "scenario": "short_confirmation",
+          "terminologyRecall": null,
+          "utteranceCount": 2
+        },
+        {
+          "errorRate": 0.780114722753346,
+          "itnEventAccuracy": null,
+          "numericEventAccuracy": null,
+          "scenario": "system_microphone_double_talk",
+          "terminologyRecall": null,
+          "utteranceCount": 4
+        },
+        {
+          "errorRate": 1.0,
+          "itnEventAccuracy": null,
+          "numericEventAccuracy": null,
+          "scenario": "non_speech",
+          "terminologyRecall": null,
+          "utteranceCount": 2
+        }
+      ],
+      "shortConfirmationDetected": true,
+      "speechEndToDriverP50Ms": null,
+      "speechEndToDriverP95Ms": null,
+      "terminologyRecall": 0.25,
+      "warmUtteranceP50Ms": 282.881,
+      "warmUtteranceP95Ms": 854.413,
+      "workerCpuSeconds": 42.53,
+      "workerCpuSecondsPerAudioSecond": 0.08743472719049382
+    },
+    {
+      "baseArmId": "control",
+      "bindings": {
+        "modelArchiveSha256": "f6b2a72ebcb1ac7a764d4cfccd886e6bcb2a95c4657c2199d0ba95ed4b9ea71a",
+        "modelSha256": "c71f0ce00bec95b07744e116345e33d8cbbe08cef896382cf907bf4b51a2cd51",
+        "runtimeArchiveSha256": "809ab5d0c77bd8f358364a244e6ab17f2afecf9779eb9fd436fa469c3ff5375c",
+        "tokensSha256": "f449eb28dc567533d7fa59be34e2abca8784f771850c78a47fb731a31429a1dc",
+        "workerSha256": "bc6e88af40fe43e4733c1d15062e1abeb9a37ef7848d5ae246eabf4494b91b78"
+      },
+      "changedVariable": "useInverseTextNormalization",
+      "codeSwitchErrorRate": 0.0746826744280055,
+      "coldLoadMs": 332.542,
+      "completeInputConsumed": true,
+      "effectiveConfig": {
+        "concurrency": 1,
+        "decodingMethod": "greedy_search",
+        "language": "auto",
+        "maximumUtteranceSeconds": 15.0,
+        "minimumSilenceSeconds": 0.5,
+        "minimumSpeechSeconds": 0.25,
+        "model": "sensevoice-int8-2024-07-17",
+        "provider": "cpu",
+        "publishesCompletedUtterancesOnly": true,
+        "publishesTokenPartials": false,
+        "recognizerLifecycle": "resident_preloaded",
+        "runtime": "sherpa-onnx-1.13.4-ort-1.27.0",
+        "threads": 2,
+        "useInverseTextNormalization": true,
+        "vadThreshold": 0.5
+      },
+      "errorRate": 0.3129303607690518,
+      "hallucinated": true,
+      "id": "itn-true",
+      "itnEventAccuracy": 0.875,
+      "maximumBacklogSeconds": 0.528,
+      "maximumRssBytes": 700825600,
+      "maximumUtteranceSeconds": 15.0,
+      "nonTargetErrorRate": 0.3469296968008557,
+      "numericEventAccuracy": 1.0,
+      "probeDurationSeconds": 30.21119,
+      "retainedRssBytesAfterWorkerExit": 0,
+      "scenarioMetrics": [
+        {
+          "errorRate": 0.01904761904761905,
+          "itnEventAccuracy": null,
+          "numericEventAccuracy": null,
+          "scenario": "clean_near_field_mandarin",
+          "terminologyRecall": null,
+          "utteranceCount": 4
+        },
+        {
+          "errorRate": 0.22784810126582278,
+          "itnEventAccuracy": null,
+          "numericEventAccuracy": null,
+          "scenario": "clean_near_field_english",
+          "terminologyRecall": null,
+          "utteranceCount": 3
+        },
+        {
+          "errorRate": 0.10476190476190476,
+          "itnEventAccuracy": null,
+          "numericEventAccuracy": null,
+          "scenario": "far_field_noisy_meeting",
+          "terminologyRecall": null,
+          "utteranceCount": 4
+        },
+        {
+          "errorRate": 0.07040572792362769,
+          "itnEventAccuracy": null,
+          "numericEventAccuracy": null,
+          "scenario": "zh_en_code_switch",
+          "terminologyRecall": null,
+          "utteranceCount": 19
+        },
+        {
+          "errorRate": 0.04093567251461988,
+          "itnEventAccuracy": 0.875,
+          "numericEventAccuracy": 1.0,
+          "scenario": "terminology_numbers",
+          "terminologyRecall": 0.75,
+          "utteranceCount": 5
+        },
+        {
+          "errorRate": 0.628361858190709,
+          "itnEventAccuracy": null,
+          "numericEventAccuracy": null,
+          "scenario": "keyboard_noise",
+          "terminologyRecall": null,
+          "utteranceCount": 3
+        },
+        {
+          "errorRate": 0.17793594306049823,
+          "itnEventAccuracy": null,
+          "numericEventAccuracy": null,
+          "scenario": "long_utterance",
+          "terminologyRecall": null,
+          "utteranceCount": 11
+        },
+        {
+          "errorRate": 0.782258064516129,
+          "itnEventAccuracy": null,
+          "numericEventAccuracy": null,
+          "scenario": "short_confirmation",
+          "terminologyRecall": null,
+          "utteranceCount": 2
+        },
+        {
+          "errorRate": 0.7648183556405354,
+          "itnEventAccuracy": null,
+          "numericEventAccuracy": null,
+          "scenario": "system_microphone_double_talk",
+          "terminologyRecall": null,
+          "utteranceCount": 4
+        },
+        {
+          "errorRate": 1.0,
+          "itnEventAccuracy": null,
+          "numericEventAccuracy": null,
+          "scenario": "non_speech",
+          "terminologyRecall": null,
+          "utteranceCount": 2
+        }
+      ],
+      "shortConfirmationDetected": true,
+      "speechEndToDriverP50Ms": null,
+      "speechEndToDriverP95Ms": null,
+      "terminologyRecall": 0.75,
+      "warmUtteranceP50Ms": 286.221,
+      "warmUtteranceP95Ms": 861.749,
+      "workerCpuSeconds": 42.93,
+      "workerCpuSecondsPerAudioSecond": 0.0882570617984458
+    },
+    {
+      "baseArmId": "control",
+      "bindings": {
+        "modelArchiveSha256": "f6b2a72ebcb1ac7a764d4cfccd886e6bcb2a95c4657c2199d0ba95ed4b9ea71a",
+        "modelSha256": "c71f0ce00bec95b07744e116345e33d8cbbe08cef896382cf907bf4b51a2cd51",
+        "runtimeArchiveSha256": "809ab5d0c77bd8f358364a244e6ab17f2afecf9779eb9fd436fa469c3ff5375c",
+        "tokensSha256": "f449eb28dc567533d7fa59be34e2abca8784f771850c78a47fb731a31429a1dc",
+        "workerSha256": "bc6e88af40fe43e4733c1d15062e1abeb9a37ef7848d5ae246eabf4494b91b78"
+      },
+      "changedVariable": "language",
+      "codeSwitchErrorRate": 0.07522839356455654,
+      "coldLoadMs": 327.435,
+      "completeInputConsumed": true,
+      "effectiveConfig": {
+        "concurrency": 1,
+        "decodingMethod": "greedy_search",
+        "language": "zh",
+        "maximumUtteranceSeconds": 15.0,
+        "minimumSilenceSeconds": 0.5,
+        "minimumSpeechSeconds": 0.25,
+        "model": "sensevoice-int8-2024-07-17",
+        "provider": "cpu",
+        "publishesCompletedUtterancesOnly": true,
+        "publishesTokenPartials": false,
+        "recognizerLifecycle": "resident_preloaded",
+        "runtime": "sherpa-onnx-1.13.4-ort-1.27.0",
+        "threads": 2,
+        "useInverseTextNormalization": false,
+        "vadThreshold": 0.5
+      },
+      "errorRate": 0.3326753623456753,
+      "hallucinated": false,
+      "id": "language-zh",
+      "itnEventAccuracy": 0.0,
+      "maximumBacklogSeconds": 0.528,
+      "maximumRssBytes": 701169664,
+      "maximumUtteranceSeconds": 15.0,
+      "nonTargetErrorRate": 0.3472129990131537,
+      "numericEventAccuracy": 0.875,
+      "probeDurationSeconds": 30.172457,
+      "retainedRssBytesAfterWorkerExit": 0,
+      "scenarioMetrics": [
+        {
+          "errorRate": 0.02857142857142857,
+          "itnEventAccuracy": null,
+          "numericEventAccuracy": null,
+          "scenario": "clean_near_field_mandarin",
+          "terminologyRecall": null,
+          "utteranceCount": 4
+        },
+        {
+          "errorRate": 0.24050632911392406,
+          "itnEventAccuracy": null,
+          "numericEventAccuracy": null,
+          "scenario": "clean_near_field_english",
+          "terminologyRecall": null,
+          "utteranceCount": 3
+        },
+        {
+          "errorRate": 0.11428571428571428,
+          "itnEventAccuracy": null,
+          "numericEventAccuracy": null,
+          "scenario": "far_field_noisy_meeting",
+          "terminologyRecall": null,
+          "utteranceCount": 4
+        },
+        {
+          "errorRate": 0.06682577565632458,
+          "itnEventAccuracy": null,
+          "numericEventAccuracy": null,
+          "scenario": "zh_en_code_switch",
+          "terminologyRecall": null,
+          "utteranceCount": 19
+        },
+        {
+          "errorRate": 0.21637426900584794,
+          "itnEventAccuracy": 0.0,
+          "numericEventAccuracy": 0.875,
+          "scenario": "terminology_numbers",
+          "terminologyRecall": 0.75,
+          "utteranceCount": 5
+        },
+        {
+          "errorRate": 0.6405867970660146,
+          "itnEventAccuracy": null,
+          "numericEventAccuracy": null,
+          "scenario": "keyboard_noise",
+          "terminologyRecall": null,
+          "utteranceCount": 3
+        },
+        {
+          "errorRate": 0.12455516014234876,
+          "itnEventAccuracy": null,
+          "numericEventAccuracy": null,
+          "scenario": "long_utterance",
+          "terminologyRecall": null,
+          "utteranceCount": 11
+        },
+        {
+          "errorRate": 0.782258064516129,
+          "itnEventAccuracy": null,
+          "numericEventAccuracy": null,
+          "scenario": "short_confirmation",
+          "terminologyRecall": null,
+          "utteranceCount": 2
+        },
+        {
+          "errorRate": 0.780114722753346,
+          "itnEventAccuracy": null,
+          "numericEventAccuracy": null,
+          "scenario": "system_microphone_double_talk",
+          "terminologyRecall": null,
+          "utteranceCount": 4
+        },
+        {
+          "errorRate": 0.0,
+          "itnEventAccuracy": null,
+          "numericEventAccuracy": null,
+          "scenario": "non_speech",
+          "terminologyRecall": null,
+          "utteranceCount": 2
+        }
+      ],
+      "shortConfirmationDetected": true,
+      "speechEndToDriverP50Ms": null,
+      "speechEndToDriverP95Ms": null,
+      "terminologyRecall": 0.75,
+      "warmUtteranceP50Ms": 285.865,
+      "warmUtteranceP95Ms": 861.218,
+      "workerCpuSeconds": 42.83,
+      "workerCpuSecondsPerAudioSecond": 0.08805147814645779
+    },
+    {
+      "baseArmId": "control",
+      "bindings": {
+        "modelArchiveSha256": "f6b2a72ebcb1ac7a764d4cfccd886e6bcb2a95c4657c2199d0ba95ed4b9ea71a",
+        "modelSha256": "c71f0ce00bec95b07744e116345e33d8cbbe08cef896382cf907bf4b51a2cd51",
+        "runtimeArchiveSha256": "809ab5d0c77bd8f358364a244e6ab17f2afecf9779eb9fd436fa469c3ff5375c",
+        "tokensSha256": "f449eb28dc567533d7fa59be34e2abca8784f771850c78a47fb731a31429a1dc",
+        "workerSha256": "bc6e88af40fe43e4733c1d15062e1abeb9a37ef7848d5ae246eabf4494b91b78"
+      },
+      "changedVariable": "language",
+      "codeSwitchErrorRate": 0.14671760045274476,
+      "coldLoadMs": 315.451,
+      "completeInputConsumed": true,
+      "effectiveConfig": {
+        "concurrency": 1,
+        "decodingMethod": "greedy_search",
+        "language": "en",
+        "maximumUtteranceSeconds": 15.0,
+        "minimumSilenceSeconds": 0.5,
+        "minimumSpeechSeconds": 0.25,
+        "model": "sensevoice-int8-2024-07-17",
+        "provider": "cpu",
+        "publishesCompletedUtterancesOnly": true,
+        "publishesTokenPartials": false,
+        "recognizerLifecycle": "resident_preloaded",
+        "runtime": "sherpa-onnx-1.13.4-ort-1.27.0",
+        "threads": 2,
+        "useInverseTextNormalization": false,
+        "vadThreshold": 0.5
+      },
+      "errorRate": 0.3858438283743817,
+      "hallucinated": true,
+      "id": "language-en",
+      "itnEventAccuracy": 0.0,
+      "maximumBacklogSeconds": 0.528,
+      "maximumRssBytes": 480935936,
+      "maximumUtteranceSeconds": 15.0,
+      "nonTargetErrorRate": 0.39240764025451275,
+      "numericEventAccuracy": 0.875,
+      "probeDurationSeconds": 30.135934,
+      "retainedRssBytesAfterWorkerExit": 0,
+      "scenarioMetrics": [
+        {
+          "errorRate": 0.06666666666666667,
+          "itnEventAccuracy": null,
+          "numericEventAccuracy": null,
+          "scenario": "clean_near_field_mandarin",
+          "terminologyRecall": null,
+          "utteranceCount": 4
+        },
+        {
+          "errorRate": 0.21518987341772153,
+          "itnEventAccuracy": null,
+          "numericEventAccuracy": null,
+          "scenario": "clean_near_field_english",
+          "terminologyRecall": null,
+          "utteranceCount": 3
+        },
+        {
+          "errorRate": 0.21904761904761905,
+          "itnEventAccuracy": null,
+          "numericEventAccuracy": null,
+          "scenario": "far_field_noisy_meeting",
+          "terminologyRecall": null,
+          "utteranceCount": 4
+        },
+        {
+          "errorRate": 0.09785202863961814,
+          "itnEventAccuracy": null,
+          "numericEventAccuracy": null,
+          "scenario": "zh_en_code_switch",
+          "terminologyRecall": null,
+          "utteranceCount": 19
+        },
+        {
+          "errorRate": 0.3333333333333333,
+          "itnEventAccuracy": 0.0,
+          "numericEventAccuracy": 0.875,
+          "scenario": "terminology_numbers",
+          "terminologyRecall": 0.5,
+          "utteranceCount": 5
+        },
+        {
+          "errorRate": 0.6381418092909535,
+          "itnEventAccuracy": null,
+          "numericEventAccuracy": null,
+          "scenario": "keyboard_noise",
+          "terminologyRecall": null,
+          "utteranceCount": 3
+        },
+        {
+          "errorRate": 0.33807829181494664,
+          "itnEventAccuracy": null,
+          "numericEventAccuracy": null,
+          "scenario": "long_utterance",
+          "terminologyRecall": null,
+          "utteranceCount": 11
+        },
+        {
+          "errorRate": 0.782258064516129,
+          "itnEventAccuracy": null,
+          "numericEventAccuracy": null,
+          "scenario": "short_confirmation",
+          "terminologyRecall": null,
+          "utteranceCount": 2
+        },
+        {
+          "errorRate": 0.7820267686424475,
+          "itnEventAccuracy": null,
+          "numericEventAccuracy": null,
+          "scenario": "system_microphone_double_talk",
+          "terminologyRecall": null,
+          "utteranceCount": 4
+        },
+        {
+          "errorRate": 1.0,
+          "itnEventAccuracy": null,
+          "numericEventAccuracy": null,
+          "scenario": "non_speech",
+          "terminologyRecall": null,
+          "utteranceCount": 2
+        }
+      ],
+      "shortConfirmationDetected": true,
+      "speechEndToDriverP50Ms": null,
+      "speechEndToDriverP95Ms": null,
+      "terminologyRecall": 0.5,
+      "warmUtteranceP50Ms": 285.23,
+      "warmUtteranceP95Ms": 861.495,
+      "workerCpuSeconds": 42.81,
+      "workerCpuSecondsPerAudioSecond": 0.08801036141606021
+    },
+    {
+      "baseArmId": "control",
+      "bindings": {
+        "modelArchiveSha256": "f6b2a72ebcb1ac7a764d4cfccd886e6bcb2a95c4657c2199d0ba95ed4b9ea71a",
+        "modelSha256": "c71f0ce00bec95b07744e116345e33d8cbbe08cef896382cf907bf4b51a2cd51",
+        "runtimeArchiveSha256": "809ab5d0c77bd8f358364a244e6ab17f2afecf9779eb9fd436fa469c3ff5375c",
+        "tokensSha256": "f449eb28dc567533d7fa59be34e2abca8784f771850c78a47fb731a31429a1dc",
+        "workerSha256": "bc6e88af40fe43e4733c1d15062e1abeb9a37ef7848d5ae246eabf4494b91b78"
+      },
+      "changedVariable": "threads",
+      "codeSwitchErrorRate": 0.08650658905327835,
+      "coldLoadMs": 331.406,
+      "completeInputConsumed": true,
+      "effectiveConfig": {
+        "concurrency": 1,
+        "decodingMethod": "greedy_search",
+        "language": "auto",
+        "maximumUtteranceSeconds": 15.0,
+        "minimumSilenceSeconds": 0.5,
+        "minimumSpeechSeconds": 0.25,
+        "model": "sensevoice-int8-2024-07-17",
+        "provider": "cpu",
+        "publishesCompletedUtterancesOnly": true,
+        "publishesTokenPartials": false,
+        "recognizerLifecycle": "resident_preloaded",
+        "runtime": "sherpa-onnx-1.13.4-ort-1.27.0",
+        "threads": 1,
+        "useInverseTextNormalization": false,
+        "vadThreshold": 0.5
+      },
+      "errorRate": 0.3296807560986605,
+      "hallucinated": false,
+      "id": "threads-1",
+      "itnEventAccuracy": 0.0,
+      "maximumBacklogSeconds": 0.528,
+      "maximumRssBytes": 696745984,
+      "maximumUtteranceSeconds": 15.0,
+      "nonTargetErrorRate": 0.34384406698526204,
+      "numericEventAccuracy": 0.875,
+      "probeDurationSeconds": 48.290381,
+      "retainedRssBytesAfterWorkerExit": 0,
+      "scenarioMetrics": [
+        {
+          "errorRate": 0.02857142857142857,
+          "itnEventAccuracy": null,
+          "numericEventAccuracy": null,
+          "scenario": "clean_near_field_mandarin",
+          "terminologyRecall": null,
+          "utteranceCount": 4
+        },
+        {
+          "errorRate": 0.22784810126582278,
+          "itnEventAccuracy": null,
+          "numericEventAccuracy": null,
+          "scenario": "clean_near_field_english",
+          "terminologyRecall": null,
+          "utteranceCount": 3
+        },
+        {
+          "errorRate": 0.11428571428571428,
+          "itnEventAccuracy": null,
+          "numericEventAccuracy": null,
+          "scenario": "far_field_noisy_meeting",
+          "terminologyRecall": null,
+          "utteranceCount": 4
+        },
+        {
+          "errorRate": 0.06921241050119331,
+          "itnEventAccuracy": null,
+          "numericEventAccuracy": null,
+          "scenario": "zh_en_code_switch",
+          "terminologyRecall": null,
+          "utteranceCount": 19
+        },
+        {
+          "errorRate": 0.21637426900584794,
+          "itnEventAccuracy": 0.0,
+          "numericEventAccuracy": 0.875,
+          "scenario": "terminology_numbers",
+          "terminologyRecall": 0.75,
+          "utteranceCount": 5
+        },
+        {
+          "errorRate": 0.6381418092909535,
+          "itnEventAccuracy": null,
+          "numericEventAccuracy": null,
+          "scenario": "keyboard_noise",
+          "terminologyRecall": null,
+          "utteranceCount": 3
+        },
+        {
+          "errorRate": 0.1103202846975089,
+          "itnEventAccuracy": null,
+          "numericEventAccuracy": null,
+          "scenario": "long_utterance",
+          "terminologyRecall": null,
+          "utteranceCount": 11
+        },
+        {
+          "errorRate": 0.782258064516129,
+          "itnEventAccuracy": null,
+          "numericEventAccuracy": null,
+          "scenario": "short_confirmation",
+          "terminologyRecall": null,
+          "utteranceCount": 2
+        },
+        {
+          "errorRate": 0.780114722753346,
+          "itnEventAccuracy": null,
+          "numericEventAccuracy": null,
+          "scenario": "system_microphone_double_talk",
+          "terminologyRecall": null,
+          "utteranceCount": 4
+        },
+        {
+          "errorRate": 0.0,
+          "itnEventAccuracy": null,
+          "numericEventAccuracy": null,
+          "scenario": "non_speech",
+          "terminologyRecall": null,
+          "utteranceCount": 2
+        }
+      ],
+      "shortConfirmationDetected": true,
+      "speechEndToDriverP50Ms": null,
+      "speechEndToDriverP95Ms": null,
+      "terminologyRecall": 0.75,
+      "warmUtteranceP50Ms": 548.052,
+      "warmUtteranceP95Ms": 1673.308,
+      "workerCpuSeconds": 40.05,
+      "workerCpuSecondsPerAudioSecond": 0.08233625262119157
+    },
+    {
+      "baseArmId": "control",
+      "bindings": {
+        "modelArchiveSha256": "f6b2a72ebcb1ac7a764d4cfccd886e6bcb2a95c4657c2199d0ba95ed4b9ea71a",
+        "modelSha256": "c71f0ce00bec95b07744e116345e33d8cbbe08cef896382cf907bf4b51a2cd51",
+        "runtimeArchiveSha256": "809ab5d0c77bd8f358364a244e6ab17f2afecf9779eb9fd436fa469c3ff5375c",
+        "tokensSha256": "f449eb28dc567533d7fa59be34e2abca8784f771850c78a47fb731a31429a1dc",
+        "workerSha256": "bc6e88af40fe43e4733c1d15062e1abeb9a37ef7848d5ae246eabf4494b91b78"
+      },
+      "changedVariable": "threads",
+      "codeSwitchErrorRate": 0.08650658905327835,
+      "coldLoadMs": 331.259,
+      "completeInputConsumed": true,
+      "effectiveConfig": {
+        "concurrency": 1,
+        "decodingMethod": "greedy_search",
+        "language": "auto",
+        "maximumUtteranceSeconds": 15.0,
+        "minimumSilenceSeconds": 0.5,
+        "minimumSpeechSeconds": 0.25,
+        "model": "sensevoice-int8-2024-07-17",
+        "provider": "cpu",
+        "publishesCompletedUtterancesOnly": true,
+        "publishesTokenPartials": false,
+        "recognizerLifecycle": "resident_preloaded",
+        "runtime": "sherpa-onnx-1.13.4-ort-1.27.0",
+        "threads": 3,
+        "useInverseTextNormalization": false,
+        "vadThreshold": 0.5
+      },
+      "errorRate": 0.3296807560986605,
+      "hallucinated": false,
+      "id": "threads-3",
+      "itnEventAccuracy": 0.0,
+      "maximumBacklogSeconds": 0.528,
+      "maximumRssBytes": 673726464,
+      "maximumUtteranceSeconds": 15.0,
+      "nonTargetErrorRate": 0.34384406698526204,
+      "numericEventAccuracy": 0.875,
+      "probeDurationSeconds": 24.658787,
+      "retainedRssBytesAfterWorkerExit": 0,
+      "scenarioMetrics": [
+        {
+          "errorRate": 0.02857142857142857,
+          "itnEventAccuracy": null,
+          "numericEventAccuracy": null,
+          "scenario": "clean_near_field_mandarin",
+          "terminologyRecall": null,
+          "utteranceCount": 4
+        },
+        {
+          "errorRate": 0.22784810126582278,
+          "itnEventAccuracy": null,
+          "numericEventAccuracy": null,
+          "scenario": "clean_near_field_english",
+          "terminologyRecall": null,
+          "utteranceCount": 3
+        },
+        {
+          "errorRate": 0.11428571428571428,
+          "itnEventAccuracy": null,
+          "numericEventAccuracy": null,
+          "scenario": "far_field_noisy_meeting",
+          "terminologyRecall": null,
+          "utteranceCount": 4
+        },
+        {
+          "errorRate": 0.06921241050119331,
+          "itnEventAccuracy": null,
+          "numericEventAccuracy": null,
+          "scenario": "zh_en_code_switch",
+          "terminologyRecall": null,
+          "utteranceCount": 19
+        },
+        {
+          "errorRate": 0.21637426900584794,
+          "itnEventAccuracy": 0.0,
+          "numericEventAccuracy": 0.875,
+          "scenario": "terminology_numbers",
+          "terminologyRecall": 0.75,
+          "utteranceCount": 5
+        },
+        {
+          "errorRate": 0.6381418092909535,
+          "itnEventAccuracy": null,
+          "numericEventAccuracy": null,
+          "scenario": "keyboard_noise",
+          "terminologyRecall": null,
+          "utteranceCount": 3
+        },
+        {
+          "errorRate": 0.1103202846975089,
+          "itnEventAccuracy": null,
+          "numericEventAccuracy": null,
+          "scenario": "long_utterance",
+          "terminologyRecall": null,
+          "utteranceCount": 11
+        },
+        {
+          "errorRate": 0.782258064516129,
+          "itnEventAccuracy": null,
+          "numericEventAccuracy": null,
+          "scenario": "short_confirmation",
+          "terminologyRecall": null,
+          "utteranceCount": 2
+        },
+        {
+          "errorRate": 0.780114722753346,
+          "itnEventAccuracy": null,
+          "numericEventAccuracy": null,
+          "scenario": "system_microphone_double_talk",
+          "terminologyRecall": null,
+          "utteranceCount": 4
+        },
+        {
+          "errorRate": 0.0,
+          "itnEventAccuracy": null,
+          "numericEventAccuracy": null,
+          "scenario": "non_speech",
+          "terminologyRecall": null,
+          "utteranceCount": 2
+        }
+      ],
+      "shortConfirmationDetected": true,
+      "speechEndToDriverP50Ms": null,
+      "speechEndToDriverP95Ms": null,
+      "terminologyRecall": 0.75,
+      "warmUtteranceP50Ms": 204.1,
+      "warmUtteranceP95Ms": 612.017,
+      "workerCpuSeconds": 47.2,
+      "workerCpuSecondsPerAudioSecond": 0.09703548373833314
+    },
+    {
+      "baseArmId": "control",
+      "bindings": {
+        "modelArchiveSha256": "f6b2a72ebcb1ac7a764d4cfccd886e6bcb2a95c4657c2199d0ba95ed4b9ea71a",
+        "modelSha256": "c71f0ce00bec95b07744e116345e33d8cbbe08cef896382cf907bf4b51a2cd51",
+        "runtimeArchiveSha256": "809ab5d0c77bd8f358364a244e6ab17f2afecf9779eb9fd436fa469c3ff5375c",
+        "tokensSha256": "f449eb28dc567533d7fa59be34e2abca8784f771850c78a47fb731a31429a1dc",
+        "workerSha256": "bc6e88af40fe43e4733c1d15062e1abeb9a37ef7848d5ae246eabf4494b91b78"
+      },
+      "changedVariable": "vadThreshold",
+      "codeSwitchErrorRate": 0.06395019807583474,
+      "coldLoadMs": 330.862,
+      "completeInputConsumed": true,
+      "effectiveConfig": {
+        "concurrency": 1,
+        "decodingMethod": "greedy_search",
+        "language": "auto",
+        "maximumUtteranceSeconds": 15.0,
+        "minimumSilenceSeconds": 0.5,
+        "minimumSpeechSeconds": 0.25,
+        "model": "sensevoice-int8-2024-07-17",
+        "provider": "cpu",
+        "publishesCompletedUtterancesOnly": true,
+        "publishesTokenPartials": false,
+        "recognizerLifecycle": "resident_preloaded",
+        "runtime": "sherpa-onnx-1.13.4-ort-1.27.0",
+        "threads": 2,
+        "useInverseTextNormalization": false,
+        "vadThreshold": 0.4
+      },
+      "errorRate": 0.2784151114864117,
+      "hallucinated": false,
+      "id": "vad-threshold-0.4",
+      "itnEventAccuracy": 0.0,
+      "maximumBacklogSeconds": 0.528,
+      "maximumRssBytes": 695533568,
+      "maximumUtteranceSeconds": 15.0,
+      "nonTargetErrorRate": 0.28617021679648214,
+      "numericEventAccuracy": 0.875,
+      "probeDurationSeconds": 31.338921,
+      "retainedRssBytesAfterWorkerExit": 0,
+      "scenarioMetrics": [
+        {
+          "errorRate": 0.02857142857142857,
+          "itnEventAccuracy": null,
+          "numericEventAccuracy": null,
+          "scenario": "clean_near_field_mandarin",
+          "terminologyRecall": null,
+          "utteranceCount": 4
+        },
+        {
+          "errorRate": 0.189873417721519,
+          "itnEventAccuracy": null,
+          "numericEventAccuracy": null,
+          "scenario": "clean_near_field_english",
+          "terminologyRecall": null,
+          "utteranceCount": 3
+        },
+        {
+          "errorRate": 0.10476190476190476,
+          "itnEventAccuracy": null,
+          "numericEventAccuracy": null,
+          "scenario": "far_field_noisy_meeting",
+          "terminologyRecall": null,
+          "utteranceCount": 3
+        },
+        {
+          "errorRate": 0.04295942720763723,
+          "itnEventAccuracy": null,
+          "numericEventAccuracy": null,
+          "scenario": "zh_en_code_switch",
+          "terminologyRecall": null,
+          "utteranceCount": 19
+        },
+        {
+          "errorRate": 0.21637426900584794,
+          "itnEventAccuracy": 0.0,
+          "numericEventAccuracy": 0.875,
+          "scenario": "terminology_numbers",
+          "terminologyRecall": 0.75,
+          "utteranceCount": 5
+        },
+        {
+          "errorRate": 0.2469437652811736,
+          "itnEventAccuracy": null,
+          "numericEventAccuracy": null,
+          "scenario": "keyboard_noise",
+          "terminologyRecall": null,
+          "utteranceCount": 4
+        },
+        {
+          "errorRate": 0.11387900355871886,
+          "itnEventAccuracy": null,
+          "numericEventAccuracy": null,
+          "scenario": "long_utterance",
+          "terminologyRecall": null,
+          "utteranceCount": 10
+        },
+        {
+          "errorRate": 0.782258064516129,
+          "itnEventAccuracy": null,
+          "numericEventAccuracy": null,
+          "scenario": "short_confirmation",
+          "terminologyRecall": null,
+          "utteranceCount": 2
+        },
+        {
+          "errorRate": 0.780114722753346,
+          "itnEventAccuracy": null,
+          "numericEventAccuracy": null,
+          "scenario": "system_microphone_double_talk",
+          "terminologyRecall": null,
+          "utteranceCount": 4
+        },
+        {
+          "errorRate": 0.0,
+          "itnEventAccuracy": null,
+          "numericEventAccuracy": null,
+          "scenario": "non_speech",
+          "terminologyRecall": null,
+          "utteranceCount": 2
+        }
+      ],
+      "shortConfirmationDetected": true,
+      "speechEndToDriverP50Ms": null,
+      "speechEndToDriverP95Ms": null,
+      "terminologyRecall": 0.75,
+      "warmUtteranceP50Ms": 297.08900000000006,
+      "warmUtteranceP95Ms": 861.653,
+      "workerCpuSeconds": 45.15,
+      "workerCpuSecondsPerAudioSecond": 0.09282101887257926
+    },
+    {
+      "baseArmId": "control",
+      "bindings": {
+        "modelArchiveSha256": "f6b2a72ebcb1ac7a764d4cfccd886e6bcb2a95c4657c2199d0ba95ed4b9ea71a",
+        "modelSha256": "c71f0ce00bec95b07744e116345e33d8cbbe08cef896382cf907bf4b51a2cd51",
+        "runtimeArchiveSha256": "809ab5d0c77bd8f358364a244e6ab17f2afecf9779eb9fd436fa469c3ff5375c",
+        "tokensSha256": "f449eb28dc567533d7fa59be34e2abca8784f771850c78a47fb731a31429a1dc",
+        "workerSha256": "bc6e88af40fe43e4733c1d15062e1abeb9a37ef7848d5ae246eabf4494b91b78"
+      },
+      "changedVariable": "vadThreshold",
+      "codeSwitchErrorRate": 0.1391785916403913,
+      "coldLoadMs": 326.465,
+      "completeInputConsumed": true,
+      "effectiveConfig": {
+        "concurrency": 1,
+        "decodingMethod": "greedy_search",
+        "language": "auto",
+        "maximumUtteranceSeconds": 15.0,
+        "minimumSilenceSeconds": 0.5,
+        "minimumSpeechSeconds": 0.25,
+        "model": "sensevoice-int8-2024-07-17",
+        "provider": "cpu",
+        "publishesCompletedUtterancesOnly": true,
+        "publishesTokenPartials": false,
+        "recognizerLifecycle": "resident_preloaded",
+        "runtime": "sherpa-onnx-1.13.4-ort-1.27.0",
+        "threads": 2,
+        "useInverseTextNormalization": false,
+        "vadThreshold": 0.6
+      },
+      "errorRate": 0.3511892713545921,
+      "hallucinated": false,
+      "id": "vad-threshold-0.6",
+      "itnEventAccuracy": 0.0,
+      "maximumBacklogSeconds": 0.528,
+      "maximumRssBytes": 695844864,
+      "maximumUtteranceSeconds": 15.0,
+      "nonTargetErrorRate": 0.3673101524961384,
+      "numericEventAccuracy": 0.875,
+      "probeDurationSeconds": 29.570741,
+      "retainedRssBytesAfterWorkerExit": 0,
+      "scenarioMetrics": [
+        {
+          "errorRate": 0.02857142857142857,
+          "itnEventAccuracy": null,
+          "numericEventAccuracy": null,
+          "scenario": "clean_near_field_mandarin",
+          "terminologyRecall": null,
+          "utteranceCount": 4
+        },
+        {
+          "errorRate": 0.3037974683544304,
+          "itnEventAccuracy": null,
+          "numericEventAccuracy": null,
+          "scenario": "clean_near_field_english",
+          "terminologyRecall": null,
+          "utteranceCount": 4
+        },
+        {
+          "errorRate": 0.18095238095238095,
+          "itnEventAccuracy": null,
+          "numericEventAccuracy": null,
+          "scenario": "far_field_noisy_meeting",
+          "terminologyRecall": null,
+          "utteranceCount": 5
+        },
+        {
+          "errorRate": 0.12410501193317422,
+          "itnEventAccuracy": null,
+          "numericEventAccuracy": null,
+          "scenario": "zh_en_code_switch",
+          "terminologyRecall": null,
+          "utteranceCount": 20
+        },
+        {
+          "errorRate": 0.2222222222222222,
+          "itnEventAccuracy": 0.0,
+          "numericEventAccuracy": 0.875,
+          "scenario": "terminology_numbers",
+          "terminologyRecall": 0.75,
+          "utteranceCount": 5
+        },
+        {
+          "errorRate": 0.628361858190709,
+          "itnEventAccuracy": null,
+          "numericEventAccuracy": null,
+          "scenario": "keyboard_noise",
+          "terminologyRecall": null,
+          "utteranceCount": 3
+        },
+        {
+          "errorRate": 0.1103202846975089,
+          "itnEventAccuracy": null,
+          "numericEventAccuracy": null,
+          "scenario": "long_utterance",
+          "terminologyRecall": null,
+          "utteranceCount": 11
+        },
+        {
+          "errorRate": 0.782258064516129,
+          "itnEventAccuracy": null,
+          "numericEventAccuracy": null,
+          "scenario": "short_confirmation",
+          "terminologyRecall": null,
+          "utteranceCount": 2
+        },
+        {
+          "errorRate": 0.780114722753346,
+          "itnEventAccuracy": null,
+          "numericEventAccuracy": null,
+          "scenario": "system_microphone_double_talk",
+          "terminologyRecall": null,
+          "utteranceCount": 4
+        },
+        {
+          "errorRate": 0.0,
+          "itnEventAccuracy": null,
+          "numericEventAccuracy": null,
+          "scenario": "non_speech",
+          "terminologyRecall": null,
+          "utteranceCount": 2
+        }
+      ],
+      "shortConfirmationDetected": true,
+      "speechEndToDriverP50Ms": null,
+      "speechEndToDriverP95Ms": null,
+      "terminologyRecall": 0.75,
+      "warmUtteranceP50Ms": 246.07299999999998,
+      "warmUtteranceP95Ms": 863.413,
+      "workerCpuSeconds": 41.56,
+      "workerCpuSecondsPerAudioSecond": 0.08544056576621029
+    },
+    {
+      "baseArmId": "control",
+      "bindings": {
+        "modelArchiveSha256": "f6b2a72ebcb1ac7a764d4cfccd886e6bcb2a95c4657c2199d0ba95ed4b9ea71a",
+        "modelSha256": "c71f0ce00bec95b07744e116345e33d8cbbe08cef896382cf907bf4b51a2cd51",
+        "runtimeArchiveSha256": "809ab5d0c77bd8f358364a244e6ab17f2afecf9779eb9fd436fa469c3ff5375c",
+        "tokensSha256": "f449eb28dc567533d7fa59be34e2abca8784f771850c78a47fb731a31429a1dc",
+        "workerSha256": "bc6e88af40fe43e4733c1d15062e1abeb9a37ef7848d5ae246eabf4494b91b78"
+      },
+      "changedVariable": "minimumSpeechSeconds",
+      "codeSwitchErrorRate": 0.07898779206079715,
+      "coldLoadMs": 357.003,
+      "completeInputConsumed": true,
+      "effectiveConfig": {
+        "concurrency": 1,
+        "decodingMethod": "greedy_search",
+        "language": "auto",
+        "maximumUtteranceSeconds": 15.0,
+        "minimumSilenceSeconds": 0.5,
+        "minimumSpeechSeconds": 0.15,
+        "model": "sensevoice-int8-2024-07-17",
+        "provider": "cpu",
+        "publishesCompletedUtterancesOnly": true,
+        "publishesTokenPartials": false,
+        "recognizerLifecycle": "resident_preloaded",
+        "runtime": "sherpa-onnx-1.13.4-ort-1.27.0",
+        "threads": 2,
+        "useInverseTextNormalization": false,
+        "vadThreshold": 0.5
+      },
+      "errorRate": 0.3214192198680098,
+      "hallucinated": false,
+      "id": "vad-min-speech-0.15",
+      "itnEventAccuracy": 0.0,
+      "maximumBacklogSeconds": 0.528,
+      "maximumRssBytes": 654884864,
+      "maximumUtteranceSeconds": 15.0,
+      "nonTargetErrorRate": 0.3330878504216865,
+      "numericEventAccuracy": 0.875,
+      "probeDurationSeconds": 30.981742,
+      "retainedRssBytesAfterWorkerExit": 0,
+      "scenarioMetrics": [
+        {
+          "errorRate": 0.02857142857142857,
+          "itnEventAccuracy": null,
+          "numericEventAccuracy": null,
+          "scenario": "clean_near_field_mandarin",
+          "terminologyRecall": null,
+          "utteranceCount": 4
+        },
+        {
+          "errorRate": 0.189873417721519,
+          "itnEventAccuracy": null,
+          "numericEventAccuracy": null,
+          "scenario": "clean_near_field_english",
+          "terminologyRecall": null,
+          "utteranceCount": 3
+        },
+        {
+          "errorRate": 0.11428571428571428,
+          "itnEventAccuracy": null,
+          "numericEventAccuracy": null,
+          "scenario": "far_field_noisy_meeting",
+          "terminologyRecall": null,
+          "utteranceCount": 4
+        },
+        {
+          "errorRate": 0.057279236276849645,
+          "itnEventAccuracy": null,
+          "numericEventAccuracy": null,
+          "scenario": "zh_en_code_switch",
+          "terminologyRecall": null,
+          "utteranceCount": 20
+        },
+        {
+          "errorRate": 0.22807017543859648,
+          "itnEventAccuracy": 0.0,
+          "numericEventAccuracy": 0.875,
+          "scenario": "terminology_numbers",
+          "terminologyRecall": 0.75,
+          "utteranceCount": 5
+        },
+        {
+          "errorRate": 0.6039119804400978,
+          "itnEventAccuracy": null,
+          "numericEventAccuracy": null,
+          "scenario": "keyboard_noise",
+          "terminologyRecall": null,
+          "utteranceCount": 3
+        },
+        {
+          "errorRate": 0.1103202846975089,
+          "itnEventAccuracy": null,
+          "numericEventAccuracy": null,
+          "scenario": "long_utterance",
+          "terminologyRecall": null,
+          "utteranceCount": 11
+        },
+        {
+          "errorRate": 0.782258064516129,
+          "itnEventAccuracy": null,
+          "numericEventAccuracy": null,
+          "scenario": "short_confirmation",
+          "terminologyRecall": null,
+          "utteranceCount": 3
+        },
+        {
+          "errorRate": 0.7782026768642447,
+          "itnEventAccuracy": null,
+          "numericEventAccuracy": null,
+          "scenario": "system_microphone_double_talk",
+          "terminologyRecall": null,
+          "utteranceCount": 4
+        },
+        {
+          "errorRate": 0.0,
+          "itnEventAccuracy": null,
+          "numericEventAccuracy": null,
+          "scenario": "non_speech",
+          "terminologyRecall": null,
+          "utteranceCount": 2
+        }
+      ],
+      "shortConfirmationDetected": true,
+      "speechEndToDriverP50Ms": null,
+      "speechEndToDriverP95Ms": null,
+      "terminologyRecall": 0.75,
+      "warmUtteranceP50Ms": 280.4,
+      "warmUtteranceP95Ms": 870.288,
+      "workerCpuSeconds": 44.17,
+      "workerCpuSecondsPerAudioSecond": 0.09080629908309693
+    },
+    {
+      "baseArmId": "control",
+      "bindings": {
+        "modelArchiveSha256": "f6b2a72ebcb1ac7a764d4cfccd886e6bcb2a95c4657c2199d0ba95ed4b9ea71a",
+        "modelSha256": "c71f0ce00bec95b07744e116345e33d8cbbe08cef896382cf907bf4b51a2cd51",
+        "runtimeArchiveSha256": "809ab5d0c77bd8f358364a244e6ab17f2afecf9779eb9fd436fa469c3ff5375c",
+        "tokensSha256": "f449eb28dc567533d7fa59be34e2abca8784f771850c78a47fb731a31429a1dc",
+        "workerSha256": "bc6e88af40fe43e4733c1d15062e1abeb9a37ef7848d5ae246eabf4494b91b78"
+      },
+      "changedVariable": "minimumSilenceSeconds",
+      "codeSwitchErrorRate": 0.11876465356940738,
+      "coldLoadMs": 330.51,
+      "completeInputConsumed": true,
+      "effectiveConfig": {
+        "concurrency": 1,
+        "decodingMethod": "greedy_search",
+        "language": "auto",
+        "maximumUtteranceSeconds": 15.0,
+        "minimumSilenceSeconds": 0.35,
+        "minimumSpeechSeconds": 0.25,
+        "model": "sensevoice-int8-2024-07-17",
+        "provider": "cpu",
+        "publishesCompletedUtterancesOnly": true,
+        "publishesTokenPartials": false,
+        "recognizerLifecycle": "resident_preloaded",
+        "runtime": "sherpa-onnx-1.13.4-ort-1.27.0",
+        "threads": 2,
+        "useInverseTextNormalization": false,
+        "vadThreshold": 0.5
+      },
+      "errorRate": 0.34099135946142256,
+      "hallucinated": false,
+      "id": "vad-min-silence-0.35",
+      "itnEventAccuracy": 0.0,
+      "maximumBacklogSeconds": 0.378,
+      "maximumRssBytes": 579321856,
+      "maximumUtteranceSeconds": 15.0,
+      "nonTargetErrorRate": 0.35656849576836935,
+      "numericEventAccuracy": 0.875,
+      "probeDurationSeconds": 30.244979,
+      "retainedRssBytesAfterWorkerExit": 0,
+      "scenarioMetrics": [
+        {
+          "errorRate": 0.0380952380952381,
+          "itnEventAccuracy": null,
+          "numericEventAccuracy": null,
+          "scenario": "clean_near_field_mandarin",
+          "terminologyRecall": null,
+          "utteranceCount": 7
+        },
+        {
+          "errorRate": 0.27848101265822783,
+          "itnEventAccuracy": null,
+          "numericEventAccuracy": null,
+          "scenario": "clean_near_field_english",
+          "terminologyRecall": null,
+          "utteranceCount": 5
+        },
+        {
+          "errorRate": 0.11428571428571428,
+          "itnEventAccuracy": null,
+          "numericEventAccuracy": null,
+          "scenario": "far_field_noisy_meeting",
+          "terminologyRecall": null,
+          "utteranceCount": 4
+        },
+        {
+          "errorRate": 0.08949880668257756,
+          "itnEventAccuracy": null,
+          "numericEventAccuracy": null,
+          "scenario": "zh_en_code_switch",
+          "terminologyRecall": null,
+          "utteranceCount": 24
+        },
+        {
+          "errorRate": 0.21637426900584794,
+          "itnEventAccuracy": 0.0,
+          "numericEventAccuracy": 0.875,
+          "scenario": "terminology_numbers",
+          "terminologyRecall": 0.75,
+          "utteranceCount": 6
+        },
+        {
+          "errorRate": 0.6381418092909535,
+          "itnEventAccuracy": null,
+          "numericEventAccuracy": null,
+          "scenario": "keyboard_noise",
+          "terminologyRecall": null,
+          "utteranceCount": 3
+        },
+        {
+          "errorRate": 0.13167259786476868,
+          "itnEventAccuracy": null,
+          "numericEventAccuracy": null,
+          "scenario": "long_utterance",
+          "terminologyRecall": null,
+          "utteranceCount": 13
+        },
+        {
+          "errorRate": 0.782258064516129,
+          "itnEventAccuracy": null,
+          "numericEventAccuracy": null,
+          "scenario": "short_confirmation",
+          "terminologyRecall": null,
+          "utteranceCount": 2
+        },
+        {
+          "errorRate": 0.780114722753346,
+          "itnEventAccuracy": null,
+          "numericEventAccuracy": null,
+          "scenario": "system_microphone_double_talk",
+          "terminologyRecall": null,
+          "utteranceCount": 5
+        },
+        {
+          "errorRate": 0.0,
+          "itnEventAccuracy": null,
+          "numericEventAccuracy": null,
+          "scenario": "non_speech",
+          "terminologyRecall": null,
+          "utteranceCount": 2
+        }
+      ],
+      "shortConfirmationDetected": true,
+      "speechEndToDriverP50Ms": null,
+      "speechEndToDriverP95Ms": null,
+      "terminologyRecall": 0.75,
+      "warmUtteranceP50Ms": 207.195,
+      "warmUtteranceP95Ms": 673.994,
+      "workerCpuSeconds": 42.97,
+      "workerCpuSecondsPerAudioSecond": 0.08833929525924099
+    },
+    {
+      "baseArmId": "control",
+      "bindings": {
+        "modelArchiveSha256": "f6b2a72ebcb1ac7a764d4cfccd886e6bcb2a95c4657c2199d0ba95ed4b9ea71a",
+        "modelSha256": "c71f0ce00bec95b07744e116345e33d8cbbe08cef896382cf907bf4b51a2cd51",
+        "runtimeArchiveSha256": "809ab5d0c77bd8f358364a244e6ab17f2afecf9779eb9fd436fa469c3ff5375c",
+        "tokensSha256": "f449eb28dc567533d7fa59be34e2abca8784f771850c78a47fb731a31429a1dc",
+        "workerSha256": "bc6e88af40fe43e4733c1d15062e1abeb9a37ef7848d5ae246eabf4494b91b78"
+      },
+      "changedVariable": "minimumSilenceSeconds",
+      "codeSwitchErrorRate": 0.0838184170102676,
+      "coldLoadMs": 343.782,
+      "completeInputConsumed": true,
+      "effectiveConfig": {
+        "concurrency": 1,
+        "decodingMethod": "greedy_search",
+        "language": "auto",
+        "maximumUtteranceSeconds": 15.0,
+        "minimumSilenceSeconds": 0.7,
+        "minimumSpeechSeconds": 0.25,
+        "model": "sensevoice-int8-2024-07-17",
+        "provider": "cpu",
+        "publishesCompletedUtterancesOnly": true,
+        "publishesTokenPartials": false,
+        "recognizerLifecycle": "resident_preloaded",
+        "runtime": "sherpa-onnx-1.13.4-ort-1.27.0",
+        "threads": 2,
+        "useInverseTextNormalization": false,
+        "vadThreshold": 0.5
+      },
+      "errorRate": 0.3288853774225456,
+      "hallucinated": false,
+      "id": "vad-min-silence-0.7",
+      "itnEventAccuracy": 0.0,
+      "maximumBacklogSeconds": 0.728,
+      "maximumRssBytes": 687865856,
+      "maximumUtteranceSeconds": 15.0,
+      "nonTargetErrorRate": 0.3429492659746328,
+      "numericEventAccuracy": 0.875,
+      "probeDurationSeconds": 30.672267,
+      "retainedRssBytesAfterWorkerExit": 0,
+      "scenarioMetrics": [
+        {
+          "errorRate": 0.02857142857142857,
+          "itnEventAccuracy": null,
+          "numericEventAccuracy": null,
+          "scenario": "clean_near_field_mandarin",
+          "terminologyRecall": null,
+          "utteranceCount": 4
+        },
+        {
+          "errorRate": 0.22784810126582278,
+          "itnEventAccuracy": null,
+          "numericEventAccuracy": null,
+          "scenario": "clean_near_field_english",
+          "terminologyRecall": null,
+          "utteranceCount": 3
+        },
+        {
+          "errorRate": 0.10476190476190476,
+          "itnEventAccuracy": null,
+          "numericEventAccuracy": null,
+          "scenario": "far_field_noisy_meeting",
+          "terminologyRecall": null,
+          "utteranceCount": 3
+        },
+        {
+          "errorRate": 0.06801909307875895,
+          "itnEventAccuracy": null,
+          "numericEventAccuracy": null,
+          "scenario": "zh_en_code_switch",
+          "terminologyRecall": null,
+          "utteranceCount": 17
+        },
+        {
+          "errorRate": 0.21637426900584794,
+          "itnEventAccuracy": 0.0,
+          "numericEventAccuracy": 0.875,
+          "scenario": "terminology_numbers",
+          "terminologyRecall": 0.75,
+          "utteranceCount": 5
+        },
+        {
+          "errorRate": 0.6381418092909535,
+          "itnEventAccuracy": null,
+          "numericEventAccuracy": null,
+          "scenario": "keyboard_noise",
+          "terminologyRecall": null,
+          "utteranceCount": 3
+        },
+        {
+          "errorRate": 0.11387900355871886,
+          "itnEventAccuracy": null,
+          "numericEventAccuracy": null,
+          "scenario": "long_utterance",
+          "terminologyRecall": null,
+          "utteranceCount": 7
+        },
+        {
+          "errorRate": 0.782258064516129,
+          "itnEventAccuracy": null,
+          "numericEventAccuracy": null,
+          "scenario": "short_confirmation",
+          "terminologyRecall": null,
+          "utteranceCount": 2
+        },
+        {
+          "errorRate": 0.780114722753346,
+          "itnEventAccuracy": null,
+          "numericEventAccuracy": null,
+          "scenario": "system_microphone_double_talk",
+          "terminologyRecall": null,
+          "utteranceCount": 4
+        },
+        {
+          "errorRate": 0.0,
+          "itnEventAccuracy": null,
+          "numericEventAccuracy": null,
+          "scenario": "non_speech",
+          "terminologyRecall": null,
+          "utteranceCount": 2
+        }
+      ],
+      "shortConfirmationDetected": true,
+      "speechEndToDriverP50Ms": null,
+      "speechEndToDriverP95Ms": null,
+      "terminologyRecall": 0.75,
+      "warmUtteranceP50Ms": 313.0535,
+      "warmUtteranceP95Ms": 870.497,
+      "workerCpuSeconds": 43.47,
+      "workerCpuSecondsPerAudioSecond": 0.08936721351918096
+    },
+    {
+      "baseArmId": "control",
+      "bindings": {
+        "modelArchiveSha256": "f6b2a72ebcb1ac7a764d4cfccd886e6bcb2a95c4657c2199d0ba95ed4b9ea71a",
+        "modelSha256": "c71f0ce00bec95b07744e116345e33d8cbbe08cef896382cf907bf4b51a2cd51",
+        "runtimeArchiveSha256": "809ab5d0c77bd8f358364a244e6ab17f2afecf9779eb9fd436fa469c3ff5375c",
+        "tokensSha256": "f449eb28dc567533d7fa59be34e2abca8784f771850c78a47fb731a31429a1dc",
+        "workerSha256": "bc6e88af40fe43e4733c1d15062e1abeb9a37ef7848d5ae246eabf4494b91b78"
+      },
+      "changedVariable": "maximumUtteranceSeconds",
+      "codeSwitchErrorRate": 0.08650658905327835,
+      "coldLoadMs": 357.17,
+      "completeInputConsumed": true,
+      "effectiveConfig": {
+        "concurrency": 1,
+        "decodingMethod": "greedy_search",
+        "language": "auto",
+        "maximumUtteranceSeconds": 12.0,
+        "minimumSilenceSeconds": 0.5,
+        "minimumSpeechSeconds": 0.25,
+        "model": "sensevoice-int8-2024-07-17",
+        "provider": "cpu",
+        "publishesCompletedUtterancesOnly": true,
+        "publishesTokenPartials": false,
+        "recognizerLifecycle": "resident_preloaded",
+        "runtime": "sherpa-onnx-1.13.4-ort-1.27.0",
+        "threads": 2,
+        "useInverseTextNormalization": false,
+        "vadThreshold": 0.5
+      },
+      "errorRate": 0.3377582906895594,
+      "hallucinated": true,
+      "id": "vad-max-utterance-12",
+      "itnEventAccuracy": 0.0,
+      "maximumBacklogSeconds": 0.528,
+      "maximumRssBytes": 710164480,
+      "maximumUtteranceSeconds": 12.0,
+      "nonTargetErrorRate": 0.3522002992479766,
+      "numericEventAccuracy": 0.875,
+      "probeDurationSeconds": 30.522362,
+      "retainedRssBytesAfterWorkerExit": 0,
+      "scenarioMetrics": [
+        {
+          "errorRate": 0.02857142857142857,
+          "itnEventAccuracy": null,
+          "numericEventAccuracy": null,
+          "scenario": "clean_near_field_mandarin",
+          "terminologyRecall": null,
+          "utteranceCount": 4
+        },
+        {
+          "errorRate": 0.2911392405063291,
+          "itnEventAccuracy": null,
+          "numericEventAccuracy": null,
+          "scenario": "clean_near_field_english",
+          "terminologyRecall": null,
+          "utteranceCount": 4
+        },
+        {
+          "errorRate": 0.11428571428571428,
+          "itnEventAccuracy": null,
+          "numericEventAccuracy": null,
+          "scenario": "far_field_noisy_meeting",
+          "terminologyRecall": null,
+          "utteranceCount": 4
+        },
+        {
+          "errorRate": 0.06921241050119331,
+          "itnEventAccuracy": null,
+          "numericEventAccuracy": null,
+          "scenario": "zh_en_code_switch",
+          "terminologyRecall": null,
+          "utteranceCount": 19
+        },
+        {
+          "errorRate": 0.2222222222222222,
+          "itnEventAccuracy": 0.0,
+          "numericEventAccuracy": 0.875,
+          "scenario": "terminology_numbers",
+          "terminologyRecall": 0.5,
+          "utteranceCount": 6
+        },
+        {
+          "errorRate": 0.6381418092909535,
+          "itnEventAccuracy": null,
+          "numericEventAccuracy": null,
+          "scenario": "keyboard_noise",
+          "terminologyRecall": null,
+          "utteranceCount": 3
+        },
+        {
+          "errorRate": 0.11387900355871886,
+          "itnEventAccuracy": null,
+          "numericEventAccuracy": null,
+          "scenario": "long_utterance",
+          "terminologyRecall": null,
+          "utteranceCount": 12
+        },
+        {
+          "errorRate": 0.782258064516129,
+          "itnEventAccuracy": null,
+          "numericEventAccuracy": null,
+          "scenario": "short_confirmation",
+          "terminologyRecall": null,
+          "utteranceCount": 2
+        },
+        {
+          "errorRate": 0.780114722753346,
+          "itnEventAccuracy": null,
+          "numericEventAccuracy": null,
+          "scenario": "system_microphone_double_talk",
+          "terminologyRecall": null,
+          "utteranceCount": 4
+        },
+        {
+          "errorRate": 1.0,
+          "itnEventAccuracy": null,
+          "numericEventAccuracy": null,
+          "scenario": "non_speech",
+          "terminologyRecall": null,
+          "utteranceCount": 3
+        }
+      ],
+      "shortConfirmationDetected": true,
+      "speechEndToDriverP50Ms": null,
+      "speechEndToDriverP95Ms": null,
+      "terminologyRecall": 0.5,
+      "warmUtteranceP50Ms": 266.058,
+      "warmUtteranceP95Ms": 698.37,
+      "workerCpuSeconds": 43.34,
+      "workerCpuSecondsPerAudioSecond": 0.08909995477159657
+    }
+  ],
+  "bindings": {
+    "contractSha256": "93fd9f1a46a9c7eef740fab19ec7e2a2ac15201318478d7a26ac2ea1b2f56651",
+    "fixtureManifestSha256": "f602b0a933327ec99f2604ce7af4fa823320aabde7ed9acb3364459fbce87ee3",
+    "scorerSha256": "2b76fc02ff49a61e58c2633111dba82d9697ff1d4c5b772fba3b5c1e577b52a5",
+    "vadSha256": "9e2449e1087496d8d4caba907f23e0bd3f78d91fa552479bb9c23ac09cbb1fd6"
+  },
+  "contractId": "sensevoice-live-caption-optimization/macos-m4/v1",
+  "kind": "sensevoice_live_caption_optimization_summary",
+  "schemaVersion": 1,
+  "selection": {
+    "reason": "quality gate passed; held-out/stability validation required",
+    "selectedArm": "vad-threshold-0.4",
+    "status": "OPTIMIZATION_SCREENED_IN"
+  },
+  "stage": "screening",
+  "status": "COMPLETE",
+  "target": {
+    "architecture": "arm64",
+    "buildMode": "debug",
+    "cpu": "Apple M4",
+    "logicalCpuCount": 10,
+    "memoryBytes": 17179869184,
+    "modelIdentifier": "Mac16,10",
+    "os": "macOS 15.7.5",
+    "osBuild": "24G624"
+  }
+}

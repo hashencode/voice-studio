@@ -3,7 +3,8 @@ import 'dart:io';
 
 import 'package:crypto/crypto.dart';
 import 'package:processing_contracts/processing_contracts.dart';
-import 'package:voice2text_desktop/features/processing/sherpa_desktop_processing_engine.dart';
+// ignore: depend_on_referenced_packages
+import 'package:desktop_sherpa_worker/desktop_sherpa_worker.dart';
 
 Future<void> main(List<String> arguments) async {
   final options = _parse(arguments);
@@ -18,6 +19,7 @@ Future<void> main(List<String> arguments) async {
       encoderPath: _required(options, 'encoder'),
       decoderPath: _required(options, 'decoder'),
       tokenizerPath: _required(options, 'tokenizer'),
+      vadPath: _required(options, 'vad'),
       segmentationPath: _required(options, 'segmentation'),
       embeddingPath: _required(options, 'embedding'),
     ),

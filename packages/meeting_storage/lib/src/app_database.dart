@@ -17,7 +17,7 @@ class AppDatabase {
       databaseName = 'voice2text_flutter.db',
       _db = database;
 
-  static const int schemaVersion = 20;
+  static const int schemaVersion = 23;
 
   final DatabaseFactory? _factory;
   final Future<String> Function()? _databasePathProvider;
@@ -177,6 +177,15 @@ class AppDatabase {
           if (oldVersion < 20) {
             await migrateCompanionMediaTransfer(db);
           }
+          if (oldVersion < 21) {
+            await migrateDesktopAiProviderSettings(db);
+          }
+          if (oldVersion < 22) {
+            await migrateDesktopCapture(db);
+          }
+          if (oldVersion < 23) {
+            await migrateDesktopLiveCaption(db);
+          }
         },
       ),
     );
@@ -255,6 +264,7 @@ class AppDatabase {
           ),
         meeting_ai_provider_id TEXT,
         meeting_ai_model_id TEXT,
+        meeting_ai_endpoint TEXT,
         meeting_ai_secret_configured INTEGER NOT NULL DEFAULT 0
       )
     ''');
@@ -273,12 +283,31 @@ class AppDatabase {
     await _createMeetingIntelligenceSchema(db);
     await _createSpeakerSchema(db);
     await _createCompanionMediaTransferSchema(db);
+    await _createDesktopCaptureSchema(db);
+    await _createDesktopLiveCaptionSchema(db);
     await _createTranscriptReviewClosureIndexes(db);
     await _createRecordingAnnotationsSchema(db);
   }
 
   static Future<void> migrateCompanionMediaTransfer(Database db) async {
     await _createCompanionMediaTransferSchema(db);
+  }
+
+  static Future<void> migrateDesktopAiProviderSettings(Database db) async {
+    await _addColumnIfMissing(
+      db,
+      table: 'app_settings',
+      column: 'meeting_ai_endpoint',
+      definition: 'TEXT',
+    );
+  }
+
+  static Future<void> migrateDesktopCapture(Database db) async {
+    await _createDesktopCaptureSchema(db);
+  }
+
+  static Future<void> migrateDesktopLiveCaption(Database db) async {
+    await _createDesktopLiveCaptionSchema(db);
   }
 
   static Future<void> migrateRecordingSessions(Database db) async {
@@ -1247,6 +1276,242 @@ class AppDatabase {
     await db.execute(
       'CREATE INDEX IF NOT EXISTS companion_transfers_peer_history '
       'ON companion_transfers(peer_device_id, created_at_ms DESC)',
+    );
+  }
+
+  static Future<void> _createDesktopCaptureSchema(Database db) async {
+    await db.execute('''
+      CREATE TABLE IF NOT EXISTS desktop_capture_sessions (
+        session_id TEXT PRIMARY KEY,
+        state TEXT NOT NULL
+          CHECK (
+            state IN (
+              'preparing', 'recording', 'paused', 'finalizing',
+              'completed', 'recoverable', 'partial_capture', 'failed'
+            )
+          ),
+        workspace_path TEXT NOT NULL,
+        capture_timeline_ms INTEGER NOT NULL DEFAULT 0
+          CHECK (capture_timeline_ms >= 0),
+        partial_capture INTEGER NOT NULL DEFAULT 0
+          CHECK (partial_capture IN (0, 1)),
+        recording_id INTEGER,
+        recording_sha256 TEXT
+          CHECK (
+            recording_sha256 IS NULL OR
+            length(recording_sha256) = 64
+          ),
+        recovery_disposition TEXT
+          CHECK (
+            recovery_disposition IS NULL OR
+            recovery_disposition IN (
+              'completed_recovery', 'kept_partial', 'discarded'
+            )
+          ),
+        created_at_ms INTEGER NOT NULL,
+        updated_at_ms INTEGER NOT NULL,
+        FOREIGN KEY(recording_id) REFERENCES recordings(id) ON DELETE SET NULL
+      )
+    ''');
+    await db.execute('''
+      CREATE TABLE IF NOT EXISTS desktop_capture_tracks (
+        session_id TEXT NOT NULL,
+        kind TEXT NOT NULL
+          CHECK (kind IN ('system_audio', 'microphone')),
+        healthy INTEGER NOT NULL CHECK (healthy IN (0, 1)),
+        sample_rate REAL NOT NULL CHECK (sample_rate > 0),
+        channels INTEGER NOT NULL CHECK (channels BETWEEN 1 AND 32),
+        format TEXT NOT NULL,
+        PRIMARY KEY(session_id, kind),
+        FOREIGN KEY(session_id)
+          REFERENCES desktop_capture_sessions(session_id)
+          ON DELETE CASCADE
+      )
+    ''');
+    await db.execute('''
+      CREATE TABLE IF NOT EXISTS desktop_capture_chunks (
+        session_id TEXT NOT NULL,
+        track_kind TEXT NOT NULL
+          CHECK (track_kind IN ('system_audio', 'microphone')),
+        sequence INTEGER NOT NULL CHECK (sequence >= 0),
+        start_ms INTEGER NOT NULL CHECK (start_ms >= 0),
+        end_ms INTEGER NOT NULL CHECK (end_ms >= start_ms),
+        relative_path TEXT NOT NULL
+          CHECK (
+            relative_path NOT LIKE '/%' AND
+            relative_path NOT LIKE '%..%'
+          ),
+        bytes INTEGER NOT NULL CHECK (bytes > 0),
+        sha256 TEXT NOT NULL CHECK (length(sha256) = 64),
+        finalized INTEGER NOT NULL DEFAULT 1 CHECK (finalized = 1),
+        created_at_ms INTEGER NOT NULL,
+        PRIMARY KEY(session_id, track_kind, sequence),
+        UNIQUE(session_id, relative_path),
+        FOREIGN KEY(session_id, track_kind)
+          REFERENCES desktop_capture_tracks(session_id, kind)
+          ON DELETE CASCADE
+      )
+    ''');
+    await db.execute('''
+      CREATE TABLE IF NOT EXISTS desktop_capture_events (
+        session_id TEXT NOT NULL,
+        sequence INTEGER NOT NULL CHECK (sequence >= 0),
+        monotonic_ms INTEGER NOT NULL CHECK (monotonic_ms >= 0),
+        kind TEXT NOT NULL
+          CHECK (
+            kind IN (
+              'device_changed', 'permission_revoked', 'gap_started',
+              'gap_ended', 'format_changed', 'disk_low', 'encoder_failed'
+            )
+          ),
+        track_kind TEXT NOT NULL
+          CHECK (track_kind IN ('system_audio', 'microphone', 'all')),
+        reason TEXT NOT NULL CHECK (length(reason) BETWEEN 1 AND 240),
+        created_at_ms INTEGER NOT NULL,
+        PRIMARY KEY(session_id, sequence),
+        FOREIGN KEY(session_id)
+          REFERENCES desktop_capture_sessions(session_id)
+          ON DELETE CASCADE
+      )
+    ''');
+    await db.execute('''
+      CREATE TABLE IF NOT EXISTS desktop_capture_command_receipts (
+        session_id TEXT NOT NULL,
+        idempotency_key TEXT NOT NULL,
+        action TEXT NOT NULL
+          CHECK (
+            action IN ('start', 'pause', 'resume', 'stop', 'recover', 'discard')
+          ),
+        result_json TEXT NOT NULL,
+        created_at_ms INTEGER NOT NULL,
+        PRIMARY KEY(session_id, idempotency_key),
+        FOREIGN KEY(session_id)
+          REFERENCES desktop_capture_sessions(session_id)
+          ON DELETE CASCADE
+      )
+    ''');
+    await db.execute(
+      'CREATE INDEX IF NOT EXISTS desktop_capture_sessions_recovery '
+      'ON desktop_capture_sessions(state, updated_at_ms, session_id)',
+    );
+    await db.execute(
+      'CREATE INDEX IF NOT EXISTS desktop_capture_chunks_timeline '
+      'ON desktop_capture_chunks('
+      'session_id, track_kind, start_ms, sequence'
+      ')',
+    );
+    await db.execute(
+      'CREATE INDEX IF NOT EXISTS desktop_capture_events_timeline '
+      'ON desktop_capture_events(session_id, monotonic_ms, sequence)',
+    );
+  }
+
+  static Future<void> _createDesktopLiveCaptionSchema(Database db) async {
+    await _addColumnIfMissing(
+      db,
+      table: 'transcript_generations',
+      column: 'generation_kind',
+      definition:
+          "TEXT NOT NULL DEFAULT 'formal' "
+          "CHECK (generation_kind IN ('draft', 'formal'))",
+    );
+    await _addColumnIfMissing(
+      db,
+      table: 'transcript_generations',
+      column: 'supersedes_generation_id',
+      definition: 'INTEGER',
+    );
+    await _addColumnIfMissing(
+      db,
+      table: 'transcript_generations',
+      column: 'reconciliation_state',
+      definition:
+          "TEXT NOT NULL DEFAULT 'not_required' "
+          "CHECK (reconciliation_state IN "
+          "('not_required', 'pending', 'kept_draft', 'accepted_formal'))",
+    );
+    await _addColumnIfMissing(
+      db,
+      table: 'transcript_segments',
+      column: 'language',
+      definition: 'TEXT',
+    );
+    await _addColumnIfMissing(
+      db,
+      table: 'transcript_segments',
+      column: 'model_sha256',
+      definition:
+          'TEXT CHECK (model_sha256 IS NULL OR length(model_sha256) = 64)',
+    );
+    await _addColumnIfMissing(
+      db,
+      table: 'transcript_segments',
+      column: 'caption_session_id',
+      definition: 'TEXT',
+    );
+    await _addColumnIfMissing(
+      db,
+      table: 'transcript_segments',
+      column: 'worker_offset_bytes',
+      definition:
+          'INTEGER CHECK (worker_offset_bytes IS NULL OR '
+          'worker_offset_bytes >= 0)',
+    );
+    await db.execute('''
+      CREATE TABLE IF NOT EXISTS desktop_live_caption_sessions (
+        session_id TEXT PRIMARY KEY,
+        generation_id INTEGER NOT NULL UNIQUE,
+        recording_id INTEGER,
+        state TEXT NOT NULL
+          CHECK (
+            state IN (
+              'preparing', 'running', 'paused', 'flushing',
+              'flushed', 'failed'
+            )
+          ),
+        spool_relative_path TEXT NOT NULL
+          CHECK (
+            spool_relative_path NOT LIKE '/%' AND
+            spool_relative_path NOT LIKE '%..%'
+          ),
+        worker_offset_bytes INTEGER NOT NULL DEFAULT 0
+          CHECK (
+            worker_offset_bytes >= 0 AND
+            worker_offset_bytes % 2 = 0
+          ),
+        last_sequence INTEGER NOT NULL DEFAULT 0
+          CHECK (last_sequence >= 0),
+        model_sha256 TEXT NOT NULL CHECK (length(model_sha256) = 64),
+        profile_id TEXT NOT NULL,
+        error_code TEXT,
+        created_at_ms INTEGER NOT NULL,
+        updated_at_ms INTEGER NOT NULL,
+        FOREIGN KEY(session_id)
+          REFERENCES desktop_capture_sessions(session_id)
+          ON DELETE CASCADE,
+        FOREIGN KEY(generation_id)
+          REFERENCES transcript_generations(id)
+          ON DELETE CASCADE,
+        FOREIGN KEY(recording_id)
+          REFERENCES recordings(id)
+          ON DELETE SET NULL
+      )
+    ''');
+    await db.execute(
+      'CREATE INDEX IF NOT EXISTS desktop_live_caption_recovery '
+      'ON desktop_live_caption_sessions(state, updated_at_ms, session_id)',
+    );
+    await db.execute(
+      'CREATE INDEX IF NOT EXISTS transcript_generations_authority '
+      'ON transcript_generations('
+      'recording_id, generation_kind, reconciliation_state, id'
+      ')',
+    );
+    await db.execute(
+      'CREATE INDEX IF NOT EXISTS transcript_segments_caption_order '
+      'ON transcript_segments('
+      'caption_session_id, generation_id, sequence_id, worker_offset_bytes'
+      ')',
     );
   }
 

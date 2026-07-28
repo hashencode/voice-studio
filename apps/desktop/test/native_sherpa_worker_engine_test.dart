@@ -5,7 +5,6 @@ import 'package:path/path.dart' as p;
 import 'package:processing_contracts/processing_contracts.dart';
 import 'package:voice2text_desktop/features/processing/desktop_job.dart';
 import 'package:voice2text_desktop/features/processing/native_sherpa_worker_engine.dart';
-import 'package:voice2text_desktop/features/processing/sherpa_desktop_processing_engine.dart';
 
 void main() {
   late _Fixture fixture;
@@ -296,7 +295,7 @@ class _Fixture {
     final source = File(p.join(importRoot.path, 'meeting.wav'));
     await source.writeAsBytes(<int>[1, 2, 3]);
     final modelPaths = List<String>.generate(
-      5,
+      6,
       (index) => p.join(modelsRoot.path, '$index.model'),
     );
     for (var index = 0; index < modelPaths.length; index += 1) {
@@ -343,8 +342,9 @@ class _Fixture {
         encoderPath: modelPaths[1],
         decoderPath: modelPaths[2],
         tokenizerPath: tokenizerPath,
-        segmentationPath: modelPaths[3],
-        embeddingPath: modelPaths[4],
+        vadPath: modelPaths[3],
+        segmentationPath: modelPaths[4],
+        embeddingPath: modelPaths[5],
       ),
     );
   }

@@ -10,8 +10,10 @@ PRODUCT_NAME = voice2text_desktop
 // The application's bundle identifier
 PRODUCT_BUNDLE_IDENTIFIER = com.voice2text.voice2textDesktop
 
-// sherpa-onnx 1.13.4 ships an arm64 runtime built for macOS 15.5.
-MACOSX_DEPLOYMENT_TARGET = 15.5
+// Keep the workstation shell on Flutter's native-assets floor. Local
+// processing and system-audio capture enforce their higher minimums only when
+// those capabilities are used.
+MACOSX_DEPLOYMENT_TARGET = 13.0
 
 // The copyright displayed in application information
 PRODUCT_COPYRIGHT = Copyright © 2026 com.voice2text. All rights reserved.

@@ -1,0 +1,89 @@
+{
+  "schemaVersion": 1,
+  "decisionId": "MACOS-CAPTURE-FEASIBILITY-U11-2026-07-28",
+  "status": "PASS",
+  "target": {
+    "os": "macOS 15.7.5",
+    "osBuild": "24G624",
+    "architecture": "arm64",
+    "cpu": "Apple M4",
+    "logicalCpuCount": 10,
+    "memoryBytes": 17179869184,
+    "buildMode": "debug"
+  },
+  "contract": {
+    "schema": "desktop-capture-session/v1",
+    "applicationMinimumMacosVersion": "13.0",
+    "minimumMacosVersion": "14.2",
+    "coreAudioTapApiMinimumMacosVersion": "14.2",
+    "localProcessingMinimumMacosVersion": "15.5",
+    "systemAudioApi": "Core Audio process tap",
+    "microphoneApi": "AVAudioEngine.inputNode",
+    "capturesScreenPixels": false,
+    "capturesAllSystemOutput": true,
+    "excludesOwnProcessOutput": true,
+    "authorityTracks": [
+      "system_audio",
+      "microphone"
+    ],
+    "container": "caf-lpcm",
+    "chunkDurationMs": 5000,
+    "captionSpool": {
+      "format": "s16le",
+      "sampleRate": 16000,
+      "channels": 1,
+      "frameDurationMs": 100
+    }
+  },
+  "probeLimits": {
+    "minimumDurationMinutes": 20,
+    "maximumDurationMinutes": 30,
+    "maximumTailChunksQuarantinedPerTrack": 1,
+    "maximumRecoveryMs": 30000
+  },
+  "observations": [
+    {
+      "evidenceId": "MACOS-CAPTURE-U11-M4-20M-2026-07-28T015450Z",
+      "path": "benchmark/desktop/capture/evidence/macos_m4_20m_chunk_recovery_probe.json",
+      "sha256": "8c28cab039cf3678b44f7278c8bc8f1fad955ac144b853a9439ae433236871fb",
+      "status": "PASS",
+      "durationSeconds": 1200,
+      "systemAudioFinalizedChunks": 240,
+      "microphoneFinalizedChunks": 240,
+      "storageBytes": 704747557,
+      "maximumRecoveryMs": 326,
+      "invalidFinalizedChunks": 0,
+      "maximumTailChunksQuarantinedPerTrack": 1
+    }
+  ],
+  "u12Evidence": {
+    "evidenceId": "MACOS-CAPTURE-U12-M4-FAULT-MATRIX-2026-07-28",
+    "path": "benchmark/desktop/capture/evidence/macos_m4_u12_fault_matrix.json",
+    "sha256": "d13f9660ef54c247e65479a7fd656589926d84c49cd3653aebe05db264de259c",
+    "status": "PASS",
+    "actualProcessTerminationStages": [
+      "during_write",
+      "during_finalize",
+      "after_journal"
+    ],
+    "maximumRecoveryMs": 2,
+    "invalidFinalizedChunks": 0
+  },
+  "lastPreflight": {
+    "capturedAt": "2026-07-28T07:55:27+08:00",
+    "observedTargetCpu": "Apple M4",
+    "requestPermissions": true,
+    "canStart": true,
+    "blockingReasons": [],
+    "integrationTestEnteredCapture": true,
+    "shortDualTrackSmokePassed": true,
+    "evidencePath": "benchmark/desktop/capture/evidence/macos_m4_dual_track_smoke.json",
+    "admissibleForDeclaredTarget": true
+  },
+  "decision": {
+    "captureContractFrozen": true,
+    "u12Allowed": true,
+    "u12ImplementationGatePassed": true,
+    "failedGates": []
+  }
+}

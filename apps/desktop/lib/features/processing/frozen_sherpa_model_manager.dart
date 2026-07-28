@@ -5,8 +5,6 @@ import 'package:crypto/crypto.dart';
 import 'package:path/path.dart' as p;
 import 'package:processing_contracts/processing_contracts.dart';
 
-import 'sherpa_desktop_processing_engine.dart';
-
 class FrozenSherpaDownload {
   FrozenSherpaDownload({
     required this.id,
@@ -156,6 +154,129 @@ class FrozenSherpaManifest {
     ('macos', 'arm64'),
     ('windows', 'x86_64'),
   };
+}
+
+class FrozenSenseVoiceManifest {
+  FrozenSenseVoiceManifest({
+    required this.setId,
+    required this.platform,
+    required this.architecture,
+    required this.developmentPosture,
+    required this.status,
+    required this.distributionEligible,
+    required this.developmentEligible,
+    required this.licenseDisposition,
+    required this.model,
+    required this.vad,
+    required this.control,
+    required this.machineDecision,
+  }) {
+    if (!_id.hasMatch(setId) ||
+        platform != 'macos' ||
+        architecture != 'arm64' ||
+        developmentPosture != 'DEVELOPMENT_ONLY' ||
+        distributionEligible ||
+        !developmentEligible ||
+        licenseDisposition != 'LOCAL_DEVELOPMENT_BENCHMARK_ONLY' ||
+        !const {
+          'PENDING_U13_MACHINE_DECISION',
+          'PASS',
+          'UNAVAILABLE',
+        }.contains(status)) {
+      throw const FormatException('invalid frozen SenseVoice manifest');
+    }
+    _validateAssets();
+    _validateControl();
+    if (status == 'PASS') {
+      final decision = machineDecision;
+      if (decision == null ||
+          decision['status'] != 'PASS' ||
+          !_sha.hasMatch(decision['evidenceSha256'] as String? ?? '') ||
+          decision['target'] != 'Mac16,10/Apple M4/macOS 15.7.5 (24G624)') {
+        throw const FormatException(
+          'SenseVoice PASS requires a target-bound machine decision',
+        );
+      }
+    } else if (machineDecision != null) {
+      throw const FormatException(
+        'unavailable SenseVoice manifest cannot expose a decision',
+      );
+    }
+  }
+
+  factory FrozenSenseVoiceManifest.fromJson(Map<String, Object?> json) {
+    if (json['schemaVersion'] != 1 ||
+        json['model'] is! Map ||
+        json['vad'] is! Map ||
+        json['control'] is! Map ||
+        (json['machineDecision'] != null && json['machineDecision'] is! Map)) {
+      throw const FormatException('unsupported frozen SenseVoice manifest');
+    }
+    return FrozenSenseVoiceManifest(
+      setId: json['setId']! as String,
+      platform: json['platform']! as String,
+      architecture: json['architecture']! as String,
+      developmentPosture: json['developmentPosture']! as String,
+      status: json['status']! as String,
+      distributionEligible: json['distributionEligible']! as bool,
+      developmentEligible: json['developmentEligible']! as bool,
+      licenseDisposition: json['licenseDisposition']! as String,
+      model: (json['model']! as Map).cast<String, Object?>(),
+      vad: (json['vad']! as Map).cast<String, Object?>(),
+      control: (json['control']! as Map).cast<String, Object?>(),
+      machineDecision: json['machineDecision'] == null
+          ? null
+          : (json['machineDecision']! as Map).cast<String, Object?>(),
+    );
+  }
+
+  final String setId;
+  final String platform;
+  final String architecture;
+  final String developmentPosture;
+  final String status;
+  final bool distributionEligible;
+  final bool developmentEligible;
+  final String licenseDisposition;
+  final Map<String, Object?> model;
+  final Map<String, Object?> vad;
+  final Map<String, Object?> control;
+  final Map<String, Object?>? machineDecision;
+
+  bool get exposesDevelopmentCapability => status == 'PASS';
+
+  void _validateAssets() {
+    final source = Uri.tryParse(model['source'] as String? ?? '');
+    final vadSource = Uri.tryParse(vad['source'] as String? ?? '');
+    if (source?.scheme != 'https' ||
+        vadSource?.scheme != 'https' ||
+        !_sha.hasMatch(model['archiveSha256'] as String? ?? '') ||
+        !_sha.hasMatch(model['modelSha256'] as String? ?? '') ||
+        !_sha.hasMatch(model['tokensSha256'] as String? ?? '') ||
+        !_sha.hasMatch(vad['sha256'] as String? ?? '') ||
+        ModelAssetManifest.pIsUnsafe(
+          model['modelRelativePath'] as String? ?? '../invalid',
+        ) ||
+        ModelAssetManifest.pIsUnsafe(
+          model['tokensRelativePath'] as String? ?? '../invalid',
+        )) {
+      throw const FormatException('invalid frozen SenseVoice assets');
+    }
+  }
+
+  void _validateControl() {
+    if (control['runtime'] != 'sherpa-onnx-1.13.4-ort-1.27.0' ||
+        control['provider'] != 'cpu' ||
+        control['threads'] != 2 ||
+        control['concurrency'] != 1 ||
+        control['decodingMethod'] != 'greedy_search' ||
+        control['language'] != 'auto' ||
+        control['useInverseTextNormalization'] != false ||
+        control['maximumUtteranceSeconds'] != 15 ||
+        control['publishesTokenPartials'] != false) {
+      throw const FormatException('frozen SenseVoice control drifted');
+    }
+  }
 }
 
 abstract interface class FrozenSherpaFetcher {
@@ -456,6 +577,7 @@ class FrozenSherpaModelManager {
     encoderPath: p.join(installed.path, 'asr', 'encoder.int8.onnx'),
     decoderPath: p.join(installed.path, 'asr', 'decoder.int8.onnx'),
     tokenizerPath: p.join(installed.path, 'asr', 'tokenizer'),
+    vadPath: p.join(installed.path, 'asr', 'silero_vad.onnx'),
     segmentationPath: p.join(
       installed.path,
       'diarization',

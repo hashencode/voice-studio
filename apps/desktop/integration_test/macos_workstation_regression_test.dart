@@ -16,9 +16,12 @@ import 'package:voice2text_desktop/app/desktop_app.dart';
 import 'package:voice2text_desktop/app/desktop_workstation_model.dart';
 import 'package:voice2text_desktop/features/companion/desktop_companion_repository.dart';
 import 'package:voice2text_desktop/features/companion/desktop_companion_service.dart';
+import 'package:voice2text_desktop/features/capture/desktop_capture_controller.dart';
+import 'package:voice2text_desktop/features/capture/desktop_capture_view_model.dart';
 import 'package:voice2text_desktop/features/meetings/playback/desktop_meeting_playback.dart';
 import 'package:voice2text_desktop/features/processing/desktop_job.dart';
 import 'package:voice2text_desktop/features/security/desktop_disk_encryption.dart';
+import 'package:voice2text_desktop/features/settings/desktop_ai_provider_settings_repository.dart';
 
 void main() {
   final binding = IntegrationTestWidgetsFlutterBinding.ensureInitialized();
@@ -240,6 +243,8 @@ class _MacosRegressionModel extends ChangeNotifier
   MeetingWorkspaceSnapshot? selectedMeeting;
   @override
   final DesktopMeetingPlaybackController playback;
+  @override
+  final DesktopCaptureUiController captureController = _NoopCaptureController();
 
   @override
   bool get aiGenerating => false;
@@ -247,6 +252,13 @@ class _MacosRegressionModel extends ChangeNotifier
   String? get aiMessage => null;
   @override
   bool get aiSecretConfigured => false;
+  @override
+  DesktopAiProviderSettings get aiProviderSettings =>
+      DesktopAiProviderSettings.deepSeek;
+  @override
+  bool get aiProviderProbing => false;
+  @override
+  bool get localProcessingSupported => true;
   @override
   bool get companionListening => true;
   @override
@@ -317,6 +329,10 @@ class _MacosRegressionModel extends ChangeNotifier
   @override
   Future<void> deleteAiSecret() async {}
   @override
+  Future<void> configureAiProvider(DesktopAiProviderSettings settings) async {}
+  @override
+  Future<void> probeAiProvider() async {}
+  @override
   Future<String?> exportMeeting(MeetingWorkspaceExportFormat format) async =>
       null;
   @override
@@ -372,9 +388,40 @@ class _MacosRegressionModel extends ChangeNotifier
 
   @override
   void dispose() {
+    (captureController as _NoopCaptureController).dispose();
     playback.dispose();
     super.dispose();
   }
+}
+
+class _NoopCaptureController extends ChangeNotifier
+    implements DesktopCaptureUiController {
+  @override
+  DesktopCaptureViewModel value = const DesktopCaptureViewModel();
+
+  @override
+  Future<void> discardRecovered(String sessionId) async {}
+  @override
+  Future<void> keepRecovered(String sessionId) async {}
+  @override
+  Future<void> pause() async {}
+  @override
+  Future<void> preflight({bool requestPermissions = false}) async {}
+  @override
+  void reset() {}
+  @override
+  Future<void> resume() async {}
+  @override
+  Future<void> restartCaptions() async {}
+  @override
+  void selectMicrophone(String deviceId) {}
+  @override
+  void setCaptionEnabled(bool enabled) {}
+  @override
+  Future<void> start() async {}
+  @override
+  Future<MeetingHandoffOutcome?> stop({String displayName = '电脑会议'}) async =>
+      null;
 }
 
 class _PlaybackPort implements DesktopPlaybackPort {

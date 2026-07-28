@@ -401,7 +401,10 @@ def _read_reusable_run(
             or not math.isfinite(duration_seconds)
             or not math.isfinite(decode_milliseconds)
             or not math.isfinite(load_milliseconds)
-            or not segment_wall_milliseconds
+            or (
+                not segment_wall_milliseconds
+                and specification.get("scenario") != "non_speech"
+            )
             or any(
                 not math.isfinite(value) or value < 0
                 for value in segment_wall_milliseconds
@@ -426,11 +429,15 @@ def _read_reusable_run(
             "rtf": decode_milliseconds / (duration_seconds * 1000),
             "loadMilliseconds": load_milliseconds,
             "decodeMilliseconds": decode_milliseconds,
-            "segmentLatencyP50Milliseconds": _nearest_rank_percentile(
-                segment_wall_milliseconds, 0.5
+            "segmentLatencyP50Milliseconds": (
+                _nearest_rank_percentile(segment_wall_milliseconds, 0.5)
+                if segment_wall_milliseconds
+                else 0.0
             ),
-            "segmentLatencyP95Milliseconds": _nearest_rank_percentile(
-                segment_wall_milliseconds, 0.95
+            "segmentLatencyP95Milliseconds": (
+                _nearest_rank_percentile(segment_wall_milliseconds, 0.95)
+                if segment_wall_milliseconds
+                else 0.0
             ),
         }
     except (KeyError, TypeError, ValueError, ScoringError):
@@ -660,7 +667,11 @@ def _validate_event(
         if (
             not isinstance(segment_count, int)
             or isinstance(segment_count, bool)
-            or segment_count <= 0
+            or segment_count < 0
+            or (
+                segment_count == 0
+                and specification.get("scenario") != "non_speech"
+            )
             or not isinstance(segment_wall_milliseconds, list)
             or len(segment_wall_milliseconds) != segment_count
             or any(
@@ -1014,11 +1025,15 @@ def execute_run(
         "decodeMilliseconds": decode_milliseconds,
         "endToEndWallMilliseconds": end_to_end_wall_milliseconds,
         "processWallMilliseconds": process_wall_milliseconds,
-        "segmentLatencyP50Milliseconds": _nearest_rank_percentile(
-            segment_wall_milliseconds, 0.5
+        "segmentLatencyP50Milliseconds": (
+            _nearest_rank_percentile(segment_wall_milliseconds, 0.5)
+            if segment_wall_milliseconds
+            else 0.0
         ),
-        "segmentLatencyP95Milliseconds": _nearest_rank_percentile(
-            segment_wall_milliseconds, 0.95
+        "segmentLatencyP95Milliseconds": (
+            _nearest_rank_percentile(segment_wall_milliseconds, 0.95)
+            if segment_wall_milliseconds
+            else 0.0
         ),
         "absolutePeakRssBytes": resources["absolutePeakRssBytes"],
         "incrementalPeakRssBytes": resources["incrementalPeakRssBytes"],

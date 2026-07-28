@@ -5,13 +5,18 @@ import 'dart:io';
 import 'dart:math';
 import 'dart:typed_data';
 
+import 'package:crypto/crypto.dart';
+// ignore: depend_on_referenced_packages
 import 'package:sherpa_onnx/sherpa_onnx.dart' as sherpa;
+// ignore: depend_on_referenced_packages, implementation_imports
 import 'package:sherpa_onnx/src/sherpa_onnx_bindings.dart';
+// ignore: depend_on_referenced_packages, implementation_imports
 import 'package:sherpa_onnx/src/utils.dart';
-import 'package:voice2text_desktop/features/processing/qwen3_result.dart';
+// ignore: depend_on_referenced_packages
+import 'package:desktop_sherpa_worker/desktop_sherpa_worker.dart';
 
 const int _schemaVersion = 2;
-const double _maximumDurationSeconds = 600;
+const double _maximumDurationSeconds = 1800;
 
 Future<void> main(List<String> arguments) async {
   Map<String, Object?>? request;
@@ -33,6 +38,7 @@ Future<void> main(List<String> arguments) async {
     final candidateId = _string(request, 'candidateId');
     final profileId = _string(request, 'profileId');
     final sourceSha256 = _string(request, 'sourceSha256');
+    await _validateInputs(request);
     await _emit(<String, Object?>{
       'schemaVersion': _schemaVersion,
       'type': 'handshake',
@@ -128,8 +134,22 @@ Future<void> main(List<String> arguments) async {
         ? _sileroSegments(
             wave: wave,
             modelPath: _modelPath(modelFiles, 'sileroVad'),
+            threshold: _optionalNumber(config, 'vadThreshold', 0.2),
+            minimumSpeechSeconds: _optionalNumber(
+              config,
+              'minSpeechSeconds',
+              0.2,
+            ),
+            maximumSpeechSeconds: _optionalNumber(
+              config,
+              'maxSpeechSeconds',
+              20,
+            ),
           )
-        : _fixedSegments(wave);
+        : _fixedSegments(
+            wave,
+            _optionalInteger(config, 'segmentDurationSeconds', 15),
+          );
     vad.stop();
     final decodeResult = _decodeSegments(recognizer, segments);
     recognizer.free();
@@ -147,7 +167,7 @@ Future<void> main(List<String> arguments) async {
       'loadMilliseconds': load.elapsedMicroseconds / 1000,
       'decodeMilliseconds': decodeResult.decodeMilliseconds,
       'segmentWallMilliseconds': decodeResult.segmentWallMilliseconds,
-      'segmentCount': segments.length,
+      'segmentCount': max(1, segments.length),
       'segmentDurationsSeconds': <double>[
         for (final segment in segments)
           segment.samples.length / wave.sampleRate,
@@ -210,8 +230,14 @@ Future<void> main(List<String> arguments) async {
   }
 }
 
-List<_Segment> _fixedSegments(sherpa.WaveData wave) {
-  final segmentSamples = wave.sampleRate * 15;
+List<_Segment> _fixedSegments(
+  sherpa.WaveData wave,
+  int segmentDurationSeconds,
+) {
+  if (segmentDurationSeconds <= 0 || segmentDurationSeconds > 60) {
+    throw const FormatException('fixed segment duration is invalid');
+  }
+  final segmentSamples = wave.sampleRate * segmentDurationSeconds;
   return <_Segment>[
     for (var start = 0; start < wave.samples.length; start += segmentSamples)
       _Segment(
@@ -228,15 +254,29 @@ List<_Segment> _fixedSegments(sherpa.WaveData wave) {
 List<_Segment> _sileroSegments({
   required sherpa.WaveData wave,
   required String modelPath,
+  required double threshold,
+  required double minimumSpeechSeconds,
+  required double maximumSpeechSeconds,
 }) {
+  if (!threshold.isFinite ||
+      threshold <= 0 ||
+      threshold >= 1 ||
+      !minimumSpeechSeconds.isFinite ||
+      minimumSpeechSeconds <= 0 ||
+      minimumSpeechSeconds > 5 ||
+      !maximumSpeechSeconds.isFinite ||
+      maximumSpeechSeconds < minimumSpeechSeconds ||
+      maximumSpeechSeconds > 30) {
+    throw const FormatException('Silero VAD bounds are invalid');
+  }
   final detector = sherpa.VoiceActivityDetector(
     config: sherpa.VadModelConfig(
       sileroVad: sherpa.SileroVadModelConfig(
         model: modelPath,
-        threshold: 0.2,
+        threshold: threshold,
         minSilenceDuration: 0.5,
-        minSpeechDuration: 0.2,
-        maxSpeechDuration: 20,
+        minSpeechDuration: minimumSpeechSeconds,
+        maxSpeechDuration: maximumSpeechSeconds,
         windowSize: 512,
       ),
       sampleRate: wave.sampleRate,
@@ -276,10 +316,74 @@ List<_Segment> _sileroSegments({
   } finally {
     detector.free();
   }
-  if (result.isEmpty) {
-    throw StateError('Silero VAD produced no speech segments');
-  }
   return result;
+}
+
+Future<void> _validateInputs(Map<String, Object?> request) async {
+  final sourcePath = _string(request, 'sourcePath');
+  final source = File(sourcePath);
+  if (!await source.exists() ||
+      await _sha256File(source) != _string(request, 'sourceSha256')) {
+    throw const FormatException('source identity mismatch');
+  }
+  final modelFiles = _object(request, 'modelFiles');
+  const requiredRoles = <String>{
+    'convFrontend',
+    'encoder',
+    'decoder',
+    'tokenizer',
+    'sileroVad',
+  };
+  if (!modelFiles.keys.toSet().containsAll(requiredRoles) ||
+      modelFiles.keys.toSet().difference(requiredRoles).isNotEmpty) {
+    throw const FormatException('model file roles are invalid');
+  }
+  for (final entry in modelFiles.entries) {
+    final identity = _objectValue(entry.value, 'sha256');
+    if (identity is! String || !RegExp(r'^[0-9a-f]{64}$').hasMatch(identity)) {
+      throw const FormatException('model hash identity is invalid');
+    }
+    final path = _objectValue(entry.value, 'path');
+    if (path is! String || path.isEmpty) {
+      throw const FormatException('model path identity is invalid');
+    }
+    if (entry.key == 'tokenizer') {
+      final directory = Directory(path);
+      if (!await directory.exists() ||
+          await _sha256Directory(directory) != identity) {
+        throw const FormatException('tokenizer identity mismatch');
+      }
+    } else {
+      final file = File(path);
+      if (!await file.exists() || await _sha256File(file) != identity) {
+        throw const FormatException('model identity mismatch');
+      }
+    }
+  }
+}
+
+Future<String> _sha256File(File file) async =>
+    (await sha256.bind(file.openRead()).first).toString();
+
+Future<String> _sha256Directory(Directory directory) async {
+  final files = await directory
+      .list(followLinks: false)
+      .where((entity) => entity is File)
+      .cast<File>()
+      .toList();
+  if (files.isEmpty || files.length > 16) {
+    throw const FormatException('tokenizer directory is invalid');
+  }
+  files.sort((left, right) => left.path.compareTo(right.path));
+  final identity = StringBuffer();
+  for (final file in files) {
+    identity
+      ..write(file.uri.pathSegments.last)
+      ..write('\u0000')
+      ..write(await _sha256File(file))
+      ..write('\n');
+  }
+  return sha256.convert(utf8.encode(identity.toString())).toString();
 }
 
 _DecodeResult _decodeSegments(
@@ -294,6 +398,19 @@ _DecodeResult _decodeSegments(
   var ffiStringCopyMicroseconds = 0;
   var jsonRepairAndDecodeMicroseconds = 0;
   var resultConversionMicroseconds = 0;
+  if (segments.isEmpty) {
+    decode.stop();
+    return const _DecodeResult(
+      text: '',
+      tokens: <String>[],
+      decodeMilliseconds: 0,
+      segmentWallMilliseconds: <double>[0],
+      nativeResultFetchMilliseconds: 0,
+      ffiStringCopyMilliseconds: 0,
+      jsonRepairAndDecodeMilliseconds: 0,
+      resultConversionMilliseconds: 0,
+    );
+  }
   for (final segment in segments) {
     final stream = recognizer.createStream();
     final segmentWall = Stopwatch()..start();
@@ -396,6 +513,24 @@ int _integer(Map<String, Object?> source, String key) {
 
 double _number(Map<String, Object?> source, String key) {
   final value = source[key];
+  if (value is! num) throw FormatException('$key must be numeric');
+  return value.toDouble();
+}
+
+int _optionalInteger(Map<String, Object?> source, String key, int fallback) {
+  final value = source[key];
+  if (value == null) return fallback;
+  if (value is! int) throw FormatException('$key must be an integer');
+  return value;
+}
+
+double _optionalNumber(
+  Map<String, Object?> source,
+  String key,
+  double fallback,
+) {
+  final value = source[key];
+  if (value == null) return fallback;
   if (value is! num) throw FormatException('$key must be numeric');
   return value.toDouble();
 }
