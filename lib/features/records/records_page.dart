@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_components/flutter_components.dart';
+import 'package:flutter_ui_mobile/flutter_ui_mobile.dart';
 import 'package:path/path.dart' as p;
 
 import '../shared/utils/formatters.dart';

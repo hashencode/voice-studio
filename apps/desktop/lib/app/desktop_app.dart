@@ -3,7 +3,7 @@ import 'dart:math';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:flutter_components/flutter_components.dart';
+import 'package:flutter_ui_mobile/flutter_ui_mobile.dart';
 import 'package:meeting_workflows/meeting_workflows.dart';
 import 'package:qr/qr.dart';
 

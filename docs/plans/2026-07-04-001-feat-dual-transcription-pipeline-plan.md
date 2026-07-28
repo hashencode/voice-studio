@@ -242,7 +242,7 @@ flowchart TB
 **Patterns to follow:**
 - Existing `AppSettings.defaults()` and `AppSettingsRepository.load/save`.
 - Existing schema versioned migrations in `AppDatabase`.
-- Goo guidance from `../flutter-components/DESIGN.md` and `../flutter-components/DOC.md` before UI edits.
+- Goo guidance from `../flutter-ui-mobile/DESIGN.md` and `../flutter-ui-mobile/DOC.md` before UI edits.
 
 **Test scenarios:**
 - Happy path: new database with no settings row loads defaults with standard mode and auto-transcribe enabled.
@@ -610,7 +610,7 @@ flowchart TB
 - Use fake realtime event stream tests before depending on real Android audio.
 - Pause state should freeze live transcript updates except for already-finalized segments; resume should continue the same transcript timeline.
 - Partial/final updates, if introduced later, should replace the same segment rather than append duplicate text.
-- UI edits must follow Goo component guidance from the sibling `flutter-components` docs before implementation.
+- UI edits must follow Goo component guidance from the sibling `flutter-ui-mobile` docs before implementation.
 
 **Patterns to follow:**
 - Existing `RecordingController` listener-driven state updates.
@@ -870,7 +870,7 @@ Exit criteria: Both regression matrices have PASS evidence on at least one real 
 - Add realtime-specific real-device logs to a new regression matrix rather than replacing the current standard matrix.
 - Add a fixed-audio QA manifest and keep private user recordings out of committed test artifacts.
 - Document first-release background/lock-screen behavior clearly; do not imply foreground-service support until it is implemented and validated.
-- Before editing UI, read `../flutter-components/DESIGN.md` and `../flutter-components/DOC.md` and use exported Goo components where applicable.
+- Before editing UI, read `../flutter-ui-mobile/DESIGN.md` and `../flutter-ui-mobile/DOC.md` and use exported Goo components where applicable.
 
 ## Sources & References
 

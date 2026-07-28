@@ -2,7 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
-import 'package:flutter_components/flutter_components.dart';
+import 'package:flutter_ui_mobile/flutter_ui_mobile.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../meeting_intelligence/model/evidence_link_entity.dart';

@@ -2,7 +2,7 @@
 
 版本：v0.4
 整理日期：2026-06-25
-依据：当前产品设计沉淀、`/Users/studio/Documents/GitHub/flutter-components/DESIGN.md`、`/Users/studio/Documents/GitHub/flutter-components/DOC.md`
+依据：当前产品设计沉淀、`/Users/studio/Documents/GitHub/flutter-ui-mobile/DESIGN.md`、`/Users/studio/Documents/GitHub/flutter-ui-mobile/DOC.md`
 
 ## 1. 文档目标
 
@@ -42,7 +42,7 @@
 
 ### 3.1 Goo 组件优先
 
-设计稿和后续 Flutter 实现都应优先使用 `package:flutter_components/flutter_components.dart` 中已公开的 Goo 组件。不要在设计稿中命名不存在的 Goo 组件。
+设计稿和后续 Flutter 实现都应优先使用 `package:flutter_ui_mobile/flutter_ui_mobile.dart` 中已公开的 Goo 组件。不要在设计稿中命名不存在的 Goo 组件。
 
 推荐组件映射：
 

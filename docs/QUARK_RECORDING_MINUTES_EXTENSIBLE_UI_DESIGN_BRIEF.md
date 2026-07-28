@@ -3,7 +3,7 @@
 版本：v0.9
 整理日期：2026-06-25
 定位：允许推翻原夸克录音纪要页面结构，以更强扩展性重新设计 AI 听记体验。
-依据：`docs/QUARK_RECORDING_MINUTES_UI_DESIGN_BRIEF.md` v0.4、`/Users/studio/Documents/GitHub/flutter-components/DESIGN.md`、`/Users/studio/Documents/GitHub/flutter-components/DOC.md`
+依据：`docs/QUARK_RECORDING_MINUTES_UI_DESIGN_BRIEF.md` v0.4、`/Users/studio/Documents/GitHub/flutter-ui-mobile/DESIGN.md`、`/Users/studio/Documents/GitHub/flutter-ui-mobile/DOC.md`
 
 ## 1. 结论
 

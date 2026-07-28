@@ -2,7 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter_components/flutter_components.dart';
+import 'package:flutter_ui_mobile/flutter_ui_mobile.dart';
 
 import '../features/importing/service/meeting_import_service.dart';
 import '../features/recording/service/recording_startup_reconciler.dart';

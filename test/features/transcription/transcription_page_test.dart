@@ -2,7 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:flutter_components/flutter_components.dart';
+import 'package:flutter_ui_mobile/flutter_ui_mobile.dart';
 import 'package:voice2text_flutter/app/theme/app_theme.dart';
 import 'package:voice2text_flutter/features/settings/repository/app_settings_repository.dart';
 import 'package:voice2text_flutter/features/transcription/model/transcription_job_entity.dart';

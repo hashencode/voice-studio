@@ -209,7 +209,7 @@ It does not implement PC Live VAD, a production AI provider, collaboration, clou
 
 ### Dependencies
 
-- The sibling `flutter-components` package remains the authority for Goo component APIs used by touched screens.
+- The sibling `flutter-ui-mobile` package remains the authority for Goo component APIs used by touched screens.
 - The checked-in Sherpa Android AAR and `full` model assets remain available and license-cleared for the intended distribution.
 - Android foreground microphone recording requirements, notification permission behavior, and the supported minimum SDK are validated on target devices.
 - Initial import guardrails are four hours and 2 GiB on the existing configured Android minimum SDK. The importer accepts only content with a decodable audio track and requires free space for the app-private copy, estimated normalized-audio workspace, and a 256 MiB reserve. These centralized values may be tightened before beta without changing the architecture.

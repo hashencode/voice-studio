@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_components/flutter_components.dart';
+import 'package:flutter_ui_mobile/flutter_ui_mobile.dart';
 
 import '../../app/theme/theme_mode_controller.dart';
 import '../meeting_intelligence/service/meeting_api_secret_store.dart';

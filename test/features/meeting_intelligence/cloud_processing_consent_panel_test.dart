@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_components/flutter_components.dart';
+import 'package:flutter_ui_mobile/flutter_ui_mobile.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:voice2text_flutter/features/meeting_intelligence/widgets/cloud_processing_consent_panel.dart';
 

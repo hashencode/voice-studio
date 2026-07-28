@@ -175,7 +175,7 @@ deepened: 2026-07-24
 
 - Android `MediaRecorder.getMaxAmplitude()` 提供自上次调用以来的最大绝对幅度；无数据或未调用录音源时允许返回零。
 - Android `AudioManager`/`AudioDeviceCallback` 提供设备变化观察；生产显示以实际路由信息为准。
-- `flutter-components` 的 `DESIGN.md`、`DOC.md` 和当前包 API 是 UI 迁移权威。
+- `flutter-ui-mobile` 的 `DESIGN.md`、`DOC.md` 和当前包 API 是 UI 迁移权威。
 - 当前 `RecordingStorageGuard` 的可用空间提供器注入是安全低存储验证的基础。
 
 ### Sources
@@ -244,7 +244,7 @@ stateDiagram-v2
 - `RecordingController` 负责可观察 UI 状态，录音页不直接调用平台 channel。
 - `RecordingStorageGuard` 通过注入提供器验证边界，不在测试中操纵真实磁盘。
 - `TranscriptionJobsRepository` 与队列协调器保持任务状态和重试幂等的事实来源。
-- Goo 组件只使用 `package:flutter_components/flutter_components.dart` 实际导出的 API。
+- Goo 组件只使用 `package:flutter_ui_mobile/flutter_ui_mobile.dart` 实际导出的 API。
 
 ### System-Wide Impact
 
@@ -382,7 +382,7 @@ stateDiagram-v2
   - Modify `test/features/home/home_page_test.dart`
   - Modify `test/features/settings/settings_page_test.dart`
   - Modify `test/features/recording/recording_page_test.dart`
-- **Approach:** 以 sibling `flutter-components` 文档和安装 API 为准，将已确认的 Material dialog/input/snackbar/progress/bottom sheet 迁移到 Goo 对等物；状态继续提供文本、语义和禁用态，保留业务回调。
+- **Approach:** 以 sibling `flutter-ui-mobile` 文档和安装 API 为准，将已确认的 Material dialog/input/snackbar/progress/bottom sheet 迁移到 Goo 对等物；状态继续提供文本、语义和禁用态，保留业务回调。
 - **Execution note:** 这是 UI 迁移，先保留行为测试，再通过 widget/theme/font smoke 验证视觉契约。
 - **Patterns to follow:** 当前录音页 `showGooDialog`、首页 `showGooSharePanel`、设置页 `GooList`/`GooSwitch`。
 - **Test scenarios:**

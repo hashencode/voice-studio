@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_components/flutter_components.dart';
+import 'package:flutter_ui_mobile/flutter_ui_mobile.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:voice2text_flutter/features/meeting_intelligence/model/meeting_insight_entity.dart';
 import 'package:voice2text_flutter/features/meeting_intelligence/widgets/meeting_note_editor.dart';

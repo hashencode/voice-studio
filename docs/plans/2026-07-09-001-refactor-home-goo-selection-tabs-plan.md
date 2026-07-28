@@ -9,7 +9,7 @@ date: 2026-07-09
 
 ## Overview
 
-Update the home page so selection, tab actions, toolbar actions, list rows, and haptics are owned by Goo component patterns instead of page-local UI workarounds. This is a cross-repo plan: the app work lands in `voice2text-flutter`, and component fixes land in the sibling `flutter-components` repo. Paths below are grouped by target repo and are relative to that repo.
+Update the home page so selection, tab actions, toolbar actions, list rows, and haptics are owned by Goo component patterns instead of page-local UI workarounds. This is a cross-repo plan: the app work lands in `voice2text-flutter`, and component fixes land in the sibling `flutter-ui-mobile` repo. Paths below are grouped by target repo and are relative to that repo.
 
 ## Problem Frame
 
@@ -50,7 +50,7 @@ The home page now uses `GooAppBar`, `GooTabs`, `GooList`, and `showGooSharePanel
   - `lib/features/home/home_page.dart`: current home page, including `_selectedIds`, `_SelectionToolbar`, `GooTabs`, `GooList.builder`, and `showGooSharePanel`.
   - `lib/features/home/home_tokens.dart`: home-only spacing and text tokens, including now-selection-toolbar-specific metrics that may become unused.
   - `test/widget_test.dart`: current app boot/navigation widget coverage.
-- `flutter-components`
+- `flutter-ui-mobile`
   - `lib/src/ui_showcase/widgets/goo_tabs.dart`: `_TabActionRail` currently uses a fixed rail and left-aligned action row.
   - `test/goo_tabs_test.dart`: existing geometry tests for tab height, content gap, action rail mask, and max action assertions.
   - `lib/src/ui_showcase/widgets/goo_selection_controller.dart`: selection state owner with `selectAll`, `clearSelection`, and editing lifecycle.
@@ -72,7 +72,7 @@ The home page now uses `GooAppBar`, `GooTabs`, `GooList`, and `showGooSharePanel
 
 ## Key Technical Decisions
 
-- Fix the tab action alignment in `flutter-components`, not in the app. The page should not compensate for a component rail that reserves a visible empty slot.
+- Fix the tab action alignment in `flutter-ui-mobile`, not in the app. The page should not compensate for a component rail that reserves a visible empty slot.
 - Use `GooSelectionOverlay<int>` for Home rather than `GooSelectionScaffold<int>`. Home already owns a custom `Scaffold`, AppBar, FAB, and stacked body; the overlay gives the same `GooToolBarDock` solution without replacing the page shell.
 - Keep haptics selection-scoped, opt-in, and light. Use the existing Goo precedent of `HapticFeedback.selectionClick()` for direct selection state changes, ensure bulk select-all emits one feedback event, and avoid changing every selection-controller consumer by default.
 - Let placeholders participate in selection and select-all. Operation availability remains governed by business rules, so placeholder-inclusive selection can disable rename/delete while still making the preview selectable.
@@ -126,7 +126,7 @@ flowchart TB
 **Dependencies:** None
 
 **Files:**
-- Target repo: `flutter-components`
+- Target repo: `flutter-ui-mobile`
 - Modify: `lib/src/ui_showcase/widgets/goo_tabs.dart`
 - Modify if demo coverage needs the one-action case: `lib/src/ui_showcase/pages/tabs_component_page.dart`
 - Test: `test/goo_tabs_test.dart`
@@ -162,7 +162,7 @@ flowchart TB
 **Dependencies:** None
 
 **Files:**
-- Target repo: `flutter-components`
+- Target repo: `flutter-ui-mobile`
 - Modify: `lib/src/ui_showcase/widgets/goo_selection_controller.dart`
 - Modify if the behavior needs overlay-level wiring: `lib/src/ui_showcase/widgets/goo_selection_scaffold.dart`
 - Modify if public usage guidance changes: `DOC.md`
@@ -219,7 +219,7 @@ flowchart TB
 - Keep the normal FAB hidden while editing, matching the current interaction model.
 
 **Patterns to follow:**
-- `flutter-components` AppBar demo using `GooSelectionOverlay` and `toolbarBuilder`.
+- `flutter-ui-mobile` AppBar demo using `GooSelectionOverlay` and `toolbarBuilder`.
 - `GooSelectionScaffold` tests for mode callbacks and toolbar visibility.
 - Current Home `GooListRowChild` forwarding pattern.
 
@@ -320,8 +320,8 @@ flowchart TB
 
 ```mermaid
 flowchart TB
-  GooTabs["flutter-components: GooTabs"]
-  SelectionComponents["flutter-components: selection controller/overlay"]
+  GooTabs["flutter-ui-mobile: GooTabs"]
+  SelectionComponents["flutter-ui-mobile: selection controller/overlay"]
   HomePage["voice2text-flutter: HomePage"]
   Repositories["recording/folder/transcription repositories"]
   Tests["component + app widget tests"]
@@ -355,7 +355,7 @@ flowchart TB
 
 ## Documentation / Operational Notes
 
-- Update `flutter-components/DOC.md` if the selection haptic behavior, Tabs action semantics, or `GooSelectionOverlay` app-facing usage guidance is missing or changed; update `DESIGN.md` only if public component guidance changes rather than usage examples.
+- Update `flutter-ui-mobile/DOC.md` if the selection haptic behavior, Tabs action semantics, or `GooSelectionOverlay` app-facing usage guidance is missing or changed; update `DESIGN.md` only if public component guidance changes rather than usage examples.
 - No migration note is required for `voice2text-flutter`; this is a UI/component alignment refactor.
 - After implementation, run the app repo's normal project check and UI watcher check per `AGENTS.md`; for component changes, run the affected component tests and apply the component change checklist.
 
@@ -363,10 +363,10 @@ flowchart TB
 
 - User request in this thread: Home UI should use Goo AppBar, Goo List, Goo Tabs, share panel, component selection toolbar, full-select behavior, and scoped haptics.
 - `voice2text-flutter`: `AGENTS.md`
-- `flutter-components`: `AGENTS.md`, `.agents/memories/PROFILE.md`, `.agents/memories/ACTIVE.md`
-- `flutter-components`: `DESIGN.md`, `DOC.md`, `docs/COMPONENT_CHANGE_CHECKLIST.md`
-- `flutter-components`: `lib/src/ui_showcase/widgets/goo_tabs.dart`
-- `flutter-components`: `lib/src/ui_showcase/widgets/goo_selection_controller.dart`
-- `flutter-components`: `lib/src/ui_showcase/widgets/goo_selection_scaffold.dart`
-- `flutter-components`: `lib/src/ui_showcase/pages/app_bar_component_page.dart`
+- `flutter-ui-mobile`: `AGENTS.md`, `.agents/memories/PROFILE.md`, `.agents/memories/ACTIVE.md`
+- `flutter-ui-mobile`: `DESIGN.md`, `DOC.md`, `docs/COMPONENT_CHANGE_CHECKLIST.md`
+- `flutter-ui-mobile`: `lib/src/ui_showcase/widgets/goo_tabs.dart`
+- `flutter-ui-mobile`: `lib/src/ui_showcase/widgets/goo_selection_controller.dart`
+- `flutter-ui-mobile`: `lib/src/ui_showcase/widgets/goo_selection_scaffold.dart`
+- `flutter-ui-mobile`: `lib/src/ui_showcase/pages/app_bar_component_page.dart`
 - Apple Developer Documentation: [Playing haptics](https://developer.apple.com/design/human-interface-guidelines/playing-haptics)

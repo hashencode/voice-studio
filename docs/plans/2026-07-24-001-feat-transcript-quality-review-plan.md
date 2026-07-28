@@ -97,7 +97,7 @@ deepened: 2026-07-24
 
 #### UI, accessibility, performance, and truth
 
-- R24. 修改后的设置页和会议详情页优先使用实际存在并通过 analyzer 的 Goo 组件与令牌；实施前核对 sibling `flutter-components` 的 `DESIGN.md`、`DOC.md` 和具体组件 API。
+- R24. 修改后的设置页和会议详情页优先使用实际存在并通过 analyzer 的 Goo 组件与令牌；实施前核对 sibling `flutter-ui-mobile` 的 `DESIGN.md`、`DOC.md` 和具体组件 API。
 - R25. 标点开关、复核状态、撤销/重做、筛选条件、导出格式与范围都有可读语义标签、可判断的禁用态和不依赖颜色的状态文本。
 - R26. 会议复核核心流程支持系统读屏、200% 动态字体、明暗主题、足够对比度和最小触控目标，且 Compact/Medium/Expanded 布局不溢出。
 - R27. 3000 个片段下时间轴仍使用惰性/虚拟化列表；筛选与状态更新不退化为每次重建全库或一次性拼接超长导出字符串。
@@ -204,7 +204,7 @@ deepened: 2026-07-24
 
 - `docs/plans/2026-07-23-001-feat-mobile-meeting-foundation-plan.md` 所实现的 SQLite v15、转写代际、时间戳片段、会议工作区、修订仓储、导出与受管资产契约保持可用。
 - `android/app/libs/sherpa-onnx.aar` 的实际 Kotlin API 和打包 JNI 与 `assets/sherpa/onnx/punctuation.onnx` 在目标 ABI 上可用；安装包 API 优先于在线文档。
-- sibling `flutter-components` 的 `DESIGN.md`、`DOC.md` 和实际导出 API 是 UI 实现权威。
+- sibling `flutter-ui-mobile` 的 `DESIGN.md`、`DOC.md` 和实际导出 API 是 UI 实现权威。
 - 物理 Android 设备可用于标点模型运行、TalkBack、大字体、主题和范围导出的最终验收。
 
 ### Sources

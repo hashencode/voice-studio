@@ -3,7 +3,7 @@ import 'dart:async';
 import 'package:companion_protocol/companion_protocol.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:flutter_components/flutter_components.dart';
+import 'package:flutter_ui_mobile/flutter_ui_mobile.dart';
 import 'package:permission_handler/permission_handler.dart';
 
 import '../records/model/recording_entity.dart';

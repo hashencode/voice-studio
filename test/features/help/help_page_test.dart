@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:flutter_components/flutter_components.dart';
+import 'package:flutter_ui_mobile/flutter_ui_mobile.dart';
 import 'package:voice2text_flutter/app/contracts/audio_contract.dart';
 import 'package:voice2text_flutter/app/theme/app_theme.dart';
 import 'package:voice2text_flutter/features/help/help_page.dart';

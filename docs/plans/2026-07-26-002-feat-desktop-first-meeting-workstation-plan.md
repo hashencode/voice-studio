@@ -287,7 +287,7 @@ execution: code
 - 后续 Windows 参考机器及 Visual Studio C++ desktop toolchain。
 - 版本固定的 Sherpa native runtime、FunASR Python/PyTorch runtime、pyannote.audio/Community-1 模型。
 - 能覆盖中文会议、噪声、重叠、静音和长时长的固定 benchmark corpus。
-- `flutter-components` 的 Goo 设计和 Flutter API；UI 实现前必须阅读其 `DESIGN.md` 和 `DOC.md`。
+- `flutter-ui-mobile` 的 Goo 设计和 Flutter API；UI 实现前必须阅读其 `DESIGN.md` 和 `DOC.md`。
 
 ---
 
@@ -345,7 +345,7 @@ execution: code
 
 - KTD25. AI orchestration 依赖 provider registry，不在页面里实现 provider 特例。保留现有 DeepSeek 预设并新增通用 OpenAI-compatible provider；当前产品设置不暴露 Ollama 或其他本地生成式大模型。自定义 endpoint 必须为远程 HTTPS 并逐场同意；密钥进入 Keychain/Credential Manager，禁止 provider 间自动回退，所有结果统一做 schema、大小、超时和 evidence 校验。
 
-- KTD26. 录音 UI 只使用 `package:flutter_components/flutter_components.dart` 中实际存在且 analyzer 通过的 Goo 组件/令牌。会议库同时提供“开始会议”和“导入”；录音前检查、录音工作区、菜单栏控制、恢复提示、草稿状态、错误/部分成功都必须有键盘、屏幕阅读器和 200% 文本缩放路径。新增 PC 工作不修改移动 UI。
+- KTD26. 录音 UI 只使用 `package:flutter_ui_mobile/flutter_ui_mobile.dart` 中实际存在且 analyzer 通过的 Goo 组件/令牌。会议库同时提供“开始会议”和“导入”；录音前检查、录音工作区、菜单栏控制、恢复提示、草稿状态、错误/部分成功都必须有键盘、屏幕阅读器和 200% 文本缩放路径。新增 PC 工作不修改移动 UI。
 
 - KTD27. 当前开发验证分三级：L0 为 5–30 秒 smoke，L1 为 2–5 分钟固定质量包，L2 为按需 15–30 分钟稳定性或故障注入。任何单次测试不得超过 30 分钟；历史一小时/两小时与五场 dogfood 只作为回归基线引用。生产签名、公证、商店、正式升级与发布候选设备矩阵不在当前执行图中。
 
@@ -885,7 +885,7 @@ macOS 参考目标还必须满足产品体验门禁：
 - 本地和 LAN 导入都由系统生成目标文件名，只接受有界 metadata，拒绝发送方路径，使用 no-follow/open-descriptor 和 canonical containment 防止 traversal、symlink/hard-link、TOCTOU、稀疏文件和覆盖。
 - 创建可恢复 processing job，但在本单元使用 fake engine 验证队列和 UI 状态。
 - 模型资产 registry 支持版本、平台、architecture、hash、license 和安装状态；候选不进入 Flutter assets。
-- UI 实施前阅读 `../flutter-components/DESIGN.md` 与 `../flutter-components/DOC.md`，使用已导出的 Goo 组件。
+- UI 实施前阅读 `../flutter-ui-mobile/DESIGN.md` 与 `../flutter-ui-mobile/DOC.md`，使用已导出的 Goo 组件。
 
 **Test Scenarios:**
 
@@ -1454,7 +1454,7 @@ utterance，最终 offset 310400 bytes、backlog 0。证据为
 
 **Approach:**
 
-- 实现 UI 前重新读取 `../flutter-components/DESIGN.md` 与 `../flutter-components/DOC.md`，仅使用 package 实际导出且 analyzer 通过的 Goo 组件、tokens 和 variants；不凭本计划中的示例名称发明 API。
+- 实现 UI 前重新读取 `../flutter-ui-mobile/DESIGN.md` 与 `../flutter-ui-mobile/DOC.md`，仅使用 package 实际导出且 analyzer 通过的 Goo 组件、tokens 和 variants；不凭本计划中的示例名称发明 API。
 - 会议库把“开始会议”设为主操作、保留“导入”；preflight 把系统音频/麦克风权限、设备、电平、磁盘、SenseVoice 模型分别呈现，字幕失败只禁用字幕。
 - recording workspace 显示单调时长、暂停/继续/停止、双轨电平/健康、草稿标签、自动跟随、字幕 backlog/重启和 partial capture。用户可关闭主窗口但不会隐式停止录音。
 - 菜单栏与窗口共享同一 controller/idempotency key，镜像暂停/继续/停止/返回窗口；停止需要清晰确认，不能产生双 finalize。

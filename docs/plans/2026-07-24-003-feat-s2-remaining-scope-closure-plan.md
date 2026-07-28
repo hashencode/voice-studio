@@ -190,7 +190,7 @@ S2 的播放器、时间线、片段编辑、标点、人工复核、范围搜�
 - `docs/plans/2026-07-24-002-feat-s1-quality-closure-plan.md` 已完成的生命周期、低存储、输入遥测和 Goo 基础继续成立。
 - `android/app/libs/sherpa-onnx.aar` 的安装包 API 和打包模型资产优先于在线文档或配置类名称。
 - `benchmark/TIMESTAMP_REVIEW.md` 定义 ASR-005 独立标注和物理设备预测的证据资格。
-- sibling `flutter-components` 的 `DESIGN.md`、`DOC.md` 和实际导出 API 是所有 UI 变更的权威。
+- sibling `flutter-ui-mobile` 的 `DESIGN.md`、`DOC.md` 和实际导出 API 是所有 UI 变更的权威。
 - 物理 Android 设备、可分享媒体和相应蓝牙/有线/USB 外设决定 REC 真机验收何时可完成。
 
 ### Sources

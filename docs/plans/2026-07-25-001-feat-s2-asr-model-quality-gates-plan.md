@@ -143,7 +143,7 @@ execution: code
 - 当前可用物理设备为 Xiaomi 10S 中端参考机；EVA-AL10 和外部麦克风可能不可用。
 - 独立 reviewer 在本 Goal 执行窗口内可能不可用，因此相关门禁可形成完整 review packet 但不能由代理批准。
 - 官方模型发布包可用于本地研究不代表应用可再分发；许可证缺失时不纳入产品资产。
-- 本次不改 UI；如实施中确需 UI，必须先读取 sibling `flutter-components/DESIGN.md` 与 `DOC.md` 并使用真实 Goo API。
+- 本次不改 UI；如实施中确需 UI，必须先读取 sibling `flutter-ui-mobile/DESIGN.md` 与 `DOC.md` 并使用真实 Goo API。
 
 ### High-Level Technical Design
 
