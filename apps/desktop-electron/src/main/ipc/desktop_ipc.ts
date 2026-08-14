@@ -1,4 +1,5 @@
 import type { ZodType } from "zod";
+import { fileURLToPath } from "node:url";
 
 import {
   bootstrapActionRequestSchema,
@@ -20,6 +21,23 @@ import {
   type OperationEvent,
   type ShellSection,
   type WorkerHealthResponse,
+  listMeetingsRequestSchema,
+  openMeetingRequestSchema,
+  searchTranscriptRequestSchema,
+  editMeetingSegmentRequestSchema,
+  meetingHistoryRequestSchema,
+  renameMeetingSpeakerRequestSchema,
+  mergeMeetingSpeakersRequestSchema,
+  assignMeetingSpeakerRequestSchema,
+  controlMeetingPlaybackRequestSchema,
+  exportMeetingRequestSchema,
+  type ExportMeetingResponse,
+  type MeetingExportFormat,
+  type MeetingPlaybackSnapshot,
+  type MeetingSegment,
+  type MeetingSummary,
+  type MeetingWorkspaceSnapshot,
+  type PlaybackAction,
 } from "../../shared/contracts";
 
 export interface IpcInvocationContext {
@@ -51,6 +69,55 @@ export interface DesktopIpcServices {
   listProcessingTasks(): Promise<ProcessingTask[]>;
   importMeeting(): Promise<ImportMeetingResponse>;
   onOperationEvent?(listener: (event: OperationEvent) => void): () => void;
+  listMeetings(options: {
+    query: string;
+    limit: number;
+    offset: number;
+  }): Promise<MeetingSummary[]>;
+  openMeeting(meetingId: number): Promise<MeetingWorkspaceSnapshot | null>;
+  searchTranscript(options: {
+    meetingId: number;
+    query: string;
+    limit: number;
+  }): Promise<MeetingSegment[]>;
+  editMeetingSegment(
+    command: Parameters<
+      import("../domain/workspace/meeting_workspace_service").MeetingWorkspaceService["editSegment"]
+    >[0],
+  ): Promise<MeetingWorkspaceSnapshot>;
+  undoMeetingEdit(
+    meetingId: number,
+    generationId: number,
+    expectedRevision: number,
+  ): Promise<MeetingWorkspaceSnapshot>;
+  redoMeetingEdit(
+    meetingId: number,
+    generationId: number,
+    expectedRevision: number,
+  ): Promise<MeetingWorkspaceSnapshot>;
+  renameMeetingSpeaker(
+    command: Parameters<
+      import("../domain/workspace/meeting_workspace_service").MeetingWorkspaceService["renameSpeaker"]
+    >[0],
+  ): Promise<MeetingWorkspaceSnapshot>;
+  mergeMeetingSpeakers(
+    command: Parameters<
+      import("../domain/workspace/meeting_workspace_service").MeetingWorkspaceService["mergeSpeakers"]
+    >[0],
+  ): Promise<MeetingWorkspaceSnapshot>;
+  assignMeetingSpeaker(
+    command: Parameters<
+      import("../domain/workspace/meeting_workspace_service").MeetingWorkspaceService["assignSpeaker"]
+    >[0],
+  ): Promise<MeetingWorkspaceSnapshot>;
+  controlMeetingPlayback(
+    meetingId: number,
+    command: PlaybackAction,
+  ): Promise<MeetingPlaybackSnapshot>;
+  exportMeeting(
+    meetingId: number,
+    format: MeetingExportFormat,
+  ): Promise<ExportMeetingResponse>;
 }
 
 export class IpcContractError extends Error {
@@ -182,6 +249,132 @@ export function createDesktopIpcHandlers(options: {
         invoke: async () => await options.services.importMeeting(),
       },
     ],
+    [
+      ipcChannels.meetingList,
+      {
+        schema: listMeetingsRequestSchema,
+        invoke: async (payload: {
+          query: string;
+          limit: number;
+          offset: number;
+        }) => ({
+          meetings: await options.services.listMeetings(payload),
+        }),
+      } as RegisteredHandler,
+    ],
+    [
+      ipcChannels.meetingOpen,
+      {
+        schema: openMeetingRequestSchema,
+        invoke: async (payload: { meetingId: number }) =>
+          await options.services.openMeeting(payload.meetingId),
+      } as RegisteredHandler,
+    ],
+    [
+      ipcChannels.meetingSearch,
+      {
+        schema: searchTranscriptRequestSchema,
+        invoke: async (payload: {
+          meetingId: number;
+          query: string;
+          limit: number;
+        }) => ({
+          segments: await options.services.searchTranscript(payload),
+        }),
+      } as RegisteredHandler,
+    ],
+    [
+      ipcChannels.meetingEditSegment,
+      {
+        schema: editMeetingSegmentRequestSchema,
+        invoke: async (payload: never) =>
+          await options.services.editMeetingSegment(payload),
+      },
+    ],
+    [
+      ipcChannels.meetingUndo,
+      {
+        schema: meetingHistoryRequestSchema,
+        invoke: async (payload: {
+          meetingId: number;
+          generationId: number;
+          expectedRevision: number;
+        }) =>
+          await options.services.undoMeetingEdit(
+            payload.meetingId,
+            payload.generationId,
+            payload.expectedRevision,
+          ),
+      } as RegisteredHandler,
+    ],
+    [
+      ipcChannels.meetingRedo,
+      {
+        schema: meetingHistoryRequestSchema,
+        invoke: async (payload: {
+          meetingId: number;
+          generationId: number;
+          expectedRevision: number;
+        }) =>
+          await options.services.redoMeetingEdit(
+            payload.meetingId,
+            payload.generationId,
+            payload.expectedRevision,
+          ),
+      } as RegisteredHandler,
+    ],
+    [
+      ipcChannels.meetingRenameSpeaker,
+      {
+        schema: renameMeetingSpeakerRequestSchema,
+        invoke: async (payload: never) =>
+          await options.services.renameMeetingSpeaker(payload),
+      },
+    ],
+    [
+      ipcChannels.meetingMergeSpeakers,
+      {
+        schema: mergeMeetingSpeakersRequestSchema,
+        invoke: async (payload: never) =>
+          await options.services.mergeMeetingSpeakers(payload),
+      },
+    ],
+    [
+      ipcChannels.meetingAssignSpeaker,
+      {
+        schema: assignMeetingSpeakerRequestSchema,
+        invoke: async (payload: never) =>
+          await options.services.assignMeetingSpeaker(payload),
+      },
+    ],
+    [
+      ipcChannels.meetingPlayback,
+      {
+        schema: controlMeetingPlaybackRequestSchema,
+        invoke: async (payload: {
+          meetingId: number;
+          command: PlaybackAction;
+        }) =>
+          await options.services.controlMeetingPlayback(
+            payload.meetingId,
+            payload.command,
+          ),
+      } as RegisteredHandler,
+    ],
+    [
+      ipcChannels.meetingExport,
+      {
+        schema: exportMeetingRequestSchema,
+        invoke: async (payload: {
+          meetingId: number;
+          format: MeetingExportFormat;
+        }) =>
+          await options.services.exportMeeting(
+            payload.meetingId,
+            payload.format,
+          ),
+      } as RegisteredHandler,
+    ],
   ]);
   return new DesktopIpcHandlers(
     options.trust,
@@ -202,11 +395,24 @@ function assertTrustedInvocation(
   event: IpcInvocationContext,
   trust: IpcTrustPolicy,
 ): void {
+  const trustedLocation = isTrustedLocation(event.origin, trust);
   if (
     event.senderId !== trust.senderId ||
     event.frameId !== trust.frameId ||
-    !isTrustedLocation(event.origin, trust)
+    !trustedLocation
   ) {
+    if (process.env.VOICE2TEXT_PROCESSING_SMOKE_OUTPUT) {
+      console.error(
+        JSON.stringify({
+          event: "electron-ipc-trust-mismatch",
+          senderMatches: event.senderId === trust.senderId,
+          frameMatches: event.frameId === trust.frameId,
+          locationMatches: trustedLocation,
+          origin: appAsarSuffix(event.origin),
+          expected: [...(trust.fileUrls ?? [])].map(appAsarSuffix),
+        }),
+      );
+    }
     throw new IpcContractError(
       "UNTRUSTED_SENDER",
       "IPC sender, frame, or origin is not trusted",
@@ -214,17 +420,32 @@ function assertTrustedInvocation(
   }
 }
 
+function appAsarSuffix(value: string): string {
+  const marker = "app.asar/";
+  const index = value.indexOf(marker);
+  return index < 0 ? "outside-app-asar" : value.slice(index + marker.length);
+}
+
 function isTrustedLocation(value: string, trust: IpcTrustPolicy): boolean {
   try {
     const url = new URL(value);
-    return url.protocol === "file:"
-      ? (trust.fileUrls?.has(url.href) ?? false)
-      : trust.origins.has(url.origin);
+    if (url.protocol !== "file:") return trust.origins.has(url.origin);
+    if (url.search || !trustedRendererHash(url.hash)) return false;
+    const candidate = fileURLToPath(url);
+    return [...(trust.fileUrls ?? [])].some(
+      (expected) => fileURLToPath(new URL(expected)) === candidate,
+    );
   } catch (error) {
     throw new IpcContractError("UNTRUSTED_SENDER", "IPC origin is invalid", {
       cause: error,
     });
   }
+}
+
+function trustedRendererHash(hash: string): boolean {
+  return ["", "#/library", "#/tasks", "#/companion", "#/settings"].includes(
+    hash,
+  );
 }
 
 function assertPayloadEnvelope(payload: unknown, maximumBytes: number): void {

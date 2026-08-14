@@ -18,6 +18,7 @@ import {
 } from "@/features/shell/shell-surfaces";
 import { useApplicationShell } from "@/features/shell/use-application-shell";
 import { LibraryFeature } from "@/features/library/library-feature";
+import { MeetingWorkspaceFeature } from "@/features/meetings/meeting-workspace-feature";
 import { TasksFeature } from "@/features/tasks/tasks-feature";
 import type { ApplicationSnapshot } from "@shared/contracts";
 
@@ -169,6 +170,7 @@ function ShellContent({
             importPending={importPending}
             onImport={onImport}
           />
+          <MeetingWorkspaceFeature />
         </div>
       );
       break;

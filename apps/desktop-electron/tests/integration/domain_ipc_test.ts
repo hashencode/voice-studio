@@ -52,6 +52,17 @@ function handlers() {
           protocolVersion: 1 as const,
           state: "canceled" as const,
         })),
+        listMeetings: vi.fn(async () => []),
+        openMeeting: vi.fn(async () => null),
+        searchTranscript: vi.fn(async () => []),
+        editMeetingSegment: vi.fn(),
+        undoMeetingEdit: vi.fn(),
+        redoMeetingEdit: vi.fn(),
+        renameMeetingSpeaker: vi.fn(),
+        mergeMeetingSpeakers: vi.fn(),
+        assignMeetingSpeaker: vi.fn(),
+        controlMeetingPlayback: vi.fn(),
+        exportMeeting: vi.fn(),
       },
       maximumPayloadBytes: 1024,
     }),
@@ -201,6 +212,17 @@ describe("Main IPC validation", () => {
           protocolVersion: 1 as const,
           state: "canceled" as const,
         })),
+        listMeetings: vi.fn(async () => []),
+        openMeeting: vi.fn(async () => null),
+        searchTranscript: vi.fn(async () => []),
+        editMeetingSegment: vi.fn(),
+        undoMeetingEdit: vi.fn(),
+        redoMeetingEdit: vi.fn(),
+        renameMeetingSpeaker: vi.fn(),
+        mergeMeetingSpeakers: vi.fn(),
+        assignMeetingSpeaker: vi.fn(),
+        controlMeetingPlayback: vi.fn(),
+        exportMeeting: vi.fn(),
       },
     });
     const payload = { expectedProtocolVersion: 1 };
@@ -221,12 +243,56 @@ describe("Main IPC validation", () => {
         {
           senderId: 1,
           frameId: 2,
+          origin: "file:///Voice2Text/renderer/index.html#/tasks",
+        },
+        payload,
+      ),
+    ).resolves.toEqual(expect.objectContaining({ protocolVersion: 1 }));
+    await expect(
+      packaged.invoke(
+        ipcChannels.workerHealth,
+        {
+          senderId: 1,
+          frameId: 2,
+          origin: "file:///%56oice2Text/renderer/index.html",
+        },
+        payload,
+      ),
+    ).resolves.toEqual(expect.objectContaining({ protocolVersion: 1 }));
+    await expect(
+      packaged.invoke(
+        ipcChannels.workerHealth,
+        {
+          senderId: 1,
+          frameId: 2,
+          origin: "file:///Voice2Text/renderer/index.html?untrusted=1",
+        },
+        payload,
+      ),
+    ).rejects.toBeInstanceOf(IpcContractError);
+    await expect(
+      packaged.invoke(
+        ipcChannels.workerHealth,
+        {
+          senderId: 1,
+          frameId: 2,
+          origin: "file:///Voice2Text/renderer/index.html#/unknown",
+        },
+        payload,
+      ),
+    ).rejects.toBeInstanceOf(IpcContractError);
+    await expect(
+      packaged.invoke(
+        ipcChannels.workerHealth,
+        {
+          senderId: 1,
+          frameId: 2,
           origin: "file:///tmp/attacker.html",
         },
         payload,
       ),
     ).rejects.toBeInstanceOf(IpcContractError);
-    expect(workerHealth).toHaveBeenCalledOnce();
+    expect(workerHealth).toHaveBeenCalledTimes(3);
   });
 });
 

@@ -15,6 +15,7 @@ import {
   type ElectronProfilePaths,
 } from "../profile/profile_paths";
 import { withTransaction } from "./database";
+import { MeetingWorkspaceRepository } from "./repositories/meeting_workspace_repository";
 
 export class IdempotencyConflictError extends Error {
   constructor(entity: string) {
@@ -33,10 +34,17 @@ export class AttemptFenceError extends Error {
 }
 
 export class DesktopRepository {
+  private readonly workspaceRepository: MeetingWorkspaceRepository;
+
   constructor(
     private readonly database: DatabaseSync,
     private readonly profile: ElectronProfilePaths,
-  ) {}
+  ) {
+    this.workspaceRepository = new MeetingWorkspaceRepository(
+      database,
+      profile,
+    );
+  }
 
   createMeeting(
     command: {
@@ -418,6 +426,13 @@ export class DesktopRepository {
           intent.runtimeSha256,
         );
       const publicationId = Number(inserted.lastInsertRowid);
+      this.workspaceRepository.materializePublishedResult({
+        meetingId: job.meetingId,
+        publicationId,
+        attempt: job.attempt,
+        payload,
+        createdAtMs: nowMs,
+      });
       const completed = this.database
         .prepare(
           "UPDATE processing_jobs SET state = 'completed', progress_fraction = 1, updated_at_ms = ? WHERE id = ? AND state = 'running' AND cancel_requested_at_ms IS NULL AND attempt = ? AND source_identity = ?",

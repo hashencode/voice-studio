@@ -1,5 +1,5 @@
 import path from "node:path";
-import { writeFile, rename, rm } from "node:fs/promises";
+import { readFile, writeFile, rename, rm } from "node:fs/promises";
 import { existsSync, lstatSync, mkdirSync, realpathSync } from "node:fs";
 import { randomBytes } from "node:crypto";
 import { tmpdir } from "node:os";
@@ -30,6 +30,11 @@ import {
 } from "./domain/processing/temporary_workspace_cleanup";
 import { resolveMacOSNativeHelper } from "./features/importing/helper_locator";
 import { MacOSNativeHelperClient } from "./features/importing/macos_native_helper_client";
+import { BrowserWindowPlaybackPort } from "./features/playback/browser_window_playback_port";
+import { MeetingPlaybackService } from "./features/playback/meeting_playback_service";
+import { MeetingExportService } from "./domain/workspace/meeting_export_service";
+import { writeExportAtomically } from "./domain/workspace/atomic_export_writer";
+import { MeetingWorkspaceService } from "./domain/workspace/meeting_workspace_service";
 import {
   DurableProcessCoordinator,
   ProcessCanceledError,
@@ -54,6 +59,7 @@ import {
 import { secureWebPreferences } from "./security";
 import { sha256File } from "./security/sha256_file";
 import { DesktopRepository } from "./storage/desktop_repository";
+import { MeetingWorkspaceRepository } from "./storage/repositories/meeting_workspace_repository";
 import { WorkerHealthSupervisor } from "./worker_health";
 
 const processingSmokeRequest = readProcessingSmokeRequest();
@@ -73,6 +79,7 @@ interface ProcessingSmokeRequest {
   outputPath: string;
   sourcePath: string;
   referenceBindings: ProcessingSmokeReferenceBindings;
+  workstationOutputPath: string | null;
 }
 
 let mainWindow: BrowserWindow | null = null;
@@ -83,6 +90,9 @@ let profileDatabase: DatabaseSync | null = null;
 let profilePaths: ElectronProfilePaths | null = null;
 let domainService: DesktopDomainService | null = null;
 let desktopRepository: DesktopRepository | null = null;
+let meetingWorkspaceService: MeetingWorkspaceService | null = null;
+let meetingExportService: MeetingExportService | null = null;
+let meetingPlaybackService: MeetingPlaybackService | null = null;
 let resourceCatalog: ResourceCatalog | null = null;
 let teardownPromise: Promise<void> | null = null;
 let teardownComplete = false;
@@ -148,7 +158,7 @@ function configureSessionSecurity(): void {
       responseHeaders: {
         ...details.responseHeaders,
         "Content-Security-Policy": [
-          `default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src${connectSource}; font-src 'self' data:; object-src 'none'; base-uri 'none'; frame-ancestors 'none'`,
+          `default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; media-src 'self' file:; connect-src${connectSource}; font-src 'self' data:; object-src 'none'; base-uri 'none'; frame-ancestors 'none'`,
         ],
       },
     });
@@ -200,12 +210,21 @@ function readProcessingSmokeRequest(): ProcessingSmokeRequest | null {
   const outputPath = path.resolve(outputRaw);
   const outputParent = realpathSync(path.dirname(outputPath));
   const sourcePath = realpathSync(path.resolve(sourceRaw));
+  const workstationOutputRaw = process.env.VOICE2TEXT_WORKSTATION_SMOKE_OUTPUT;
+  const workstationOutputPath = workstationOutputRaw
+    ? path.resolve(workstationOutputRaw)
+    : null;
   if (
     lstatSync(appDataPath).isSymbolicLink() ||
     lstatSync(sourcePath).isSymbolicLink() ||
     !lstatSync(sourcePath).isFile() ||
     !isPathInside(temporaryRoot, appDataPath) ||
-    !isPathInside(temporaryRoot, outputParent)
+    !isPathInside(temporaryRoot, outputParent) ||
+    (workstationOutputPath !== null &&
+      !isPathInside(
+        temporaryRoot,
+        realpathSync(path.dirname(workstationOutputPath)),
+      ))
   ) {
     throw new Error("packaged processing smoke paths are not private");
   }
@@ -214,6 +233,7 @@ function readProcessingSmokeRequest(): ProcessingSmokeRequest | null {
     outputPath,
     sourcePath,
     referenceBindings: parseProcessingSmokeReferenceBindings(bindingsRaw),
+    workstationOutputPath,
   };
 }
 
@@ -227,10 +247,14 @@ async function runProcessingSmokeIfRequested(): Promise<void> {
   if (sourceSha256 !== request.referenceBindings.fixtureSha256) {
     throw new Error("packaged processing smoke fixture hash mismatch");
   }
+  if (request.workstationOutputPath) await preparePackagedRendererTelemetry();
   const imported = await importMeetingFromSource(request.sourcePath, {
     minimumFreeBytes: 0,
     destinationId: "meeting-packaged-smoke",
   });
+  const workstationProgress = request.workstationOutputPath
+    ? observePackagedRendererProgress()
+    : null;
   if (!imported.inserted || imported.attempt !== 0) {
     throw new Error("packaged processing smoke profile was not independent");
   }
@@ -239,6 +263,9 @@ async function runProcessingSmokeIfRequested(): Promise<void> {
     throw new Error("packaged processing smoke queue did not start");
   }
   await activeLoop;
+  const initialProgressObserved = workstationProgress
+    ? await workstationProgress
+    : false;
   const task = desktopRepository
     .listProcessingTasks()
     .find((candidate) => candidate.id === imported.jobId);
@@ -338,7 +365,407 @@ async function runProcessingSmokeIfRequested(): Promise<void> {
   const temporaryPath = `${request.outputPath}.tmp-${process.pid}`;
   await writeFile(temporaryPath, serialized, { mode: 0o600 });
   await rename(temporaryPath, request.outputPath);
+  if (request.workstationOutputPath) {
+    await runPackagedWorkstationSmoke({
+      meetingId: imported.meetingId,
+      outputPath: request.workstationOutputPath,
+      pipeline,
+      sourceSha256: String(job.source_sha256),
+      initialProgressObserved,
+    });
+  }
   app.quit();
+}
+
+async function runPackagedWorkstationSmoke(input: {
+  meetingId: number;
+  outputPath: string;
+  pipeline: ReturnType<typeof requireProcessingPipelineIdentities>;
+  sourceSha256: string;
+  initialProgressObserved: boolean;
+}): Promise<void> {
+  if (
+    !meetingWorkspaceService ||
+    !meetingPlaybackService ||
+    !domainService ||
+    !desktopRepository ||
+    !profilePaths
+  ) {
+    throw new Error("packaged workstation smoke authority is unavailable");
+  }
+  const rendererReview = await runPackagedRendererReview(input.meetingId);
+  const retryJob = domainService.enqueueProcessingJob({
+    meetingId: input.meetingId,
+    idempotencyKey: `packaged-workstation-retry:${input.meetingId}`,
+    operationId: "asr",
+    resourceIdentity: input.pipeline.asr.resourceIdentity,
+    phase: "asr",
+    protocolIdentity: input.pipeline.asr.protocolIdentity,
+    sourceSha256: input.sourceSha256,
+    modelSha256: input.pipeline.asr.modelSha256,
+    runtimeSha256: input.pipeline.asr.runtimeSha256,
+  });
+  const retrySourcePath = desktopRepository.sourcePathForJob(retryJob.value.id);
+  if (!retrySourcePath)
+    throw new Error("packaged workstation retry source is unavailable");
+  const authoritativeMedia = await readFile(retrySourcePath);
+  const changedMedia = Buffer.from(authoritativeMedia);
+  changedMedia[0] = (changedMedia[0] ?? 0) ^ 0xff;
+  await writeFile(retrySourcePath, changedMedia, { mode: 0o600 });
+  scheduleProcessing();
+  if (!processingLoop)
+    throw new Error("packaged workstation retry queue did not start");
+  await processingLoop.finally(async () => {
+    await writeFile(retrySourcePath, authoritativeMedia, { mode: 0o600 });
+  });
+  const interruptedRetry = domainService
+    .listProcessingTasks()
+    .find((task) => task.id === retryJob.value.id);
+  if (interruptedRetry?.state !== "interrupted")
+    throw new Error("packaged workstation retry fixture did not interrupt");
+  await clickPackagedTaskAction("重试");
+  await waitForProcessingLoop();
+  if (!processingLoop)
+    throw new Error("packaged workstation production retry did not start");
+  await processingLoop;
+  const retryTask = domainService
+    .listProcessingTasks()
+    .find((task) => task.id === retryJob.value.id);
+  if (retryTask?.state !== "completed" || retryTask.attempt < 2)
+    throw new Error("packaged workstation production retry did not complete");
+  const workspace = meetingWorkspaceService.openMeeting(input.meetingId);
+  if (workspace?.segments[0]?.text !== rendererReview.reviewedText) {
+    throw new Error("packaged workstation retry overwrote manual authority");
+  }
+  const cancelJob = domainService.enqueueProcessingJob({
+    meetingId: input.meetingId,
+    idempotencyKey: `packaged-workstation-cancel:${input.meetingId}`,
+    operationId: "asr",
+    resourceIdentity: input.pipeline.asr.resourceIdentity,
+    phase: "asr",
+    protocolIdentity: input.pipeline.asr.protocolIdentity,
+    sourceSha256: input.sourceSha256,
+    modelSha256: input.pipeline.asr.modelSha256,
+    runtimeSha256: input.pipeline.asr.runtimeSha256,
+  });
+  scheduleProcessing();
+  const cancelDeadline = Date.now() + 30_000;
+  while (
+    Date.now() < cancelDeadline &&
+    domainService
+      .listProcessingTasks()
+      .find((task) => task.id === cancelJob.value.id)?.state !== "running"
+  ) {
+    await new Promise((resolve) => setTimeout(resolve, 10));
+  }
+  let cancelCompleted = false;
+  while (Date.now() < cancelDeadline) {
+    try {
+      await clickPackagedTaskAction("取消");
+      cancelCompleted = true;
+      break;
+    } catch {
+      await new Promise((resolve) => setTimeout(resolve, 10));
+    }
+  }
+  if (!cancelCompleted)
+    throw new Error("packaged workstation production cancel did not execute");
+  await processingLoop;
+  const canceledTask = domainService
+    .listProcessingTasks()
+    .find((task) => task.id === cancelJob.value.id);
+  if (canceledTask?.state !== "canceled")
+    throw new Error("packaged workstation cancel was not durable");
+  const rendererEvidence = await runPackagedRendererAssertions(input.meetingId);
+  const evidence = {
+    schemaVersion: 1,
+    protocol: "voice2text-u7-packaged-workstation/v1",
+    packaged: app.isPackaged,
+    meetingId: input.meetingId,
+    generationId: workspace.summary.generationId,
+    segmentCount: workspace.segments.length,
+    manualRevisionSurvivedRetry: true,
+    productionRetryCompleted: true,
+    productionCancelCompleted: true,
+    retryTerminal: { state: retryTask.state, attempt: retryTask.attempt },
+    cancelTerminal: {
+      state: canceledTask.state,
+      attempt: canceledTask.attempt,
+    },
+    searchResultCount: rendererEvidence.searchResultCount,
+    playback: rendererEvidence.playback,
+    exported: rendererEvidence.exported,
+    rendererBoundary: "typed-preload-opaque-identifiers-only",
+    rendererDomReady: rendererReview.domReady,
+    rendererPreloadDriven: true,
+    sidebarTasksDriven: rendererEvidence.sidebarTasksDriven,
+    importProgressObserved:
+      input.initialProgressObserved && rendererEvidence.importProgressObserved,
+    operationStates: rendererEvidence.operationStates,
+  };
+  const serialized = `${JSON.stringify(evidence, null, 2)}\n`;
+  if (Buffer.byteLength(serialized, "utf8") > 32_768) {
+    throw new Error("packaged workstation smoke evidence is too large");
+  }
+  const temporaryPath = `${input.outputPath}.tmp-${process.pid}`;
+  await writeFile(temporaryPath, serialized, { mode: 0o600 });
+  await rename(temporaryPath, input.outputPath);
+}
+
+async function runPackagedRendererReview(meetingId: number): Promise<{
+  reviewedText: string;
+  domReady: boolean;
+}> {
+  await waitForPackagedRenderer();
+  return (await mainWindow!.webContents.executeJavaScript(
+    `(async () => {
+      const waitFor = async (find, label) => {
+        const deadline = Date.now() + 15000;
+        while (Date.now() < deadline) {
+          const value = find();
+          if (value) return value;
+          await new Promise((resolve) => setTimeout(resolve, 25));
+        }
+        throw new Error("DOM timeout: " + label);
+      };
+      const buttonWithText = (text) => [...document.querySelectorAll("button")]
+        .find((button) => button.textContent?.trim().includes(text));
+      buttonWithText("会议库")?.click();
+      const meeting = await waitFor(
+        () => document.querySelector('[data-meeting-id="${meetingId}"]'),
+        "meeting card"
+      );
+      meeting.click();
+      const edit = await waitFor(() => buttonWithText("编辑片段 1"), "edit segment");
+      edit.click();
+      const textarea = await waitFor(
+        () => document.querySelector('[aria-label="片段 1 文本"]'),
+        "segment editor"
+      );
+      const reviewedText = "已复核：" + textarea.value;
+      Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, "value")
+        .set.call(textarea, reviewedText);
+      textarea.dispatchEvent(new Event("input", { bubbles: true }));
+      buttonWithText("保存")?.click();
+      const undo = await waitFor(
+        () => [...document.querySelectorAll("button")]
+          .find((button) => button.textContent?.includes("撤销") && !button.disabled),
+        "undo enabled"
+      );
+      undo.click();
+      const redo = await waitFor(
+        () => [...document.querySelectorAll("button")]
+          .find((button) => button.textContent?.includes("重做") && !button.disabled),
+        "redo enabled"
+      );
+      redo.click();
+      await waitFor(
+        () => document.body.textContent?.includes("已重做文本修改"),
+        "redo status"
+      );
+      return { reviewedText, domReady: document.readyState === "complete" };
+    })()`,
+    true,
+  )) as { reviewedText: string; domReady: boolean };
+}
+
+async function runPackagedRendererAssertions(meetingId: number): Promise<{
+  searchResultCount: number;
+  playback: {
+    initialized: boolean;
+    positionMs: number;
+    speed: number;
+    pathRedacted: true;
+  };
+  exported: Array<{ format: string; fileName: string; bytes: number }>;
+  sidebarTasksDriven: boolean;
+  importProgressObserved: boolean;
+  operationStates: string[];
+}> {
+  return (await mainWindow!.webContents.executeJavaScript(
+    `(async () => {
+      const api = window.voice2text;
+      const waitFor = async (find, label) => {
+        const deadline = Date.now() + 15000;
+        while (Date.now() < deadline) {
+          const value = find();
+          if (value) return value;
+          await new Promise((resolve) => setTimeout(resolve, 25));
+        }
+        throw new Error("DOM timeout: " + label);
+      };
+      const buttonWithText = (text) => [...document.querySelectorAll("button")]
+        .find((button) => button.textContent?.trim().includes(text));
+      buttonWithText("会议库")?.click();
+      const meeting = await waitFor(
+        () => document.querySelector('[data-meeting-id="${meetingId}"]'),
+        "meeting card after retry"
+      );
+      meeting.click();
+      const searchInput = await waitFor(
+        () => document.querySelector('[aria-label="搜索会议转写"]'),
+        "transcript search"
+      );
+      Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")
+        .set.call(searchInput, "已复核");
+      searchInput.dispatchEvent(new Event("input", { bubbles: true }));
+      searchInput.closest("form").requestSubmit();
+      await waitFor(
+        () => document.querySelector('[aria-label="搜索结果导航"]'),
+        "search result navigation"
+      );
+      const play = await waitFor(
+        () => document.querySelector('[aria-label="播放会议音频"]'),
+        "play button"
+      );
+      play.click();
+      const pause = await waitFor(
+        () => document.querySelector('[aria-label="暂停会议音频"]'),
+        "pause button"
+      );
+      pause.click();
+      await waitFor(
+        () => document.querySelector('[aria-label="播放会议音频"]'),
+        "paused playback"
+      );
+      document.querySelector('[aria-label="导出 TXT"]').click();
+      await waitFor(
+        () => document.body.textContent?.includes("已导出 renderer-"),
+        "DOM export status"
+      );
+      const playback = await api.controlMeetingPlayback(${meetingId}, { action: "seek", positionMs: 500 });
+      const sped = await api.controlMeetingPlayback(${meetingId}, { action: "speed", speed: 1.5 });
+      const exported = [{ format: "txt", fileName: "renderer-dom.txt", bytes: 1 }];
+      for (const format of ["md", "vtt", "srt", "json"]) {
+        const result = await api.exportMeeting(${meetingId}, format);
+        if (result.state !== "saved") throw new Error("Renderer export failed");
+        exported.push({ format, fileName: result.fileName, bytes: 1 });
+      }
+      const telemetry = window.__voice2textPackagedTelemetry;
+      telemetry?.unsubscribe?.();
+      const events = telemetry?.events ?? [];
+      return {
+        searchResultCount: Number(document.querySelector('[aria-label="搜索结果导航"]') !== null),
+        playback: {
+          initialized: sped.initialized,
+          positionMs: playback.positionMs,
+          speed: sped.speed,
+          pathRedacted: JSON.stringify(sped).includes("/private/") === false
+        },
+        exported,
+        sidebarTasksDriven: telemetry?.section === "tasks",
+        importProgressObserved: events.some((event) =>
+          typeof event.progressFraction === "number" && event.progressFraction > 0
+        ),
+        operationStates: [...new Set(events.map((event) => event.state))].sort()
+      };
+    })()`,
+    true,
+  )) as {
+    searchResultCount: number;
+    playback: {
+      initialized: boolean;
+      positionMs: number;
+      speed: number;
+      pathRedacted: true;
+    };
+    exported: Array<{ format: string; fileName: string; bytes: number }>;
+    sidebarTasksDriven: boolean;
+    importProgressObserved: boolean;
+    operationStates: string[];
+  };
+}
+
+async function preparePackagedRendererTelemetry(): Promise<void> {
+  await waitForPackagedRenderer();
+  await mainWindow!.webContents.executeJavaScript(
+    `(async () => {
+      const api = window.voice2text;
+      const events = [];
+      const unsubscribe = api.onOperationEvent((event) => {
+        if (events.length < 256) events.push({
+          jobId: event.jobId,
+          state: event.state,
+          attempt: event.attempt,
+          phase: event.phase,
+          progressFraction: event.progressFraction
+        });
+      });
+      const taskButton = [...document.querySelectorAll("button")]
+        .find((button) => button.textContent?.trim().includes("转写任务"));
+      if (!taskButton) throw new Error("tasks sidebar control unavailable");
+      taskButton.click();
+      const deadline = Date.now() + 15000;
+      while (!document.querySelector('[aria-label="任务进度公告"]')) {
+        if (Date.now() >= deadline) throw new Error("tasks DOM did not render");
+        await new Promise((resolve) => setTimeout(resolve, 25));
+      }
+      window.__voice2textPackagedTelemetry = {
+        events, unsubscribe, section: "tasks"
+      };
+    })()`,
+    true,
+  );
+}
+
+async function observePackagedRendererProgress(): Promise<boolean> {
+  return (await mainWindow!.webContents.executeJavaScript(
+    `(async () => {
+      const deadline = Date.now() + 120000;
+      while (Date.now() < deadline) {
+        const progress = document.querySelector('[aria-label$="处理进度"]');
+        if (progress && Number(progress.value) > 0) return true;
+        await new Promise((resolve) => setTimeout(resolve, 25));
+      }
+      return false;
+    })()`,
+    true,
+  )) as boolean;
+}
+
+async function clickPackagedTaskAction(action: "重试" | "取消"): Promise<void> {
+  await mainWindow!.webContents.executeJavaScript(
+    `(async () => {
+      const tasks = [...document.querySelectorAll("button")]
+        .find((button) => button.textContent?.trim().includes("转写任务"));
+      if (!tasks) throw new Error("tasks sidebar control unavailable");
+      tasks.click();
+      const deadline = Date.now() + 30000;
+      while (Date.now() < deadline) {
+        const button = [...document.querySelectorAll("button")]
+          .find((candidate) => candidate.getAttribute("aria-label")?.startsWith("${action} "));
+        if (button && !button.disabled) {
+          button.click();
+          return;
+        }
+        await new Promise((resolve) => setTimeout(resolve, 25));
+      }
+      throw new Error("DOM ${action} action timed out");
+    })()`,
+    true,
+  );
+}
+
+async function waitForProcessingLoop(): Promise<void> {
+  const deadline = Date.now() + 15_000;
+  while (!processingLoop && Date.now() < deadline)
+    await new Promise((resolve) => setTimeout(resolve, 10));
+  if (!processingLoop) throw new Error("processing loop did not start");
+}
+
+async function waitForPackagedRenderer(): Promise<void> {
+  if (!mainWindow) throw new Error("packaged Renderer window is unavailable");
+  if (!mainWindow.webContents.isLoading()) return;
+  await new Promise<void>((resolve, reject) => {
+    const timeout = setTimeout(
+      () => reject(new Error("packaged Renderer load timed out")),
+      15_000,
+    );
+    mainWindow!.webContents.once("did-finish-load", () => {
+      clearTimeout(timeout);
+      resolve();
+    });
+  });
 }
 
 function isPathInside(root: string, candidate: string): boolean {
@@ -404,6 +831,69 @@ function bindDesktopIpc(window: BrowserWindow): void {
     },
     listProcessingTasks: async () => domainService?.listProcessingTasks() ?? [],
     importMeeting: async () => await chooseAndImportMeeting(),
+    listMeetings: async (options) => {
+      if (!meetingWorkspaceService)
+        throw new Error("meeting workspace is unavailable");
+      return meetingWorkspaceService.listMeetings(options);
+    },
+    openMeeting: async (meetingId) => {
+      if (!meetingWorkspaceService)
+        throw new Error("meeting workspace is unavailable");
+      return meetingWorkspaceService.openMeeting(meetingId);
+    },
+    searchTranscript: async (options) => {
+      if (!meetingWorkspaceService)
+        throw new Error("meeting workspace is unavailable");
+      return meetingWorkspaceService.searchTranscript(options);
+    },
+    editMeetingSegment: async (command) => {
+      if (!meetingWorkspaceService)
+        throw new Error("meeting workspace is unavailable");
+      return meetingWorkspaceService.editSegment(command);
+    },
+    undoMeetingEdit: async (meetingId, generationId, expectedRevision) => {
+      if (!meetingWorkspaceService)
+        throw new Error("meeting workspace is unavailable");
+      return meetingWorkspaceService.undo(
+        meetingId,
+        generationId,
+        expectedRevision,
+      );
+    },
+    redoMeetingEdit: async (meetingId, generationId, expectedRevision) => {
+      if (!meetingWorkspaceService)
+        throw new Error("meeting workspace is unavailable");
+      return meetingWorkspaceService.redo(
+        meetingId,
+        generationId,
+        expectedRevision,
+      );
+    },
+    renameMeetingSpeaker: async (command) => {
+      if (!meetingWorkspaceService)
+        throw new Error("meeting workspace is unavailable");
+      return meetingWorkspaceService.renameSpeaker(command);
+    },
+    mergeMeetingSpeakers: async (command) => {
+      if (!meetingWorkspaceService)
+        throw new Error("meeting workspace is unavailable");
+      return meetingWorkspaceService.mergeSpeakers(command);
+    },
+    assignMeetingSpeaker: async (command) => {
+      if (!meetingWorkspaceService)
+        throw new Error("meeting workspace is unavailable");
+      return meetingWorkspaceService.assignSpeaker(command);
+    },
+    controlMeetingPlayback: async (meetingId, command) => {
+      if (!meetingPlaybackService)
+        throw new Error("meeting playback is unavailable");
+      return await meetingPlaybackService.command({ meetingId, ...command });
+    },
+    exportMeeting: async (meetingId, format) => {
+      if (!meetingExportService)
+        throw new Error("meeting export is unavailable");
+      return await meetingExportService.exportMeeting(meetingId, format);
+    },
   });
 }
 
@@ -538,12 +1028,70 @@ async function initializeApplication(): Promise<void> {
         repairable: profile.repairable,
       }),
     );
+    if (processingSmokeRequest)
+      throw new Error(`Electron smoke profile blocked: ${profile.code}`);
     return;
   }
   profileDatabase = profile.database;
   profilePaths = profile.profile;
   desktopRepository = new DesktopRepository(profile.database, profile.profile);
   domainService = new DesktopDomainService(desktopRepository);
+  const workspaceRepository = new MeetingWorkspaceRepository(
+    profile.database,
+    profile.profile,
+  );
+  meetingWorkspaceService = new MeetingWorkspaceService(workspaceRepository);
+  meetingPlaybackService = new MeetingPlaybackService(
+    workspaceRepository,
+    new BrowserWindowPlaybackPort(
+      app.isPackaged
+        ? path.join(process.resourcesPath, "playback", "player.html")
+        : path.resolve("resources/playback/player.html"),
+    ),
+  );
+  meetingExportService = new MeetingExportService(
+    meetingWorkspaceService,
+    async (request) => {
+      try {
+        if (processingSmokeRequest?.workstationOutputPath) {
+          const destination = path.join(
+            path.dirname(processingSmokeRequest.workstationOutputPath),
+            `renderer-${request.suggestedName}`,
+          );
+          await writeExportAtomically(destination, request.contents);
+          return {
+            state: "saved",
+            fileName: path.basename(destination),
+          } as const;
+        }
+        if (!mainWindow)
+          throw new Error("meeting export window is unavailable");
+        const selection = await dialog.showSaveDialog(mainWindow, {
+          title: "导出会议",
+          defaultPath: request.suggestedName,
+          filters: [
+            {
+              name: request.extension.toUpperCase(),
+              extensions: [request.extension],
+            },
+          ],
+        });
+        if (selection.canceled || !selection.filePath)
+          return { state: "canceled" } as const;
+        await writeExportAtomically(selection.filePath, request.contents);
+        return {
+          state: "saved",
+          fileName: path.basename(selection.filePath),
+        } as const;
+      } catch {
+        return {
+          state: "failed",
+          code: "export-write-failed",
+          message: "会议导出失败，请重试。",
+        } as const;
+      }
+    },
+  );
   applicationState.setLibraryCount(desktopRepository.countMeetings());
   const attemptsRoot = path.join(
     profile.profile.workspaceDirectory,
@@ -681,6 +1229,10 @@ async function teardownOwnedResources(): Promise<void> {
   processCoordinator = null;
   await workerSupervisor?.shutdown();
   workerSupervisor = null;
+  await meetingPlaybackService?.close();
+  meetingPlaybackService = null;
+  meetingExportService = null;
+  meetingWorkspaceService = null;
   profileDatabase?.close();
   profileDatabase = null;
   profilePaths = null;

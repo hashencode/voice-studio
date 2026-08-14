@@ -40,6 +40,17 @@ export function registerDesktopIpc(
     ipcChannels.retryProcessing,
     ipcChannels.processingTasks,
     ipcChannels.importMeeting,
+    ipcChannels.meetingList,
+    ipcChannels.meetingOpen,
+    ipcChannels.meetingSearch,
+    ipcChannels.meetingEditSegment,
+    ipcChannels.meetingUndo,
+    ipcChannels.meetingRedo,
+    ipcChannels.meetingRenameSpeaker,
+    ipcChannels.meetingMergeSpeakers,
+    ipcChannels.meetingAssignSpeaker,
+    ipcChannels.meetingPlayback,
+    ipcChannels.meetingExport,
   ] as const;
   for (const channel of channels) {
     ipcMain.handle(channel, async (event, payload: unknown) => {
@@ -73,9 +84,37 @@ function invocationContext(
   trustedFrameId: number,
 ): IpcInvocationContext {
   const frame = event.senderFrame;
+  const currentMainFrame = window.webContents.mainFrame;
+  const isCurrentMainFrame =
+    frame != null &&
+    frame.routingId === currentMainFrame.routingId &&
+    frame.processId === currentMainFrame.processId &&
+    frame.parent === null &&
+    frame.url === window.webContents.getURL();
+  if (process.env.VOICE2TEXT_PROCESSING_SMOKE_OUTPUT && !isCurrentMainFrame) {
+    console.error(
+      JSON.stringify({
+        event: "electron-ipc-main-frame-mismatch",
+        senderMatches: event.sender === window.webContents,
+        routingMatches: frame?.routingId === currentMainFrame.routingId,
+        processMatches: frame?.processId === currentMainFrame.processId,
+        parentIsNull: frame?.parent === null,
+        urlMatches: frame?.url === window.webContents.getURL(),
+        frameUrl: packagedUrlSuffix(frame?.url),
+        currentUrl: packagedUrlSuffix(window.webContents.getURL()),
+      }),
+    );
+  }
   return {
     senderId: event.sender === window.webContents ? event.sender.id : -1,
-    frameId: frame === window.webContents.mainFrame ? trustedFrameId : -1,
+    frameId: isCurrentMainFrame ? trustedFrameId : -1,
     origin: frame?.url ?? "invalid:",
   };
+}
+
+function packagedUrlSuffix(value: string | undefined): string {
+  if (!value) return "missing";
+  const marker = "app.asar/";
+  const index = value.indexOf(marker);
+  return index < 0 ? "outside-app-asar" : value.slice(index + marker.length);
 }

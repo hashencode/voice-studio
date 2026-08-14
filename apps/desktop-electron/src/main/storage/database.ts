@@ -13,6 +13,8 @@ import {
   migrateSchemaV1ToV2,
   migrateSchemaV2ToV3,
   migrateSchemaV3ToV4,
+  migrateSchemaV4ToV5,
+  migrateSchemaV5ToV6,
   REQUIRED_SCHEMA_TABLES,
 } from "./schema";
 
@@ -66,11 +68,31 @@ export function openElectronDatabase(databasePath: string): DatabaseSync {
       // Preserve the original open or validation error.
     }
     if (error instanceof StorageError) throw error;
+    if (process.env.VOICE2TEXT_PROCESSING_SMOKE_OUTPUT) {
+      console.error(
+        JSON.stringify({
+          event: "electron-storage-open-failed",
+          code:
+            typeof (error as NodeJS.ErrnoException)?.code === "string"
+              ? (error as NodeJS.ErrnoException).code
+              : "UNKNOWN",
+          message: storageDiagnostic(error),
+        }),
+      );
+    }
     throw new StorageCorruptionError(
       "Electron database could not be opened or validated",
       { cause: error },
     );
   }
+}
+
+function storageDiagnostic(error: unknown): string {
+  const raw = error instanceof Error ? error.message : String(error);
+  return raw
+    .replace(/(?:\/[^\s:'"]+)+/g, "<path>")
+    .replaceAll(/[\r\n]/g, " ")
+    .slice(0, 240);
 }
 
 export function withTransaction<T>(database: DatabaseSync, action: () => T): T {
@@ -135,6 +157,20 @@ function migrate(database: DatabaseSync): void {
     withTransaction(database, () => {
       migrateSchemaV3ToV4(database);
       database.exec("PRAGMA user_version = 4");
+    });
+    version = 4;
+  }
+  if (version === 4) {
+    withTransaction(database, () => {
+      migrateSchemaV4ToV5(database);
+      database.exec("PRAGMA user_version = 5");
+    });
+    version = 5;
+  }
+  if (version === 5) {
+    withTransaction(database, () => {
+      migrateSchemaV5ToV6(database);
+      database.exec("PRAGMA user_version = 6");
     });
   }
 }

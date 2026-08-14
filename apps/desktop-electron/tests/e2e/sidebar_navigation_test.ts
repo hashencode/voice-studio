@@ -17,7 +17,10 @@ afterEach(() => {
   window.history.replaceState(null, "", "/");
 });
 
-function applicationApi(initial: ApplicationSnapshot) {
+function applicationApi(
+  initial: ApplicationSnapshot,
+  overrides: Partial<Voice2TextDesktopApi> = {},
+) {
   let snapshot = initial;
   const navigate = vi.fn(async (section: ShellSection) => {
     snapshot = {
@@ -33,11 +36,23 @@ function applicationApi(initial: ApplicationSnapshot) {
     retryProcessing: vi.fn(),
     listProcessingTasks: vi.fn(async () => []),
     importMeeting: vi.fn(),
+    listMeetings: vi.fn(async () => []),
+    openMeeting: vi.fn(async () => null),
+    searchTranscript: vi.fn(async () => []),
+    editMeetingSegment: vi.fn(),
+    undoMeetingEdit: vi.fn(),
+    redoMeetingEdit: vi.fn(),
+    renameMeetingSpeaker: vi.fn(),
+    mergeMeetingSpeakers: vi.fn(),
+    assignMeetingSpeaker: vi.fn(),
+    controlMeetingPlayback: vi.fn(),
+    exportMeeting: vi.fn(),
     onOperationEvent: vi.fn(() => () => undefined),
     getApplicationSnapshot: vi.fn(async () => snapshot),
     navigate,
     requestBootstrapAction: vi.fn(async () => snapshot),
     onApplicationSnapshot: vi.fn(() => () => undefined),
+    ...overrides,
   };
   Object.defineProperty(window, "voice2text", {
     configurable: true,
@@ -115,5 +130,64 @@ describe("sidebar navigation e2e", () => {
     expect(
       screen.getByRole("complementary", { name: "录制工作区" }),
     ).toHaveTextContent("访谈");
+  });
+
+  it("closes meeting playback once when sidebar navigation unmounts the workspace", async () => {
+    const meeting = {
+      revision: 3,
+      summary: {
+        meetingId: 4,
+        displayName: "项目周会.wav",
+        durationMs: 6_000,
+        createdAtMs: 1,
+        processingState: "completed" as const,
+        generationId: 9,
+        generationKind: "formal" as const,
+        segmentCount: 0,
+      },
+      segments: [],
+      speakers: [],
+      canUndo: false,
+      canRedo: false,
+    };
+    const initial: ApplicationSnapshot = {
+      ...restored,
+      navigation: { section: "library" },
+      library: { phase: "ready", meetingCount: 1 },
+      capture: { phase: "idle" },
+    };
+    const controlMeetingPlayback = vi.fn(async () => ({
+      meetingId: 4,
+      initialized: false,
+      playing: false,
+      positionMs: 0,
+      durationMs: 6_000,
+      speed: 1,
+      error: null,
+    }));
+    applicationApi(initial, {
+      listMeetings: vi.fn(async () => [meeting.summary]),
+      openMeeting: vi.fn(async () => meeting),
+      controlMeetingPlayback,
+    });
+    const user = userEvent.setup();
+    render(createElement(App));
+    await user.click(
+      await screen.findByRole("button", { name: /打开 项目周会/ }),
+    );
+    expect(
+      await screen.findByRole("heading", { name: "项目周会.wav" }),
+    ).toBeVisible();
+
+    await user.click(screen.getByRole("button", { name: "Companion" }));
+    expect(
+      await screen.findByRole("heading", { name: "Companion" }),
+    ).toBeVisible();
+    await waitFor(() =>
+      expect(controlMeetingPlayback).toHaveBeenCalledWith(4, {
+        action: "close",
+      }),
+    );
+    expect(controlMeetingPlayback).toHaveBeenCalledTimes(1);
   });
 });

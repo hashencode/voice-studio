@@ -6,6 +6,15 @@ import {
   processingTaskStateSchema,
   sha256Schema,
 } from "./import_processing";
+import type {
+  ExportMeetingResponse,
+  MeetingExportFormat,
+  MeetingPlaybackSnapshot,
+  MeetingSegment,
+  MeetingSummary,
+  MeetingWorkspaceSnapshot,
+  PlaybackAction,
+} from "./meeting_workspace";
 
 export const desktopProtocolVersion = 1 as const;
 export const desktopWorkerHealthProtocol =
@@ -22,6 +31,17 @@ export const ipcChannels = {
   processingTasks: "desktop.processing.tasks.v1",
   importMeeting: "desktop.importing.choose-and-import.v1",
   operationEvent: "desktop.processing.event.v1",
+  meetingList: "desktop.meetings.list.v1",
+  meetingOpen: "desktop.meetings.open.v1",
+  meetingSearch: "desktop.meetings.search.v1",
+  meetingEditSegment: "desktop.meetings.edit-segment.v1",
+  meetingUndo: "desktop.meetings.undo.v1",
+  meetingRedo: "desktop.meetings.redo.v1",
+  meetingRenameSpeaker: "desktop.meetings.rename-speaker.v1",
+  meetingMergeSpeakers: "desktop.meetings.merge-speakers.v1",
+  meetingAssignSpeaker: "desktop.meetings.assign-speaker.v1",
+  meetingPlayback: "desktop.meetings.playback.v1",
+  meetingExport: "desktop.meetings.export.v1",
 } as const;
 
 export const workerHealthRequestSchema = z
@@ -178,4 +198,62 @@ export interface Voice2TextDesktopApi {
   >;
   importMeeting(): Promise<ImportMeetingResponse>;
   onOperationEvent(listener: (event: OperationEvent) => void): () => void;
+  listMeetings(
+    query?: string,
+    limit?: number,
+    offset?: number,
+  ): Promise<MeetingSummary[]>;
+  openMeeting(meetingId: number): Promise<MeetingWorkspaceSnapshot | null>;
+  searchTranscript(
+    meetingId: number,
+    query: string,
+    limit?: number,
+  ): Promise<MeetingSegment[]>;
+  editMeetingSegment(command: {
+    meetingId: number;
+    generationId: number;
+    segmentId: number;
+    text: string;
+    expectedRevision: number;
+  }): Promise<MeetingWorkspaceSnapshot>;
+  undoMeetingEdit(
+    meetingId: number,
+    generationId: number,
+    expectedRevision: number,
+  ): Promise<MeetingWorkspaceSnapshot>;
+  redoMeetingEdit(
+    meetingId: number,
+    generationId: number,
+    expectedRevision: number,
+  ): Promise<MeetingWorkspaceSnapshot>;
+  renameMeetingSpeaker(command: {
+    meetingId: number;
+    generationId: number;
+    speakerId: number;
+    name: string;
+    expectedRevision: number;
+  }): Promise<MeetingWorkspaceSnapshot>;
+  mergeMeetingSpeakers(command: {
+    meetingId: number;
+    generationId: number;
+    targetSpeakerId: number;
+    sourceSpeakerIds: number[];
+    expectedRevision: number;
+  }): Promise<MeetingWorkspaceSnapshot>;
+  assignMeetingSpeaker(command: {
+    meetingId: number;
+    generationId: number;
+    segmentId: number;
+    state: "assigned" | "overlap" | "unknown";
+    speakerId: number | null;
+    expectedRevision: number;
+  }): Promise<MeetingWorkspaceSnapshot>;
+  controlMeetingPlayback(
+    meetingId: number,
+    command: PlaybackAction,
+  ): Promise<MeetingPlaybackSnapshot>;
+  exportMeeting(
+    meetingId: number,
+    format: MeetingExportFormat,
+  ): Promise<ExportMeetingResponse>;
 }

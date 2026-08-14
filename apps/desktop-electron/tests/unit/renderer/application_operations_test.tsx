@@ -64,6 +64,17 @@ function installOperationsApi(overrides: Partial<Voice2TextDesktopApi> = {}) {
     retryProcessing: vi.fn(),
     listProcessingTasks: vi.fn(async () => [runningTask]),
     importMeeting: vi.fn(),
+    listMeetings: vi.fn(async () => []),
+    openMeeting: vi.fn(async () => null),
+    searchTranscript: vi.fn(async () => []),
+    editMeetingSegment: vi.fn(),
+    undoMeetingEdit: vi.fn(),
+    redoMeetingEdit: vi.fn(),
+    renameMeetingSpeaker: vi.fn(),
+    mergeMeetingSpeakers: vi.fn(),
+    assignMeetingSpeaker: vi.fn(),
+    controlMeetingPlayback: vi.fn(),
+    exportMeeting: vi.fn(),
     onOperationEvent: vi.fn((listener) => {
       operationListener = listener;
       return unsubscribeOperation;

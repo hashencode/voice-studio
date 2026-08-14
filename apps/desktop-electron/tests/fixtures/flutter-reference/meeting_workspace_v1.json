@@ -1,0 +1,130 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "schema": "voice2text-electron-meeting-workspace-characterization/v1",
+  "frozenAt": "2026-08-14",
+  "flutterReference": {
+    "repositoryRevision": "8333ffe07017cde582c036fb83816dd0f8dfd603",
+    "workspaceLastChangeRevision": "faf1b3373dbfa40c452bafef83ddfa56140ed426",
+    "runtimeUse": "reference-only",
+    "prohibitedActions": [
+      "launch-flutter-desktop",
+      "inspect-flutter-runtime-profile",
+      "copy-or-migrate-flutter-runtime-profile"
+    ]
+  },
+  "sources": [
+    {
+      "path": "packages/meeting_workflows/lib/src/meeting_workspace/meeting_workspace_models.dart",
+      "sha256": "12197f1d5b7d3cce1be8e35e2a2bc724713b2e017a969bc7aea519e6efdc0aee"
+    },
+    {
+      "path": "packages/meeting_workflows/lib/src/meeting_workspace/meeting_workspace_port.dart",
+      "sha256": "14b83c13268c9bfca4575cab38c673d67fb4efa03faa7ab6fc100569135e944c"
+    },
+    {
+      "path": "packages/meeting_workflows/lib/src/meeting_workspace/meeting_workspace_service.dart",
+      "sha256": "c938740b3118854b223c4a3e32b0f481c1a3b40288caa882baddf022d111dabb"
+    },
+    {
+      "path": "packages/meeting_workflows/test/meeting_workspace_service_test.dart",
+      "sha256": "87cd32b215ae578f0f1202ed4a95064d5b0c52880053096cecfb5af1249f5c2d"
+    },
+    {
+      "path": "apps/desktop/lib/features/meetings/data/desktop_meeting_workspace_repository.dart",
+      "sha256": "16af8197bdb0e6800aa54d11e309630ce3d68ac11836a936f5aae9846b62fa4e"
+    },
+    {
+      "path": "apps/desktop/lib/features/meetings/playback/desktop_meeting_playback.dart",
+      "sha256": "8decd5e88f58aa69d77298f96fce2699b3609f307d971c091ee4d07ab7055eb3"
+    },
+    {
+      "path": "apps/desktop/lib/features/meetings/export/desktop_meeting_export.dart",
+      "sha256": "69c9913716cb96138343626546cae2a5f13eb7a578f1086c9b4c2227b25ab2c0"
+    },
+    {
+      "path": "apps/desktop/test/desktop_meeting_workspace_repository_test.dart",
+      "sha256": "511cd69ec479ada286d553c40c2a39e1bcdfc012289ce8e15b1bc13a69a9f088"
+    }
+  ],
+  "semantics": {
+    "library": {
+      "query": "trimmed case-insensitive substring",
+      "limit": { "minimum": 1, "maximum": 500 },
+      "ordering": "updated-descending then meeting-id-descending"
+    },
+    "authority": {
+      "selection": "only a complete active result publication may become an active formal generation",
+      "manualText": "stable segment manual text and review state survive a later processing publication",
+      "manualSpeaker": "stable speaker names, merges, and segment assignments survive a later processing publication",
+      "provenance": "machine text and formal generation identity remain distinct from manual values",
+      "undoRedo": "text revision history is durable; a new edit invalidates the redo branch"
+    },
+    "speakers": {
+      "states": ["assigned", "overlap", "unknown"],
+      "manualSourceWins": true
+    },
+    "playback": {
+      "privilegeOwner": "electron-main",
+      "rendererContract": "opaque meeting id and allowlisted action only",
+      "speed": { "minimum": 0.5, "maximum": 2.0 },
+      "seek": "clamped to zero and meeting duration"
+    },
+    "export": {
+      "formats": ["txt", "md", "vtt", "srt", "json"],
+      "source": "selected active generation including reviewed manual authority",
+      "destinationOwner": "electron-main",
+      "safeFilename": "path separators, colon, and control characters replaced; empty base falls back to meeting"
+    }
+  },
+  "fixtures": {
+    "mixedSpeakerMeeting": {
+      "displayName": "项目周会",
+      "durationMs": 6000,
+      "segments": [
+        {
+          "sequenceId": 0,
+          "startMs": 0,
+          "endMs": 1500,
+          "text": "确认下周发布。",
+          "speakerState": "assigned",
+          "speakerKey": "speaker-a"
+        },
+        {
+          "sequenceId": 1,
+          "startMs": 1500,
+          "endMs": 3000,
+          "text": "我会准备发布清单。",
+          "speakerState": "assigned",
+          "speakerKey": "speaker-b"
+        },
+        {
+          "sequenceId": 2,
+          "startMs": 3000,
+          "endMs": 5000,
+          "text": "好的。",
+          "speakerState": "overlap",
+          "speakerKey": null
+        }
+      ]
+    },
+    "largeTranscript": {
+      "segmentCount": 3001,
+      "targetSequenceId": 2999,
+      "targetText": "唯一检索目标",
+      "sampleCount": 20,
+      "openP95MaximumMs": 2000,
+      "searchP95MaximumMs": 200
+    }
+  },
+  "acceptance": [
+    "restart preserves active generation, manual revisions, speakers, and media-time mapping",
+    "processing retry cannot overwrite manual transcript or speaker authority",
+    "empty, partial, overlap, unknown-speaker, and 3001-segment workspaces remain usable",
+    "all review actions have keyboard and visible semantic status",
+    "Renderer receives neither media paths nor export destinations"
+  ],
+  "laterReferenceChangeDisposition": {
+    "policy": "Each later source hash change requires an explicit U7 parity disposition before closure.",
+    "changes": []
+  }
+}

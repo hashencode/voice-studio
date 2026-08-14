@@ -13,6 +13,7 @@ const config: ForgeConfig = {
     extraResource: [
       path.resolve("resources/worker"),
       path.resolve("resources/native"),
+      path.resolve("resources/playback"),
     ],
     osxSign: {},
   },

@@ -18,7 +18,49 @@ const referenceSources = [
   "packages/desktop_sherpa_worker/lib/src/sherpa_desktop_processing_engine.dart",
 ] as const;
 
+export interface PackagedWorkstationEvidence {
+  schemaVersion: 1;
+  protocol: "voice2text-u7-packaged-workstation/v1";
+  packaged: boolean;
+  meetingId: number;
+  generationId: number;
+  segmentCount: number;
+  manualRevisionSurvivedRetry: boolean;
+  productionRetryCompleted: boolean;
+  productionCancelCompleted: boolean;
+  retryTerminal: { state: string; attempt: number };
+  cancelTerminal: { state: string; attempt: number };
+  searchResultCount: number;
+  playback: {
+    initialized: boolean;
+    positionMs: number;
+    speed: number;
+    pathRedacted: boolean;
+  };
+  exported: Array<{ format: string; fileName: string; bytes: number }>;
+  rendererBoundary: string;
+  rendererDomReady: boolean;
+  rendererPreloadDriven: boolean;
+  sidebarTasksDriven: boolean;
+  importProgressObserved: boolean;
+  operationStates: string[];
+}
+
 export async function runPackagedProcessingSmoke(): Promise<ProcessingSmokeEvidence> {
+  return (await runPackagedSmoke(false)).processing;
+}
+
+export async function runPackagedLocalWorkstationSmoke(): Promise<PackagedWorkstationEvidence> {
+  const result = await runPackagedSmoke(true);
+  if (!result.workstation)
+    throw new Error("packaged workstation evidence is missing");
+  return result.workstation;
+}
+
+async function runPackagedSmoke(captureWorkstation: boolean): Promise<{
+  processing: ProcessingSmokeEvidence;
+  workstation: PackagedWorkstationEvidence | null;
+}> {
   const electronRoot = path.resolve(".");
   const repositoryRoot = path.resolve(electronRoot, "../..");
   const appRoot = path.join(
@@ -35,6 +77,10 @@ export async function runPackagedProcessingSmoke(): Promise<ProcessingSmokeEvide
   const appDataPath = path.join(processTemporaryPath, "app-data");
   const evidenceDirectory = path.join(processTemporaryPath, "evidence");
   const outputPath = path.join(evidenceDirectory, "processing-evidence.json");
+  const workstationOutputPath = path.join(
+    evidenceDirectory,
+    "workstation-evidence.json",
+  );
   await mkdir(appDataPath, { mode: 0o700 });
   await mkdir(evidenceDirectory, { mode: 0o700 });
   try {
@@ -61,6 +107,9 @@ export async function runPackagedProcessingSmoke(): Promise<ProcessingSmokeEvide
         VOICE2TEXT_PROCESSING_SMOKE_SOURCE: sourcePath,
         VOICE2TEXT_PROCESSING_SMOKE_REFERENCE_BINDINGS:
           JSON.stringify(referenceBindings),
+        ...(captureWorkstation
+          ? { VOICE2TEXT_WORKSTATION_SMOKE_OUTPUT: workstationOutputPath }
+          : {}),
       },
       stdio: ["ignore", "pipe", "pipe"],
     });
@@ -102,7 +151,45 @@ export async function runPackagedProcessingSmoke(): Promise<ProcessingSmokeEvide
     ) {
       throw new Error("packaged processing evidence is invalid");
     }
-    return receipt;
+    let workstation: PackagedWorkstationEvidence | null = null;
+    if (captureWorkstation) {
+      const workstationRaw = await readFile(workstationOutputPath);
+      if (workstationRaw.byteLength > 32_768) {
+        throw new Error(
+          "packaged workstation evidence exceeded its byte limit",
+        );
+      }
+      workstation = JSON.parse(
+        workstationRaw.toString("utf8"),
+      ) as PackagedWorkstationEvidence;
+      if (
+        workstation.schemaVersion !== 1 ||
+        workstation.protocol !== "voice2text-u7-packaged-workstation/v1" ||
+        workstation.packaged !== true ||
+        !workstation.manualRevisionSurvivedRetry ||
+        !workstation.productionRetryCompleted ||
+        !workstation.productionCancelCompleted ||
+        workstation.retryTerminal.state !== "completed" ||
+        workstation.retryTerminal.attempt < 2 ||
+        workstation.cancelTerminal.state !== "canceled" ||
+        workstation.cancelTerminal.attempt < 1 ||
+        workstation.searchResultCount < 1 ||
+        workstation.exported.length !== 5 ||
+        workstation.playback.pathRedacted !== true ||
+        workstation.rendererBoundary !==
+          "typed-preload-opaque-identifiers-only" ||
+        !workstation.rendererDomReady ||
+        !workstation.rendererPreloadDriven ||
+        !workstation.sidebarTasksDriven ||
+        !workstation.importProgressObserved ||
+        !["queued", "running"].every((state) =>
+          workstation!.operationStates.includes(state),
+        )
+      ) {
+        throw new Error("packaged workstation evidence is invalid");
+      }
+    }
+    return { processing: receipt, workstation };
   } finally {
     await rm(temporaryRoot, { force: true, recursive: true });
   }

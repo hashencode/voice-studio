@@ -15,6 +15,24 @@ import {
   type OperationEvent,
   type ShellSection,
   type Voice2TextDesktopApi,
+  listMeetingsRequestSchema,
+  listMeetingsResponseSchema,
+  openMeetingRequestSchema,
+  openMeetingResponseSchema,
+  searchTranscriptRequestSchema,
+  searchTranscriptResponseSchema,
+  editMeetingSegmentRequestSchema,
+  meetingHistoryRequestSchema,
+  renameMeetingSpeakerRequestSchema,
+  mergeMeetingSpeakersRequestSchema,
+  assignMeetingSpeakerRequestSchema,
+  controlMeetingPlaybackRequestSchema,
+  meetingPlaybackSnapshotSchema,
+  exportMeetingRequestSchema,
+  exportMeetingResponseSchema,
+  meetingWorkspaceSnapshotSchema,
+  type MeetingExportFormat,
+  type PlaybackAction,
 } from "../shared/contracts";
 
 export interface PreloadIpcBridge {
@@ -98,6 +116,101 @@ export function createDesktopApi(
         subscribed = false;
         bridge.off(ipcChannels.operationEvent, validatedListener);
       };
+    },
+    async listMeetings(query = "", limit = 200, offset = 0) {
+      const payload = listMeetingsRequestSchema.parse({ query, limit, offset });
+      const response = await bridge.invoke(ipcChannels.meetingList, payload);
+      return listMeetingsResponseSchema.parse(response).meetings;
+    },
+    async openMeeting(meetingId: number) {
+      const payload = openMeetingRequestSchema.parse({ meetingId });
+      return openMeetingResponseSchema.parse(
+        await bridge.invoke(ipcChannels.meetingOpen, payload),
+      );
+    },
+    async searchTranscript(meetingId: number, query: string, limit = 200) {
+      const payload = searchTranscriptRequestSchema.parse({
+        meetingId,
+        query,
+        limit,
+      });
+      const response = await bridge.invoke(ipcChannels.meetingSearch, payload);
+      return searchTranscriptResponseSchema.parse(response).segments;
+    },
+    async editMeetingSegment(
+      command: Parameters<Voice2TextDesktopApi["editMeetingSegment"]>[0],
+    ) {
+      const payload = editMeetingSegmentRequestSchema.parse(command);
+      return meetingWorkspaceSnapshotSchema.parse(
+        await bridge.invoke(ipcChannels.meetingEditSegment, payload),
+      );
+    },
+    async undoMeetingEdit(
+      meetingId: number,
+      generationId: number,
+      expectedRevision: number,
+    ) {
+      const payload = meetingHistoryRequestSchema.parse({
+        meetingId,
+        generationId,
+        expectedRevision,
+      });
+      return meetingWorkspaceSnapshotSchema.parse(
+        await bridge.invoke(ipcChannels.meetingUndo, payload),
+      );
+    },
+    async redoMeetingEdit(
+      meetingId: number,
+      generationId: number,
+      expectedRevision: number,
+    ) {
+      const payload = meetingHistoryRequestSchema.parse({
+        meetingId,
+        generationId,
+        expectedRevision,
+      });
+      return meetingWorkspaceSnapshotSchema.parse(
+        await bridge.invoke(ipcChannels.meetingRedo, payload),
+      );
+    },
+    async renameMeetingSpeaker(
+      command: Parameters<Voice2TextDesktopApi["renameMeetingSpeaker"]>[0],
+    ) {
+      const payload = renameMeetingSpeakerRequestSchema.parse(command);
+      return meetingWorkspaceSnapshotSchema.parse(
+        await bridge.invoke(ipcChannels.meetingRenameSpeaker, payload),
+      );
+    },
+    async mergeMeetingSpeakers(
+      command: Parameters<Voice2TextDesktopApi["mergeMeetingSpeakers"]>[0],
+    ) {
+      const payload = mergeMeetingSpeakersRequestSchema.parse(command);
+      return meetingWorkspaceSnapshotSchema.parse(
+        await bridge.invoke(ipcChannels.meetingMergeSpeakers, payload),
+      );
+    },
+    async assignMeetingSpeaker(
+      command: Parameters<Voice2TextDesktopApi["assignMeetingSpeaker"]>[0],
+    ) {
+      const payload = assignMeetingSpeakerRequestSchema.parse(command);
+      return meetingWorkspaceSnapshotSchema.parse(
+        await bridge.invoke(ipcChannels.meetingAssignSpeaker, payload),
+      );
+    },
+    async controlMeetingPlayback(meetingId: number, command: PlaybackAction) {
+      const payload = controlMeetingPlaybackRequestSchema.parse({
+        meetingId,
+        command,
+      });
+      return meetingPlaybackSnapshotSchema.parse(
+        await bridge.invoke(ipcChannels.meetingPlayback, payload),
+      );
+    },
+    async exportMeeting(meetingId: number, format: MeetingExportFormat) {
+      const payload = exportMeetingRequestSchema.parse({ meetingId, format });
+      return exportMeetingResponseSchema.parse(
+        await bridge.invoke(ipcChannels.meetingExport, payload),
+      );
     },
   });
 }
