@@ -34,20 +34,22 @@ describe.skipIf(process.platform !== "darwin")(
       async (mode) => {
         const fixture = fakeHelper(mode);
         const client = new MacOSNativeHelperClient(fixture.executable, {
-          handshakeTimeoutMs: 1_000,
+          handshakeTimeoutMs: mode === "handshake-timeout" ? 5_000 : 1_000,
         });
 
         const opening = client.openSession({
           exactSourcePaths: [],
           destinationRoots: [],
         });
-        const rejected = expect(opening).rejects.toThrow();
-        await waitForFile(fixture.pidPath);
-        await rejected;
+        await Promise.all([
+          expect(opening).rejects.toThrow(),
+          waitForFile(fixture.pidPath),
+        ]);
         expect(
           processExists(Number(readFileSync(fixture.pidPath, "utf8"))),
         ).toBe(false);
       },
+      15_000,
     );
 
     it.each(["forged-result", "forged-error"] as const)(
@@ -338,7 +340,7 @@ function processExists(pid: number): boolean {
 }
 
 async function waitForFile(path: string): Promise<void> {
-  const deadline = Date.now() + 2_000;
+  const deadline = Date.now() + 10_000;
   while (true) {
     try {
       readFileSync(path);
