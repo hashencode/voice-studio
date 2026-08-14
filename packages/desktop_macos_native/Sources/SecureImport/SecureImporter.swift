@@ -344,7 +344,10 @@ public func cleanupSecureImportTemporaryFiles(
   now: Date = Date()
 ) throws -> Int {
   guard age >= 0 else { return 0 }
-  let root = URL(filePath: destinationRoot, directoryHint: .isDirectory).standardizedFileURL
+  // `standardizedFileURL` resolves macOS' `/var` alias even when the caller
+  // supplied the symlink-free `/private/var` authority. Keep normalization
+  // lexical so the dirfd walk validates the exact capability path.
+  let root = URL(filePath: destinationRoot, directoryHint: .isDirectory).standardized
   let rootFD = try openDirectoryChainWithoutSymlinks(root.path)
   defer { Darwin.close(rootFD) }
   let stagingFD = openat(
@@ -387,9 +390,9 @@ public func cleanupSecureImportTemporaryFiles(
 }
 
 public func discardSecureImportedFile(path: String, destinationRoot: String) throws {
-  let root = URL(filePath: destinationRoot, directoryHint: .isDirectory).standardizedFileURL
+  let root = URL(filePath: destinationRoot, directoryHint: .isDirectory).standardized
   let complete = root.appending(path: "complete", directoryHint: .isDirectory)
-  let target = URL(filePath: path).standardizedFileURL
+  let target = URL(filePath: path).standardized
   let name = target.lastPathComponent
   guard target.deletingLastPathComponent().path == complete.path,
     !name.isEmpty, name != ".", name != "..", !name.contains("/")

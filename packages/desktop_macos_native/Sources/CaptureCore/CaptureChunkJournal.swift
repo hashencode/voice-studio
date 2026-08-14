@@ -32,6 +32,9 @@ final class CaptureChunkJournal {
 #if DEBUG
   nonisolated(unsafe) static var durabilityObserver: ((String) -> Void)?
   nonisolated(unsafe) static var recoveryRootPinnedObserver: (() -> Void)?
+  nonisolated(unsafe) static var captionSpoolAppendObserver: (() throws -> Void)?
+  nonisolated(unsafe) static var captionSpoolRebuildObserver: (() throws -> Void)?
+  nonisolated(unsafe) static var captionSpoolFinalizeObserver: (() throws -> Void)?
 #endif
   private static let maximumChunks = 100_000
   private static let maximumEvents = 100_000
@@ -54,6 +57,7 @@ final class CaptureChunkJournal {
   private var tracks = [[String: Any]]()
   private var failedTracks = Set<NativeCaptureTrack>()
   private var captionSpool: CaptionPcmSpoolWriter?
+  private var finalizedCaptionSpool: [String: Any]?
   private let failureHandler: ((NativeCaptureTrack, String) -> Void)?
 
   init(
@@ -152,7 +156,21 @@ final class CaptureChunkJournal {
         return
       }
       do {
-        try? self.captionSpool?.append(buffer, track: kind)
+        do {
+#if DEBUG
+          try Self.captionSpoolAppendObserver?()
+#endif
+          try self.captionSpool?.append(buffer, track: kind)
+        } catch {
+          try? self.captionSpool?.finalize()
+          self.captionSpool = nil
+          self.recordEvent(
+            kind: "caption_degraded",
+            track: kind.rawValue,
+            reason: "caption_spool_append_failed",
+            at: self.captureTimelineMs
+          )
+        }
         if let chunk = try writer.append(buffer) {
           self.triggerDevelopmentCrash(stage: "during_finalize", code: 87)
           self.chunks.append(chunk)
@@ -211,8 +229,42 @@ final class CaptureChunkJournal {
       captureTimelineMs = max(captureTimelineMs, timelineMs)
       try persist()
       try finalizeOpenChunks()
-      try captionSpool?.finalize()
+      do {
+#if DEBUG
+        try Self.captionSpoolFinalizeObserver?()
+#endif
+        try captionSpool?.finalize()
+      } catch {
+        try? captionSpool?.finalize()
+        if events.count < Self.maximumEvents {
+          events.append([
+            "sequence": events.count,
+            "monotonicMs": max(0, captureTimelineMs),
+            "kind": "caption_degraded",
+            "track": "all",
+            "reason": "caption_spool_finalize_failed",
+          ])
+        }
+      }
       captionSpool = nil
+      let expectedDurationMs = Self.maximumChunkEndMs(chunks)
+      if Self.rebuildCaptionSpoolIfNeeded(at: root, validatedChunks: chunks) {
+        finalizedCaptionSpool = try? Self.captionSpoolAuthority(
+          at: root,
+          captureTimelineMs: captureTimelineMs,
+          expectedDurationMs: expectedDurationMs,
+          gapCount: Self.gapCount(events)
+        )
+      }
+      if finalizedCaptionSpool == nil, events.count < Self.maximumEvents {
+        events.append([
+          "sequence": events.count,
+          "monotonicMs": max(0, captureTimelineMs),
+          "kind": "caption_degraded",
+          "track": "all",
+          "reason": "caption_spool_rebuild_failed",
+        ])
+      }
       state = partial ? "partial_capture" : "completed"
       try persist()
     }
@@ -325,7 +377,7 @@ final class CaptureChunkJournal {
       "tracks": tracks,
       "chunks": chunks,
       "events": events,
-      "spool": [
+      "spool": finalizedCaptionSpool ?? [
         "relativePath": "caption/live-caption.pcmspool",
         "format": "s16le",
         "sampleRate": 16000,
@@ -466,26 +518,56 @@ final class CaptureChunkJournal {
       }
     }
 
-    let captionSpoolRebuilt = rebuildCaptionSpoolIfNeeded(
-      at: root,
-      validatedChunks: validatedChunks
+    let spoolWasBound = captionSpoolMatchesJournal(at: root, document: document)
+    let previousSpool = document["spool"] as? NSDictionary
+    let captionSpoolRebuilt = spoolWasBound ? false : rebuildCaptionSpoolIfNeeded(
+      at: root, validatedChunks: validatedChunks
     )
     let captionSpoolUsable = hasCompleteCaptionFrame(at: root)
+    let recordedTimelineMs =
+      (document["captureTimelineMs"] as? NSNumber)?.intValue ?? lastSafeChunkMs
+    if captionSpoolUsable,
+      let authority = try? captionSpoolAuthority(
+        at: root,
+        captureTimelineMs: max(recordedTimelineMs, lastSafeChunkMs),
+        expectedDurationMs: maximumChunkEndMs(validatedChunks),
+        gapCount: gapCount((document["events"] as? [[String: Any]]) ?? [])
+      )
+    {
+      document["spool"] = authority
+    } else if !spoolWasBound {
+      document["spool"] = [
+        "relativePath": "caption/live-caption.pcmspool",
+        "format": "s16le",
+        "sampleRate": 16_000,
+        "channels": 1,
+        "frameDurationMs": 100,
+        "disposable": true,
+        "complete": false,
+        "formalEligible": false,
+        "error": "caption_spool_rebuild_failed",
+      ]
+    }
+    let spoolProofChanged = !(previousSpool?.isEqual(to: document["spool"] as? [AnyHashable: Any] ?? [:]) ?? false)
 
-    if document["state"] as? String != "completed" || invalidFinalized > 0 {
+    if document["state"] as? String != "completed" || invalidFinalized > 0 || spoolProofChanged {
       guard directoryIdentityMatches(root, pinnedRoot) else { return nil }
       let previousState = document["state"] as? String
       let recordedTimelineMs =
         (document["captureTimelineMs"] as? NSNumber)?.intValue ?? 0
       let recoveredTimelineMs = max(recordedTimelineMs, lastSafeChunkMs)
-      let recoveredState = invalidFinalized > 0 ||
-        previousState == "partial_capture" ||
-        previousState == "failed"
-        ? "partial_capture"
-        : "recoverable"
+      let recoveredState: String
+      if invalidFinalized > 0 || previousState == "partial_capture" || previousState == "failed" {
+        recoveredState = "partial_capture"
+      } else if previousState == "completed" {
+        recoveredState = "completed"
+      } else {
+        recoveredState = "recoverable"
+      }
       if invalidFinalized > 0 ||
         previousState != recoveredState ||
-        recordedTimelineMs != recoveredTimelineMs
+        recordedTimelineMs != recoveredTimelineMs ||
+        spoolProofChanged
       {
         document["captureTimelineMs"] = recoveredTimelineMs
         document["state"] = recoveredState
@@ -542,8 +624,6 @@ final class CaptureChunkJournal {
     at root: URL,
     validatedChunks: [[String: Any]]
   ) -> Bool {
-    guard !hasCompleteCaptionFrame(at: root) else { return false }
-
     var chunksByTrack = [NativeCaptureTrack: [[String: Any]]]()
     for track in NativeCaptureTrack.allCases {
       let matching = validatedChunks
@@ -575,6 +655,9 @@ final class CaptureChunkJournal {
     )
 
     do {
+#if DEBUG
+      try captionSpoolRebuildObserver?()
+#endif
       try createPrivateDirectory(captionDirectory)
       FileManager.default.createFile(
         atPath: temporary.path,
@@ -693,6 +776,85 @@ final class CaptureChunkJournal {
       return false
     }
     return bytes >= CaptionPcmSpoolWriter.frameBytes
+  }
+
+  private static func captionSpoolMatchesJournal(
+    at root: URL,
+    document: [String: Any]
+  ) -> Bool {
+    guard
+      let spool = document["spool"] as? [String: Any],
+      spool["complete"] as? Bool == true,
+      spool["disposable"] as? Bool == true,
+      spool["formalEligible"] as? Bool == true,
+      let expectedBytes = (spool["bytes"] as? NSNumber)?.intValue,
+      expectedBytes > 0,
+      expectedBytes % CaptionPcmSpoolWriter.frameBytes == 0,
+      let expectedHash = spool["sha256"] as? String,
+      expectedHash.count == 64
+    else {
+      return false
+    }
+    let url = root.appendingPathComponent("caption/live-caption.pcmspool")
+    guard
+      let pinned = try? readPinnedRegularFile(
+        url,
+        expectedBytes: Int64(expectedBytes),
+        maximumBytes: 4 * 60 * 60 * 16_000 * 2,
+        collect: false
+      )
+    else {
+      return false
+    }
+    return pinned.sha256 == expectedHash
+  }
+
+  private static func captionSpoolAuthority(
+    at root: URL,
+    captureTimelineMs: Int,
+    expectedDurationMs: Int,
+    gapCount: Int
+  ) throws -> [String: Any] {
+    let url = root.appendingPathComponent("caption/live-caption.pcmspool")
+    let values = try url.resourceValues(forKeys: [.fileSizeKey])
+    let bytes = values.fileSize ?? 0
+    guard
+      bytes > 0,
+      bytes <= 4 * 60 * 60 * 16_000 * 2,
+      bytes % CaptionPcmSpoolWriter.frameBytes == 0,
+      bytes / 32 == ((expectedDurationMs + 99) / 100) * 100
+    else {
+      throw CaptureFailure("CAPTURE_SPOOL_INVALID", "caption spool is incomplete")
+    }
+    return [
+      "relativePath": "caption/live-caption.pcmspool",
+      "format": "s16le",
+      "sampleRate": 16_000,
+      "channels": 1,
+      "frameDurationMs": 100,
+      // CAF chunks and the journal remain the recording authority. This
+      // derived processing input is disposable and deterministically rebuilt.
+      "disposable": true,
+      "complete": true,
+      "formalEligible": true,
+      "bytes": bytes,
+      "sha256": try sha256(url),
+      "durationMs": bytes / 32,
+      "captureTimelineMs": max(0, captureTimelineMs),
+      "gapCount": max(0, gapCount),
+    ]
+  }
+
+  private static func gapCount(_ events: [[String: Any]]) -> Int {
+    events.filter {
+      ["track_gap", "device_changed", "encoder_failed"].contains(
+        $0["kind"] as? String ?? ""
+      )
+    }.count
+  }
+
+  private static func maximumChunkEndMs(_ chunks: [[String: Any]]) -> Int {
+    chunks.compactMap { ($0["endMs"] as? NSNumber)?.intValue }.max() ?? 0
   }
 
   static func clone(_ source: AVAudioPCMBuffer) -> AVAudioPCMBuffer? {

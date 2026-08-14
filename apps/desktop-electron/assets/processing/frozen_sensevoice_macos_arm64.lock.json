@@ -1,0 +1,11 @@
+{
+  "schemaVersion": 1,
+  "target": "darwin-arm64",
+  "frozenReferenceSha256": "c2bade93dc7b55e42f1038eb09b81fdd6e84b0e153d1051d5efe131f52346011",
+  "archiveBytes": 1047870769,
+  "vadBytes": 643854,
+  "archiveMembers": {
+    "model": "sherpa-onnx-sense-voice-zh-en-ja-ko-yue-2024-07-17/model.int8.onnx",
+    "tokens": "sherpa-onnx-sense-voice-zh-en-ja-ko-yue-2024-07-17/tokens.txt"
+  }
+}

@@ -48,6 +48,47 @@ interface FrozenAuthority {
   files: FrozenFile[];
 }
 
+interface FrozenSenseVoiceAuthority {
+  schemaVersion: number;
+  setId: string;
+  platform: string;
+  architecture: string;
+  developmentPosture: string;
+  status: string;
+  distributionEligible: boolean;
+  developmentEligible: boolean;
+  licenseDisposition: string;
+  model: {
+    source: string;
+    archiveSha256: string;
+    modelRelativePath: string;
+    modelSha256: string;
+    tokensRelativePath: string;
+    tokensSha256: string;
+  };
+  vad: { source: string; sha256: string };
+  control: {
+    runtime: string;
+    provider: string;
+    threads: number;
+    concurrency: number;
+    decodingMethod: string;
+    language: string;
+    useInverseTextNormalization: boolean;
+    maximumUtteranceSeconds: number;
+    publishesTokenPartials: boolean;
+  };
+}
+
+interface FrozenSenseVoiceLock {
+  schemaVersion: number;
+  target: string;
+  frozenReferenceSha256: string;
+  archiveBytes: number;
+  vadBytes: number;
+  archiveMembers: { model: string; tokens: string };
+}
+
 const runtimeArchive = {
   id: "sherpa-onnx-macos-runtime",
   package: "sherpa_onnx_macos",
@@ -70,12 +111,34 @@ const rootLockPath = path.resolve(process.argv[4] ?? "../../pubspec.lock");
 const temporaryRoot = process.argv[5]
   ? await validatedSuppliedTemporaryRoot(process.argv[5])
   : await mkdtemp(path.join(os.tmpdir(), "voice2text-electron-sherpa-"));
+const senseVoiceAuthorityPath = path.resolve(
+  process.argv[6] ??
+    "../desktop/assets/processing/frozen_sensevoice_macos_arm64.json",
+);
+const senseVoiceLockPath = path.resolve(
+  process.argv[7] ??
+    "assets/processing/frozen_sensevoice_macos_arm64.lock.json",
+);
+const liveCaptionOnly = process.env.VOICE2TEXT_LIVE_CAPTION_ONLY === "1";
 
 try {
   const authorityBytes = await readFile(authorityPath);
+  const senseVoiceAuthorityBytes = await readFile(senseVoiceAuthorityPath);
+  const senseVoiceLock = validateSenseVoiceLock(
+    JSON.parse(await readFile(senseVoiceLockPath, "utf8")) as unknown,
+  );
+  if (
+    createHash("sha256").update(senseVoiceAuthorityBytes).digest("hex") !==
+    senseVoiceLock.frozenReferenceSha256
+  ) {
+    throw new Error("frozen SenseVoice reference hash disagrees with lock");
+  }
   assertRuntimeLock(await readFile(rootLockPath, "utf8"));
   const authority = validateAuthority(
     JSON.parse(authorityBytes.toString("utf8")) as unknown,
+  );
+  const senseVoiceAuthority = validateSenseVoiceAuthority(
+    JSON.parse(senseVoiceAuthorityBytes.toString("utf8")) as unknown,
   );
   await mkdir(path.join(outputRoot, "models"), {
     recursive: true,
@@ -88,117 +151,156 @@ try {
 
   const sourceReceipts: Array<Record<string, unknown>> = [];
   const memberReceipts: Array<Record<string, unknown>> = [];
-  for (const download of authority.downloads) {
-    const downloadPath = path.join(temporaryRoot, `${download.id}.download`);
-    await freshDownload(download.source, downloadPath);
-    await assertFileIdentity(downloadPath, download.bytes, download.sha256);
-    sourceReceipts.push({
-      id: download.id,
-      source: download.source,
-      bytes: download.bytes,
-      sha256: download.sha256,
-    });
-    const members = authority.files.filter(
-      (candidate) => candidate.downloadId === download.id,
-    );
-    const extractionRoot = path.join(temporaryRoot, `${download.id}.members`);
-    if (download.kind === "tar.bz2") {
-      await extractMembers(
-        downloadPath,
-        extractionRoot,
-        members.map((member) => member.archiveMember ?? ""),
-        "j",
+  if (!liveCaptionOnly) {
+    for (const download of authority.downloads) {
+      const downloadPath = path.join(temporaryRoot, `${download.id}.download`);
+      await freshDownload(download.source, downloadPath);
+      await assertFileIdentity(downloadPath, download.bytes, download.sha256);
+      sourceReceipts.push({
+        id: download.id,
+        source: download.source,
+        bytes: download.bytes,
+        sha256: download.sha256,
+      });
+      const members = authority.files.filter(
+        (candidate) => candidate.downloadId === download.id,
       );
+      const extractionRoot = path.join(temporaryRoot, `${download.id}.members`);
+      if (download.kind === "tar.bz2") {
+        await extractMembers(
+          downloadPath,
+          extractionRoot,
+          members.map((member) => member.archiveMember ?? ""),
+          "j",
+        );
+      }
+      for (const member of members) {
+        const destination = containedOutput(
+          outputRoot,
+          path.join("models", member.relativePath),
+        );
+        await mkdir(path.dirname(destination), {
+          recursive: true,
+          mode: 0o700,
+        });
+        if (download.kind === "file") {
+          if (member.archiveMember !== undefined) {
+            throw new Error(
+              "direct frozen download unexpectedly names a member",
+            );
+          }
+          await copyFile(downloadPath, destination);
+        } else {
+          if (!member.archiveMember) {
+            throw new Error("frozen archive member is missing");
+          }
+          const extracted = containedOutput(
+            extractionRoot,
+            member.archiveMember,
+          );
+          await assertPrivateRegularFile(extracted, extractionRoot);
+          await copyFile(extracted, destination);
+        }
+        await assertFileIdentity(destination, member.bytes, member.sha256);
+        memberReceipts.push({
+          path: path.relative(outputRoot, destination),
+          downloadId: member.downloadId,
+          archiveMember: member.archiveMember,
+          bytes: member.bytes,
+          sha256: member.sha256,
+        });
+      }
+      await rm(downloadPath, { force: true });
     }
-    for (const member of members) {
+
+    const runtimeDownloadPath = path.join(temporaryRoot, "runtime.tar.gz");
+    await freshDownload(runtimeArchive.source, runtimeDownloadPath);
+    const runtimeArchiveIdentity =
+      await sha256FileWithShasum(runtimeDownloadPath);
+    if (runtimeArchiveIdentity !== runtimeArchive.sha256) {
+      throw new Error("fresh Sherpa runtime archive hash mismatch");
+    }
+    sourceReceipts.push({
+      id: runtimeArchive.id,
+      source: runtimeArchive.source,
+      bytes: (await stat(runtimeDownloadPath)).size,
+      sha256: runtimeArchive.sha256,
+    });
+    const runtimeExtractionRoot = path.join(temporaryRoot, "runtime-members");
+    await extractMembers(
+      runtimeDownloadPath,
+      runtimeExtractionRoot,
+      runtimeMembers.map((name) => `macos/${name}`),
+      "z",
+    );
+    for (const runtimeName of runtimeMembers) {
       const destination = containedOutput(
         outputRoot,
-        path.join("models", member.relativePath),
+        path.join("runtime", runtimeName),
       );
-      await mkdir(path.dirname(destination), { recursive: true, mode: 0o700 });
-      if (download.kind === "file") {
-        if (member.archiveMember !== undefined) {
-          throw new Error("direct frozen download unexpectedly names a member");
-        }
-        await copyFile(downloadPath, destination);
-      } else {
-        if (!member.archiveMember) {
-          throw new Error("frozen archive member is missing");
-        }
-        const extracted = containedOutput(extractionRoot, member.archiveMember);
-        await assertPrivateRegularFile(extracted, extractionRoot);
-        await copyFile(extracted, destination);
-      }
-      await assertFileIdentity(destination, member.bytes, member.sha256);
+      const extracted = containedOutput(
+        runtimeExtractionRoot,
+        `macos/${runtimeName}`,
+      );
+      await assertPrivateRegularFile(extracted, runtimeExtractionRoot);
+      await copyFile(extracted, destination);
       memberReceipts.push({
         path: path.relative(outputRoot, destination),
-        downloadId: member.downloadId,
-        archiveMember: member.archiveMember,
-        bytes: member.bytes,
-        sha256: member.sha256,
+        downloadId: runtimeArchive.id,
+        archiveMember: `macos/${runtimeName}`,
+        bytes: (await stat(destination)).size,
+        sha256: await sha256FileWithShasum(destination),
       });
     }
-    await rm(downloadPath, { force: true });
   }
 
-  const runtimeDownloadPath = path.join(temporaryRoot, "runtime.tar.gz");
-  await freshDownload(runtimeArchive.source, runtimeDownloadPath);
-  const runtimeArchiveIdentity = await sha256(runtimeDownloadPath);
-  if (runtimeArchiveIdentity !== runtimeArchive.sha256) {
-    throw new Error("fresh Sherpa runtime archive hash mismatch");
-  }
-  sourceReceipts.push({
-    id: runtimeArchive.id,
-    source: runtimeArchive.source,
-    bytes: (await stat(runtimeDownloadPath)).size,
-    sha256: runtimeArchive.sha256,
+  await materializeSenseVoice({
+    authority: senseVoiceAuthority,
+    lock: senseVoiceLock,
+    outputRoot,
+    temporaryRoot,
+    sourceReceipts,
+    memberReceipts,
   });
-  const runtimeExtractionRoot = path.join(temporaryRoot, "runtime-members");
-  await extractMembers(
-    runtimeDownloadPath,
-    runtimeExtractionRoot,
-    runtimeMembers.map((name) => `macos/${name}`),
-    "z",
-  );
-  for (const runtimeName of runtimeMembers) {
-    const destination = containedOutput(
-      outputRoot,
-      path.join("runtime", runtimeName),
-    );
-    const extracted = containedOutput(
-      runtimeExtractionRoot,
-      `macos/${runtimeName}`,
-    );
-    await assertPrivateRegularFile(extracted, runtimeExtractionRoot);
-    await copyFile(extracted, destination);
-    memberReceipts.push({
-      path: path.relative(outputRoot, destination),
-      downloadId: runtimeArchive.id,
-      archiveMember: `macos/${runtimeName}`,
-      bytes: (await stat(destination)).size,
-      sha256: await sha256(destination),
-    });
-  }
 
+  if (!liveCaptionOnly) {
+    await writeFile(
+      path.join(outputRoot, "frozen-authority.json"),
+      authorityBytes,
+      { mode: 0o600 },
+    );
+  }
   await writeFile(
-    path.join(outputRoot, "frozen-authority.json"),
-    authorityBytes,
-    {
-      mode: 0o600,
-    },
+    path.join(outputRoot, "frozen-sensevoice-authority.json"),
+    senseVoiceAuthorityBytes,
+    { mode: 0o600 },
   );
   await writeFile(
-    path.join(outputRoot, "frozen-resource-build.json"),
+    path.join(
+      outputRoot,
+      liveCaptionOnly
+        ? "frozen-live-caption-resource-build.json"
+        : "frozen-resource-build.json",
+    ),
     `${JSON.stringify(
       {
         schemaVersion: 1,
         developmentOnly: true,
         distributionEligible: authority.distributionEligible,
-        licenseDisposition: authority.licenseDisposition,
-        setId: authority.setId,
-        contentKey: authority.contentKey,
-        authoritySha256: createHash("sha256")
-          .update(authorityBytes)
+        licenseDisposition: liveCaptionOnly
+          ? senseVoiceAuthority.licenseDisposition
+          : authority.licenseDisposition,
+        setId: liveCaptionOnly ? senseVoiceAuthority.setId : authority.setId,
+        ...(liveCaptionOnly
+          ? {}
+          : {
+              contentKey: authority.contentKey,
+              authoritySha256: createHash("sha256")
+                .update(authorityBytes)
+                .digest("hex"),
+            }),
+        liveCaptionAuthoritySha256: createHash("sha256")
+          .update(senseVoiceAuthorityBytes)
           .digest("hex"),
         sources: sourceReceipts,
         members: memberReceipts,
@@ -210,6 +312,161 @@ try {
   );
 } finally {
   await rm(temporaryRoot, { force: true, recursive: true });
+}
+
+async function materializeSenseVoice(input: {
+  authority: FrozenSenseVoiceAuthority;
+  lock: FrozenSenseVoiceLock;
+  outputRoot: string;
+  temporaryRoot: string;
+  sourceReceipts: Array<Record<string, unknown>>;
+  memberReceipts: Array<Record<string, unknown>>;
+}): Promise<void> {
+  const { authority, lock, outputRoot, temporaryRoot } = input;
+  const archivePath = path.join(temporaryRoot, "sensevoice-model.download");
+  await freshDownload(authority.model.source, archivePath);
+  await assertFileIdentity(
+    archivePath,
+    lock.archiveBytes,
+    authority.model.archiveSha256,
+  );
+  input.sourceReceipts.push({
+    id: "sensevoice-model-archive",
+    source: authority.model.source,
+    bytes: lock.archiveBytes,
+    sha256: authority.model.archiveSha256,
+  });
+  const members = [
+    {
+      source: lock.archiveMembers.model,
+      destination: "models/live-caption/model.int8.onnx",
+      sha256: authority.model.modelSha256,
+    },
+    {
+      source: lock.archiveMembers.tokens,
+      destination: "models/live-caption/tokens.txt",
+      sha256: authority.model.tokensSha256,
+    },
+  ];
+  const extractionRoot = path.join(temporaryRoot, "sensevoice-model.members");
+  await extractMembers(
+    archivePath,
+    extractionRoot,
+    members.map((member) => member.source),
+    "j",
+  );
+  for (const member of members) {
+    const source = containedOutput(extractionRoot, member.source);
+    await assertPrivateRegularFile(source, extractionRoot);
+    const destination = containedOutput(outputRoot, member.destination);
+    await mkdir(path.dirname(destination), { recursive: true, mode: 0o700 });
+    await copyFile(source, destination);
+    const bytes = (await stat(destination)).size;
+    await assertFileSha256(destination, member.sha256);
+    input.memberReceipts.push({
+      path: member.destination,
+      downloadId: "sensevoice-model-archive",
+      archiveMember: member.source,
+      bytes,
+      sha256: member.sha256,
+    });
+  }
+
+  const vadDownload = path.join(temporaryRoot, "sensevoice-vad.download");
+  await freshDownload(authority.vad.source, vadDownload);
+  await assertFileIdentity(vadDownload, lock.vadBytes, authority.vad.sha256);
+  const vadDestination = containedOutput(
+    outputRoot,
+    "models/live-caption/silero_vad.onnx",
+  );
+  await mkdir(path.dirname(vadDestination), { recursive: true, mode: 0o700 });
+  await copyFile(vadDownload, vadDestination);
+  await assertFileIdentity(vadDestination, lock.vadBytes, authority.vad.sha256);
+  input.sourceReceipts.push({
+    id: "sensevoice-silero-vad",
+    source: authority.vad.source,
+    bytes: lock.vadBytes,
+    sha256: authority.vad.sha256,
+  });
+  input.memberReceipts.push({
+    path: "models/live-caption/silero_vad.onnx",
+    downloadId: "sensevoice-silero-vad",
+    bytes: lock.vadBytes,
+    sha256: authority.vad.sha256,
+  });
+}
+
+function validateSenseVoiceAuthority(raw: unknown): FrozenSenseVoiceAuthority {
+  if (!raw || typeof raw !== "object" || Array.isArray(raw)) {
+    throw new Error("frozen SenseVoice authority is invalid");
+  }
+  const authority = raw as Partial<FrozenSenseVoiceAuthority>;
+  const model = authority.model;
+  const vad = authority.vad;
+  const control = authority.control;
+  if (
+    authority.schemaVersion !== 1 ||
+    authority.platform !== "macos" ||
+    authority.architecture !== "arm64" ||
+    authority.developmentPosture !== "DEVELOPMENT_ONLY" ||
+    authority.status !== "PASS" ||
+    authority.distributionEligible !== false ||
+    authority.developmentEligible !== true ||
+    authority.licenseDisposition !== "LOCAL_DEVELOPMENT_BENCHMARK_ONLY" ||
+    typeof authority.setId !== "string" ||
+    !authority.setId.startsWith("sensevoice-live-caption-macos-arm64-") ||
+    !model ||
+    !isOfficialSource(model.source) ||
+    !isSha256(model.archiveSha256) ||
+    model.modelRelativePath !== "model.int8.onnx" ||
+    !isSha256(model.modelSha256) ||
+    model.tokensRelativePath !== "tokens.txt" ||
+    !isSha256(model.tokensSha256) ||
+    !vad ||
+    !isOfficialSource(vad.source) ||
+    !isSha256(vad.sha256) ||
+    !control ||
+    control.runtime !== "sherpa-onnx-1.13.4-ort-1.27.0" ||
+    control.provider !== "cpu" ||
+    control.threads !== 2 ||
+    control.concurrency !== 1 ||
+    control.decodingMethod !== "greedy_search" ||
+    control.language !== "auto" ||
+    control.useInverseTextNormalization !== false ||
+    control.maximumUtteranceSeconds !== 15 ||
+    control.publishesTokenPartials !== false
+  ) {
+    throw new Error(
+      "frozen SenseVoice authority does not match the macOS arm64 development contract",
+    );
+  }
+  return authority as FrozenSenseVoiceAuthority;
+}
+
+function validateSenseVoiceLock(raw: unknown): FrozenSenseVoiceLock {
+  if (!raw || typeof raw !== "object" || Array.isArray(raw)) {
+    throw new Error("frozen SenseVoice lock is invalid");
+  }
+  const lock = raw as Partial<FrozenSenseVoiceLock>;
+  const archiveBytes = lock.archiveBytes;
+  const vadBytes = lock.vadBytes;
+  if (
+    lock.schemaVersion !== 1 ||
+    lock.target !== "darwin-arm64" ||
+    !isSha256(lock.frozenReferenceSha256) ||
+    !Number.isSafeInteger(archiveBytes) ||
+    archiveBytes === undefined ||
+    archiveBytes <= 0 ||
+    !Number.isSafeInteger(vadBytes) ||
+    vadBytes === undefined ||
+    vadBytes <= 0 ||
+    !lock.archiveMembers ||
+    !safeRelativePath(lock.archiveMembers.model) ||
+    !safeRelativePath(lock.archiveMembers.tokens)
+  ) {
+    throw new Error("frozen SenseVoice lock is invalid");
+  }
+  return lock as FrozenSenseVoiceLock;
 }
 
 function validateAuthority(raw: unknown): FrozenAuthority {
@@ -404,13 +661,18 @@ async function assertFileIdentity(
   if (!metadata.isFile() || metadata.size !== expectedBytes) {
     throw new Error(`resource byte length mismatch: ${path.basename(file)}`);
   }
-  if ((await sha256(file)) !== expectedSha256) {
+  if ((await sha256FileWithShasum(file)) !== expectedSha256) {
     throw new Error(`resource SHA-256 mismatch: ${path.basename(file)}`);
   }
 }
 
-async function sha256(file: string): Promise<string> {
-  return await sha256FileWithShasum(file);
+async function assertFileSha256(
+  file: string,
+  expectedSha256: string,
+): Promise<void> {
+  if ((await sha256FileWithShasum(file)) !== expectedSha256) {
+    throw new Error(`resource SHA-256 mismatch: ${path.basename(file)}`);
+  }
 }
 
 async function run(

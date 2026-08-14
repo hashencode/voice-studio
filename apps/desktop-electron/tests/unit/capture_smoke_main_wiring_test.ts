@@ -9,7 +9,7 @@ it("routes every packaged smoke through its isolated appData and fails blocked p
     "utf8",
   );
   expect(source).toContain('smokeAppDataPath ?? app.getPath("appData")');
-  expect(source).toContain(
-    "if (processingSmokeRequest || captureSmokeRequest)",
+  expect(source).toMatch(
+    /if \(\s*processingSmokeRequest \|\|\s*captureSmokeRequest \|\|\s*captionFormalSmokeRequest\s*\)/,
   );
 });

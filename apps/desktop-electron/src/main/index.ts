@@ -28,6 +28,7 @@ import {
   type ImportMeetingResponse,
   type OperationEvent,
   type CaptureSnapshot,
+  type CaptionSnapshot,
 } from "../shared/contracts";
 import { DesktopApplicationState } from "./application/application_state";
 import {
@@ -93,22 +94,38 @@ import { sha256File } from "./security/sha256_file";
 import { DesktopRepository } from "./storage/desktop_repository";
 import { MeetingWorkspaceRepository } from "./storage/repositories/meeting_workspace_repository";
 import { CaptureRepository } from "./storage/repositories/capture_repository";
+import { TranscriptRepository } from "./storage/repositories/transcript_repository";
+import { LiveCaptionService } from "./domain/captions/live_caption_service";
+import { CaptionWorkerSupervisor } from "./processes/caption_worker_supervisor";
+import { FormalTranscriptHandoffService } from "./domain/captions/formal_transcript_handoff_service";
+import { prepareFormalCaptureMedia } from "./domain/captions/formal_capture_media";
+import { finalizeCommittedCaptureTranscript } from "./domain/captions/capture_formal_completion";
 import { WorkerHealthSupervisor } from "./worker_health";
 
 let processingSmokeRequest: ProcessingSmokeRequest | null = null;
 let captureSmokeRequest: CaptureSmokeRequest | null = null;
+let captionFormalSmokeRequest: CaptionFormalSmokeRequest | null = null;
 try {
   processingSmokeRequest = readProcessingSmokeRequest();
   captureSmokeRequest = readCaptureSmokeRequest();
+  captionFormalSmokeRequest = readCaptionFormalSmokeRequest();
 } catch (error) {
   reportBootstrapFailure("request-parse", error);
   app.exit(78);
 }
-if (processingSmokeRequest && captureSmokeRequest) {
+if (
+  [
+    processingSmokeRequest,
+    captureSmokeRequest,
+    captionFormalSmokeRequest,
+  ].filter(Boolean).length > 1
+) {
   throw new Error("packaged smoke modes are mutually exclusive");
 }
 const smokeAppDataPath =
-  processingSmokeRequest?.appDataPath ?? captureSmokeRequest?.appDataPath;
+  processingSmokeRequest?.appDataPath ??
+  captureSmokeRequest?.appDataPath ??
+  captionFormalSmokeRequest?.appDataPath;
 if (smokeAppDataPath) {
   const smokeUserData = path.join(smokeAppDataPath, "electron-user-data");
   mkdirSync(smokeUserData, { recursive: true, mode: 0o700 });
@@ -131,6 +148,19 @@ interface CaptureSmokeRequest {
   phase: "initialize" | "crash" | "verify";
 }
 
+interface CaptionFormalSmokeRequest {
+  appDataPath: string;
+  outputPath: string;
+  sourcePath: string;
+  phase: "run" | "verify";
+}
+
+let captionFormalSmokeAuthority: {
+  sessionId: string;
+  recordingSha256: string;
+  journalSha256: string;
+} | null = null;
+
 let mainWindow: BrowserWindow | null = null;
 let unregisterIpc: (() => void) | null = null;
 let workerSupervisor: WorkerHealthSupervisor | null = null;
@@ -139,6 +169,9 @@ let profileDatabase: DatabaseSync | null = null;
 let profilePaths: ElectronProfilePaths | null = null;
 let domainService: DesktopDomainService | null = null;
 let desktopRepository: DesktopRepository | null = null;
+let transcriptRepository: TranscriptRepository | null = null;
+let liveCaptionService: LiveCaptionService | null = null;
+let formalTranscriptHandoff: FormalTranscriptHandoffService | null = null;
 let meetingWorkspaceService: MeetingWorkspaceService | null = null;
 let meetingExportService: MeetingExportService | null = null;
 let meetingPlaybackService: MeetingPlaybackService | null = null;
@@ -162,6 +195,7 @@ let bootstrapPromise: Promise<void> | null = null;
 let processingLoop: Promise<void> | null = null;
 const applicationState = new DesktopApplicationState();
 const operationListeners = new Set<(event: OperationEvent) => void>();
+const captionListeners = new Set<(snapshot: CaptionSnapshot) => void>();
 
 function createMainWindow(): BrowserWindow {
   const window = new BrowserWindow({
@@ -333,6 +367,46 @@ function readCaptureSmokeRequest(): CaptureSmokeRequest | null {
   return { appDataPath, outputPath, phase: phaseRaw };
 }
 
+function readCaptionFormalSmokeRequest(): CaptionFormalSmokeRequest | null {
+  const values = [
+    process.env.VOICE2TEXT_CAPTION_FORMAL_SMOKE_APP_DATA,
+    process.env.VOICE2TEXT_CAPTION_FORMAL_SMOKE_OUTPUT,
+    process.env.VOICE2TEXT_CAPTION_FORMAL_SMOKE_SOURCE,
+    process.env.VOICE2TEXT_CAPTION_FORMAL_SMOKE_PHASE,
+  ];
+  if (values.every((value) => value === undefined)) return null;
+  if (!app.isPackaged || values.some((value) => !value)) {
+    throw new Error(
+      "packaged caption formal smoke requires a complete packaged-only request",
+    );
+  }
+  const [appDataRaw, outputRaw, sourceRaw, phaseRaw] = values as [
+    string,
+    string,
+    string,
+    string,
+  ];
+  if (phaseRaw !== "run" && phaseRaw !== "verify") {
+    throw new Error("packaged caption formal smoke phase is invalid");
+  }
+  const temporaryRoot = realpathSync(tmpdir());
+  const appDataPath = realpathSync(path.resolve(appDataRaw));
+  const outputPath = path.resolve(outputRaw);
+  const outputParent = realpathSync(path.dirname(outputPath));
+  const sourcePath = realpathSync(path.resolve(sourceRaw));
+  if (
+    lstatSync(appDataPath).isSymbolicLink() ||
+    lstatSync(sourcePath).isSymbolicLink() ||
+    !lstatSync(sourcePath).isFile() ||
+    !isPathInside(temporaryRoot, appDataPath) ||
+    !isPathInside(temporaryRoot, outputParent) ||
+    !isPathInside(temporaryRoot, sourcePath)
+  ) {
+    throw new Error("packaged caption formal smoke paths are not private");
+  }
+  return { appDataPath, outputPath, sourcePath, phase: phaseRaw };
+}
+
 async function runProcessingSmokeIfRequested(): Promise<void> {
   const request = processingSmokeRequest;
   if (!request) return;
@@ -471,6 +545,314 @@ async function runProcessingSmokeIfRequested(): Promise<void> {
     });
   }
   app.quit();
+}
+
+async function runCaptionFormalSmokeIfRequested(): Promise<void> {
+  const request = captionFormalSmokeRequest;
+  if (!request) return;
+  if (
+    !profileDatabase ||
+    !profilePaths ||
+    !resourceCatalog ||
+    !transcriptRepository ||
+    !formalTranscriptHandoff
+  ) {
+    throw new Error("packaged caption formal smoke authority is unavailable");
+  }
+  const sessionId = "session-caption-formal-smoke-123456";
+  if (request.phase === "verify") {
+    const snapshot = transcriptRepository.getSnapshot(sessionId);
+    if (!snapshot || snapshot.formal.state !== "completed") {
+      throw new Error("packaged caption formal restart state is unavailable");
+    }
+    const renderer = await inspectPackagedCaptionPreload(sessionId);
+    const prior = JSON.parse(
+      (await readFile(request.outputPath, "utf8")).slice(0, 32_769),
+    ) as Record<string, unknown>;
+    await writeCaptionFormalSmokeReceipt(request.outputPath, {
+      ...prior,
+      restart: {
+        formalState: snapshot.formal.state,
+        generationId: snapshot.formal.generationId,
+        snapshotVisibleThroughPreload: renderer.snapshotVisibleThroughPreload,
+      },
+    });
+    app.quit();
+    return;
+  }
+  if (!liveCaptionService) {
+    throw new Error("packaged live-caption runtime is unavailable");
+  }
+  const source = await readFile(request.sourcePath);
+  const pcm = extractBoundedMonoPcm16Wav(source);
+  const sessionRoot = path.join(profilePaths.captureDirectory, sessionId);
+  const captionRoot = path.join(sessionRoot, "caption");
+  mkdirSync(captionRoot, { recursive: true, mode: 0o700 });
+  const spoolPath = path.join(captionRoot, "live-caption.pcmspool");
+  await writeFile(spoolPath, pcm, { mode: 0o600, flag: "wx" });
+  const spoolSha256 = createHash("sha256").update(pcm).digest("hex");
+  const durationMs = pcm.byteLength / 32;
+  const journal = Buffer.from(
+    JSON.stringify({
+      schema: "desktop-capture-session/v1",
+      sessionId,
+      state: "completed",
+      captureMode: "microphone_only",
+      captureTimelineMs: durationMs,
+      tracks: [
+        {
+          kind: "microphone",
+          healthy: true,
+          sampleRate: 16_000,
+          channels: 1,
+          format: "s16le",
+        },
+      ],
+      chunks: [],
+      events: [],
+      spool: {
+        relativePath: "caption/live-caption.pcmspool",
+        format: "s16le",
+        sampleRate: 16_000,
+        channels: 1,
+        frameDurationMs: 100,
+        disposable: true,
+        complete: true,
+        formalEligible: true,
+        bytes: pcm.byteLength,
+        sha256: spoolSha256,
+        durationMs,
+        captureTimelineMs: durationMs,
+        gapCount: 0,
+      },
+    }),
+  );
+  await writeFile(path.join(sessionRoot, "journal.json"), journal, {
+    mode: 0o600,
+    flag: "wx",
+  });
+  const journalSha256 = createHash("sha256").update(journal).digest("hex");
+  const recordingSha256 = journalSha256;
+  const nowMs = Date.now();
+  profileDatabase
+    .prepare(
+      `INSERT INTO capture_sessions (
+        session_id, title, workspace_path, state, capture_mode,
+        capture_timeline_ms, system_audio_healthy, microphone_healthy,
+        partial_capture, finalized_chunk_count, event_count, gap_count,
+        recording_sha256, journal_sha256, created_at_ms, updated_at_ms
+      ) VALUES (?, ?, ?, 'completed', 'microphone_only', ?, 0, 1, 0, 1, 0, 0, ?, ?, ?, ?)`,
+    )
+    .run(
+      sessionId,
+      "Packaged caption formal smoke",
+      sessionRoot,
+      durationMs,
+      recordingSha256,
+      journalSha256,
+      nowMs,
+      nowMs,
+    );
+  captionFormalSmokeAuthority = {
+    sessionId,
+    recordingSha256,
+    journalSha256,
+  };
+  const liveIdentity = resourceCatalog.processingIdentity("live-caption");
+  if (!liveIdentity) {
+    throw new Error("packaged live-caption resource identity is unavailable");
+  }
+  const started = await liveCaptionService.start({
+    sessionId,
+    sessionRoot,
+    ...liveIdentity,
+  });
+  if (!started.draft || started.draft.state === "degraded") {
+    throw new Error("packaged live-caption worker did not start");
+  }
+  const pipeline = requireProcessingPipelineIdentities(resourceCatalog);
+  const queued = await formalTranscriptHandoff.finalize({
+    sessionId,
+    displayName: "Packaged caption formal smoke",
+    processing: { operationId: "asr", ...pipeline.asr },
+  });
+  publishCaption(queued);
+  await waitForProcessingLoop();
+  await processingLoop;
+  const snapshot = transcriptRepository.getSnapshot(sessionId);
+  const handoff = profileDatabase
+    .prepare(
+      `SELECT meeting_id, processing_job_id, normalized_sha256,
+        normalized_size_bytes FROM caption_formal_handoffs WHERE session_id = ?`,
+    )
+    .get(sessionId);
+  const jobDiagnostic = handoff?.processing_job_id
+    ? profileDatabase
+        .prepare(
+          `SELECT attempt, state, phase, operation_id, error_code
+           FROM processing_jobs WHERE id = ?`,
+        )
+        .get(handoff.processing_job_id)
+    : null;
+  if (
+    !snapshot ||
+    snapshot.draft?.state !== "flushed" ||
+    snapshot.formal.state !== "completed" ||
+    snapshot.formal.attempt !== 1 ||
+    snapshot.formal.generationId == null
+  ) {
+    throw new Error(
+      `packaged caption formal processing did not complete: ${JSON.stringify({
+        draftState: snapshot?.draft?.state ?? "missing",
+        draftErrorCode: snapshot?.draft?.errorCode ?? null,
+        formalState: snapshot?.formal.state ?? "missing",
+        formalErrorCode: snapshot?.formal.errorCode ?? null,
+        formalAttempt: snapshot?.formal.attempt ?? -1,
+        job: jobDiagnostic
+          ? {
+              state: String(jobDiagnostic.state),
+              phase: String(jobDiagnostic.phase),
+              operationId: String(jobDiagnostic.operation_id),
+              attempt: Number(jobDiagnostic.attempt),
+              errorCode:
+                jobDiagnostic.error_code == null
+                  ? null
+                  : String(jobDiagnostic.error_code),
+            }
+          : null,
+      })}`,
+    );
+  }
+  if (!handoff?.processing_job_id || !handoff.meeting_id) {
+    throw new Error("packaged caption formal durable handoff is missing");
+  }
+  const counts = profileDatabase
+    .prepare(
+      `SELECT
+        (SELECT COUNT(*) FROM processing_jobs WHERE meeting_id = ?) AS jobs,
+        (SELECT COUNT(*) FROM result_publications WHERE job_id = ?) AS publications,
+        (SELECT COUNT(*) FROM caption_formal_attempts WHERE session_id = ?) AS attempts`,
+    )
+    .get(handoff.meeting_id, handoff.processing_job_id, sessionId);
+  const job = profileDatabase
+    .prepare("SELECT attempt, state FROM processing_jobs WHERE id = ?")
+    .get(handoff.processing_job_id);
+  const renderer = await inspectPackagedCaptionPreload(sessionId);
+  const utteranceCount = Number(
+    profileDatabase
+      .prepare(
+        `SELECT COUNT(*) AS count FROM caption_utterances AS utterances
+         JOIN caption_sessions AS sessions ON sessions.id = utterances.caption_session_id
+         WHERE sessions.session_id = ?`,
+      )
+      .get(sessionId)?.count ?? 0,
+  );
+  if (utteranceCount < 1 || job?.state !== "completed") {
+    throw new Error("packaged caption worker produced no durable draft");
+  }
+  await writeCaptionFormalSmokeReceipt(request.outputPath, {
+    schemaVersion: 1,
+    packaged: app.isPackaged,
+    sessionIdentitySha256: createHash("sha256").update(sessionId).digest("hex"),
+    draft: {
+      state: snapshot.draft!.state,
+      utteranceCount,
+      backlogBytes: snapshot.draft!.backlogBytes,
+    },
+    formal: snapshot.formal,
+    database: {
+      processingJobCount: Number(counts?.jobs ?? -1),
+      publicationCount: Number(counts?.publications ?? -1),
+      formalAttemptCount: Number(counts?.attempts ?? -1),
+      processingAttempt: Number(job?.attempt ?? -1),
+    },
+    media: {
+      sourceSha256: recordingSha256,
+      outputSha256: String(handoff.normalized_sha256),
+      outputBytes: Number(handoff.normalized_size_bytes),
+    },
+    resource: {
+      manifestSha256: resourceCatalog.identity,
+      liveCaptionModelSha256: liveIdentity.modelSha256,
+      liveCaptionRuntimeSha256: liveIdentity.runtimeSha256,
+      formalModelSha256: pipeline.diarization.modelSha256,
+      formalRuntimeSha256: pipeline.diarization.runtimeSha256,
+    },
+    renderer,
+  });
+  app.quit();
+}
+
+function extractBoundedMonoPcm16Wav(source: Buffer): Buffer {
+  if (
+    source.byteLength < 44 ||
+    source.byteLength > 512 * 1024 * 1024 ||
+    source.toString("ascii", 0, 4) !== "RIFF" ||
+    source.toString("ascii", 8, 12) !== "WAVE"
+  ) {
+    throw new Error("caption formal smoke WAV is invalid");
+  }
+  let formatValid = false;
+  let pcm: Buffer | null = null;
+  for (let offset = 12; offset + 8 <= source.byteLength;) {
+    const chunkId = source.toString("ascii", offset, offset + 4);
+    const chunkBytes = source.readUInt32LE(offset + 4);
+    const start = offset + 8;
+    const end = start + chunkBytes;
+    if (end > source.byteLength)
+      throw new Error("caption formal smoke WAV is truncated");
+    if (chunkId === "fmt " && chunkBytes >= 16) {
+      formatValid =
+        source.readUInt16LE(start) === 1 &&
+        source.readUInt16LE(start + 2) === 1 &&
+        source.readUInt32LE(start + 4) === 16_000 &&
+        source.readUInt16LE(start + 14) === 16;
+    } else if (chunkId === "data") {
+      const alignedBytes = chunkBytes - (chunkBytes % 3_200);
+      if (alignedBytes > 0) pcm = source.subarray(start, start + alignedBytes);
+    }
+    offset = end + (chunkBytes % 2);
+  }
+  if (!formatValid || !pcm) {
+    throw new Error("caption formal smoke WAV is not 16 kHz mono PCM16");
+  }
+  return pcm;
+}
+
+async function inspectPackagedCaptionPreload(sessionId: string): Promise<{
+  snapshotVisibleThroughPreload: boolean;
+  retryMethodVisibleThroughPreload: boolean;
+}> {
+  await waitForPackagedRenderer();
+  return (await mainWindow!.webContents.executeJavaScript(
+    `(async () => {
+      const api = window.voice2text;
+      const snapshot = await api.getCaptionSnapshot({ sessionId: ${JSON.stringify(sessionId)} });
+      return {
+        snapshotVisibleThroughPreload: snapshot?.sessionId === ${JSON.stringify(sessionId)},
+        retryMethodVisibleThroughPreload: typeof api.retryFormalTranscript === "function"
+      };
+    })()`,
+    true,
+  )) as {
+    snapshotVisibleThroughPreload: boolean;
+    retryMethodVisibleThroughPreload: boolean;
+  };
+}
+
+async function writeCaptionFormalSmokeReceipt(
+  outputPath: string,
+  receipt: Record<string, unknown>,
+): Promise<void> {
+  const serialized = `${JSON.stringify(receipt, null, 2)}\n`;
+  if (Buffer.byteLength(serialized, "utf8") > 32_768) {
+    throw new Error(
+      "packaged caption formal receipt exceeded its privacy bound",
+    );
+  }
+  const temporaryPath = `${outputPath}.tmp-${process.pid}`;
+  await writeFile(temporaryPath, serialized, { mode: 0o600 });
+  await rename(temporaryPath, outputPath);
 }
 
 async function runPackagedWorkstationSmoke(input: {
@@ -911,6 +1293,17 @@ async function startCapture(options: {
     microphoneDeviceId: options.microphoneDeviceId,
     captionEnabled: options.captionEnabled,
   });
+  if (options.captionEnabled) {
+    const identity = resourceCatalog?.processingIdentity("live-caption");
+    if (!identity || !liveCaptionService || !profilePaths) {
+      throw new Error("verified live-caption runtime is unavailable");
+    }
+    await liveCaptionService.start({
+      sessionId: result.sessionId,
+      sessionRoot: path.join(profilePaths.captureDirectory, result.sessionId),
+      ...identity,
+    });
+  }
   activeCaptureTitle = options.title;
   publishCapture(result);
   return result;
@@ -923,6 +1316,29 @@ async function controlCapture(options: {
 }): Promise<CaptureSnapshot> {
   if (!captureService) throw new Error("macOS capture helper is unavailable");
   const result = await captureService.control(options);
+  if (options.action === "pause") {
+    await liveCaptionService?.pause(options.sessionId);
+  } else if (options.action === "resume") {
+    await liveCaptionService?.resume(options.sessionId);
+  } else {
+    // The native capture commit is already durable at this point. Surface it
+    // before the separately retryable formal projection is attempted.
+    publishCapture(result);
+    await finalizeCommittedCaptureTranscript({
+      handoff: formalTranscriptHandoff,
+      sessionId: options.sessionId,
+      displayName: activeCaptureTitle,
+      processing: resourceCatalog?.processingPipelineIdentities()
+        ? {
+            operationId: "asr",
+            ...resourceCatalog.processingPipelineIdentities()!.asr,
+          }
+        : null,
+      publish: publishCaption,
+      reportFailure: () =>
+        console.error("Voice2Text formal transcript handoff failed"),
+    });
+  }
   publishCapture(result);
   return result;
 }
@@ -969,7 +1385,11 @@ async function pollCaptureSnapshot(): Promise<void> {
   }
   capturePollInFlight = true;
   try {
-    publishCapture(await captureService.refresh(current.sessionId));
+    const refreshed = await captureService.refresh(current.sessionId);
+    publishCapture(refreshed);
+    if (refreshed.state === "recording") {
+      await liveCaptionService?.poll(refreshed.sessionId);
+    }
   } catch (error) {
     console.error("Capture snapshot refresh failed", error);
   } finally {
@@ -1125,6 +1545,10 @@ function bindDesktopIpc(window: BrowserWindow): void {
       operationListeners.add(listener);
       return () => operationListeners.delete(listener);
     },
+    onCaptionSnapshot: (listener) => {
+      captionListeners.add(listener);
+      return () => captionListeners.delete(listener);
+    },
     workerHealth: async () => {
       if (!workerSupervisor)
         throw new Error("worker capability is unavailable");
@@ -1191,7 +1615,27 @@ function bindDesktopIpc(window: BrowserWindow): void {
         options.idempotencyKey,
       );
       publishCapture(kept);
+      const pipeline = resourceCatalog?.processingPipelineIdentities();
+      await finalizeCommittedCaptureTranscript({
+        handoff: formalTranscriptHandoff,
+        sessionId: kept.sessionId,
+        displayName: activeCaptureTitle,
+        processing: pipeline ? { operationId: "asr", ...pipeline.asr } : null,
+        publish: publishCaption,
+        reportFailure: () =>
+          console.error("Voice2Text recovered formal handoff failed"),
+      });
       return kept;
+    },
+    getCaptionSnapshot: async ({ sessionId }) =>
+      transcriptRepository?.getSnapshot(sessionId) ?? null,
+    retryFormalTranscript: async (command) => {
+      if (!formalTranscriptHandoff) {
+        throw new Error("formal transcript retry is unavailable");
+      }
+      const snapshot = await formalTranscriptHandoff.retry(command);
+      publishCaption(snapshot);
+      return snapshot;
     },
     listMeetings: async (options) => {
       if (!meetingWorkspaceService)
@@ -1391,7 +1835,11 @@ async function initializeApplication(): Promise<void> {
         repairable: profile.repairable,
       }),
     );
-    if (processingSmokeRequest || captureSmokeRequest)
+    if (
+      processingSmokeRequest ||
+      captureSmokeRequest ||
+      captionFormalSmokeRequest
+    )
       throw new Error(`Electron smoke profile blocked: ${profile.code}`);
     return;
   }
@@ -1399,7 +1847,13 @@ async function initializeApplication(): Promise<void> {
   traceCaptureSmoke("profile-ready");
   profilePaths = profile.profile;
   desktopRepository = new DesktopRepository(profile.database, profile.profile);
+  transcriptRepository = new TranscriptRepository(
+    profile.database,
+    profile.profile,
+  );
   domainService = new DesktopDomainService(desktopRepository);
+  domainService.reconcileStartup();
+  transcriptRepository.reconcileFormalProcessingAttempts(Date.now());
   try {
     await initializeCapture(profile.database, profile.profile);
     traceCaptureSmoke("capture-ready");
@@ -1517,6 +1971,80 @@ async function initializeApplication(): Promise<void> {
         resourcesPath: process.resourcesPath,
       }),
     );
+    const liveCaptionIdentity =
+      resourceCatalog.processingIdentity("live-caption");
+    if (liveCaptionIdentity && transcriptRepository) {
+      liveCaptionService = new LiveCaptionService(
+        transcriptRepository,
+        {
+          launch: async (options) =>
+            await CaptionWorkerSupervisor.launch({
+              ...options,
+              workspaceRoot: profile.profile.captureDirectory,
+              command: resourceCatalog!.command("live-caption", {
+                runtimeRoot: path.join(resourceCatalog!.root, "runtime"),
+                attemptOutput: options.sessionRoot,
+              }),
+            }),
+        },
+        publishCaption,
+      );
+      liveCaptionService.reconcileStartup();
+    }
+    if (transcriptRepository) {
+      formalTranscriptHandoff = new FormalTranscriptHandoffService({
+        repository: transcriptRepository,
+        profile: profile.profile,
+        flushDraft: async (sessionId) =>
+          await liveCaptionService?.flush(sessionId),
+        prepareMedia: async (sessionId) => {
+          const snapshot = captureService?.snapshot();
+          const durableCapture = profile.database
+            .prepare(
+              `SELECT state, recording_sha256, journal_sha256
+               FROM capture_sessions WHERE session_id = ?`,
+            )
+            .get(sessionId);
+          const smokeAuthority =
+            captionFormalSmokeAuthority?.sessionId === sessionId
+              ? captionFormalSmokeAuthority
+              : null;
+          if (
+            (!snapshot ||
+              snapshot.sessionId !== sessionId ||
+              !snapshot.recordingSha256 ||
+              !snapshot.journalSha256) &&
+            (!durableCapture ||
+              !["completed", "partial_capture"].includes(
+                String(durableCapture.state),
+              ) ||
+              !durableCapture.recording_sha256 ||
+              !durableCapture.journal_sha256) &&
+            !smokeAuthority
+          ) {
+            throw new Error("finalized capture authority is unavailable");
+          }
+          return await prepareFormalCaptureMedia({
+            profile: profile.profile,
+            sessionId,
+            recordingSha256:
+              smokeAuthority?.recordingSha256 ??
+              (snapshot?.sessionId === sessionId
+                ? snapshot.recordingSha256!
+                : String(durableCapture!.recording_sha256)),
+            journalSha256:
+              smokeAuthority?.journalSha256 ??
+              (snapshot?.sessionId === sessionId
+                ? snapshot.journalSha256!
+                : String(durableCapture!.journal_sha256)),
+          });
+        },
+        scheduleProcessing: () => scheduleProcessing(),
+      });
+      for (const snapshot of await formalTranscriptHandoff.reconcileStartup()) {
+        publishCaption(snapshot);
+      }
+    }
     workerSupervisor = new WorkerHealthSupervisor(
       resourceCatalog.command("worker-health"),
     );
@@ -1528,6 +2056,8 @@ async function initializeApplication(): Promise<void> {
     await cleanupNativeImportArtifacts(profile.profile, desktopRepository);
     if (processingSmokeRequest) {
       await runProcessingSmokeIfRequested();
+    } else if (captionFormalSmokeRequest) {
+      await runCaptionFormalSmokeIfRequested();
     } else {
       scheduleProcessing();
     }
@@ -1536,13 +2066,14 @@ async function initializeApplication(): Promise<void> {
     applicationState.setProcessingCapability(
       error instanceof Error ? error.message : "本地处理运行时不可用",
     );
-    if (processingSmokeRequest) throw error;
+    if (processingSmokeRequest || captionFormalSmokeRequest) throw error;
   }
   if (captureSmokeRequest) {
     traceCaptureSmoke("capture-smoke-start");
     await runCaptureSmokeIfRequested();
   }
-  if (!processingSmokeRequest) await runBootstrapSmokeIfRequested();
+  if (!processingSmokeRequest && !captionFormalSmokeRequest)
+    await runBootstrapSmokeIfRequested();
 }
 
 async function initializeCapture(
@@ -1853,7 +2384,11 @@ if (isPrimaryInstance) {
 }
 
 function reportBootstrapFailure(stage: string, error: unknown): void {
-  if (!process.env.VOICE2TEXT_CAPTURE_SMOKE_PHASE) return;
+  if (
+    !process.env.VOICE2TEXT_CAPTURE_SMOKE_PHASE &&
+    !process.env.VOICE2TEXT_CAPTION_FORMAL_SMOKE_PHASE
+  )
+    return;
   const record = error instanceof Error ? error : new Error("unknown error");
   const candidateCode = (error as NodeJS.ErrnoException | undefined)?.code;
   const code = typeof candidateCode === "string" ? candidateCode : "none";
@@ -1892,9 +2427,12 @@ async function teardownOwnedResources(): Promise<void> {
   meetingWorkspaceService = null;
   if (capturePollTimer) clearInterval(capturePollTimer);
   capturePollTimer = null;
+  await liveCaptionService?.shutdown();
+  liveCaptionService = null;
   await captureNativeSession?.close();
   captureNativeSession = null;
   captureService = null;
+  formalTranscriptHandoff = null;
   captureTray?.destroy();
   captureTray = null;
   profileDatabase?.close();
@@ -1902,6 +2440,7 @@ async function teardownOwnedResources(): Promise<void> {
   profilePaths = null;
   domainService = null;
   desktopRepository = null;
+  transcriptRepository = null;
   resourceCatalog = null;
 }
 
@@ -1911,6 +2450,19 @@ function emitOperation(event: Omit<OperationEvent, "protocolVersion">): void {
     ...event,
   };
   for (const listener of operationListeners) listener(value);
+  try {
+    const caption = transcriptRepository?.syncFormalForProcessingJob(
+      event.jobId,
+      Date.now(),
+    );
+    if (caption) publishCaption(caption);
+  } catch {
+    console.error("Voice2Text caption formal state sync failed");
+  }
+}
+
+function publishCaption(snapshot: CaptionSnapshot): void {
+  for (const listener of captionListeners) listener(snapshot);
 }
 
 function scheduleProcessing(): void {

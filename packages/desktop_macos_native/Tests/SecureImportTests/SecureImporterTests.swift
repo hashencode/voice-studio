@@ -122,6 +122,22 @@ struct SecureImporterTests {
     #expect(FileManager.default.fileExists(atPath: symlink.path))
   }
 
+  @Test("cleanup preserves a caller-provided symlink-free macOS canonical path")
+  func cleanupAcceptsPrivateVarAuthority() throws {
+    let temporaryPath = FileManager.default.temporaryDirectory.path
+    let canonicalTemporaryPath = temporaryPath.hasPrefix("/var/")
+      ? "/private" + temporaryPath : temporaryPath
+    let root = URL(filePath: canonicalTemporaryPath, directoryHint: .isDirectory)
+      .appending(path: "secure-import-canonical-\(UUID().uuidString)")
+    defer { try? FileManager.default.removeItem(at: root) }
+    let destination = root.appending(path: "destination")
+    let staging = destination.appending(path: "staging")
+    try FileManager.default.createDirectory(at: staging, withIntermediateDirectories: true)
+
+    #expect(destination.path.hasPrefix("/private/"))
+    #expect(try cleanupSecureImportTemporaryFiles(destinationRoot: destination.path) == 0)
+  }
+
   @Test("discard and cleanup reject a destination whose ancestor was replaced by a symlink")
   func destructiveOperationsRejectReplacedAncestor() throws {
     let fixture = try Fixture()

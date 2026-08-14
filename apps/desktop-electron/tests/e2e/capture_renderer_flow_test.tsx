@@ -67,6 +67,9 @@ function installApi() {
     startCapture: vi.fn(),
     controlCapture: vi.fn(),
     actOnCaptureRecovery: vi.fn(),
+    getCaptionSnapshot: vi.fn(async () => null),
+    retryFormalTranscript: vi.fn(),
+    onCaptionSnapshot: vi.fn(() => () => undefined),
   } as unknown as Voice2TextDesktopApi;
   Object.defineProperty(window, "voice2text", {
     configurable: true,

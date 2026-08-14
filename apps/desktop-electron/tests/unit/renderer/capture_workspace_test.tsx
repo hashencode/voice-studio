@@ -51,6 +51,9 @@ function installCaptureApi(overrides: Partial<Voice2TextDesktopApi> = {}) {
     controlCapture: vi.fn(async () => recording),
     listCaptureRecoveries: vi.fn(async () => []),
     actOnCaptureRecovery: vi.fn(async () => null),
+    getCaptionSnapshot: vi.fn(async () => null),
+    retryFormalTranscript: vi.fn(),
+    onCaptionSnapshot: vi.fn(() => () => undefined),
     ...overrides,
   } as unknown as Voice2TextDesktopApi;
   Object.defineProperty(window, "voice2text", {

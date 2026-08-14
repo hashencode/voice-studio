@@ -80,6 +80,9 @@ function installOperationsApi(overrides: Partial<Voice2TextDesktopApi> = {}) {
     controlCapture: vi.fn(),
     listCaptureRecoveries: vi.fn(async () => []),
     actOnCaptureRecovery: vi.fn(),
+    getCaptionSnapshot: vi.fn(async () => null),
+    retryFormalTranscript: vi.fn(),
+    onCaptionSnapshot: vi.fn(() => () => undefined),
     onOperationEvent: vi.fn((listener) => {
       operationListener = listener;
       return unsubscribeOperation;

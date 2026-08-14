@@ -45,6 +45,8 @@ export function registerDesktopIpc(
     ipcChannels.captureControl,
     ipcChannels.captureRecoveryList,
     ipcChannels.captureRecoveryAction,
+    ipcChannels.captionSnapshotGet,
+    ipcChannels.captionFormalRetry,
     ipcChannels.meetingList,
     ipcChannels.meetingOpen,
     ipcChannels.meetingSearch,
@@ -76,9 +78,15 @@ export function registerDesktopIpc(
       window.webContents.send(ipcChannels.operationEvent, event);
     }
   });
+  const unsubscribeCaption = services.onCaptionSnapshot?.((snapshot) => {
+    if (!window.isDestroyed()) {
+      window.webContents.send(ipcChannels.captionSnapshotEvent, snapshot);
+    }
+  });
   return () => {
     unsubscribeSnapshot?.();
     unsubscribeOperation?.();
+    unsubscribeCaption?.();
     for (const channel of channels) ipcMain.removeHandler(channel);
   };
 }

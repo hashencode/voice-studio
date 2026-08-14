@@ -16,6 +16,7 @@ import {
   migrateSchemaV4ToV5,
   migrateSchemaV5ToV6,
   migrateSchemaV6ToV7,
+  migrateSchemaV7ToV8,
   REQUIRED_SCHEMA_TABLES,
 } from "./schema";
 
@@ -182,6 +183,13 @@ function migrate(database: DatabaseSync): void {
     withTransaction(database, () => {
       migrateSchemaV6ToV7(database);
       database.exec("PRAGMA user_version = 7");
+    });
+    version = 7;
+  }
+  if (version === 7) {
+    withTransaction(database, () => {
+      migrateSchemaV7ToV8(database);
+      database.exec("PRAGMA user_version = 8");
     });
   }
 }

@@ -16,6 +16,11 @@ import type {
   PlaybackAction,
 } from "./meeting_workspace";
 import type { CapturePreflight, CaptureSnapshot } from "./capture";
+import type {
+  CaptionFormalRetryRequest,
+  CaptionSnapshot,
+  CaptionSnapshotRequest,
+} from "./captions";
 
 export const desktopProtocolVersion = 1 as const;
 export const desktopWorkerHealthProtocol =
@@ -48,6 +53,9 @@ export const ipcChannels = {
   captureControl: "desktop.capture.control.v1",
   captureRecoveryList: "desktop.capture.recovery-list.v1",
   captureRecoveryAction: "desktop.capture.recovery-action.v1",
+  captionSnapshotGet: "desktop.captions.snapshot.get.v1",
+  captionFormalRetry: "desktop.captions.formal.retry.v1",
+  captionSnapshotEvent: "desktop.captions.snapshot.v1",
 } as const;
 
 export const workerHealthRequestSchema = z
@@ -283,4 +291,11 @@ export interface Voice2TextDesktopApi {
     sessionId: string;
     idempotencyKey: string;
   }): Promise<CaptureSnapshot | null>;
+  getCaptionSnapshot(
+    options: CaptionSnapshotRequest,
+  ): Promise<CaptionSnapshot | null>;
+  retryFormalTranscript(
+    options: CaptionFormalRetryRequest,
+  ): Promise<CaptionSnapshot>;
+  onCaptionSnapshot(listener: (snapshot: CaptionSnapshot) => void): () => void;
 }

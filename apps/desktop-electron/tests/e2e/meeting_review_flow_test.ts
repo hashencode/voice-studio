@@ -135,6 +135,8 @@ it("reviews a completed meeting through validated Main and Preload contracts wit
     controlCapture: vi.fn(),
     listCaptureRecoveries: vi.fn(async () => []),
     actOnCaptureRecovery: vi.fn(),
+    getCaptionSnapshot: vi.fn(async () => null),
+    retryFormalTranscript: vi.fn(),
     listMeetings: async (options) => workspace.listMeetings(options),
     openMeeting: async (meetingId) => workspace.openMeeting(meetingId),
     searchTranscript: async (options) => workspace.searchTranscript(options),

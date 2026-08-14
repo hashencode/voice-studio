@@ -38,6 +38,11 @@ import {
   captureRecoveryActionRequestSchema,
   type CapturePreflight,
   type CaptureSnapshot,
+  captionSnapshotRequestSchema,
+  captionFormalRetryRequestSchema,
+  type CaptionFormalRetryRequest,
+  type CaptionSnapshot,
+  type CaptionSnapshotRequest,
   type ExportMeetingResponse,
   type MeetingExportFormat,
   type MeetingPlaybackSnapshot,
@@ -96,6 +101,13 @@ export interface DesktopIpcServices {
     sessionId: string;
     idempotencyKey: string;
   }): Promise<CaptureSnapshot | null>;
+  getCaptionSnapshot(
+    options: CaptionSnapshotRequest,
+  ): Promise<CaptionSnapshot | null>;
+  retryFormalTranscript(
+    options: CaptionFormalRetryRequest,
+  ): Promise<CaptionSnapshot>;
+  onCaptionSnapshot?(listener: (snapshot: CaptionSnapshot) => void): () => void;
   onOperationEvent?(listener: (event: OperationEvent) => void): () => void;
   listMeetings(options: {
     query: string;
@@ -326,6 +338,22 @@ export function createDesktopIpcHandlers(options: {
           sessionId: string;
           idempotencyKey: string;
         }) => await options.services.actOnCaptureRecovery(payload),
+      } as RegisteredHandler,
+    ],
+    [
+      ipcChannels.captionSnapshotGet,
+      {
+        schema: captionSnapshotRequestSchema,
+        invoke: async (payload: CaptionSnapshotRequest) =>
+          await options.services.getCaptionSnapshot(payload),
+      } as RegisteredHandler,
+    ],
+    [
+      ipcChannels.captionFormalRetry,
+      {
+        schema: captionFormalRetryRequestSchema,
+        invoke: async (payload: CaptionFormalRetryRequest) =>
+          await options.services.retryFormalTranscript(payload),
       } as RegisteredHandler,
     ],
     [

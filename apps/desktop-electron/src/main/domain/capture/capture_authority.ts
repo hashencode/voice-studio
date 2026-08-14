@@ -39,6 +39,27 @@ const eventSchema = z
     reason: z.string().min(1).max(240),
   })
   .strict();
+const finalizedSpoolSchema = z
+  .object({
+    relativePath: z.literal("caption/live-caption.pcmspool"),
+    format: z.literal("s16le"),
+    sampleRate: z.literal(16_000),
+    channels: z.literal(1),
+    frameDurationMs: z.literal(100),
+    disposable: z.literal(true),
+    complete: z.literal(true),
+    formalEligible: z.literal(true),
+    bytes: z
+      .number()
+      .int()
+      .positive()
+      .max(4 * 60 * 60 * 16_000 * 2),
+    sha256: sha256Schema,
+    durationMs: z.number().int().positive().safe(),
+    captureTimelineMs: z.number().int().nonnegative().safe(),
+    gapCount: z.number().int().nonnegative().max(100_000),
+  })
+  .strict();
 const journalSchema = z
   .object({
     schema: z.literal("desktop-capture-session/v1"),
@@ -47,6 +68,17 @@ const journalSchema = z
     tracks: z.array(trackSchema).min(1).max(2),
     chunks: z.array(chunkSchema).max(100_000),
     events: z.array(eventSchema).max(100_000),
+    state: z
+      .enum([
+        "completed",
+        "partial_capture",
+        "recoverable",
+        "recording",
+        "paused",
+      ])
+      .optional(),
+    captureTimelineMs: z.number().int().nonnegative().safe().optional(),
+    spool: finalizedSpoolSchema.optional(),
   })
   .passthrough();
 
@@ -146,14 +178,16 @@ export async function validateCaptureAuthority(options: {
   }
 }
 
-async function openDirectory(directoryPath: string): Promise<FileHandle> {
+export async function openDirectory(
+  directoryPath: string,
+): Promise<FileHandle> {
   return await open(
     directoryPath,
     constants.O_RDONLY | constants.O_DIRECTORY | constants.O_NOFOLLOW,
   );
 }
 
-async function assertPathIdentity(
+export async function assertPathIdentity(
   filePath: string,
   handle: FileHandle,
   label: string,

@@ -59,6 +59,9 @@ function installApi(
     controlCapture: vi.fn(),
     listCaptureRecoveries: vi.fn(async () => []),
     actOnCaptureRecovery: vi.fn(),
+    getCaptionSnapshot: vi.fn(async () => null),
+    retryFormalTranscript: vi.fn(),
+    onCaptionSnapshot: vi.fn(() => () => undefined),
     onOperationEvent: vi.fn(() => () => undefined),
     getApplicationSnapshot: vi.fn(async () => snapshot),
     navigate: vi.fn(async (section) => ({

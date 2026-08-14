@@ -39,6 +39,10 @@ import {
   captureRecoveryActionRequestSchema,
   capturePreflightSchema,
   captureSnapshotSchema,
+  captionSnapshotRequestSchema,
+  captionFormalRetryRequestSchema,
+  captionSnapshotSchema,
+  type CaptionSnapshot,
 } from "../shared/contracts";
 
 export interface PreloadIpcBridge {
@@ -150,6 +154,36 @@ export function createDesktopApi(
         payload,
       );
       return response === null ? null : captureSnapshotSchema.parse(response);
+    },
+    async getCaptionSnapshot(
+      options: Parameters<Voice2TextDesktopApi["getCaptionSnapshot"]>[0],
+    ) {
+      const payload = captionSnapshotRequestSchema.parse(options);
+      const response = await bridge.invoke(
+        ipcChannels.captionSnapshotGet,
+        payload,
+      );
+      return response === null ? null : captionSnapshotSchema.parse(response);
+    },
+    async retryFormalTranscript(
+      options: Parameters<Voice2TextDesktopApi["retryFormalTranscript"]>[0],
+    ) {
+      const payload = captionFormalRetryRequestSchema.parse(options);
+      return captionSnapshotSchema.parse(
+        await bridge.invoke(ipcChannels.captionFormalRetry, payload),
+      );
+    },
+    onCaptionSnapshot(listener: (snapshot: CaptionSnapshot) => void) {
+      let subscribed = true;
+      const validatedListener = (payload: unknown) => {
+        listener(captionSnapshotSchema.parse(payload));
+      };
+      bridge.on(ipcChannels.captionSnapshotEvent, validatedListener);
+      return () => {
+        if (!subscribed) return;
+        subscribed = false;
+        bridge.off(ipcChannels.captionSnapshotEvent, validatedListener);
+      };
     },
     onOperationEvent(listener: (event: OperationEvent) => void) {
       let subscribed = true;

@@ -81,6 +81,221 @@ final class CaptureControllerTests: XCTestCase {
     XCTAssertLessThan(fileIndex, directoryIndex)
   }
 
+  func testFinalizedJournalBindsCompleteCaptionSpoolAndRecoveryRebuildsTruncation() throws {
+    let parent = try temporaryRoot()
+    defer { try? FileManager.default.removeItem(at: parent) }
+    let session = parent.appendingPathComponent(
+      "session-caption-authority-123456", isDirectory: true
+    )
+    guard
+      let format = AVAudioFormat(
+        standardFormatWithSampleRate: 48_000,
+        channels: 1
+      ),
+      let buffer = AVAudioPCMBuffer(
+        pcmFormat: format,
+        frameCapacity: 48_000
+      )
+    else {
+      return XCTFail("test audio buffer unavailable")
+    }
+    buffer.frameLength = 48_000
+    for index in 0..<Int(buffer.frameLength) {
+      buffer.floatChannelData?[0][index] = sin(Float(index) / 20)
+    }
+    let journal = try CaptureChunkJournal(
+      root: session,
+      sessionID: session.lastPathComponent,
+      systemFormat: nil,
+      microphoneFormat: format,
+      captureMode: "microphone_only"
+    )
+    try journal.beginRecording()
+    journal.append(buffer, to: .microphone)
+    try journal.finalize(at: 1_000, partial: false)
+
+    let journalURL = session.appendingPathComponent("journal.json")
+    let document = try XCTUnwrap(
+      JSONSerialization.jsonObject(with: Data(contentsOf: journalURL))
+        as? [String: Any]
+    )
+    let spool = try XCTUnwrap(document["spool"] as? [String: Any])
+    let bytes = try XCTUnwrap((spool["bytes"] as? NSNumber)?.intValue)
+    XCTAssertGreaterThan(bytes, 0)
+    XCTAssertEqual(bytes % 3_200, 0)
+    XCTAssertEqual(spool["complete"] as? Bool, true)
+    XCTAssertEqual(spool["disposable"] as? Bool, true)
+    XCTAssertEqual(spool["formalEligible"] as? Bool, true)
+    XCTAssertEqual((spool["durationMs"] as? NSNumber)?.intValue, bytes / 32)
+    let originalSpoolHash = try CaptureChunkJournal.sha256(
+      session.appendingPathComponent("caption/live-caption.pcmspool")
+    )
+    XCTAssertEqual(spool["sha256"] as? String, originalSpoolHash)
+
+    try FileManager.default.removeItem(
+      at: session.appendingPathComponent("caption/live-caption.pcmspool")
+    )
+    let report = try XCTUnwrap(CaptureChunkJournal.recoverSession(at: session))
+    XCTAssertTrue(report.captionSpoolRebuilt)
+    let rewritten = try XCTUnwrap(
+      JSONSerialization.jsonObject(with: Data(contentsOf: journalURL))
+        as? [String: Any]
+    )
+    let rebuilt = try XCTUnwrap(rewritten["spool"] as? [String: Any])
+    XCTAssertEqual(rebuilt["complete"] as? Bool, true)
+    XCTAssertEqual(
+      rebuilt["sha256"] as? String,
+      try CaptureChunkJournal.sha256(
+        session.appendingPathComponent("caption/live-caption.pcmspool")
+      )
+    )
+    XCTAssertEqual(rebuilt["sha256"] as? String, originalSpoolHash)
+    XCTAssertGreaterThan((rebuilt["bytes"] as? NSNumber)?.intValue ?? 0, 3_200)
+    XCTAssertFalse(
+      ((rewritten["chunks"] as? [[String: Any]]) ?? []).isEmpty,
+      "CAF chunks remain the canonical recording authority"
+    )
+
+    let rebuiltBytes = try Data(
+      contentsOf: session.appendingPathComponent("caption/live-caption.pcmspool")
+    )
+    try rebuiltBytes.dropLast(3_200).write(
+      to: session.appendingPathComponent("caption/live-caption.pcmspool")
+    )
+    let truncated = try XCTUnwrap(CaptureChunkJournal.recoverSession(at: session))
+    XCTAssertTrue(truncated.captionSpoolRebuilt)
+    XCTAssertEqual(
+      try CaptureChunkJournal.sha256(
+        session.appendingPathComponent("caption/live-caption.pcmspool")
+      ),
+      originalSpoolHash
+    )
+  }
+
+  func testCaptionSpoolAppendFailureDoesNotPoisonAuthorityTrack() throws {
+    let parent = try temporaryRoot()
+    defer {
+      CaptureChunkJournal.captionSpoolAppendObserver = nil
+      try? FileManager.default.removeItem(at: parent)
+    }
+    let session = parent.appendingPathComponent(
+      "session-caption-degraded-123456", isDirectory: true
+    )
+    guard
+      let format = AVAudioFormat(standardFormatWithSampleRate: 48_000, channels: 1),
+      let buffer = AVAudioPCMBuffer(pcmFormat: format, frameCapacity: 48_000)
+    else {
+      return XCTFail("test audio buffer unavailable")
+    }
+    buffer.frameLength = 48_000
+    CaptureChunkJournal.captionSpoolAppendObserver = {
+      throw CocoaError(.fileWriteUnknown)
+    }
+    let journal = try CaptureChunkJournal(
+      root: session,
+      sessionID: session.lastPathComponent,
+      systemFormat: nil,
+      microphoneFormat: format,
+      captureMode: "microphone_only"
+    )
+    try journal.beginRecording()
+    journal.append(buffer, to: .microphone)
+    try journal.finalize(at: 1_000, partial: false)
+
+    let document = try XCTUnwrap(
+      JSONSerialization.jsonObject(
+        with: Data(contentsOf: session.appendingPathComponent("journal.json"))
+      ) as? [String: Any]
+    )
+    let track = try XCTUnwrap((document["tracks"] as? [[String: Any]])?.first)
+    XCTAssertEqual(track["healthy"] as? Bool, true)
+    XCTAssertEqual((document["chunks"] as? [[String: Any]])?.count, 1)
+    XCTAssertEqual((document["spool"] as? [String: Any])?["formalEligible"] as? Bool, true)
+  }
+
+  func testCaptionSpoolRebuildFailureDoesNotBlockCompletedCaptureAuthority() throws {
+    let parent = try temporaryRoot()
+    defer {
+      CaptureChunkJournal.captionSpoolRebuildObserver = nil
+      try? FileManager.default.removeItem(at: parent)
+    }
+    let session = parent.appendingPathComponent(
+      "session-caption-rebuild-fail-123456", isDirectory: true
+    )
+    guard
+      let format = AVAudioFormat(standardFormatWithSampleRate: 48_000, channels: 1),
+      let buffer = AVAudioPCMBuffer(pcmFormat: format, frameCapacity: 48_000)
+    else {
+      return XCTFail("test audio buffer unavailable")
+    }
+    buffer.frameLength = 48_000
+    CaptureChunkJournal.captionSpoolRebuildObserver = {
+      throw CocoaError(.fileWriteUnknown)
+    }
+    let journal = try CaptureChunkJournal(
+      root: session,
+      sessionID: session.lastPathComponent,
+      systemFormat: nil,
+      microphoneFormat: format,
+      captureMode: "microphone_only"
+    )
+    try journal.beginRecording()
+    journal.append(buffer, to: .microphone)
+    XCTAssertNoThrow(try journal.finalize(at: 1_000, partial: false))
+
+    let journalURL = session.appendingPathComponent("journal.json")
+    let document = try XCTUnwrap(
+      JSONSerialization.jsonObject(with: Data(contentsOf: journalURL))
+        as? [String: Any]
+    )
+    XCTAssertEqual(document["state"] as? String, "completed")
+    XCTAssertEqual((document["chunks"] as? [[String: Any]])?.count, 1)
+    XCTAssertNotNil(try? CaptureChunkJournal.sha256(journalURL))
+    XCTAssertNotEqual(
+      (document["spool"] as? [String: Any])?["formalEligible"] as? Bool,
+      true
+    )
+  }
+
+  func testCaptionSpoolFinalizeFailureDoesNotBlockCompletedCaptureAuthority() throws {
+    let parent = try temporaryRoot()
+    defer {
+      CaptureChunkJournal.captionSpoolFinalizeObserver = nil
+      try? FileManager.default.removeItem(at: parent)
+    }
+    let session = parent.appendingPathComponent(
+      "session-caption-finalize-fail-123456", isDirectory: true
+    )
+    guard
+      let format = AVAudioFormat(standardFormatWithSampleRate: 48_000, channels: 1),
+      let buffer = AVAudioPCMBuffer(pcmFormat: format, frameCapacity: 48_000)
+    else {
+      return XCTFail("test audio buffer unavailable")
+    }
+    buffer.frameLength = 48_000
+    let journal = try CaptureChunkJournal(
+      root: session,
+      sessionID: session.lastPathComponent,
+      systemFormat: nil,
+      microphoneFormat: format,
+      captureMode: "microphone_only"
+    )
+    try journal.beginRecording()
+    journal.append(buffer, to: .microphone)
+    CaptureChunkJournal.captionSpoolFinalizeObserver = {
+      throw CocoaError(.fileWriteUnknown)
+    }
+    XCTAssertNoThrow(try journal.finalize(at: 1_000, partial: false))
+    let document = try XCTUnwrap(
+      JSONSerialization.jsonObject(
+        with: Data(contentsOf: session.appendingPathComponent("journal.json"))
+      ) as? [String: Any]
+    )
+    XCTAssertEqual(document["state"] as? String, "completed")
+    XCTAssertEqual((document["chunks"] as? [[String: Any]])?.count, 1)
+    XCTAssertEqual((document["spool"] as? [String: Any])?["formalEligible"] as? Bool, true)
+  }
+
   func testCompletedRecoveryQuarantinesInvalidChunksAndPublishesOnlyValidatedPrefix() throws {
     let root = try temporaryRoot()
     defer { try? FileManager.default.removeItem(at: root) }

@@ -78,6 +78,7 @@ const manifestSchema = z
               .array(relativeArtifactPathSchema)
               .max(64)
               .optional(),
+            workerReportedModelArtifact: relativeArtifactPathSchema.optional(),
             runtimeArtifacts: z
               .array(relativeArtifactPathSchema)
               .max(64)
@@ -201,7 +202,9 @@ export class ResourceCatalog {
     }
     return {
       protocolIdentity: entry.protocolIdentity,
-      modelSha256: combinedArtifactHash(this.manifest, entry.modelArtifacts),
+      modelSha256: entry.workerReportedModelArtifact
+        ? artifactHash(this.manifest, entry.workerReportedModelArtifact)
+        : combinedArtifactHash(this.manifest, entry.modelArtifacts),
       runtimeSha256: combinedArtifactHash(
         this.manifest,
         entry.runtimeArtifacts,
@@ -336,6 +339,21 @@ function substituteArgument(
   variables: { runtimeRoot?: string; attemptOutput?: string },
   resourceRoot: string,
 ): string {
+  const option = /^(--[a-z][a-z0-9-]{0,127})=(.+)$/i.exec(argument);
+  if (option) {
+    if (option[1] === "--control-json") {
+      const parsed = JSON.parse(option[2]!) as unknown;
+      if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
+        throw new Error("resource control argument must be a JSON object");
+      }
+      return argument;
+    }
+    return `${option[1]}=${substituteArgument(
+      option[2]!,
+      variables,
+      resourceRoot,
+    )}`;
+  }
   if (argument === "{runtimeRoot}") {
     return variables.runtimeRoot ?? path.join(resourceRoot, "runtime");
   }
@@ -371,6 +389,29 @@ function assertUniqueManifestEntries(manifest: ResourceManifest): void {
   ) {
     throw new Error("resource manifest contains duplicate operations");
   }
+  for (const operation of manifest.operations) {
+    if (
+      operation.workerReportedModelArtifact &&
+      !operation.modelArtifacts?.includes(operation.workerReportedModelArtifact)
+    ) {
+      throw new Error(
+        "worker-reported model artifact must be an operation model artifact",
+      );
+    }
+  }
+}
+
+function artifactHash(
+  manifest: ResourceManifest,
+  artifactPath: string,
+): string {
+  const artifact = manifest.artifacts.find(
+    (item) => item.path === artifactPath,
+  );
+  if (!artifact) {
+    throw new Error(`processing identity artifact is absent: ${artifactPath}`);
+  }
+  return artifact.sha256;
 }
 
 function combinedArtifactHash(

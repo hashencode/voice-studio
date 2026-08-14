@@ -113,6 +113,11 @@ printf '%s\\n' '{"schemaVersion":1,"type":"result","operationId":"progress-failu
         arguments: ["/etc/passwd"],
       },
       {
+        operation: "unsafe-option-operation",
+        executable: "bin/process-tree-fixture",
+        arguments: ["--model=/etc/passwd"],
+      },
+      {
         operation: "resource-path-operation",
         executable: "bin/process-tree-fixture",
         arguments: ["{resourceRoot}/model.bin"],
@@ -387,6 +392,16 @@ describe.skipIf(process.platform !== "darwin")(
         }),
       ).rejects.toThrow("authorized roots");
       expect(existsSync(join(unsafeOutput, "leader.pid"))).toBe(false);
+      await expect(
+        unsafeSupervisor.run({
+          intent: {
+            ...intent(catalog.identity, 83),
+            operationId: "unsafe-option-operation",
+          },
+          command: catalog.command("unsafe-option-operation"),
+          attemptOutputDirectory: unsafeOutput,
+        }),
+      ).rejects.toThrow("authorized roots");
 
       const limitedOutput = join(workspaceRoot, "limited");
       mkdirSync(limitedOutput, { recursive: true });

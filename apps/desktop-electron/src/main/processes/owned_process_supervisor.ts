@@ -370,8 +370,13 @@ function validateCommandArguments(
     if (argument.includes("\0")) {
       throw new Error("resource command contains an invalid argument");
     }
-    if (!path.isAbsolute(argument)) continue;
-    const candidate = path.resolve(argument);
+    const optionSeparator = argument.indexOf("=");
+    const value =
+      argument.startsWith("--") && optionSeparator > 2
+        ? argument.slice(optionSeparator + 1)
+        : argument;
+    if (!path.isAbsolute(value)) continue;
+    const candidate = path.resolve(value);
     if (
       !isPathAtOrInside(command.resourceRoot, candidate) &&
       !isPathAtOrInside(attemptOutputDirectory, candidate)

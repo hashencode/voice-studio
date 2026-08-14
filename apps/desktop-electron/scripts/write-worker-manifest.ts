@@ -36,6 +36,13 @@ for (let index = 0; index < artifactFiles.length; index += 4) {
     )),
   );
 }
+const artifactSha256 = (relativePath: string): string => {
+  const artifact = artifacts.find(
+    (candidate) => candidate.path === relativePath,
+  );
+  if (!artifact) throw new Error(`worker artifact is missing: ${relativePath}`);
+  return artifact.sha256;
+};
 await writeFile(
   path.join(root, "manifest.json"),
   `${JSON.stringify(
@@ -49,6 +56,35 @@ await writeFile(
           operation: "worker-health",
           executable: "bin/desktop_sherpa_worker",
           arguments: ["--phase", "health", "--runtime-root", "{runtimeRoot}"],
+        },
+        {
+          operation: "live-caption",
+          executable: "bin/desktop_sensevoice_caption_worker",
+          protocolIdentity: "sensevoice-live-caption-worker/v1",
+          arguments: [
+            "--runtime-root={runtimeRoot}",
+            "--model-root={resourceRoot}/models/live-caption",
+            "--asset-root={resourceRoot}/models/live-caption",
+            "--fixture-root={attemptOutput}",
+            "--model={resourceRoot}/models/live-caption/model.int8.onnx",
+            `--model-sha256=${artifactSha256("models/live-caption/model.int8.onnx")}`,
+            "--tokens={resourceRoot}/models/live-caption/tokens.txt",
+            `--tokens-sha256=${artifactSha256("models/live-caption/tokens.txt")}`,
+            "--vad={resourceRoot}/models/live-caption/silero_vad.onnx",
+            `--vad-sha256=${artifactSha256("models/live-caption/silero_vad.onnx")}`,
+            '--control-json={"provider":"cpu","threads":2,"concurrency":1,"decodingMethod":"greedy_search","language":"auto","useInverseTextNormalization":false,"recognizerLifecycle":"resident_preloaded","vadThreshold":0.5,"minimumSpeechSeconds":0.25,"minimumSilenceSeconds":0.5,"maximumUtteranceSeconds":15,"publishesTokenPartials":false,"publishesCompletedUtterancesOnly":true}',
+          ],
+          modelArtifacts: [
+            "models/live-caption/model.int8.onnx",
+            "models/live-caption/tokens.txt",
+            "models/live-caption/silero_vad.onnx",
+          ],
+          workerReportedModelArtifact: "models/live-caption/model.int8.onnx",
+          runtimeArtifacts: [
+            "runtime/libonnxruntime.1.27.0.dylib",
+            "runtime/libsherpa-onnx-c-api.dylib",
+            "runtime/libsherpa-onnx-cxx-api.dylib",
+          ],
         },
         {
           operation: "asr",

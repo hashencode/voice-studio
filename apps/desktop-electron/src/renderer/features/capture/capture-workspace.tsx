@@ -12,6 +12,7 @@ import {
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { CaptionWorkspace } from "@/features/captions/caption-workspace";
 import type {
   ApplicationSnapshot,
   CapturePreflight,
@@ -547,6 +548,7 @@ function ActiveCapture({
       {capture.phase === "partial_capture" || capture.partialCapture ? (
         <PartialCaptureStatus capture={capture} />
       ) : null}
+      <ActiveCaptionWorkspace sessionId={capture.sessionId} />
       {pendingAction?.startsWith("control-") ? (
         <p className="text-sm font-medium">
           {capture.phase === "finalizing" ? "正在安全结束录制" : "操作处理中…"}
@@ -597,6 +599,17 @@ function ActiveCapture({
         </div>
       ) : null}
     </section>
+  );
+}
+
+function ActiveCaptionWorkspace({ sessionId }: { sessionId: string }) {
+  return (
+    <CaptionWorkspace
+      sessionId={sessionId}
+      getSnapshot={window.voice2text.getCaptionSnapshot}
+      subscribe={window.voice2text.onCaptionSnapshot}
+      retryFormal={window.voice2text.retryFormalTranscript}
+    />
   );
 }
 

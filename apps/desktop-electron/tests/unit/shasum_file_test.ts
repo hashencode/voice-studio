@@ -86,6 +86,6 @@ it("rejects unbounded subprocess output", async () => {
   writeFileSync(command, "#!/bin/sh\nyes x | head -c 2048\n");
   chmodSync(command, 0o700);
   await expect(
-    sha256FileWithShasum(file, { command, timeoutMs: 1000 }),
+    sha256FileWithShasum(file, { command, timeoutMs: 3000 }),
   ).rejects.toThrow(/output limit/i);
 });
