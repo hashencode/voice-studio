@@ -224,6 +224,54 @@ describe.skipIf(process.platform !== "darwin")(
               code: "HELPER_COMMAND_NOT_ALLOWLISTED",
             }),
           );
+          expect(
+            await invoke("companion-discovery-register", id("discovery"), {
+              userInitiated: true,
+              port: 4242,
+              deviceId: "desktop-01",
+              deviceName: "Voice2Text Mac",
+              fingerprint: "ABCDEFGHIJKLMNOPQRSTUVWXYZ234567",
+            }),
+          ).toEqual(
+            expect.objectContaining({
+              type: "error",
+              code: "HELPER_CAPABILITY_DENIED",
+            }),
+          );
+          const invalidCredential = Buffer.alloc(31, 7).toString("base64");
+          const invalidCredentialCommandId = id("companion-credential");
+          const invalidCredentialReceipt = await invoke(
+            "companion-credential-replace",
+            invalidCredentialCommandId,
+            {
+              kind: "identity-seed",
+              credentialBase64: invalidCredential,
+            },
+          );
+          expect(JSON.stringify(invalidCredentialReceipt)).not.toContain(
+            invalidCredential,
+          );
+          expect(invalidCredentialReceipt).toEqual(
+            expect.objectContaining({
+              type: "error",
+              code: "KEYCHAIN_ARGUMENTS_INVALID",
+            }),
+          );
+          expect(
+            await invoke(
+              "companion-credential-replace",
+              invalidCredentialCommandId,
+              {
+                kind: "identity-seed",
+                credentialBase64: invalidCredential,
+              },
+            ),
+          ).toEqual(
+            expect.objectContaining({
+              type: "error",
+              code: "HELPER_COMMAND_REPLAYED",
+            }),
+          );
         } finally {
           if (stored) {
             await invoke("secret-delete", id("cleanup"), {

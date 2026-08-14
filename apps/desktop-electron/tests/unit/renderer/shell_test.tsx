@@ -10,6 +10,7 @@ import type {
   ProcessingTask,
   Voice2TextDesktopApi,
 } from "../../../src/shared/contracts";
+import { companionRendererStubs } from "../../fixtures/companion";
 
 const readySnapshot: ApplicationSnapshot = {
   protocolVersion: 1,
@@ -38,6 +39,7 @@ function installApi(
   overrides: Partial<Voice2TextDesktopApi> = {},
 ) {
   const api: Voice2TextDesktopApi = {
+    ...companionRendererStubs(),
     getAiSettings: vi.fn(async () => testAiSettings()),
     saveAiSettings: vi.fn(async () => testAiSettings()),
     replaceAiProviderSecret: vi.fn(async () => testAiSettings()),

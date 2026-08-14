@@ -11,7 +11,7 @@ describe("U10 AI storage authority", () => {
   it("migrates to v9 without persisting secret material", () => {
     database = openElectronDatabase(":memory:");
     expect(database.prepare("PRAGMA user_version").get()).toEqual({
-      user_version: 9,
+      user_version: 10,
     });
     const repository = new AiJobRepository(database);
     repository.saveSettings({

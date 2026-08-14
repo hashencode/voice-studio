@@ -70,6 +70,139 @@ struct NativeSecurityTests {
         providerId: "deepseek") == .denied)
   }
 
+  @Test("companion credentials preserve frozen service accounts and encoding")
+  func companionCredentialIdentity() throws {
+    let backend = FakeKeychainBackend(readResult: .missing)
+    let store = CompanionCredentialStore(backend: backend)
+    let credential = Data((0..<32).map(UInt8.init))
+
+    #expect(
+      try store.replace(.identitySeed, credential: credential) == .stored)
+    #expect(backend.lastService == "com.voice2text.desktop.companion")
+    #expect(backend.lastAccount == "companion.identity.seed.v1")
+    #expect(backend.lastValue == Data(credential.base64EncodedString().utf8))
+    #expect(backend.lastAccessibility == .whenUnlockedThisDeviceOnly)
+    #expect(backend.lastSynchronizable == false)
+    #expect(backend.lastUsesDataProtectionKeychain == true)
+
+    backend.readResult = .value(Data(credential.base64EncodedString().utf8))
+    #expect(try store.read(.peer(deviceId: "android-01")) == .available(credential))
+    #expect(backend.lastAccount == "companion.peer.android-01.credential.v1")
+    #expect(try store.delete(.peer(deviceId: "android-01")) == .deleted)
+    #expect(backend.lastService == "com.voice2text.desktop.companion")
+    #expect(backend.lastAccount == "companion.peer.android-01.credential.v1")
+  }
+
+  @Test("companion credentials reject invalid identities sizes and corrupt values")
+  func companionCredentialBounds() throws {
+    let backend = FakeKeychainBackend(readResult: .value(Data("not-base64".utf8)))
+    let store = CompanionCredentialStore(backend: backend)
+
+    #expect(try store.read(.identitySeed) == .corrupt)
+    #expect(throws: NativeSecurityFailure.self) {
+      _ = try store.read(.peer(deviceId: "invalid peer"))
+    }
+    #expect(throws: NativeSecurityFailure.self) {
+      _ = try store.replace(.identitySeed, credential: Data(repeating: 1, count: 31))
+    }
+  }
+
+  @Test("companion discovery requires opt-in and advertises only the receiver protocol")
+  func companionDiscoveryRegistration() throws {
+    let backend = FakeCompanionBonjourBackend(result: .registered(name: "Voice2Text Mac"))
+    let discovery = CompanionDiscoveryRegistrar(backend: backend)
+
+    #expect(throws: NativeSecurityFailure.self) {
+      _ = try discovery.register(
+        CompanionDiscoveryRequest(
+          userInitiated: false,
+          port: 4242,
+          deviceId: "desktop-01",
+          deviceName: "Voice2Text Mac",
+          fingerprint: "ABCDEFGHIJKLMNOPQRSTUVWXYZ234567"
+        ))
+    }
+    #expect(throws: NativeSecurityFailure.self) {
+      _ = try discovery.register(
+        CompanionDiscoveryRequest(
+          userInitiated: true,
+          port: 4242,
+          deviceId: "desktop-01",
+          deviceName: String(repeating: "x", count: 64),
+          fingerprint: "ABCDEFGHIJKLMNOPQRSTUVWXYZ234567"
+        ))
+    }
+    let receipt = try discovery.register(
+      CompanionDiscoveryRequest(
+        userInitiated: true,
+        port: 4242,
+        deviceId: "desktop-01",
+        deviceName: "Voice2Text Mac",
+        fingerprint: "ABCDEFGHIJKLMNOPQRSTUVWXYZ234567"
+      ))
+
+    #expect(receipt.state == .registered)
+    #expect(receipt.manualFallbackAvailable == false)
+    #expect(backend.lastAdvertisement?.domain == "local.")
+    #expect(backend.lastAdvertisement?.serviceType == "_voice2text-media._tcp.")
+    #expect(backend.lastAdvertisement?.port == 4242)
+    #expect(
+      backend.lastAdvertisement?.txtRecord == [
+        "schema": "companion-media-transfer/v1",
+        "capability": "media-transfer/v1",
+        "deviceId": "desktop-01",
+        "fingerprint": "ABCDEFGHIJKLMNOPQRSTUVWXYZ234567",
+      ])
+    #expect(backend.listenerCreated == false)
+  }
+
+  @Test("companion discovery permission failures preserve manual fallback")
+  func companionDiscoveryFallback() throws {
+    for (result, expectedState) in [
+      (
+        CompanionBonjourRegistrationResult.permissionDenied,
+        CompanionDiscoveryState.permissionDenied
+      ),
+      (.permissionPending, .permissionPending),
+      (.unavailable, .unavailable),
+    ] {
+      let backend = FakeCompanionBonjourBackend(result: result)
+      let discovery = CompanionDiscoveryRegistrar(backend: backend)
+      let receipt = try discovery.register(
+        CompanionDiscoveryRequest(
+          userInitiated: true,
+          port: 4242,
+          deviceId: "desktop-01",
+          deviceName: "Voice2Text Mac",
+          fingerprint: "ABCDEFGHIJKLMNOPQRSTUVWXYZ234567"
+        ))
+      #expect(receipt.state == expectedState)
+      #expect(receipt.manualFallbackAvailable == true)
+    }
+  }
+
+  @Test("pending discovery converges to its late registered name without republishing")
+  func companionDiscoveryLateSuccess() throws {
+    let backend = FakeCompanionBonjourBackend(result: .permissionPending)
+    let discovery = CompanionDiscoveryRegistrar(backend: backend)
+    let request = CompanionDiscoveryRequest(
+      userInitiated: true,
+      port: 4242,
+      deviceId: "desktop-01",
+      deviceName: "Voice2Text Mac",
+      fingerprint: "ABCDEFGHIJKLMNOPQRSTUVWXYZ234567"
+    )
+
+    #expect(try discovery.register(request).state == .permissionPending)
+    backend.statusResult = .registered(name: "Voice2Text Mac (2)")
+    #expect(discovery.status().registeredName == "Voice2Text Mac (2)")
+    #expect(try discovery.register(request).registeredName == "Voice2Text Mac (2)")
+    #expect(backend.registerCallCount == 1)
+    #expect(discovery.unregister().state == .stopped)
+    #expect(discovery.unregister().state == .stopped)
+    #expect(backend.stopCallCount == 1)
+  }
+
   @Test("FileVault reports only device security truth")
   func fileVaultTruth() {
     let enabled = FileVaultStatusProbe(runner: { _ in
@@ -116,6 +249,31 @@ struct NativeSecurityTests {
     }
     #expect(startedAt.duration(to: .now) < .seconds(2))
   }
+}
+
+private final class FakeCompanionBonjourBackend: CompanionBonjourBackend, @unchecked Sendable {
+  var result: CompanionBonjourRegistrationResult
+  var statusResult: CompanionBonjourRegistrationResult?
+  var lastAdvertisement: CompanionBonjourAdvertisement?
+  var listenerCreated = false
+  var registerCallCount = 0
+  var stopCallCount = 0
+
+  init(result: CompanionBonjourRegistrationResult) {
+    self.result = result
+  }
+
+  func register(
+    _ advertisement: CompanionBonjourAdvertisement
+  ) -> CompanionBonjourRegistrationResult {
+    registerCallCount += 1
+    lastAdvertisement = advertisement
+    return result
+  }
+
+  func status() -> CompanionBonjourRegistrationResult? { statusResult }
+
+  func stop() { stopCallCount += 1 }
 }
 
 private final class FakeKeychainBackend: KeychainBackend, @unchecked Sendable {

@@ -1,4 +1,4 @@
-export const ELECTRON_SCHEMA_VERSION = 9;
+export const ELECTRON_SCHEMA_VERSION = 10;
 export const ELECTRON_APPLICATION_ID = 0x56325445;
 export { createSchemaV1 } from "./migrations/v1";
 export { migrateSchemaV1ToV2 } from "./migrations/v2";
@@ -9,6 +9,7 @@ export { migrateSchemaV5ToV6 } from "./migrations/v6";
 export { migrateSchemaV6ToV7 } from "./migrations/v7";
 export { migrateSchemaV7ToV8 } from "./migrations/v8";
 export { migrateSchemaV8ToV9 } from "./migrations/v9";
+export { migrateSchemaV9ToV10 } from "./migrations/v10";
 
 export const REQUIRED_SCHEMA_TABLES = [
   "meetings",
@@ -40,4 +41,9 @@ export const REQUIRED_SCHEMA_TABLES = [
   "ai_insights",
   "ai_evidence_links",
   "ai_command_receipts",
+  "companion_settings",
+  "companion_peers",
+  "companion_transfers",
+  "companion_transfer_chunks",
+  "companion_command_receipts",
 ] as const;

@@ -20,6 +20,7 @@ export interface HelperCapabilities {
   exactSourcePaths: string[];
   destinationRoots: string[];
   captureSessionRoot?: string;
+  companionDiscovery?: true;
 }
 
 interface HelperFrame {

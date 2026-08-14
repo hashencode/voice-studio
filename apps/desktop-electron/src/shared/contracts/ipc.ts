@@ -28,6 +28,14 @@ import type {
   MeetingAiSnapshot,
   RetryMeetingAiRequest,
 } from "./meeting_ai";
+import type {
+  CompanionOptInRequest,
+  CompanionPairingInviteRequest,
+  CompanionPeerRevokeRequest,
+  CompanionSnapshot,
+  CompanionTransferCancelRequest,
+  CompanionTransferRetryRequest,
+} from "./companion";
 
 export const desktopProtocolVersion = 1 as const;
 export const desktopWorkerHealthProtocol =
@@ -72,6 +80,13 @@ export const ipcChannels = {
   meetingAiGenerate: "desktop.ai.meeting.generate.v1",
   meetingAiRetry: "desktop.ai.meeting.retry.v1",
   meetingAiSnapshotEvent: "desktop.ai.meeting.snapshot.v1",
+  companionSnapshotGet: "desktop.companion.snapshot.get.v1",
+  companionOptInSet: "desktop.companion.opt-in.set.v1",
+  companionPairingInviteCreate: "desktop.companion.pairing-invite.create.v1",
+  companionPeerRevoke: "desktop.companion.peer.revoke.v1",
+  companionTransferCancel: "desktop.companion.transfer.cancel.v1",
+  companionTransferRetry: "desktop.companion.transfer.retry.v1",
+  companionSnapshotEvent: "desktop.companion.snapshot.v1",
 } as const;
 
 export const workerHealthRequestSchema = z
@@ -203,6 +218,23 @@ export type ImportMeetingResponse = z.infer<typeof importMeetingResponseSchema>;
 export type DesktopError = z.infer<typeof desktopErrorSchema>;
 
 export interface Voice2TextDesktopApi {
+  getCompanionSnapshot(): Promise<CompanionSnapshot>;
+  setCompanionOptIn(options: CompanionOptInRequest): Promise<CompanionSnapshot>;
+  createCompanionPairingInvite(
+    options: CompanionPairingInviteRequest,
+  ): Promise<CompanionSnapshot>;
+  revokeCompanionPeer(
+    options: CompanionPeerRevokeRequest,
+  ): Promise<CompanionSnapshot>;
+  cancelCompanionTransfer(
+    options: CompanionTransferCancelRequest,
+  ): Promise<CompanionSnapshot>;
+  retryCompanionTransfer(
+    options: CompanionTransferRetryRequest,
+  ): Promise<CompanionSnapshot>;
+  onCompanionSnapshot(
+    listener: (snapshot: CompanionSnapshot) => void,
+  ): () => void;
   getAiSettings(): Promise<AiSettingsSnapshot>;
   saveAiSettings(options: {
     providerId: "deepseek" | "openai-compatible";

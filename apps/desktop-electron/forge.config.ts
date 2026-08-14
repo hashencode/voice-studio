@@ -17,6 +17,9 @@ const config: ForgeConfig = {
         "Voice2Text uses the selected microphone for meetings you explicitly record.",
       NSAudioCaptureUsageDescription:
         "Voice2Text captures system audio only while you explicitly record a meeting.",
+      NSLocalNetworkUsageDescription:
+        "Voice2Text discovers your paired phone on the local network only when you enable companion transfer.",
+      NSBonjourServices: ["_voice2text-media._tcp"],
     },
     extraResource: [
       path.resolve("resources/worker"),

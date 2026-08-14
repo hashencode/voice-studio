@@ -33,6 +33,7 @@ export class SecureImportDomainService {
   }): Promise<{
     meetingId: number;
     jobId: number;
+    recordingId: number;
     mediaSha256: string;
     inserted: boolean;
     state: ProcessingJobState;
@@ -83,6 +84,7 @@ export class SecureImportDomainService {
     return {
       meetingId: commit.meeting.id,
       jobId: commit.job.id,
+      recordingId: commit.mediaAuthorityId,
       mediaSha256: receipt.normalizedSha256,
       inserted: commit.inserted,
       state: commit.job.state,

@@ -347,16 +347,17 @@ class CompanionCheckpoint {
   CompanionCheckpoint({
     required this.transferId,
     required this.wholeFileSha256,
+    required this.chunkCount,
     required Iterable<int> missingChunks,
     required this.updatedAtMs,
   }) : missingChunks = List<int>.unmodifiable(missingChunks) {
     _requireIdentifier(transferId, 'transferId');
     _requireSha256(wholeFileSha256, 'wholeFileSha256');
     _requireTimestamp(updatedAtMs);
-    if (this.missingChunks.length > companionMaximumChunkCount ||
-        this.missingChunks.any(
-          (value) => value < 0 || value >= companionMaximumChunkCount,
-        ) ||
+    if (chunkCount < 1 ||
+        chunkCount > companionMaximumChunkCount ||
+        this.missingChunks.length > chunkCount ||
+        this.missingChunks.any((value) => value < 0 || value >= chunkCount) ||
         this.missingChunks.toSet().length != this.missingChunks.length) {
       throw const CompanionProtocolException(
         'INVALID_CHECKPOINT',
@@ -367,15 +368,79 @@ class CompanionCheckpoint {
 
   final String transferId;
   final String wholeFileSha256;
+  final int chunkCount;
   final List<int> missingChunks;
   final int updatedAtMs;
 
   Map<String, Object> toJson() => <String, Object>{
     'transferId': transferId,
     'wholeFileSha256': wholeFileSha256,
-    'missingChunks': missingChunks,
+    'chunkCount': chunkCount,
+    'missingChunkBitmap': encodeMissingChunkBitmap(chunkCount, missingChunks),
     'updatedAtMs': updatedAtMs,
   };
+}
+
+String encodeMissingChunkBitmap(int chunkCount, Iterable<int> missingChunks) {
+  if (chunkCount < 1 || chunkCount > companionMaximumChunkCount) {
+    throw const CompanionProtocolException(
+      'INVALID_CHECKPOINT',
+      'Checkpoint chunk count is invalid.',
+    );
+  }
+  final bytes = List<int>.filled((chunkCount + 7) ~/ 8, 0);
+  final seen = <int>{};
+  for (final index in missingChunks) {
+    if (index < 0 || index >= chunkCount || !seen.add(index)) {
+      throw const CompanionProtocolException(
+        'INVALID_CHECKPOINT',
+        'Checkpoint missing chunk set is invalid.',
+      );
+    }
+    bytes[index >> 3] |= 1 << (index & 7);
+  }
+  return base64Encode(bytes);
+}
+
+List<int> decodeMissingChunkBitmap({
+  required int chunkCount,
+  required Object? encoded,
+}) {
+  if (chunkCount < 1 ||
+      chunkCount > companionMaximumChunkCount ||
+      encoded is! String) {
+    throw const CompanionProtocolException(
+      'INVALID_CHECKPOINT',
+      'Checkpoint bitmap is invalid.',
+    );
+  }
+  final List<int> bytes;
+  try {
+    bytes = base64Decode(encoded);
+  } on FormatException {
+    throw const CompanionProtocolException(
+      'INVALID_CHECKPOINT',
+      'Checkpoint bitmap is invalid.',
+    );
+  }
+  if (bytes.length != (chunkCount + 7) ~/ 8 || base64Encode(bytes) != encoded) {
+    throw const CompanionProtocolException(
+      'INVALID_CHECKPOINT',
+      'Checkpoint bitmap is invalid.',
+    );
+  }
+  final unusedBits = bytes.length * 8 - chunkCount;
+  if (unusedBits > 0 && (bytes.last >> (8 - unusedBits)) != 0) {
+    throw const CompanionProtocolException(
+      'INVALID_CHECKPOINT',
+      'Checkpoint bitmap has non-zero padding.',
+    );
+  }
+  return List<int>.unmodifiable(
+    Iterable<int>.generate(
+      chunkCount,
+    ).where((index) => (bytes[index >> 3] & (1 << (index & 7))) != 0),
+  );
 }
 
 class CompanionReceipt {

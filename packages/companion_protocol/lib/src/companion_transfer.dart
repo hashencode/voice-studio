@@ -70,6 +70,7 @@ class CompanionTransferReceiver {
       return CompanionCheckpoint(
         transferId: manifest.transferId,
         wholeFileSha256: manifest.wholeFileSha256,
+        chunkCount: manifest.chunkCount,
         missingChunks: const <int>[],
         updatedAtMs: _clockMs(),
       );
@@ -356,6 +357,7 @@ class FileCompanionTransferStore implements CompanionTransferStore {
     return CompanionCheckpoint(
       transferId: manifest.transferId,
       wholeFileSha256: manifest.wholeFileSha256,
+      chunkCount: manifest.chunkCount,
       missingChunks: missing,
       updatedAtMs: DateTime.now().millisecondsSinceEpoch,
     );

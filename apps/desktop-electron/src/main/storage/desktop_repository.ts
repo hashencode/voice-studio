@@ -651,6 +651,45 @@ export class DesktopRepository {
       .map(mapMediaAuthority);
   }
 
+  committedImportForSourceSha256(sourceSha256: string): {
+    meeting: MeetingRecord;
+    job: ProcessingJobRecord;
+    mediaAuthorityId: number;
+    contentSha256: string;
+    normalizedPath: string;
+    normalizedSizeBytes: number;
+  } | null {
+    if (!/^[a-f0-9]{64}$/.test(sourceSha256)) {
+      throw new Error("source authority hash is invalid");
+    }
+    const rows = this.database
+      .prepare(
+        `SELECT a.id AS media_authority_id, a.content_sha256,
+          a.normalized_path, a.size_bytes,
+          m.id AS meeting_id, j.id AS job_id
+         FROM media_authorities a
+         JOIN meetings m ON m.media_authority_id = a.id
+         JOIN processing_jobs j ON j.meeting_id = m.id
+           AND j.idempotency_key = 'processing:' || a.content_sha256
+         WHERE a.source_sha256 = ?
+         ORDER BY a.id, m.id, j.id LIMIT 2`,
+      )
+      .all(sourceSha256);
+    if (rows.length === 0) return null;
+    if (rows.length !== 1) {
+      throw new Error("source authority resolves to multiple imports");
+    }
+    const row = rows[0]!;
+    return {
+      meeting: this.requireMeeting(Number(row.meeting_id)),
+      job: this.requireJob(Number(row.job_id)),
+      mediaAuthorityId: Number(row.media_authority_id),
+      contentSha256: String(row.content_sha256),
+      normalizedPath: String(row.normalized_path),
+      normalizedSizeBytes: Number(row.size_bytes),
+    };
+  }
+
   commitValidatedImport(
     command: {
       displayName: string;
@@ -667,7 +706,12 @@ export class DesktopRepository {
       runtimeSha256: string;
     },
     nowMs: number,
-  ): { meeting: MeetingRecord; job: ProcessingJobRecord; inserted: boolean } {
+  ): {
+    meeting: MeetingRecord;
+    job: ProcessingJobRecord;
+    mediaAuthorityId: number;
+    inserted: boolean;
+  } {
     assertProfileOwnedPath(this.profile, command.normalizedPath);
     return withTransaction(this.database, () => {
       const existingAsset = this.database
@@ -689,6 +733,7 @@ export class DesktopRepository {
         return {
           meeting: mapMeeting(meetingRow),
           job: mapJob(jobRow),
+          mediaAuthorityId: Number(existingAsset.id),
           inserted: false,
         };
       }
@@ -746,6 +791,7 @@ export class DesktopRepository {
       return {
         meeting: this.requireMeeting(meetingId),
         job: this.requireJob(Number(job.lastInsertRowid)),
+        mediaAuthorityId: mediaId,
         inserted: true,
       };
     });

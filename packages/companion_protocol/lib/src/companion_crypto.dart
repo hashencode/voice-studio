@@ -7,6 +7,126 @@ import 'package:cryptography/cryptography.dart';
 import 'companion_models.dart';
 import 'companion_pairing.dart';
 
+class CompanionPairingEphemeral {
+  CompanionPairingEphemeral._(this.privateKey, this.publicKey);
+
+  final List<int> privateKey;
+  final SimplePublicKey publicKey;
+
+  static Future<CompanionPairingEphemeral> generate() async {
+    final pair = await X25519().newKeyPair();
+    return CompanionPairingEphemeral._(
+      List<int>.from(await pair.extractPrivateKeyBytes()),
+      await pair.extractPublicKey(),
+    );
+  }
+
+  Future<List<int>> sharedSecret(SimplePublicKey peerPublicKey) async {
+    if (privateKey.length != 32 ||
+        peerPublicKey.type != KeyPairType.x25519 ||
+        peerPublicKey.bytes.length != 32) {
+      throw const CompanionProtocolException(
+        'INVALID_PAIRING_KEY',
+        'Pairing key is invalid.',
+      );
+    }
+    final pair = await X25519().newKeyPairFromSeed(privateKey);
+    final secret = await X25519().sharedSecretKey(
+      keyPair: pair,
+      remotePublicKey: peerPublicKey,
+    );
+    final bytes = List<int>.from(await secret.extractBytes());
+    if (bytes.every((byte) => byte == 0)) {
+      bytes.fillRange(0, bytes.length, 0);
+      throw const CompanionProtocolException(
+        'INVALID_PAIRING_KEY',
+        'Pairing shared secret is invalid.',
+      );
+    }
+    return bytes;
+  }
+
+  void destroy() => privateKey.fillRange(0, privateKey.length, 0);
+}
+
+Future<List<int>> deriveCompanionPairingCredential({
+  required List<int> secret,
+  required String pairingId,
+  required String purpose,
+  List<int>? transcriptHash,
+}) async {
+  if (secret.length != 32 ||
+      !RegExp(r'^[a-zA-Z0-9][a-zA-Z0-9._:-]{0,127}$').hasMatch(pairingId) ||
+      !<String>{'temporary-channel', 'long-term-peer'}.contains(purpose) ||
+      (purpose == 'long-term-peer' && transcriptHash?.length != 32)) {
+    throw const CompanionProtocolException(
+      'INVALID_PAIRING_KEY',
+      'Pairing credential input is invalid.',
+    );
+  }
+  final salt = hashes.sha256
+      .convert(utf8.encode('$companionMediaTransferSchema:pairing:$pairingId'))
+      .bytes;
+  final derived = await Hkdf(hmac: Hmac.sha256(), outputLength: 32).deriveKey(
+    secretKey: SecretKey(secret),
+    nonce: salt,
+    info: <int>[
+      ...utf8.encode('$companionMediaTransferSchema:pairing:$purpose'),
+      ...?transcriptHash,
+    ],
+  );
+  return List<int>.from(await derived.extractBytes());
+}
+
+Future<void> verifyCompanionReceipt({
+  required CompanionReceipt receipt,
+  required CompanionTransferManifest manifest,
+  required String expectedDesktopDeviceId,
+  required String expectedDesktopFingerprint,
+  required SimplePublicKey desktopIdentityPublicKey,
+}) async {
+  if (desktopIdentityPublicKey.type != KeyPairType.ed25519 ||
+      companionFingerprint(desktopIdentityPublicKey.bytes) !=
+          expectedDesktopFingerprint) {
+    throw const CompanionProtocolException(
+      'RECEIPT_IDENTITY_MISMATCH',
+      'Desktop receipt identity is not the paired identity.',
+    );
+  }
+  if (receipt.transferId != manifest.transferId ||
+      receipt.wholeFileSha256 != manifest.wholeFileSha256 ||
+      receipt.sizeBytes != manifest.sizeBytes ||
+      receipt.desktopDeviceId != expectedDesktopDeviceId) {
+    throw const CompanionProtocolException(
+      'RECEIPT_MISMATCH',
+      'Desktop receipt is not bound to this transfer and peer.',
+    );
+  }
+  final List<int> signatureBytes;
+  try {
+    signatureBytes = base64Decode(receipt.signature);
+  } on FormatException {
+    throw const CompanionProtocolException(
+      'RECEIPT_SIGNATURE_INVALID',
+      'Desktop receipt signature is invalid.',
+    );
+  }
+  if (signatureBytes.length != 64 ||
+      base64Encode(signatureBytes) != receipt.signature ||
+      !await Ed25519().verify(
+        utf8.encode(jsonEncode(receipt.unsignedJson())),
+        signature: Signature(
+          signatureBytes,
+          publicKey: desktopIdentityPublicKey,
+        ),
+      )) {
+    throw const CompanionProtocolException(
+      'RECEIPT_SIGNATURE_INVALID',
+      'Desktop receipt signature is invalid.',
+    );
+  }
+}
+
 class CompanionIdentity {
   CompanionIdentity._({
     required this.privateSeed,

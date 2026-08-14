@@ -154,6 +154,80 @@ describe.skipIf(process.platform !== "darwin")(
       }
     });
 
+    it("enforces companion allowlist capability arguments and replay", async () => {
+      const helper = nativeHelperPath();
+      const unprivileged = await new MacOSNativeHelperClient(
+        helper,
+      ).openSession({ exactSourcePaths: [], destinationRoots: [] });
+      try {
+        await expect(
+          unprivileged.invokeRaw({
+            command: "companion-discovery-register",
+            request: {
+              userInitiated: true,
+              port: 4242,
+              deviceId: "desktop-01",
+              deviceName: "Voice2Text Mac",
+              fingerprint: "ABCDEFGHIJKLMNOPQRSTUVWXYZ234567",
+            },
+          }),
+        ).rejects.toThrow(/HELPER_CAPABILITY_DENIED/);
+      } finally {
+        await unprivileged.close();
+      }
+
+      const session = await new MacOSNativeHelperClient(helper).openSession({
+        exactSourcePaths: [],
+        destinationRoots: [],
+        companionDiscovery: true,
+      });
+      const invalidCredentialCommand = {
+        command: "companion-credential-replace",
+        commandId: "companion-invalid-credential-123456",
+        request: {
+          kind: "identity-seed",
+          credentialBase64: Buffer.alloc(31, 7).toString("base64"),
+        },
+      };
+      try {
+        await expect(
+          session.invokeRaw(invalidCredentialCommand),
+        ).rejects.toThrow(/KEYCHAIN_ARGUMENTS_INVALID/);
+        await expect(
+          session.invokeRaw(invalidCredentialCommand),
+        ).rejects.toThrow(/HELPER_COMMAND_REPLAYED/);
+        await expect(
+          session.invokeRaw({
+            command: "companion-discovery-register",
+            request: {
+              userInitiated: false,
+              port: 4242,
+              deviceId: "desktop-01",
+              deviceName: "Voice2Text Mac",
+              fingerprint: "ABCDEFGHIJKLMNOPQRSTUVWXYZ234567",
+            },
+          }),
+        ).rejects.toThrow(/COMPANION_DISCOVERY_ARGUMENTS_INVALID/);
+        await expect(
+          session.invokeRaw({ command: "companion-discovery-unregister" }),
+        ).resolves.toMatchObject({
+          companionDiscovery: {
+            schemaVersion: 1,
+            state: "stopped",
+            serviceType: "_voice2text-media._tcp.",
+            port: null,
+            registeredName: null,
+            manualFallbackAvailable: true,
+          },
+        });
+        await expect(
+          session.invokeRaw({ command: "companion-list-keychain-accounts" }),
+        ).rejects.toThrow(/HELPER_COMMAND_NOT_ALLOWLISTED/);
+      } finally {
+        await session.close();
+      }
+    });
+
     it("rejects a symbolic-link capture root during handshake", async () => {
       const root = mkdtempSync(
         join(realpathSync(tmpdir()), "voice2text-capture-link-"),

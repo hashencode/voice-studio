@@ -9,21 +9,25 @@ class CompanionPairingTranscript {
     required this.pairingId,
     required this.initiatorDeviceId,
     required this.initiatorFingerprint,
+    required this.initiatorEphemeralPublicKey,
     required this.responderDeviceId,
     required this.responderFingerprint,
+    required this.responderEphemeralPublicKey,
     required this.shortCodeHash,
     required this.expiresAtMs,
-    required this.capabilities,
-  }) {
+    required List<String> capabilities,
+  }) : capabilities = List<String>.unmodifiable(capabilities) {
     if (!RegExp(r'^[a-zA-Z0-9][a-zA-Z0-9._:-]{0,127}$').hasMatch(pairingId) ||
         initiatorDeviceId.isEmpty ||
         responderDeviceId.isEmpty ||
         !RegExp(r'^[A-Z2-7]{20,64}$').hasMatch(initiatorFingerprint) ||
         !RegExp(r'^[A-Z2-7]{20,64}$').hasMatch(responderFingerprint) ||
+        !_isCanonicalFixedBase64(initiatorEphemeralPublicKey, 32) ||
+        !_isCanonicalFixedBase64(responderEphemeralPublicKey, 32) ||
         !RegExp(r'^[a-f0-9]{64}$').hasMatch(shortCodeHash) ||
         expiresAtMs < 0 ||
-        capabilities.isEmpty ||
-        !capabilities.contains(companionMediaTransferCapability)) {
+        capabilities.length != 1 ||
+        capabilities.first != companionMediaTransferCapability) {
       throw const CompanionProtocolException(
         'INVALID_PAIRING_TRANSCRIPT',
         'Pairing transcript is invalid.',
@@ -34,8 +38,10 @@ class CompanionPairingTranscript {
   final String pairingId;
   final String initiatorDeviceId;
   final String initiatorFingerprint;
+  final String initiatorEphemeralPublicKey;
   final String responderDeviceId;
   final String responderFingerprint;
+  final String responderEphemeralPublicKey;
   final String shortCodeHash;
   final int expiresAtMs;
   final List<String> capabilities;
@@ -45,8 +51,10 @@ class CompanionPairingTranscript {
     'pairingId': pairingId,
     'initiatorDeviceId': initiatorDeviceId,
     'initiatorFingerprint': initiatorFingerprint,
+    'initiatorEphemeralPublicKey': initiatorEphemeralPublicKey,
     'responderDeviceId': responderDeviceId,
     'responderFingerprint': responderFingerprint,
+    'responderEphemeralPublicKey': responderEphemeralPublicKey,
     'shortCodeHash': shortCodeHash,
     'expiresAtMs': expiresAtMs,
     'capabilities': capabilities,
@@ -65,6 +73,15 @@ class CompanionPairingTranscript {
       );
     }
     return sha256.convert(utf8.encode('$pairingId:$code')).toString();
+  }
+}
+
+bool _isCanonicalFixedBase64(String value, int expectedBytes) {
+  try {
+    final bytes = base64Decode(value);
+    return bytes.length == expectedBytes && base64Encode(bytes) == value;
+  } on FormatException {
+    return false;
   }
 }
 

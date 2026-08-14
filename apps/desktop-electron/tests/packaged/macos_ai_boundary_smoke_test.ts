@@ -75,7 +75,7 @@ describe("packaged macOS AI security boundary", () => {
             networkRequestCount: 0,
             before: { consents: 0, jobs: 0, notes: 0 },
             after: { consents: 0, jobs: 0, notes: 0 },
-            databaseUserVersion: 9,
+            databaseUserVersion: 10,
             deviceSecurity: {
               kind: "device-security",
               fileVaultState: expect.stringMatching(

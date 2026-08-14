@@ -18,6 +18,7 @@ import { DesktopRepository } from "../../src/main/storage/desktop_repository";
 import { MeetingWorkspaceRepository } from "../../src/main/storage/repositories/meeting_workspace_repository";
 import { createDesktopApi } from "../../src/preload/api";
 import type { ApplicationSnapshot } from "../../src/shared/contracts";
+import { companionCommandStubs } from "../fixtures/companion";
 
 const roots: string[] = [];
 afterEach(() => {
@@ -122,6 +123,7 @@ it("reviews a completed meeting through validated Main and Preload contracts wit
   });
   const snapshot = applicationSnapshot();
   const services: DesktopIpcServices = {
+    ...companionCommandStubs(),
     getAiSettings: vi.fn(),
     saveAiSettings: vi.fn(),
     replaceAiProviderSecret: vi.fn(),

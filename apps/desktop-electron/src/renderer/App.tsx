@@ -8,6 +8,7 @@ import {
   useSidebar,
 } from "@/components/ui/sidebar";
 import { CaptureWorkspace } from "@/features/capture/capture-workspace";
+import { CompanionFeature } from "@/features/companion/companion-feature";
 import {
   CapabilityUnavailable,
   LoadingShell,
@@ -195,14 +196,7 @@ function ShellContent({
       );
       break;
     case "companion":
-      section = (
-        <Page title="Companion" eyebrow="手机交接">
-          <Placeholder
-            title="尚未连接手机"
-            description="配对与局域网传输将在后续迁移单元接入。"
-          />
-        </Page>
-      );
+      section = <CompanionFeature />;
       break;
     case "settings":
       section = (
@@ -241,25 +235,6 @@ function Page({
       </div>
       {children}
     </section>
-  );
-}
-
-function Placeholder({
-  title,
-  description,
-}: {
-  title: string;
-  description: string;
-}) {
-  return (
-    <div className="grid min-h-64 place-items-center rounded-xl border bg-card p-8 text-center">
-      <div>
-        <h2 className="text-lg font-semibold">{title}</h2>
-        <p className="mt-2 max-w-md text-sm text-muted-foreground">
-          {description}
-        </p>
-      </div>
-    </div>
   );
 }
 

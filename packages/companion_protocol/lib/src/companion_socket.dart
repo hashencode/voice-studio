@@ -5,6 +5,7 @@ import 'dart:math';
 import 'dart:typed_data';
 
 import 'package:crypto/crypto.dart';
+import 'package:cryptography/cryptography.dart';
 
 import 'companion_crypto.dart';
 import 'companion_models.dart';
@@ -322,6 +323,266 @@ class CompanionSocketServer {
   }
 }
 
+class CompanionSocketPairingClient {
+  CompanionSocketPairingClient({
+    required this.deviceId,
+    required this.deviceName,
+    required this.identity,
+    required this.pairingId,
+    required this.shortCode,
+    required this.targetDeviceId,
+    required this.targetFingerprint,
+    required this.targetIdentityPublicKey,
+    required this.targetEphemeralPublicKey,
+    required this.expiresAtMs,
+    required this.persistPendingTrust,
+    this.finalAcknowledgementTimeout = const Duration(seconds: 30),
+    Random? secureRandom,
+    int Function()? clockMs,
+  }) : _secureRandom = secureRandom ?? Random.secure(),
+       _clockMs = clockMs ?? (() => DateTime.now().millisecondsSinceEpoch);
+
+  final String deviceId;
+  final String deviceName;
+  final CompanionIdentity identity;
+  final String pairingId;
+  final String shortCode;
+  final String targetDeviceId;
+  final String targetFingerprint;
+  final SimplePublicKey targetIdentityPublicKey;
+  final SimplePublicKey targetEphemeralPublicKey;
+  final int expiresAtMs;
+  final Future<void> Function(CompanionPeerTrust trust) persistPendingTrust;
+  final Duration finalAcknowledgementTimeout;
+  final Random _secureRandom;
+  final int Function() _clockMs;
+
+  Future<CompanionPeerTrust> pair({
+    required InternetAddress address,
+    required int port,
+  }) async {
+    if (_clockMs() > expiresAtMs ||
+        companionFingerprint(targetIdentityPublicKey.bytes) !=
+            targetFingerprint ||
+        targetIdentityPublicKey.type != KeyPairType.ed25519 ||
+        targetEphemeralPublicKey.type != KeyPairType.x25519) {
+      throw const CompanionProtocolException(
+        'INVALID_PAIRING_INVITE',
+        'Pairing invite identity or expiry is invalid.',
+      );
+    }
+    final ephemeral = await CompanionPairingEphemeral.generate();
+    final sharedSecret = await ephemeral.sharedSecret(targetEphemeralPublicKey);
+    final temporaryCredential = await deriveCompanionPairingCredential(
+      secret: sharedSecret,
+      pairingId: pairingId,
+      purpose: 'temporary-channel',
+    );
+    final socket = await Socket.connect(
+      address,
+      port,
+      timeout: const Duration(seconds: 10),
+    );
+    final reader = _CompanionFrameReader(socket);
+    try {
+      final sessionId =
+          'session-${_clockMs()}-${_secureRandom.nextInt(1 << 32)}';
+      final initiatorNonce = List<int>.generate(
+        32,
+        (_) => _secureRandom.nextInt(256),
+      );
+      _writePlain(socket, <String, Object?>{
+        'schema': companionMediaTransferSchema,
+        'type': 'sessionHello',
+        'sessionId': sessionId,
+        'deviceId': deviceId,
+        'deviceName': deviceName,
+        'fingerprint': identity.fingerprint,
+        'pairingId': pairingId,
+        'initiatorEphemeralPublicKey': base64Encode(ephemeral.publicKey.bytes),
+        'initiatorNonce': base64Encode(initiatorNonce),
+        'issuedAtMs': _clockMs(),
+      });
+      final ack = _decodePlain(await reader.next());
+      _requireExactKeys(ack, <String>{
+        'schema',
+        'type',
+        'sessionId',
+        'deviceId',
+        'deviceName',
+        'fingerprint',
+        'responderNonce',
+        'expiresAtMs',
+      });
+      if (ack['schema'] != companionMediaTransferSchema ||
+          ack['type'] != 'sessionHelloAck' ||
+          ack['sessionId'] != sessionId ||
+          ack['deviceId'] != targetDeviceId ||
+          ack['fingerprint'] != targetFingerprint) {
+        throw const CompanionProtocolException(
+          'TARGET_IDENTITY_MISMATCH',
+          'Desktop identity does not match the pairing invite.',
+        );
+      }
+      final responderNonce = _decodeFixedBase64(
+        ack['responderNonce'],
+        32,
+        'responderNonce',
+      );
+      final sessionExpiresAtMs = ack['expiresAtMs'] as int? ?? -1;
+      final sessions = await CompanionSession.establish(
+        sessionId: sessionId,
+        sharedCredential: temporaryCredential,
+        initiatorNonce: initiatorNonce,
+        responderNonce: responderNonce,
+        expiresAtMs: sessionExpiresAtMs,
+      );
+      final session = sessions.$1;
+      final transcript = CompanionPairingTranscript(
+        pairingId: pairingId,
+        initiatorDeviceId: deviceId,
+        initiatorFingerprint: identity.fingerprint,
+        initiatorEphemeralPublicKey: base64Encode(ephemeral.publicKey.bytes),
+        responderDeviceId: targetDeviceId,
+        responderFingerprint: targetFingerprint,
+        responderEphemeralPublicKey: base64Encode(
+          targetEphemeralPublicKey.bytes,
+        ),
+        shortCodeHash: CompanionPairingTranscript.hashShortCode(
+          pairingId: pairingId,
+          code: shortCode,
+        ),
+        expiresAtMs: expiresAtMs,
+        capabilities: const <String>[companionMediaTransferCapability],
+      );
+      final initiatorSignature = await identity.sign(
+        transcript.canonicalBytes(),
+      );
+      await _writeSealed(
+        socket,
+        session,
+        CompanionMessageType.pairingTranscript,
+        'pairing-$pairingId',
+        <String, Object?>{
+          'transcript': transcript.toJson(),
+          'shortCode': shortCode,
+          'initiatorIdentityPublicKey': base64Encode(identity.publicKey.bytes),
+          'initiatorSignature': base64Encode(initiatorSignature.bytes),
+        },
+        _clockMs(),
+      );
+      final response = await _readSealed(reader, session, _clockMs());
+      if (response.type != CompanionMessageType.pairingTranscript) {
+        throw const CompanionProtocolException(
+          'PAIRING_RESPONSE_INVALID',
+          'Desktop pairing response is invalid.',
+        );
+      }
+      _requireExactKeys(response.payload, <String>{
+        'transcript',
+        'responderIdentityPublicKey',
+        'responderSignature',
+        'verified',
+      });
+      if (response.payload['verified'] != true ||
+          jsonEncode(response.payload['transcript']) !=
+              jsonEncode(transcript.toJson())) {
+        throw const CompanionProtocolException(
+          'PAIRING_TRANSCRIPT_MISMATCH',
+          'Desktop pairing transcript changed.',
+        );
+      }
+      final responderIdentityBytes = _decodeFixedBase64(
+        response.payload['responderIdentityPublicKey'],
+        32,
+        'responderIdentityPublicKey',
+      );
+      final responderSignatureBytes = _decodeFixedBase64(
+        response.payload['responderSignature'],
+        64,
+        'responderSignature',
+      );
+      if (!_constantTimeBytes(
+        responderIdentityBytes,
+        targetIdentityPublicKey.bytes,
+      )) {
+        throw const CompanionProtocolException(
+          'PAIRING_RESPONDER_IDENTITY_MISMATCH',
+          'Desktop pairing identity changed.',
+        );
+      }
+      final signed = CompanionSignedPairing(
+        transcript: transcript,
+        initiatorPublicKey: identity.publicKey,
+        initiatorSignature: initiatorSignature,
+        responderPublicKey: targetIdentityPublicKey,
+        responderSignature: Signature(
+          responderSignatureBytes,
+          publicKey: targetIdentityPublicKey,
+        ),
+      );
+      await signed.verify();
+      final transcriptHash = sha256.convert(transcript.canonicalBytes()).bytes;
+      final durable = await deriveCompanionPairingCredential(
+        secret: sharedSecret,
+        pairingId: pairingId,
+        purpose: 'long-term-peer',
+        transcriptHash: transcriptHash,
+      );
+      final trust = CompanionPeerTrust(
+        peerDeviceId: targetDeviceId,
+        peerFingerprint: targetFingerprint,
+        sharedCredential: List<int>.unmodifiable(List<int>.from(durable)),
+        pairedAtMs: _clockMs(),
+      );
+      durable.fillRange(0, durable.length, 0);
+      await persistPendingTrust(trust);
+      final transcriptHashHex = sha256
+          .convert(transcript.canonicalBytes())
+          .toString();
+      await _writeSealed(
+        socket,
+        session,
+        CompanionMessageType.pairingTranscript,
+        'pairing-commit-$pairingId',
+        <String, Object?>{'commit': true, 'transcriptHash': transcriptHashHex},
+        _clockMs(),
+      );
+      try {
+        final committed = await _readSealed(
+          reader,
+          session,
+          _clockMs(),
+        ).timeout(finalAcknowledgementTimeout);
+        _requireExactKeys(committed.payload, <String>{
+          'paired',
+          'transcriptHash',
+        });
+        if (committed.type != CompanionMessageType.pairingTranscript ||
+            committed.payload['paired'] != true ||
+            committed.payload['transcriptHash'] != transcriptHashHex) {
+          throw const CompanionProtocolException(
+            'PAIRING_COMMIT_MISMATCH',
+            'Desktop pairing commit is invalid.',
+          );
+        }
+      } on Object {
+        throw const CompanionProtocolException(
+          'PAIRING_CONFIRMATION_UNKNOWN',
+          'Pairing commit was sent but desktop confirmation was lost; probe the persisted pending credential.',
+        );
+      }
+      return trust;
+    } finally {
+      sharedSecret.fillRange(0, sharedSecret.length, 0);
+      temporaryCredential.fillRange(0, temporaryCredential.length, 0);
+      ephemeral.destroy();
+      socket.destroy();
+      await socket.close();
+    }
+  }
+}
+
 class CompanionSocketClient {
   CompanionSocketClient({
     required this.deviceId,
@@ -330,6 +591,7 @@ class CompanionSocketClient {
     required this.targetDeviceId,
     required this.targetFingerprint,
     required this.sharedCredential,
+    this.targetIdentityPublicKey,
     this.pairingId,
     Random? secureRandom,
     int Function()? clockMs,
@@ -346,6 +608,7 @@ class CompanionSocketClient {
   final String targetDeviceId;
   final String targetFingerprint;
   final List<int> sharedCredential;
+  final SimplePublicKey? targetIdentityPublicKey;
   final String? pairingId;
   final Random _secureRandom;
   final int Function() _clockMs;
@@ -443,6 +706,7 @@ class CompanionSocketClient {
       );
       var checkpoint = _checkpointFromJson(
         (await _readSealed(reader, session, _clockMs())).payload,
+        manifest,
       );
       var sent = 0;
       var sentChunks = 0;
@@ -498,6 +762,7 @@ class CompanionSocketClient {
         _writeFrame(socket, _binaryFrame, encrypted);
         checkpoint = _checkpointFromJson(
           (await _readSealed(reader, session, _clockMs())).payload,
+          manifest,
         );
         sent += bytes.length;
         sentChunks++;
@@ -528,10 +793,34 @@ class CompanionSocketClient {
           'Desktop did not return a receipt.',
         );
       }
-      return _receiptFromJson(receiptEnvelope.payload);
+      final receipt = _receiptFromJson(receiptEnvelope.payload);
+      await _verifyReceipt(receipt, manifest);
+      return receipt;
     } finally {
       await socket.close();
     }
+  }
+
+  Future<void> _verifyReceipt(
+    CompanionReceipt receipt,
+    CompanionTransferManifest manifest,
+  ) async {
+    final publicKey = targetIdentityPublicKey;
+    if (publicKey == null ||
+        publicKey.type != KeyPairType.ed25519 ||
+        companionFingerprint(publicKey.bytes) != targetFingerprint) {
+      throw const CompanionProtocolException(
+        'RECEIPT_IDENTITY_UNAVAILABLE',
+        'Paired desktop public identity is required to verify receipts.',
+      );
+    }
+    await verifyCompanionReceipt(
+      receipt: receipt,
+      manifest: manifest,
+      expectedDesktopDeviceId: targetDeviceId,
+      expectedDesktopFingerprint: targetFingerprint,
+      desktopIdentityPublicKey: publicKey,
+    );
   }
 }
 
@@ -623,19 +912,28 @@ void _writeFrame(Socket socket, int kind, List<int> payload) {
 
 class _CompanionFrameReader {
   _CompanionFrameReader(
-    Stream<List<int>> stream, {
+    this._socket, {
     void Function(List<int> frame)? observeFrame,
   }) : _observeFrame = observeFrame {
-    _subscription = stream.listen(
+    _subscription = _socket.listen(
       (data) {
         _buffer.addAll(data);
         _drain();
+        if (_buffer.length > (_maximumFrameBytes + 4) * 2) {
+          _failTransport(
+            const CompanionProtocolException(
+              'FRAME_SIZE_INVALID',
+              'Incoming frame buffer exceeds its hard limit.',
+            ),
+            StackTrace.current,
+          );
+        }
       },
       onError: (Object error, StackTrace stackTrace) {
-        _failPending(error, stackTrace);
+        _failTransport(error, stackTrace);
       },
       onDone: () {
-        _failPending(
+        _failTransport(
           const CompanionProtocolException(
             'CONNECTION_CLOSED',
             'Connection closed before the next frame.',
@@ -648,6 +946,7 @@ class _CompanionFrameReader {
   }
 
   final List<int> _buffer = <int>[];
+  final Socket _socket;
   final void Function(List<int> frame)? _observeFrame;
   final List<Completer<Uint8List>> _pending = <Completer<Uint8List>>[];
   late final StreamSubscription<List<int>> _subscription;
@@ -656,7 +955,17 @@ class _CompanionFrameReader {
     final completer = Completer<Uint8List>();
     _pending.add(completer);
     _drain();
-    return completer.future.timeout(const Duration(seconds: 30));
+    return completer.future.timeout(
+      const Duration(seconds: 30),
+      onTimeout: () {
+        const error = CompanionProtocolException(
+          'FRAME_TIMEOUT',
+          'Timed out waiting for the next transport frame.',
+        );
+        _failTransport(error, StackTrace.current);
+        throw error;
+      },
+    );
   }
 
   void _drain() {
@@ -668,8 +977,7 @@ class _CompanionFrameReader {
           'FRAME_SIZE_INVALID',
           'Incoming transport frame is outside the size limit.',
         );
-        _failPending(error, StackTrace.current);
-        unawaited(_subscription.cancel());
+        _failTransport(error, StackTrace.current);
         return;
       }
       if (_buffer.length < 4 + length) return;
@@ -686,6 +994,13 @@ class _CompanionFrameReader {
     }
     _pending.clear();
   }
+
+  void _failTransport(Object error, StackTrace stackTrace) {
+    _failPending(error, stackTrace);
+    _buffer.clear();
+    unawaited(_subscription.cancel());
+    _socket.destroy();
+  }
 }
 
 List<int> _decodeFixedBase64(Object? raw, int bytes, String field) {
@@ -699,6 +1014,9 @@ List<int> _decodeFixedBase64(Object? raw, int bytes, String field) {
     throw CompanionProtocolException('INVALID_FIELD', '$field is invalid.');
   }
   if (decoded.length != bytes) {
+    throw CompanionProtocolException('INVALID_FIELD', '$field is invalid.');
+  }
+  if (base64Encode(decoded) != raw) {
     throw CompanionProtocolException('INVALID_FIELD', '$field is invalid.');
   }
   return decoded;
@@ -724,17 +1042,55 @@ CompanionChunk _chunkFromJson(Map<String, Object?> map) {
   );
 }
 
-CompanionCheckpoint _checkpointFromJson(Map<String, Object?> map) {
-  final missing = map['missingChunks'];
+CompanionCheckpoint _checkpointFromJson(
+  Map<String, Object?> map,
+  CompanionTransferManifest manifest,
+) {
+  _requireExactKeys(map, <String>{
+    'transferId',
+    'wholeFileSha256',
+    'chunkCount',
+    'missingChunkBitmap',
+    'updatedAtMs',
+  });
+  final chunkCount = map['chunkCount'] as int? ?? -1;
+  if (chunkCount != manifest.chunkCount) {
+    throw const CompanionProtocolException(
+      'INVALID_CHECKPOINT',
+      'Checkpoint chunk count does not match the manifest.',
+    );
+  }
   return CompanionCheckpoint(
     transferId: map['transferId'] as String? ?? '',
     wholeFileSha256: map['wholeFileSha256'] as String? ?? '',
-    missingChunks: missing is List ? missing.whereType<int>() : const <int>[],
+    chunkCount: chunkCount,
+    missingChunks: decodeMissingChunkBitmap(
+      chunkCount: chunkCount,
+      encoded: map['missingChunkBitmap'],
+    ),
     updatedAtMs: map['updatedAtMs'] as int? ?? -1,
   );
 }
 
 CompanionReceipt _receiptFromJson(Map<String, Object?> map) {
+  _requireExactKeys(map, <String>{
+    'schema',
+    'receiptId',
+    'transferId',
+    'wholeFileSha256',
+    'sizeBytes',
+    'desktopDeviceId',
+    'desktopDeviceName',
+    'desktopRecordingId',
+    'committedAtMs',
+    'signature',
+  });
+  if (map['schema'] != companionMediaTransferSchema) {
+    throw const CompanionProtocolException(
+      'UNSUPPORTED_SCHEMA',
+      'Receipt schema is invalid.',
+    );
+  }
   return CompanionReceipt(
     receiptId: map['receiptId'] as String? ?? '',
     transferId: map['transferId'] as String? ?? '',
@@ -746,4 +1102,13 @@ CompanionReceipt _receiptFromJson(Map<String, Object?> map) {
     committedAtMs: map['committedAtMs'] as int? ?? -1,
     signature: map['signature'] as String? ?? '',
   );
+}
+
+bool _constantTimeBytes(List<int> left, List<int> right) {
+  if (left.length != right.length) return false;
+  var difference = 0;
+  for (var index = 0; index < left.length; index++) {
+    difference |= left[index] ^ right[index];
+  }
+  return difference == 0;
 }

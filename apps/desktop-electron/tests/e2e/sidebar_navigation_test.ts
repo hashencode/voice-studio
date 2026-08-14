@@ -11,6 +11,7 @@ import type {
   ShellSection,
   Voice2TextDesktopApi,
 } from "../../src/shared/contracts";
+import { companionRendererStubs } from "../fixtures/companion";
 
 afterEach(() => {
   vi.restoreAllMocks();
@@ -31,6 +32,7 @@ function applicationApi(
     return snapshot;
   });
   const api: Voice2TextDesktopApi = {
+    ...companionRendererStubs(),
     getAiSettings: vi.fn(async () => testAiSettings()),
     saveAiSettings: vi.fn(async () => testAiSettings()),
     replaceAiProviderSecret: vi.fn(async () => testAiSettings()),

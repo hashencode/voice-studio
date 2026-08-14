@@ -5,7 +5,9 @@ import {
   existsSync,
   lstatSync,
   mkdirSync,
+  readFileSync,
   realpathSync,
+  unlinkSync,
 } from "node:fs";
 import { createHash, randomBytes, randomUUID } from "node:crypto";
 import { tmpdir } from "node:os";
@@ -30,6 +32,7 @@ import {
   type CaptureSnapshot,
   type CaptionSnapshot,
   type MeetingAiSnapshot,
+  type CompanionSnapshot,
 } from "../shared/contracts";
 import { DesktopApplicationState } from "./application/application_state";
 import {
@@ -105,17 +108,25 @@ import { MeetingAiService } from "./domain/meeting-intelligence/meeting_ai_servi
 import { AiJobRepository } from "./storage/repositories/ai_job_repository";
 import { MacOSHelperSecretStore } from "./features/secrets/macos_helper_secret_store";
 import { UnavailableDesktopSecretStore } from "./features/secrets/secret_store_port";
+import { CompanionService } from "./domain/companion/companion_service";
+import { CompanionReceiver } from "./domain/companion/companion_receiver";
+import { CompanionImportCoordinator } from "./domain/companion/companion_import_coordinator";
+import { validatePinnedMediaAuthority } from "./security/pinned_media_authority";
+import { MacOSCompanionNativeAdapter } from "./features/companion/macos_companion_native_adapter";
+import { TransferRepository } from "./storage/repositories/transfer_repository";
 import { WorkerHealthSupervisor } from "./worker_health";
 
 let processingSmokeRequest: ProcessingSmokeRequest | null = null;
 let captureSmokeRequest: CaptureSmokeRequest | null = null;
 let captionFormalSmokeRequest: CaptionFormalSmokeRequest | null = null;
 let aiBoundarySmokeRequest: AiBoundarySmokeRequest | null = null;
+let companionSmokeRequest: CompanionSmokeRequest | null = null;
 try {
   processingSmokeRequest = readProcessingSmokeRequest();
   captureSmokeRequest = readCaptureSmokeRequest();
   captionFormalSmokeRequest = readCaptionFormalSmokeRequest();
   aiBoundarySmokeRequest = readAiBoundarySmokeRequest();
+  companionSmokeRequest = readCompanionSmokeRequest();
 } catch (error) {
   reportBootstrapFailure("request-parse", error);
   app.exit(78);
@@ -126,6 +137,7 @@ if (
     captureSmokeRequest,
     captionFormalSmokeRequest,
     aiBoundarySmokeRequest,
+    companionSmokeRequest,
   ].filter(Boolean).length > 1
 ) {
   throw new Error("packaged smoke modes are mutually exclusive");
@@ -134,7 +146,8 @@ const smokeAppDataPath =
   processingSmokeRequest?.appDataPath ??
   captureSmokeRequest?.appDataPath ??
   captionFormalSmokeRequest?.appDataPath ??
-  aiBoundarySmokeRequest?.appDataPath;
+  aiBoundarySmokeRequest?.appDataPath ??
+  companionSmokeRequest?.appDataPath;
 if (smokeAppDataPath) {
   const smokeUserData = path.join(smokeAppDataPath, "electron-user-data");
   mkdirSync(smokeUserData, { recursive: true, mode: 0o700 });
@@ -169,6 +182,17 @@ interface AiBoundarySmokeRequest {
   outputPath: string;
 }
 
+interface CompanionSmokeRequest {
+  appDataPath: string;
+  outputPath: string;
+  readyPath: string;
+  credentialStorePath: string;
+  phase: "pair-checkpoint" | "run" | "verify";
+  identitySeed: Buffer;
+  expectedTransferId: string;
+  expectedSourceSha256: string;
+}
+
 let captionFormalSmokeAuthority: {
   sessionId: string;
   recordingSha256: string;
@@ -190,6 +214,9 @@ let meetingWorkspaceService: MeetingWorkspaceService | null = null;
 let meetingExportService: MeetingExportService | null = null;
 let meetingPlaybackService: MeetingPlaybackService | null = null;
 let meetingAiService: MeetingAiService | null = null;
+let companionService: CompanionService | null = null;
+let companionNativeAdapter: MacOSCompanionNativeAdapter | null = null;
+let unsubscribeCompanion: (() => void) | null = null;
 let resourceCatalog: ResourceCatalog | null = null;
 let captureService: DesktopCaptureService | null = null;
 let captureNativeSession: MacOSNativeHelperSession | null = null;
@@ -212,6 +239,7 @@ const applicationState = new DesktopApplicationState();
 const operationListeners = new Set<(event: OperationEvent) => void>();
 const captionListeners = new Set<(snapshot: CaptionSnapshot) => void>();
 const meetingAiListeners = new Set<(snapshot: MeetingAiSnapshot) => void>();
+const companionListeners = new Set<(snapshot: CompanionSnapshot) => void>();
 
 function createMainWindow(): BrowserWindow {
   const window = new BrowserWindow({
@@ -447,6 +475,131 @@ function readAiBoundarySmokeRequest(): AiBoundarySmokeRequest | null {
     throw new Error("packaged AI boundary smoke paths are not private");
   }
   return { appDataPath, outputPath };
+}
+
+function readCompanionSmokeRequest(): CompanionSmokeRequest | null {
+  const requestRaw = process.env.VOICE2TEXT_COMPANION_SMOKE_REQUEST;
+  if (requestRaw === undefined) return null;
+  if (!app.isPackaged || requestRaw.length < 1) {
+    throw new Error(
+      "packaged companion smoke requires a packaged-only request file",
+    );
+  }
+  const temporaryRoot = realpathSync(tmpdir());
+  const requestedPath = path.resolve(requestRaw);
+  const requestedStat = lstatSync(requestedPath);
+  const requestPath = realpathSync(requestedPath);
+  const parentPath = realpathSync(path.dirname(requestPath));
+  const parentStat = lstatSync(parentPath);
+  if (
+    requestedStat.isSymbolicLink() ||
+    !requestedStat.isFile() ||
+    requestedStat.nlink !== 1 ||
+    (requestedStat.mode & 0o077) !== 0 ||
+    (typeof process.getuid === "function" &&
+      requestedStat.uid !== process.getuid()) ||
+    !parentStat.isDirectory() ||
+    parentStat.isSymbolicLink() ||
+    (parentStat.mode & 0o077) !== 0 ||
+    !isPathInside(temporaryRoot, requestPath)
+  ) {
+    throw new Error("packaged companion smoke request is not private");
+  }
+  let raw: Buffer;
+  try {
+    raw = readFileSync(requestPath);
+  } finally {
+    unlinkSync(requestPath);
+  }
+  if (raw.length < 2 || raw.length > 16 * 1024) {
+    raw.fill(0);
+    throw new Error("packaged companion smoke request size is invalid");
+  }
+  let decoded: Record<string, unknown>;
+  try {
+    const candidate = JSON.parse(raw.toString("utf8")) as unknown;
+    if (
+      !candidate ||
+      typeof candidate !== "object" ||
+      Array.isArray(candidate)
+    ) {
+      throw new Error("invalid request");
+    }
+    decoded = candidate as Record<string, unknown>;
+  } finally {
+    raw.fill(0);
+  }
+  const appDataPath = realpathSync(path.resolve(String(decoded.appDataPath)));
+  const outputPath = path.resolve(String(decoded.outputPath));
+  const readyPath = path.resolve(String(decoded.readyPath));
+  const requestedCredentialStorePath = path.resolve(
+    String(decoded.credentialStorePath),
+  );
+  const outputParent = realpathSync(path.dirname(outputPath));
+  const readyParent = realpathSync(path.dirname(readyPath));
+  const credentialStoreParent = realpathSync(
+    path.dirname(requestedCredentialStorePath),
+  );
+  const credentialStorePath = path.join(
+    credentialStoreParent,
+    path.basename(requestedCredentialStorePath),
+  );
+  const phase = decoded.phase;
+  const expectedTransferId = decoded.expectedTransferId;
+  const expectedSourceSha256 = decoded.expectedSourceSha256;
+  if (
+    decoded.schemaVersion !== 1 ||
+    (phase !== "pair-checkpoint" && phase !== "run" && phase !== "verify") ||
+    lstatSync(appDataPath).isSymbolicLink() ||
+    !isPathInside(temporaryRoot, appDataPath) ||
+    !isPathInside(temporaryRoot, outputParent) ||
+    !isPathInside(temporaryRoot, readyParent) ||
+    !isPathInside(temporaryRoot, credentialStoreParent) ||
+    (lstatSync(credentialStoreParent).mode & 0o077) !== 0 ||
+    typeof expectedTransferId !== "string" ||
+    !/^[a-zA-Z0-9][a-zA-Z0-9._:-]{0,127}$/.test(expectedTransferId) ||
+    typeof expectedSourceSha256 !== "string" ||
+    !/^[a-f0-9]{64}$/.test(expectedSourceSha256)
+  ) {
+    throw new Error("packaged companion smoke request fields are invalid");
+  }
+  if (existsSync(credentialStorePath)) {
+    const storeStat = lstatSync(credentialStorePath);
+    if (
+      storeStat.isSymbolicLink() ||
+      !storeStat.isFile() ||
+      storeStat.nlink !== 1 ||
+      storeStat.size !== 32 ||
+      (storeStat.mode & 0o077) !== 0 ||
+      realpathSync(credentialStorePath) !== credentialStorePath ||
+      (typeof process.getuid === "function" &&
+        storeStat.uid !== process.getuid())
+    ) {
+      throw new Error("packaged companion smoke credential store is unsafe");
+    }
+  }
+  return {
+    appDataPath,
+    outputPath,
+    readyPath,
+    credentialStorePath,
+    phase,
+    identitySeed: decodeCompanionSmokeSecret(decoded.identitySeedBase64),
+    expectedTransferId,
+    expectedSourceSha256,
+  };
+}
+
+function decodeCompanionSmokeSecret(value: unknown): Buffer {
+  if (typeof value !== "string" || value.length !== 44) {
+    throw new Error("packaged companion smoke credential is invalid");
+  }
+  const decoded = Buffer.from(value, "base64");
+  if (decoded.length !== 32 || decoded.toString("base64") !== value) {
+    decoded.fill(0);
+    throw new Error("packaged companion smoke credential is invalid");
+  }
+  return decoded;
 }
 
 async function runProcessingSmokeIfRequested(): Promise<void> {
@@ -1578,6 +1731,44 @@ async function prepareCaptureForQuit(): Promise<boolean> {
 function bindDesktopIpc(window: BrowserWindow): void {
   unregisterIpc?.();
   unregisterIpc = registerDesktopIpc(window, {
+    getCompanionSnapshot: async () => {
+      return requireCompanionService().snapshot();
+    },
+    setCompanionOptIn: async (options) => {
+      return await requireCompanionService().setOptIn(
+        options.enabled,
+        options.idempotencyKey,
+      );
+    },
+    createCompanionPairingInvite: async (options) => {
+      return requireCompanionService().createPairingInvite(
+        options.idempotencyKey,
+      );
+    },
+    revokeCompanionPeer: async (options) => {
+      return await requireCompanionService().revokePeer(
+        options.deviceId,
+        options.idempotencyKey,
+      );
+    },
+    cancelCompanionTransfer: async (options) => {
+      return requireCompanionService().cancelTransfer(
+        options.transferId,
+        options.expectedRevision,
+        options.idempotencyKey,
+      );
+    },
+    retryCompanionTransfer: async (options) => {
+      return requireCompanionService().retryTransfer(
+        options.transferId,
+        options.expectedRevision,
+        options.idempotencyKey,
+      );
+    },
+    onCompanionSnapshot: (listener) => {
+      companionListeners.add(listener);
+      return () => companionListeners.delete(listener);
+    },
     getAiSettings: async () => {
       if (!meetingAiService)
         throw new Error("meeting AI settings are unavailable");
@@ -1786,6 +1977,13 @@ function bindDesktopIpc(window: BrowserWindow): void {
   });
 }
 
+function requireCompanionService(): CompanionService {
+  if (!companionService) {
+    throw new Error("companion receiver is unavailable");
+  }
+  return companionService;
+}
+
 async function chooseAndImportMeeting(): Promise<ImportMeetingResponse> {
   if (!mainWindow || !profilePaths || !domainService || !desktopRepository) {
     throw new Error("Electron profile is not ready for import");
@@ -1829,12 +2027,45 @@ async function chooseAndImportMeeting(): Promise<ImportMeetingResponse> {
 
 async function importMeetingFromSource(
   sourcePath: string,
-  options: { minimumFreeBytes: number; destinationId?: string },
+  options: {
+    minimumFreeBytes: number;
+    destinationId?: string;
+    expectedSourceSha256?: string;
+    discardExistingPublished?: boolean;
+  },
 ) {
   if (!profilePaths || !domainService || !desktopRepository) {
     throw new Error("Electron profile is not ready for import");
   }
   const pipeline = requireProcessingPipelineIdentities(resourceCatalog);
+  if (options.expectedSourceSha256) {
+    const existing = desktopRepository.committedImportForSourceSha256(
+      options.expectedSourceSha256,
+    );
+    if (existing) {
+      const result = {
+        meetingId: existing.meeting.id,
+        jobId: existing.job.id,
+        recordingId: existing.mediaAuthorityId,
+        mediaSha256: existing.contentSha256,
+        inserted: false,
+        state: existing.job.state,
+        attempt: existing.job.attempt,
+        progressFraction: existing.job.progressFraction,
+        sourceSha256: options.expectedSourceSha256,
+      };
+      applicationState.setLibraryCount(desktopRepository.countMeetings());
+      emitOperation({
+        jobId: result.jobId,
+        state: result.state,
+        attempt: result.attempt,
+        phase: "asr",
+        progressFraction: result.progressFraction,
+      });
+      if (result.state === "queued") scheduleProcessing();
+      return result;
+    }
+  }
   const destinationRoot = profilePaths.mediaDirectory;
   const helperPath = resolveMacOSNativeHelper({
     appRoot: app.getAppPath(),
@@ -1844,18 +2075,31 @@ async function importMeetingFromSource(
   if (!existsSync(helperPath)) {
     throw new Error("macOS 安全导入 helper 不可用");
   }
+  const destinationId =
+    options.destinationId ??
+    `meeting-${Date.now()}-${randomBytes(12).toString("hex")}`;
   const helper = new MacOSNativeHelperClient(helperPath);
   const nativeSession = await helper.openSession({
     exactSourcePaths: [sourcePath],
     destinationRoots: [destinationRoot],
   });
   try {
+    const expectedPublishedPath = path.join(
+      destinationRoot,
+      "complete",
+      `${destinationId}.wav`,
+    );
+    if (existsSync(expectedPublishedPath) && options.expectedSourceSha256) {
+      if (!options.discardExistingPublished) {
+        throw new Error("secure import destination already exists");
+      }
+      await nativeSession.discard(expectedPublishedPath, destinationRoot);
+    }
     const receipt = await nativeSession.secureImport({
       sourcePath,
       destinationRoot,
-      destinationId:
-        options.destinationId ??
-        `meeting-${Date.now()}-${randomBytes(12).toString("hex")}`,
+      destinationId,
+      expectedSourceSha256: options.expectedSourceSha256,
       maxSourceBytes: 4 * 1024 * 1024 * 1024,
       minimumFreeBytes: options.minimumFreeBytes,
       temporaryStorageMultiplier: 3,
@@ -1879,7 +2123,7 @@ async function importMeetingFromSource(
       progressFraction: result.progressFraction,
     });
     if (result.state === "queued") scheduleProcessing();
-    return result;
+    return { ...result, sourceSha256: receipt.sourceSha256 };
   } finally {
     await nativeSession.close();
   }
@@ -1922,7 +2166,8 @@ async function initializeApplication(): Promise<void> {
       processingSmokeRequest ||
       captureSmokeRequest ||
       captionFormalSmokeRequest ||
-      aiBoundarySmokeRequest
+      aiBoundarySmokeRequest ||
+      companionSmokeRequest
     )
       throw new Error(`Electron smoke profile blocked: ${profile.code}`);
     return;
@@ -1938,6 +2183,17 @@ async function initializeApplication(): Promise<void> {
   domainService = new DesktopDomainService(desktopRepository);
   domainService.reconcileStartup();
   transcriptRepository.reconcileFormalProcessingAttempts(Date.now());
+  try {
+    await initializeCompanion(profile.database, profile.profile);
+  } catch (error) {
+    console.error("macOS companion initialization failed", error);
+    unsubscribeCompanion?.();
+    unsubscribeCompanion = null;
+    await companionService?.close().catch(() => undefined);
+    companionService = null;
+    await companionNativeAdapter?.close().catch(() => undefined);
+    companionNativeAdapter = null;
+  }
   try {
     await initializeCapture(profile.database, profile.profile);
     traceCaptureSmoke("capture-ready");
@@ -2159,7 +2415,12 @@ async function initializeApplication(): Promise<void> {
     applicationState.setProcessingCapability(
       error instanceof Error ? error.message : "本地处理运行时不可用",
     );
-    if (processingSmokeRequest || captionFormalSmokeRequest) throw error;
+    if (
+      processingSmokeRequest ||
+      captionFormalSmokeRequest ||
+      companionSmokeRequest
+    )
+      throw error;
   }
   if (captureSmokeRequest) {
     traceCaptureSmoke("capture-smoke-start");
@@ -2168,10 +2429,14 @@ async function initializeApplication(): Promise<void> {
   if (aiBoundarySmokeRequest) {
     await runAiBoundarySmokeIfRequested();
   }
+  if (companionSmokeRequest) {
+    await runCompanionSmokeIfRequested();
+  }
   if (
     !processingSmokeRequest &&
     !captionFormalSmokeRequest &&
-    !aiBoundarySmokeRequest
+    !aiBoundarySmokeRequest &&
+    !companionSmokeRequest
   )
     await runBootstrapSmokeIfRequested();
 }
@@ -2253,6 +2518,174 @@ async function runAiBoundarySmokeIfRequested(): Promise<void> {
   app.quit();
 }
 
+async function runCompanionSmokeIfRequested(): Promise<void> {
+  const request = companionSmokeRequest;
+  if (
+    !request ||
+    !companionService ||
+    !companionNativeAdapter ||
+    !profileDatabase ||
+    !resourceCatalog
+  ) {
+    if (request)
+      throw new Error("packaged companion smoke services are unavailable");
+    return;
+  }
+  let initial = companionService.snapshot();
+  const port = initial.identity?.port;
+  if (
+    !initial.optIn ||
+    initial.discovery.state !== "ready" ||
+    !Number.isSafeInteger(port) ||
+    Number(port) < 1 ||
+    Number(port) > 65_535
+  ) {
+    throw new Error("packaged companion receiver did not become ready");
+  }
+  if (request.phase === "pair-checkpoint") {
+    initial = companionService.createPairingInvite(
+      `packaged-pairing-${request.expectedTransferId}`,
+    );
+    if (!initial.pairingInvite) {
+      throw new Error("packaged companion pairing invite is unavailable");
+    }
+  }
+  const desktopPublicKey = await companionNativeAdapter.identityPublicKey();
+  const desktopPublicKeyBase64 = desktopPublicKey.toString("base64");
+  desktopPublicKey.fill(0);
+  await writeCompanionSmokeJson(request.readyPath, {
+    schemaVersion: 1,
+    phase: request.phase,
+    port,
+    desktopDeviceId: initial.identity!.deviceId,
+    desktopFingerprint: initial.identity!.fingerprint,
+    desktopPublicKeyBase64,
+    pairingInvite:
+      request.phase === "pair-checkpoint" ? initial.pairingInvite : undefined,
+  });
+  const transfer =
+    request.phase !== "verify"
+      ? await waitForCompanionSmokeTransfer(
+          companionService,
+          request.expectedTransferId,
+        )
+      : companionService
+          .snapshot()
+          .transfers.find(
+            (candidate) => candidate.transferId === request.expectedTransferId,
+          );
+  if (
+    !transfer ||
+    transfer.state !== "committed" ||
+    !transfer.senderDeleteAllowed ||
+    transfer.wholeFileSha256 !== request.expectedSourceSha256 ||
+    !transfer.receipt
+  ) {
+    throw new Error("packaged companion transfer did not durably commit");
+  }
+  const durable = profileDatabase
+    .prepare(
+      `SELECT t.state, t.revision, t.meeting_id, t.processing_job_id,
+        t.recording_id, t.receipt_json, t.sender_delete_allowed,
+        a.normalized_path, a.source_sha256, a.content_sha256, a.size_bytes
+       FROM companion_transfers t
+       JOIN meetings m ON m.id = t.meeting_id
+       JOIN processing_jobs j ON j.id = t.processing_job_id AND j.meeting_id = m.id
+       JOIN media_authorities a ON a.id = t.recording_id AND a.id = m.media_authority_id
+       WHERE t.transfer_id = ?`,
+    )
+    .get(request.expectedTransferId);
+  if (
+    !durable ||
+    durable.state !== "committed" ||
+    Number(durable.sender_delete_allowed) !== 1 ||
+    durable.source_sha256 !== request.expectedSourceSha256 ||
+    typeof durable.receipt_json !== "string"
+  ) {
+    throw new Error("packaged companion database authority is incomplete");
+  }
+  const normalizedSha256 = await sha256File(String(durable.normalized_path));
+  if (normalizedSha256 !== durable.content_sha256) {
+    throw new Error("packaged companion normalized media hash changed");
+  }
+  await writeCompanionSmokeJson(request.outputPath, {
+    schemaVersion: 1,
+    phase: request.phase === "verify" ? "restart-verified" : "committed",
+    protocol: "companion-media-transfer/v1",
+    transferIdSha256: createHash("sha256")
+      .update(request.expectedTransferId)
+      .digest("hex"),
+    sourceSha256: request.expectedSourceSha256,
+    normalizedSha256,
+    normalizedSizeBytes: Number(durable.size_bytes),
+    receiptSha256: createHash("sha256")
+      .update(String(durable.receipt_json))
+      .digest("hex"),
+    receiptSignatureSha256: createHash("sha256")
+      .update(transfer.receipt.signature)
+      .digest("hex"),
+    meetingId: Number(durable.meeting_id),
+    processingJobId: Number(durable.processing_job_id),
+    recordingId: Number(durable.recording_id),
+    transferRevision: Number(durable.revision),
+    senderDeleteAllowed: true,
+    missingChunkCount: transfer.missingChunkCount,
+    databaseUserVersion: Number(
+      profileDatabase.prepare("PRAGMA user_version").get()?.user_version,
+    ),
+  });
+  app.quit();
+}
+
+async function waitForCompanionSmokeTransfer(
+  service: CompanionService,
+  transferId: string,
+): Promise<CompanionSnapshot["transfers"][number]> {
+  const current = service
+    .snapshot()
+    .transfers.find((candidate) => candidate.transferId === transferId);
+  if (current?.state === "committed") return current;
+  return await new Promise((resolve, reject) => {
+    const timer = setTimeout(
+      () => {
+        unsubscribe();
+        reject(new Error("packaged companion transfer timed out"));
+      },
+      10 * 60 * 1_000,
+    );
+    const unsubscribe = service.onSnapshot((snapshot) => {
+      const transfer = snapshot.transfers.find(
+        (candidate) => candidate.transferId === transferId,
+      );
+      if (!transfer) return;
+      if (transfer.state === "committed") {
+        clearTimeout(timer);
+        unsubscribe();
+        resolve(transfer);
+      } else if (["failed", "canceled", "expired"].includes(transfer.state)) {
+        clearTimeout(timer);
+        unsubscribe();
+        reject(
+          new Error("packaged companion transfer reached a terminal failure"),
+        );
+      }
+    });
+  });
+}
+
+async function writeCompanionSmokeJson(
+  outputPath: string,
+  value: Record<string, unknown>,
+): Promise<void> {
+  const encoded = `${JSON.stringify(value, null, 2)}\n`;
+  if (Buffer.byteLength(encoded, "utf8") > 16 * 1024) {
+    throw new Error("companion smoke receipt exceeded its privacy-safe bound");
+  }
+  const temporaryPath = `${outputPath}.tmp-${process.pid}`;
+  await writeFile(temporaryPath, encoded, { mode: 0o600 });
+  await rename(temporaryPath, outputPath);
+}
+
 async function initializeCapture(
   database: DatabaseSync,
   profile: ElectronProfilePaths,
@@ -2281,6 +2714,283 @@ async function initializeCapture(
   const recoveries = await captureService.recover();
   activeCaptureTitle = recoveries.length > 0 ? "中断的会议录制" : "会议录制";
   publishCapture(recoveries[0] ?? captureService.snapshot());
+}
+
+async function initializeCompanion(
+  database: DatabaseSync,
+  profile: ElectronProfilePaths,
+): Promise<void> {
+  const native = companionSmokeRequest
+    ? createCompanionSmokeNativeAdapter(companionSmokeRequest)
+    : new MacOSCompanionNativeAdapter(
+        new MacOSNativeHelperClient(requireMacOSCompanionHelperPath(), {
+          handshakeTimeoutMs: 10_000,
+          invokeTimeoutMs: 30_000,
+        }),
+      );
+  const repository = new TransferRepository(database);
+  if (companionSmokeRequest) {
+    repository.setReceiverEnabled(true, Date.now());
+  }
+  let service: CompanionService | null = null;
+  const receiver = new CompanionReceiver({
+    root: profile.transferDirectory,
+    repository,
+    security: native,
+    identity: native,
+    handlers: {
+      resolveInvite: (input) => service?.resolveInvite(input) ?? null,
+      confirmInvite: async (input) => {
+        if (!service) throw new Error("companion service is unavailable");
+        return await service.confirmInvite(input);
+      },
+      commitInvite: async (input) => {
+        if (!service) throw new Error("companion service is unavailable");
+        await service.commitInvite(input);
+      },
+      commit: async (manifest, stagedSourcePath) => {
+        if (!service) throw new Error("companion service is unavailable");
+        return await service.commitTransfer(manifest, stagedSourcePath);
+      },
+    },
+    onTransferChanged: () => service?.notifyTransferChanged(),
+    onSessionError: companionSmokeRequest
+      ? (code) => process.stderr.write(`[companion-smoke] receiver=${code}\n`)
+      : undefined,
+  });
+  const importCoordinator = new CompanionImportCoordinator({
+    repository,
+    lookupCommitted: (sourceSha256) => {
+      const committed =
+        desktopRepository?.committedImportForSourceSha256(sourceSha256);
+      return committed
+        ? {
+            meetingId: committed.meeting.id,
+            jobId: committed.job.id,
+            recordingId: committed.mediaAuthorityId,
+            sourceSha256,
+            normalizedPath: committed.normalizedPath,
+            normalizedSha256: committed.contentSha256,
+            normalizedSizeBytes: committed.normalizedSizeBytes,
+          }
+        : null;
+    },
+    validateCommitted: async (authority) =>
+      await validatePinnedMediaAuthority({
+        authorityPath: authority.normalizedPath,
+        authorityDirectory: path.join(profile.mediaDirectory, "complete"),
+        expectedBytes: authority.normalizedSizeBytes,
+        expectedSha256: authority.normalizedSha256,
+      }),
+    publishedPath: (destinationIdentity) =>
+      path.join(
+        profile.mediaDirectory,
+        "complete",
+        `meeting-companion-${destinationIdentity.slice(0, 32)}.wav`,
+      ),
+    publishedExists: existsSync,
+    discardPublished: async (publishedPath) => {
+      const helper = new MacOSNativeHelperClient(
+        requireMacOSCompanionHelperPath(),
+      );
+      const session = await helper.openSession({
+        exactSourcePaths: [],
+        destinationRoots: [profile.mediaDirectory],
+      });
+      try {
+        await session.discard(publishedPath, profile.mediaDirectory);
+      } finally {
+        await session.close();
+      }
+    },
+    importFresh: async (stagedSourcePath, manifest, destinationIdentity) => {
+      const imported = await importMeetingFromSource(stagedSourcePath, {
+        minimumFreeBytes: 2 * 1024 * 1024 * 1024,
+        destinationId: `meeting-companion-${destinationIdentity.slice(0, 32)}`,
+        expectedSourceSha256: manifest.wholeFileSha256,
+        discardExistingPublished: false,
+      });
+      const committed = desktopRepository?.committedImportForSourceSha256(
+        imported.sourceSha256,
+      );
+      if (!committed) {
+        throw new Error("companion secure import authority is unavailable");
+      }
+      return {
+        meetingId: committed.meeting.id,
+        jobId: committed.job.id,
+        recordingId: committed.mediaAuthorityId,
+        sourceSha256: imported.sourceSha256,
+        normalizedPath: committed.normalizedPath,
+        normalizedSha256: committed.contentSha256,
+        normalizedSizeBytes: committed.normalizedSizeBytes,
+      };
+    },
+  });
+  service = new CompanionService(
+    repository,
+    native,
+    native,
+    receiver,
+    native,
+    {
+      commitVerifiedTransfer: (stagedSourcePath, manifest) =>
+        importCoordinator.commitVerifiedTransfer(stagedSourcePath, manifest),
+    },
+    Date.now,
+    undefined,
+    companionSmokeRequest ? () => "127.0.0.1" : undefined,
+  );
+  companionNativeAdapter = native;
+  companionService = service;
+  unsubscribeCompanion = service.onSnapshot(publishCompanion);
+  publishCompanion(await service.reconcileStartup());
+}
+
+function requireMacOSCompanionHelperPath(): string {
+  const helperPath = resolveMacOSNativeHelper({
+    appRoot: app.getAppPath(),
+    packaged: app.isPackaged,
+    resourcesPath: process.resourcesPath,
+  });
+  if (!existsSync(helperPath)) {
+    throw new Error("macOS companion helper is missing");
+  }
+  return helperPath;
+}
+
+function createCompanionSmokeNativeAdapter(
+  request: CompanionSmokeRequest,
+): MacOSCompanionNativeAdapter {
+  const invokeRaw = async (command: Record<string, unknown>) => {
+    if (command.command === "companion-credential-read") {
+      const credentialRequest = command.request as
+        { kind?: unknown; peerDeviceId?: unknown } | undefined;
+      const credential =
+        credentialRequest?.kind === "identity-seed"
+          ? request.identitySeed
+          : credentialRequest?.kind === "peer-shared" &&
+              typeof credentialRequest.peerDeviceId === "string"
+            ? readCompanionSmokeCredentialStore(request.credentialStorePath)
+            : null;
+      return {
+        companionCredential: credential
+          ? {
+              schemaVersion: 1,
+              state: "available",
+              credentialBase64: credential.toString("base64"),
+            }
+          : { schemaVersion: 1, state: "missing" },
+      };
+    }
+    if (command.command === "companion-credential-replace") {
+      const credentialRequest = command.request as
+        | {
+            kind?: unknown;
+            peerDeviceId?: unknown;
+            credentialBase64?: unknown;
+          }
+        | undefined;
+      if (
+        credentialRequest?.kind !== "peer-shared" ||
+        typeof credentialRequest.peerDeviceId !== "string"
+      ) {
+        throw new Error("packaged companion credential target is invalid");
+      }
+      const credential = decodeCompanionSmokeSecret(
+        credentialRequest.credentialBase64,
+      );
+      const temporaryPath = `${request.credentialStorePath}.tmp-${process.pid}`;
+      try {
+        await writeFile(temporaryPath, credential, { mode: 0o600, flag: "wx" });
+        await rename(temporaryPath, request.credentialStorePath);
+      } finally {
+        credential.fill(0);
+        await rm(temporaryPath, { force: true });
+      }
+      return {
+        companionCredential: { schemaVersion: 1, state: "stored" },
+      };
+    }
+    if (command.command === "companion-credential-delete") {
+      const existed = existsSync(request.credentialStorePath);
+      if (existed) unlinkSync(request.credentialStorePath);
+      return {
+        companionCredential: {
+          schemaVersion: 1,
+          state: existed ? "deleted" : "missing",
+        },
+      };
+    }
+    if (
+      command.command === "companion-discovery-register" ||
+      command.command === "companion-discovery-status"
+    ) {
+      const discoveryRequest = command.request as
+        { port?: unknown } | undefined;
+      const port =
+        command.command === "companion-discovery-register"
+          ? discoveryRequest?.port
+          : companionService?.snapshot().identity?.port;
+      return {
+        companionDiscovery: {
+          schemaVersion: 1,
+          state: "registered",
+          serviceType: "_voice2text-media._tcp.",
+          port,
+          registeredName: "Voice2Text Packaged Smoke",
+          manualFallbackAvailable: false,
+        },
+      };
+    }
+    if (command.command === "companion-discovery-unregister") {
+      return {
+        companionDiscovery: {
+          schemaVersion: 1,
+          state: "stopped",
+          serviceType: "_voice2text-media._tcp.",
+          port: null,
+          registeredName: null,
+          manualFallbackAvailable: true,
+        },
+      };
+    }
+    throw new Error("packaged companion smoke native command is unavailable");
+  };
+  return new MacOSCompanionNativeAdapter({
+    openSession: async (
+      capabilities: Parameters<MacOSNativeHelperClient["openSession"]>[0],
+    ) => {
+      if (
+        capabilities.companionDiscovery !== true ||
+        capabilities.exactSourcePaths.length !== 0 ||
+        capabilities.destinationRoots.length !== 0
+      ) {
+        throw new Error("packaged companion smoke capability mismatch");
+      }
+      return {
+        invokeRaw,
+        close: async () => undefined,
+      } as unknown as MacOSNativeHelperSession;
+    },
+  } as unknown as MacOSNativeHelperClient);
+}
+
+function readCompanionSmokeCredentialStore(pathname: string): Buffer | null {
+  if (!existsSync(pathname)) return null;
+  const stat = lstatSync(pathname);
+  if (
+    stat.isSymbolicLink() ||
+    !stat.isFile() ||
+    stat.nlink !== 1 ||
+    stat.size !== 32 ||
+    (stat.mode & 0o077) !== 0 ||
+    realpathSync(pathname) !== pathname ||
+    (typeof process.getuid === "function" && stat.uid !== process.getuid())
+  ) {
+    throw new Error("packaged companion credential store is unsafe");
+  }
+  return readFileSync(pathname);
 }
 
 async function runCaptureSmokeIfRequested(): Promise<void> {
@@ -2563,7 +3273,8 @@ if (isPrimaryInstance) {
 function reportBootstrapFailure(stage: string, error: unknown): void {
   if (
     !process.env.VOICE2TEXT_CAPTURE_SMOKE_PHASE &&
-    !process.env.VOICE2TEXT_CAPTION_FORMAL_SMOKE_PHASE
+    !process.env.VOICE2TEXT_CAPTION_FORMAL_SMOKE_PHASE &&
+    !process.env.VOICE2TEXT_COMPANION_SMOKE_REQUEST
   )
     return;
   const record = error instanceof Error ? error : new Error("unknown error");
@@ -2604,6 +3315,13 @@ async function teardownOwnedResources(): Promise<void> {
   meetingWorkspaceService = null;
   await meetingAiService?.shutdown();
   meetingAiService = null;
+  unsubscribeCompanion?.();
+  unsubscribeCompanion = null;
+  await companionService?.close();
+  companionService = null;
+  await companionNativeAdapter?.close();
+  companionNativeAdapter = null;
+  companionSmokeRequest?.identitySeed.fill(0);
   if (capturePollTimer) clearInterval(capturePollTimer);
   capturePollTimer = null;
   await liveCaptionService?.shutdown();
@@ -2625,6 +3343,10 @@ async function teardownOwnedResources(): Promise<void> {
 
 function publishMeetingAi(snapshot: MeetingAiSnapshot): void {
   for (const listener of meetingAiListeners) listener(snapshot);
+}
+
+function publishCompanion(snapshot: CompanionSnapshot): void {
+  for (const listener of companionListeners) listener(snapshot);
 }
 
 function emitOperation(event: Omit<OperationEvent, "protocolVersion">): void {

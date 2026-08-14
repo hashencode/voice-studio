@@ -1,5 +1,7 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
+import 'dart:typed_data';
 
 import 'package:companion_protocol/companion_protocol.dart';
 import 'package:crypto/crypto.dart';
@@ -18,8 +20,10 @@ void main() {
         pairingId: 'pair-1',
         initiatorDeviceId: 'android-1',
         initiatorFingerprint: initiator.fingerprint,
+        initiatorEphemeralPublicKey: base64Encode(List<int>.filled(32, 1)),
         responderDeviceId: 'desktop-1',
         responderFingerprint: responder.fingerprint,
+        responderEphemeralPublicKey: base64Encode(List<int>.filled(32, 2)),
         shortCodeHash: CompanionPairingTranscript.hashShortCode(
           pairingId: 'pair-1',
           code: '123456',
@@ -209,6 +213,86 @@ void main() {
         ),
       );
     });
+
+    test(
+      'receipt signature binds transfer, size, device, and recording',
+      () async {
+        final desktop = await CompanionIdentity.fromSeed(
+          List<int>.filled(32, 0x5d),
+        );
+        final manifest = _manifest(
+          utf8.encode('receipt bytes'),
+          chunkBytes: 4096,
+        );
+        Future<CompanionReceipt> signed({
+          String? transferId,
+          int? sizeBytes,
+          String? desktopDeviceId,
+          int? recordingId,
+        }) async {
+          final unsigned = <String, Object>{
+            'schema': companionMediaTransferSchema,
+            'receiptId': 'receipt-${manifest.transferId}',
+            'transferId': transferId ?? manifest.transferId,
+            'wholeFileSha256': manifest.wholeFileSha256,
+            'sizeBytes': sizeBytes ?? manifest.sizeBytes,
+            'desktopDeviceId': desktopDeviceId ?? 'desktop-1',
+            'desktopDeviceName': 'Studio Mac',
+            'desktopRecordingId': recordingId ?? 42,
+            'committedAtMs': 1234,
+          };
+          return CompanionReceipt(
+            receiptId: unsigned['receiptId']! as String,
+            transferId: unsigned['transferId']! as String,
+            wholeFileSha256: manifest.wholeFileSha256,
+            sizeBytes: unsigned['sizeBytes']! as int,
+            desktopDeviceId: unsigned['desktopDeviceId']! as String,
+            desktopDeviceName: 'Studio Mac',
+            desktopRecordingId: unsigned['desktopRecordingId']! as int,
+            committedAtMs: 1234,
+            signature: base64Encode(
+              (await desktop.sign(utf8.encode(jsonEncode(unsigned)))).bytes,
+            ),
+          );
+        }
+
+        final valid = await signed();
+        await verifyCompanionReceipt(
+          receipt: valid,
+          manifest: manifest,
+          expectedDesktopDeviceId: 'desktop-1',
+          expectedDesktopFingerprint: desktop.fingerprint,
+          desktopIdentityPublicKey: desktop.publicKey,
+        );
+        for (final invalid in <CompanionReceipt>[
+          await signed(transferId: 'transfer-wrong'),
+          await signed(sizeBytes: manifest.sizeBytes + 1),
+          await signed(desktopDeviceId: 'desktop-wrong'),
+          CompanionReceipt(
+            receiptId: valid.receiptId,
+            transferId: valid.transferId,
+            wholeFileSha256: valid.wholeFileSha256,
+            sizeBytes: valid.sizeBytes,
+            desktopDeviceId: valid.desktopDeviceId,
+            desktopDeviceName: valid.desktopDeviceName,
+            desktopRecordingId: valid.desktopRecordingId + 1,
+            committedAtMs: valid.committedAtMs,
+            signature: valid.signature,
+          ),
+        ]) {
+          await expectLater(
+            verifyCompanionReceipt(
+              receipt: invalid,
+              manifest: manifest,
+              expectedDesktopDeviceId: 'desktop-1',
+              expectedDesktopFingerprint: desktop.fingerprint,
+              desktopIdentityPublicKey: desktop.publicKey,
+            ),
+            throwsA(isA<CompanionProtocolException>()),
+          );
+        }
+      },
+    );
   });
 
   group('bounded media transfer', () {
@@ -225,6 +309,71 @@ void main() {
         await temporary.delete(recursive: true);
       }
     });
+
+    test('checkpoint bitmap stays bounded at frozen chunk limits', () {
+      for (final chunkCount in <int>[16384, companionMaximumChunkCount]) {
+        final full = List<int>.generate(chunkCount, (index) => index);
+        final sparse = <int>[0, chunkCount ~/ 2, chunkCount - 1];
+        for (final missing in <List<int>>[full, sparse]) {
+          final encoded = encodeMissingChunkBitmap(chunkCount, missing);
+          expect(
+            utf8.encode(encoded).length,
+            lessThan(companionMaximumMetadataBytes),
+          );
+          expect(
+            decodeMissingChunkBitmap(chunkCount: chunkCount, encoded: encoded),
+            missing,
+          );
+        }
+      }
+    });
+
+    test(
+      'socket reader closes immediately on an oversized frame header',
+      () async {
+        final server = await ServerSocket.bind(InternetAddress.loopbackIPv4, 0);
+        final served = Completer<void>();
+        server.listen((socket) async {
+          final header = ByteData(4)
+            ..setUint32(0, companionMaximumChunkBytes + 4096 + 1, Endian.big);
+          socket.add(header.buffer.asUint8List());
+          await socket.flush();
+          await socket.close();
+          if (!served.isCompleted) served.complete();
+        });
+        final bytes = utf8.encode('bounded reader source');
+        final source = File('${temporary.path}/bounded-reader.wav');
+        await source.writeAsBytes(bytes);
+        final client = CompanionSocketClient(
+          deviceId: 'mobile-reader-1',
+          deviceName: 'Reader Phone',
+          deviceFingerprint: 'M'.padRight(32, 'M'),
+          targetDeviceId: 'desktop-reader-1',
+          targetFingerprint: 'D'.padRight(32, 'D'),
+          sharedCredential: List<int>.filled(32, 1),
+        );
+        try {
+          await expectLater(
+            client.sendFile(
+              address: InternetAddress.loopbackIPv4,
+              port: server.port,
+              source: source,
+              manifest: _manifest(bytes, chunkBytes: 4096),
+            ),
+            throwsA(
+              isA<CompanionProtocolException>().having(
+                (error) => error.code,
+                'code',
+                'FRAME_SIZE_INVALID',
+              ),
+            ),
+          );
+          await served.future;
+        } finally {
+          await server.close();
+        }
+      },
+    );
 
     test('resumes only missing chunks and receipt is idempotent', () async {
       final bytes = utf8.encode('secure meeting media payload');
@@ -418,7 +567,10 @@ void main() {
       );
       final credential = List<int>.generate(32, (index) => index + 1);
       final mobileFingerprint = 'M'.padRight(32, 'M');
-      final desktopFingerprint = 'D'.padRight(32, 'D');
+      final desktopIdentity = await CompanionIdentity.fromSeed(
+        List<int>.filled(32, 0x5d),
+      );
+      final desktopFingerprint = desktopIdentity.fingerprint;
       var commitCount = 0;
       var pairingConfirmations = 0;
       CompanionPeerTrust? pairedTrust;
@@ -428,7 +580,9 @@ void main() {
         ),
         desktopDeviceId: 'desktop-network-1',
         desktopDeviceName: 'Studio Mac',
-        signReceipt: (_) async => base64Encode(List<int>.filled(64, 3)),
+        signReceipt: (unsigned) async => base64Encode(
+          (await desktopIdentity.sign(utf8.encode(jsonEncode(unsigned)))).bytes,
+        ),
         commitImport: (path, _) async {
           commitCount++;
           return (
@@ -484,6 +638,7 @@ void main() {
         deviceFingerprint: mobileFingerprint,
         targetDeviceId: 'desktop-network-1',
         targetFingerprint: desktopFingerprint,
+        targetIdentityPublicKey: desktopIdentity.publicKey,
         sharedCredential: credential,
         pairingId: 'pairing-network-1',
       );

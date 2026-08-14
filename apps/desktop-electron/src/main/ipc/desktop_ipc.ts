@@ -63,6 +63,18 @@ import {
   type MeetingAiConsentPreview,
   type MeetingAiSnapshot,
   type RetryMeetingAiRequest,
+  companionSnapshotRequestSchema,
+  companionOptInRequestSchema,
+  companionPairingInviteRequestSchema,
+  companionPeerRevokeRequestSchema,
+  companionTransferCancelRequestSchema,
+  companionTransferRetryRequestSchema,
+  type CompanionOptInRequest,
+  type CompanionPairingInviteRequest,
+  type CompanionPeerRevokeRequest,
+  type CompanionSnapshot,
+  type CompanionTransferCancelRequest,
+  type CompanionTransferRetryRequest,
 } from "../../shared/contracts";
 
 export interface IpcInvocationContext {
@@ -79,6 +91,23 @@ export interface IpcTrustPolicy {
 }
 
 export interface DesktopIpcServices {
+  getCompanionSnapshot(): Promise<CompanionSnapshot>;
+  setCompanionOptIn(options: CompanionOptInRequest): Promise<CompanionSnapshot>;
+  createCompanionPairingInvite(
+    options: CompanionPairingInviteRequest,
+  ): Promise<CompanionSnapshot>;
+  revokeCompanionPeer(
+    options: CompanionPeerRevokeRequest,
+  ): Promise<CompanionSnapshot>;
+  cancelCompanionTransfer(
+    options: CompanionTransferCancelRequest,
+  ): Promise<CompanionSnapshot>;
+  retryCompanionTransfer(
+    options: CompanionTransferRetryRequest,
+  ): Promise<CompanionSnapshot>;
+  onCompanionSnapshot?(
+    listener: (snapshot: CompanionSnapshot) => void,
+  ): () => void;
   getAiSettings(): Promise<AiSettingsSnapshot>;
   saveAiSettings(options: {
     providerId: "deepseek" | "openai-compatible";
@@ -264,6 +293,53 @@ export function createDesktopIpcHandlers(options: {
   maximumPayloadBytes?: number;
 }): DesktopIpcHandlers {
   const handlers = new Map<string, RegisteredHandler>([
+    [
+      ipcChannels.companionSnapshotGet,
+      {
+        schema: companionSnapshotRequestSchema,
+        invoke: async () => options.services.getCompanionSnapshot(),
+      },
+    ],
+    [
+      ipcChannels.companionOptInSet,
+      {
+        schema: companionOptInRequestSchema,
+        invoke: async (payload: CompanionOptInRequest) =>
+          options.services.setCompanionOptIn(payload),
+      } as RegisteredHandler,
+    ],
+    [
+      ipcChannels.companionPairingInviteCreate,
+      {
+        schema: companionPairingInviteRequestSchema,
+        invoke: async (payload: CompanionPairingInviteRequest) =>
+          options.services.createCompanionPairingInvite(payload),
+      } as RegisteredHandler,
+    ],
+    [
+      ipcChannels.companionPeerRevoke,
+      {
+        schema: companionPeerRevokeRequestSchema,
+        invoke: async (payload: CompanionPeerRevokeRequest) =>
+          options.services.revokeCompanionPeer(payload),
+      } as RegisteredHandler,
+    ],
+    [
+      ipcChannels.companionTransferCancel,
+      {
+        schema: companionTransferCancelRequestSchema,
+        invoke: async (payload: CompanionTransferCancelRequest) =>
+          options.services.cancelCompanionTransfer(payload),
+      } as RegisteredHandler,
+    ],
+    [
+      ipcChannels.companionTransferRetry,
+      {
+        schema: companionTransferRetryRequestSchema,
+        invoke: async (payload: CompanionTransferRetryRequest) =>
+          options.services.retryCompanionTransfer(payload),
+      } as RegisteredHandler,
+    ],
     [
       ipcChannels.aiSettingsGet,
       {

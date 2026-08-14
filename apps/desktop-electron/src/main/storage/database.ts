@@ -18,6 +18,7 @@ import {
   migrateSchemaV6ToV7,
   migrateSchemaV7ToV8,
   migrateSchemaV8ToV9,
+  migrateSchemaV9ToV10,
   REQUIRED_SCHEMA_TABLES,
 } from "./schema";
 
@@ -74,7 +75,10 @@ export function openElectronDatabase(databasePath: string): DatabaseSync {
       // Preserve the original open or validation error.
     }
     if (error instanceof StorageError) throw error;
-    if (process.env.VOICE2TEXT_PROCESSING_SMOKE_OUTPUT) {
+    if (
+      process.env.VOICE2TEXT_PROCESSING_SMOKE_OUTPUT ||
+      process.env.VOICE2TEXT_COMPANION_SMOKE_REQUEST
+    ) {
       console.error(
         JSON.stringify({
           event: "electron-storage-open-failed",
@@ -198,6 +202,13 @@ function migrate(database: DatabaseSync): void {
     withTransaction(database, () => {
       migrateSchemaV8ToV9(database);
       database.exec("PRAGMA user_version = 9");
+    });
+    version = 9;
+  }
+  if (version === 9) {
+    withTransaction(database, () => {
+      migrateSchemaV9ToV10(database);
+      database.exec("PRAGMA user_version = 10");
     });
   }
 }

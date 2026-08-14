@@ -1,6 +1,7 @@
 {
   "extends": "./tsconfig.base.json",
   "compilerOptions": {
+    "allowImportingTsExtensions": true,
     "lib": ["DOM", "ES2023"],
     "jsx": "react-jsx",
     "types": ["node", "vitest/globals", "@testing-library/jest-dom"]
@@ -10,6 +11,7 @@
     "tests/**/*.tsx",
     "src/**/*.ts",
     "src/**/*.tsx",
-    "scripts/**/*.ts"
+    "scripts/**/*.ts",
+    "vite.main.config.mts"
   ]
 }

@@ -55,6 +55,14 @@ import {
   meetingAiConsentPreviewSchema,
   meetingAiSnapshotSchema,
   type MeetingAiSnapshot,
+  companionSnapshotRequestSchema,
+  companionOptInRequestSchema,
+  companionPairingInviteRequestSchema,
+  companionPeerRevokeRequestSchema,
+  companionTransferCancelRequestSchema,
+  companionTransferRetryRequestSchema,
+  companionSnapshotSchema,
+  type CompanionSnapshot,
 } from "../shared/contracts";
 
 export interface PreloadIpcBridge {
@@ -67,6 +75,78 @@ export function createDesktopApi(
   bridge: PreloadIpcBridge,
 ): Voice2TextDesktopApi {
   return Object.freeze({
+    async getCompanionSnapshot() {
+      return companionSnapshotSchema.parse(
+        await bridge.invoke(
+          ipcChannels.companionSnapshotGet,
+          companionSnapshotRequestSchema.parse({}),
+        ),
+      );
+    },
+    async setCompanionOptIn(
+      options: Parameters<Voice2TextDesktopApi["setCompanionOptIn"]>[0],
+    ) {
+      return companionSnapshotSchema.parse(
+        await bridge.invoke(
+          ipcChannels.companionOptInSet,
+          companionOptInRequestSchema.parse(options),
+        ),
+      );
+    },
+    async createCompanionPairingInvite(
+      options: Parameters<
+        Voice2TextDesktopApi["createCompanionPairingInvite"]
+      >[0],
+    ) {
+      return companionSnapshotSchema.parse(
+        await bridge.invoke(
+          ipcChannels.companionPairingInviteCreate,
+          companionPairingInviteRequestSchema.parse(options),
+        ),
+      );
+    },
+    async revokeCompanionPeer(
+      options: Parameters<Voice2TextDesktopApi["revokeCompanionPeer"]>[0],
+    ) {
+      return companionSnapshotSchema.parse(
+        await bridge.invoke(
+          ipcChannels.companionPeerRevoke,
+          companionPeerRevokeRequestSchema.parse(options),
+        ),
+      );
+    },
+    async cancelCompanionTransfer(
+      options: Parameters<Voice2TextDesktopApi["cancelCompanionTransfer"]>[0],
+    ) {
+      return companionSnapshotSchema.parse(
+        await bridge.invoke(
+          ipcChannels.companionTransferCancel,
+          companionTransferCancelRequestSchema.parse(options),
+        ),
+      );
+    },
+    async retryCompanionTransfer(
+      options: Parameters<Voice2TextDesktopApi["retryCompanionTransfer"]>[0],
+    ) {
+      return companionSnapshotSchema.parse(
+        await bridge.invoke(
+          ipcChannels.companionTransferRetry,
+          companionTransferRetryRequestSchema.parse(options),
+        ),
+      );
+    },
+    onCompanionSnapshot(listener: (snapshot: CompanionSnapshot) => void) {
+      let subscribed = true;
+      const validatedListener = (payload: unknown) => {
+        listener(companionSnapshotSchema.parse(payload));
+      };
+      bridge.on(ipcChannels.companionSnapshotEvent, validatedListener);
+      return () => {
+        if (!subscribed) return;
+        subscribed = false;
+        bridge.off(ipcChannels.companionSnapshotEvent, validatedListener);
+      };
+    },
     async getAiSettings() {
       const payload = getAiSettingsRequestSchema.parse({});
       return aiSettingsSnapshotSchema.parse(

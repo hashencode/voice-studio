@@ -11,6 +11,7 @@ struct Capabilities: Codable {
   let exactSourcePaths: [String]
   let destinationRoots: [String]
   let captureSessionRoot: String?
+  let companionDiscovery: Bool?
 }
 
 struct CapturePreflightRequest: Codable {
@@ -37,6 +38,20 @@ struct SecretProviderRequest: Codable {
 struct SecretReplaceRequest: Codable {
   let providerId: String
   let secret: String
+}
+
+struct CompanionCredentialRequest: Codable {
+  let kind: String
+  let peerDeviceId: String?
+  let credentialBase64: String?
+}
+
+struct CompanionDiscoveryRegisterRequest: Codable {
+  let userInitiated: Bool
+  let port: Int
+  let deviceId: String
+  let deviceName: String
+  let fingerprint: String
 }
 
 struct Handshake: Codable {
@@ -148,6 +163,58 @@ func decodeSecurityRequest<T: Decodable>(_ type: T.Type, from object: [String: A
   return decoded
 }
 
+func decodeCompanionRequest<T: Decodable>(
+  _ type: T.Type,
+  from object: [String: Any],
+  code: String,
+  message: String
+) throws -> T {
+  guard let raw = object["request"] as? [String: Any],
+    JSONSerialization.isValidJSONObject(raw),
+    let decoded = try? decoder.decode(T.self, from: JSONSerialization.data(withJSONObject: raw))
+  else { throw NativeSecurityFailure(code, message) }
+  return decoded
+}
+
+func companionCredentialKey(_ request: CompanionCredentialRequest) throws
+  -> CompanionCredentialKey
+{
+  switch request.kind {
+  case "identity-seed":
+    guard request.peerDeviceId == nil else {
+      throw NativeSecurityFailure(
+        "KEYCHAIN_ARGUMENTS_INVALID",
+        "companion credential key is invalid"
+      )
+    }
+    return .identitySeed
+  case "peer-shared":
+    guard let peerDeviceId = request.peerDeviceId else {
+      throw NativeSecurityFailure(
+        "KEYCHAIN_ARGUMENTS_INVALID",
+        "companion credential key is invalid"
+      )
+    }
+    return .peer(deviceId: peerDeviceId)
+  default:
+    throw NativeSecurityFailure(
+      "KEYCHAIN_ARGUMENTS_INVALID",
+      "companion credential key is invalid"
+    )
+  }
+}
+
+func companionDiscoveryReceiptObject(_ receipt: CompanionDiscoveryReceipt) -> [String: Any] {
+  [
+    "schemaVersion": receipt.schemaVersion,
+    "state": receipt.state.rawValue,
+    "serviceType": receipt.serviceType,
+    "port": receipt.port ?? NSNull(),
+    "registeredName": receipt.registeredName ?? NSNull(),
+    "manualFallbackAvailable": receipt.manualFallbackAvailable,
+  ]
+}
+
 func encodedObject<T: Encodable>(_ value: T) throws -> Any {
   try JSONSerialization.jsonObject(with: encoder.encode(value))
 }
@@ -169,9 +236,18 @@ let captureCommands: Set<String> = [
 let securityCommands: Set<String> = [
   "secret-read", "secret-replace", "secret-delete", "filevault-status",
 ]
-let replayProtectedCommands = captureCommands.union(securityCommands)
+let companionCredentialCommands: Set<String> = [
+  "companion-credential-read", "companion-credential-replace", "companion-credential-delete",
+]
+let companionDiscoveryCommands: Set<String> = [
+  "companion-discovery-register", "companion-discovery-status", "companion-discovery-unregister",
+]
+let companionCommands = companionCredentialCommands.union(companionDiscoveryCommands)
+let replayProtectedCommands = captureCommands.union(securityCommands).union(companionCommands)
 let providerSecretStore = ProviderSecretStore()
 let fileVaultStatusProbe = FileVaultStatusProbe()
+let companionCredentialStore = CompanionCredentialStore()
+let companionDiscovery = CompanionDiscoveryRegistrar()
 var seenCommandIds = Set<String>()
 
 while let commandData = readLine() {
@@ -200,12 +276,27 @@ while let commandData = readLine() {
           "capture capability is missing"
         )
       }
-      guard seenCommandIds.insert(commandId).inserted else {
+      if companionDiscoveryCommands.contains(command),
+        handshake.capabilities.companionDiscovery != true
+      {
+        throw NativeSecurityFailure(
+          "HELPER_CAPABILITY_DENIED",
+          "companion discovery capability is missing"
+        )
+      }
+      guard !seenCommandIds.contains(commandId) else {
         throw SecureImportFailure(
           "HELPER_COMMAND_REPLAYED",
           "helper command was replayed"
         )
       }
+      guard seenCommandIds.count < 4_096 else {
+        throw SecureImportFailure(
+          "HELPER_SESSION_LIMIT_EXCEEDED",
+          "helper command receipt limit was reached"
+        )
+      }
+      seenCommandIds.insert(commandId)
     }
     switch command {
     case "secure-import":
@@ -328,6 +419,104 @@ while let commandData = readLine() {
         "command": command,
         "security": try encodedObject(fileVaultStatusProbe.status()),
       ])
+    case "companion-credential-read":
+      let request = try decodeCompanionRequest(
+        CompanionCredentialRequest.self,
+        from: object,
+        code: "KEYCHAIN_ARGUMENTS_INVALID",
+        message: "companion credential arguments are invalid"
+      )
+      let value = try companionCredentialStore.read(companionCredentialKey(request))
+      let receipt: [String: Any]
+      switch value {
+      case .available(let credential):
+        receipt = [
+          "schemaVersion": 1,
+          "state": "available",
+          "credentialBase64": credential.base64EncodedString(),
+        ]
+      case .missing:
+        receipt = ["schemaVersion": 1, "state": "missing"]
+      case .denied:
+        receipt = ["schemaVersion": 1, "state": "denied"]
+      case .corrupt:
+        receipt = ["schemaVersion": 1, "state": "corrupt"]
+      }
+      emitSession([
+        "type": "result", "command": command, "companionCredential": receipt,
+      ])
+    case "companion-credential-replace":
+      let request = try decodeCompanionRequest(
+        CompanionCredentialRequest.self,
+        from: object,
+        code: "KEYCHAIN_ARGUMENTS_INVALID",
+        message: "companion credential arguments are invalid"
+      )
+      guard let encoded = request.credentialBase64,
+        let credential = Data(base64Encoded: encoded),
+        credential.count == 32,
+        credential.base64EncodedString() == encoded
+      else {
+        throw NativeSecurityFailure(
+          "KEYCHAIN_ARGUMENTS_INVALID",
+          "companion credential encoding is invalid"
+        )
+      }
+      let state = try companionCredentialStore.replace(
+        companionCredentialKey(request),
+        credential: credential
+      )
+      emitSession([
+        "type": "result",
+        "command": command,
+        "companionCredential": ["schemaVersion": 1, "state": state.rawValue],
+      ])
+    case "companion-credential-delete":
+      let request = try decodeCompanionRequest(
+        CompanionCredentialRequest.self,
+        from: object,
+        code: "KEYCHAIN_ARGUMENTS_INVALID",
+        message: "companion credential arguments are invalid"
+      )
+      let state = try companionCredentialStore.delete(companionCredentialKey(request))
+      emitSession([
+        "type": "result",
+        "command": command,
+        "companionCredential": ["schemaVersion": 1, "state": state.rawValue],
+      ])
+    case "companion-discovery-register":
+      let request = try decodeCompanionRequest(
+        CompanionDiscoveryRegisterRequest.self,
+        from: object,
+        code: "COMPANION_DISCOVERY_ARGUMENTS_INVALID",
+        message: "companion discovery arguments are invalid"
+      )
+      let receipt = try companionDiscovery.register(
+        CompanionDiscoveryRequest(
+          userInitiated: request.userInitiated,
+          port: request.port,
+          deviceId: request.deviceId,
+          deviceName: request.deviceName,
+          fingerprint: request.fingerprint
+        )
+      )
+      emitSession([
+        "type": "result",
+        "command": command,
+        "companionDiscovery": companionDiscoveryReceiptObject(receipt),
+      ])
+    case "companion-discovery-unregister":
+      emitSession([
+        "type": "result",
+        "command": command,
+        "companionDiscovery": companionDiscoveryReceiptObject(companionDiscovery.unregister()),
+      ])
+    case "companion-discovery-status":
+      emitSession([
+        "type": "result",
+        "command": command,
+        "companionDiscovery": companionDiscoveryReceiptObject(companionDiscovery.status()),
+      ])
     default:
       throw SecureImportFailure(
         "HELPER_COMMAND_NOT_ALLOWLISTED", "helper command is not allowlisted")
@@ -344,3 +533,5 @@ while let commandData = readLine() {
     ])
   }
 }
+
+_ = companionDiscovery.unregister()
