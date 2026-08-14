@@ -55,3 +55,22 @@ following:
 Removal is a separate reviewed change. It must delete Flutter-only desktop
 build wiring and documentation without deleting shared contracts, workers,
 fixtures, benchmarks, or retained historical evidence.
+
+## Target closure gate
+
+Electron target closure is recorded in
+`docs/product/desktop-electron-scope.json` and validated by
+`tool/validate_electron_desktop_scope.py`. A target can claim `PASS` only when
+its evidence binds the current source revision, dependency lock, packaged app,
+native helper, workers, runtimes, models, fixtures, signing result, target
+fingerprint, product-flow checks, privacy scan, and accessibility checks.
+
+The active macOS gate remains `DEVELOPMENT_ONLY`; notarization, automatic
+updates, store submission, and a release-candidate device matrix are explicitly
+outside it. Windows begins only after macOS closure and must produce independent
+target evidence. A macOS result never transfers to Windows.
+
+Until both supported targets pass independently, the Flutter removal gate is
+closed. A blocked Electron result preserves `apps/desktop` as reference source
+and does not authorize launching it, opening its runtime profile, sharing its
+database, or using it as a fallback.
