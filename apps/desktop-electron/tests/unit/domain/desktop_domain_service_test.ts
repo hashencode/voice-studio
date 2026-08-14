@@ -11,6 +11,7 @@ import {
   DesktopDomainService,
   PartialPublicationError,
 } from "../../../src/main/domain/desktop_domain_service";
+import { initializeElectronProfile } from "../../../src/main/profile/electron_profile";
 import { openElectronDatabase } from "../../../src/main/storage/database";
 import {
   DesktopRepository,
@@ -57,14 +58,23 @@ afterEach(() => {
 function openService(nowMs = 1000) {
   const root = mkdtempSync(join(tmpdir(), "voice2text-electron-domain-"));
   temporaryRoots.push(root);
-  const database = openElectronDatabase(join(root, "domain.db"));
-  const repository = new DesktopRepository(database);
+  const initialized = initializeElectronProfile(root);
+  if (initialized.status !== "ready") throw new Error(initialized.message);
+  const { database, profile } = initialized;
+  const repository = new DesktopRepository(database, profile);
   const service = new DesktopDomainService(repository, () => nowMs);
-  return { database, repository, service };
+  const meetingCommand = {
+    ...fixture.meeting,
+    mediaPath: join(profile.mediaDirectory, "meeting-001.wav"),
+  };
+  return { database, meetingCommand, profile, repository, service };
 }
 
-function seedMeetingAndJob(service: DesktopDomainService) {
-  const meeting = service.createMeeting(fixture.meeting);
+function seedMeetingAndJob(
+  service: DesktopDomainService,
+  meetingCommand: CharacterizationFixture["meeting"],
+) {
+  const meeting = service.createMeeting(meetingCommand);
   const job = service.enqueueProcessingJob({
     ...fixture.job,
     meetingId: meeting.value.id,
@@ -73,11 +83,31 @@ function seedMeetingAndJob(service: DesktopDomainService) {
 }
 
 describe("DesktopDomainService idempotency", () => {
-  it("does not duplicate a meeting, job, note, or receipt", () => {
-    const { database, service } = openService();
+  it("rejects durable media paths outside the Electron profile", () => {
+    const { database, meetingCommand, service } = openService();
     try {
-      const first = seedMeetingAndJob(service);
-      const secondMeeting = service.createMeeting(fixture.meeting);
+      expect(() =>
+        service.createMeeting({
+          ...meetingCommand,
+          mediaPath: join(
+            dirname(meetingCommand.mediaPath),
+            "..",
+            "..",
+            "outside.wav",
+          ),
+        }),
+      ).toThrow("outside the Electron profile");
+      expect(rowCount(database, "meetings")).toBe(0);
+    } finally {
+      database.close();
+    }
+  });
+
+  it("does not duplicate a meeting, job, note, or receipt", () => {
+    const { database, meetingCommand, service } = openService();
+    try {
+      const first = seedMeetingAndJob(service, meetingCommand);
+      const secondMeeting = service.createMeeting(meetingCommand);
       const secondJob = service.enqueueProcessingJob({
         ...fixture.job,
         meetingId: first.meeting.value.id,
@@ -115,12 +145,12 @@ describe("DesktopDomainService idempotency", () => {
   });
 
   it("rejects reuse of an idempotency key with different content", () => {
-    const { database, service } = openService();
+    const { database, meetingCommand, service } = openService();
     try {
-      service.createMeeting(fixture.meeting);
+      service.createMeeting(meetingCommand);
       expect(() =>
         service.createMeeting({
-          ...fixture.meeting,
+          ...meetingCommand,
           displayName: "Different meeting.wav",
         }),
       ).toThrow(IdempotencyConflictError);
@@ -133,9 +163,9 @@ describe("DesktopDomainService idempotency", () => {
 
 describe("attempt and source fenced publication", () => {
   it("rejects partial, wrong-source, and late results before atomic publication", () => {
-    const { database, repository, service } = openService();
+    const { database, meetingCommand, repository, service } = openService();
     try {
-      const { job } = seedMeetingAndJob(service);
+      const { job } = seedMeetingAndJob(service, meetingCommand);
       const firstIntent = service.claimNextProcessingJob({
         sourceIdentity: "worker:first",
         deadlineAtMs: 5000,
@@ -188,9 +218,9 @@ describe("attempt and source fenced publication", () => {
   });
 
   it("rolls publication back if the job cannot complete", () => {
-    const { database, repository, service } = openService();
+    const { database, meetingCommand, repository, service } = openService();
     try {
-      seedMeetingAndJob(service);
+      seedMeetingAndJob(service, meetingCommand);
       const intent = service.claimNextProcessingJob({
         sourceIdentity: "worker:atomic",
         deadlineAtMs: 5000,
@@ -235,9 +265,9 @@ function rowCount(
 
 describe("startup reconciliation", () => {
   it("marks running work interrupted and never automatically retries it", () => {
-    const { database, repository, service } = openService();
+    const { database, meetingCommand, repository, service } = openService();
     try {
-      const { job } = seedMeetingAndJob(service);
+      const { job } = seedMeetingAndJob(service, meetingCommand);
       service.claimNextProcessingJob({
         sourceIdentity: "worker:orphaned",
         deadlineAtMs: 5000,

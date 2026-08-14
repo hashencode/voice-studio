@@ -5,7 +5,7 @@ import { DatabaseSync } from "node:sqlite";
 import {
   assertElectronProfilePaths,
   type ElectronProfilePaths,
-} from "../profile/electron_profile";
+} from "../profile/profile_paths";
 import {
   createSchemaV1,
   ELECTRON_APPLICATION_ID,

@@ -7,6 +7,10 @@ import type {
   ProcessingJobRecord,
   PublicationRecord,
 } from "../domain/models";
+import {
+  assertProfileOwnedPath,
+  type ElectronProfilePaths,
+} from "../profile/profile_paths";
 import { withTransaction } from "./database";
 
 export class IdempotencyConflictError extends Error {
@@ -26,7 +30,10 @@ export class AttemptFenceError extends Error {
 }
 
 export class DesktopRepository {
-  constructor(private readonly database: DatabaseSync) {}
+  constructor(
+    private readonly database: DatabaseSync,
+    private readonly profile: ElectronProfilePaths,
+  ) {}
 
   createMeeting(
     command: {
@@ -38,6 +45,7 @@ export class DesktopRepository {
     },
     nowMs: number,
   ): IdempotentResult<MeetingRecord> {
+    assertProfileOwnedPath(this.profile, command.mediaPath);
     return withTransaction(this.database, () => {
       const existing = this.findMeetingByIdempotencyKey(command.idempotencyKey);
       if (existing) {

@@ -1,9 +1,11 @@
 import path from "node:path";
 import { writeFile, rename } from "node:fs/promises";
+import type { DatabaseSync } from "node:sqlite";
 
 import { app, BrowserWindow, session } from "electron";
 
 import { registerDesktopIpc } from "./ipc";
+import { initializeElectronProfile } from "./profile/electron_profile";
 import { resolveWorkerResources } from "./resource_locator";
 import { secureWebPreferences } from "./security";
 import { WorkerHealthSupervisor } from "./worker_health";
@@ -13,6 +15,7 @@ app.enableSandbox();
 let mainWindow: BrowserWindow | null = null;
 let unregisterIpc: (() => void) | null = null;
 let workerSupervisor: WorkerHealthSupervisor | null = null;
+let profileDatabase: DatabaseSync | null = null;
 
 function createMainWindow(): BrowserWindow {
   const window = new BrowserWindow({
@@ -94,6 +97,20 @@ async function runBootstrapSmokeIfRequested(): Promise<void> {
 }
 
 void app.whenReady().then(async () => {
+  const profile = initializeElectronProfile(app.getPath("appData"));
+  if (profile.status === "blocked") {
+    console.error(
+      JSON.stringify({
+        event: "electron-profile-initialization-blocked",
+        code: profile.code,
+        message: profile.message,
+        repairable: profile.repairable,
+      }),
+    );
+    app.quit();
+    return;
+  }
+  profileDatabase = profile.database;
   configureSessionSecurity();
   workerSupervisor = new WorkerHealthSupervisor(
     resolveWorkerResources({
@@ -125,4 +142,6 @@ app.on("before-quit", () => {
   unregisterIpc?.();
   unregisterIpc = null;
   workerSupervisor?.shutdown();
+  profileDatabase?.close();
+  profileDatabase = null;
 });

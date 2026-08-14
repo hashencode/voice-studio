@@ -9,6 +9,7 @@ import { afterEach, describe, expect, it } from "vitest";
 import {
   ElectronProfileError,
   initializeElectronProfile,
+  profilePathsForApplicationData,
 } from "../../../src/main/profile/electron_profile";
 import {
   ELECTRON_APPLICATION_ID,
@@ -35,8 +36,9 @@ function temporaryRoot(): string {
 
 describe("Electron SQLite v1", () => {
   it("creates the fresh schema with its application identity and foreign keys", () => {
-    const profile = initializeElectronProfile(temporaryRoot());
-    const database = openElectronProfileDatabase(profile);
+    const initialized = initializeElectronProfile(temporaryRoot());
+    if (initialized.status !== "ready") throw new Error(initialized.message);
+    const database = initialized.database;
 
     try {
       expect(
@@ -149,9 +151,10 @@ describe("independent Electron profile", () => {
     mkdirSync(join(root, "flutter-desktop", "database"), { recursive: true });
     writeFileSync(flutterDatabase, "flutter-profile-poison");
 
-    const profile = initializeElectronProfile(root);
-    const database = openElectronProfileDatabase(profile);
-    database.close();
+    const initialized = initializeElectronProfile(root);
+    if (initialized.status !== "ready") throw new Error(initialized.message);
+    const profile = initialized.profile;
+    initialized.database.close();
 
     expect(profile.root).toBe(join(root, "voice2text-electron", "v1"));
     expect(profile.databasePath).not.toBe(flutterDatabase);
@@ -162,7 +165,7 @@ describe("independent Electron profile", () => {
 
   it("rejects a profile database path outside its declared root", () => {
     const root = temporaryRoot();
-    const profile = initializeElectronProfile(root);
+    const profile = profilePathsForApplicationData(root);
     expect(() =>
       openElectronProfileDatabase({
         ...profile,
