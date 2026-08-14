@@ -16,7 +16,22 @@ Future<void> main(List<String> arguments) async {
         .transform(const LineSplitter())
         .first;
     final request = jsonDecode(requestLine);
-    if (request is! Map<String, Object?> ||
+    if (request is! Map<String, Object?>) {
+      throw const FormatException('invalid worker request');
+    }
+    if (phase == 'health') {
+      validateDesktopWorkerHealthRequest(request);
+      sherpa.initBindings(_required(options, 'runtime-root'));
+      _emit(<String, Object?>{
+        'schemaVersion': desktopWorkerHealthProtocolVersion,
+        'type': 'result',
+        'operation': 'health',
+        'protocol': desktopWorkerHealthProtocol,
+        'runtime': 'sherpa-onnx',
+      });
+      return;
+    }
+    if (
         request['schemaVersion'] != 1 ||
         request['sourcePath'] is! String ||
         request['sourceSha256'] is! String) {

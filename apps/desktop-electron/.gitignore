@@ -1,0 +1,7 @@
+.vite/
+src/renderer/.vite/
+node_modules/
+out/
+resources/worker/
+*.log
+*.tsbuildinfo
