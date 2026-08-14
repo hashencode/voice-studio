@@ -82,6 +82,15 @@ export class DesktopApplicationState {
     });
   }
 
+  setLibraryCount(meetingCount: number): ApplicationSnapshot {
+    return this.update({
+      library:
+        meetingCount === 0
+          ? { phase: "empty" }
+          : { phase: "ready", meetingCount },
+    });
+  }
+
   private update(
     patch: Partial<Omit<ApplicationSnapshot, "protocolVersion" | "revision">>,
   ): ApplicationSnapshot {

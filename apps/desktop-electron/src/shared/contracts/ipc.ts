@@ -1,5 +1,12 @@
 import { z } from "zod";
 
+import {
+  processingTaskPhaseSchema,
+  processingTaskSchema,
+  processingTaskStateSchema,
+  sha256Schema,
+} from "./import_processing";
+
 export const desktopProtocolVersion = 1 as const;
 export const desktopWorkerHealthProtocol =
   "desktop-sherpa-worker-health/v1" as const;
@@ -11,6 +18,9 @@ export const ipcChannels = {
   applicationSnapshotEvent: "desktop.application.snapshot-event.v1",
   workerHealth: "desktop.worker.health.v1",
   cancelProcessing: "desktop.processing.cancel.v1",
+  retryProcessing: "desktop.processing.retry.v1",
+  processingTasks: "desktop.processing.tasks.v1",
+  importMeeting: "desktop.importing.choose-and-import.v1",
   operationEvent: "desktop.processing.event.v1",
 } as const;
 
@@ -25,7 +35,7 @@ export const workerHealthResponseSchema = z
     protocolVersion: z.literal(desktopProtocolVersion),
     protocol: z.literal(desktopWorkerHealthProtocol),
     runtime: z.literal("sherpa-onnx"),
-    workerSha256: z.string().regex(/^[a-f0-9]{64}$/),
+    workerSha256: sha256Schema,
   })
   .strict();
 
@@ -41,19 +51,76 @@ export const cancelProcessingResponseSchema = z
   })
   .strict();
 
+export const retryProcessingRequestSchema = z
+  .object({
+    jobId: z.number().int().positive(),
+    expectedAttempt: z.number().int().positive(),
+  })
+  .strict();
+
+export const retryProcessingResponseSchema = z
+  .object({
+    protocolVersion: z.literal(desktopProtocolVersion),
+    jobId: z.number().int().positive(),
+    state: z.literal("queued"),
+  })
+  .strict();
+
+export const processingTasksRequestSchema = z
+  .object({ expectedProtocolVersion: z.literal(desktopProtocolVersion) })
+  .strict();
+
+export const processingTasksResponseSchema = z
+  .object({
+    protocolVersion: z.literal(desktopProtocolVersion),
+    tasks: z.array(processingTaskSchema).max(10_000),
+  })
+  .strict();
+
+export const importMeetingRequestSchema = z.object({}).strict();
+
+export const importMeetingResponseSchema = z.union([
+  z
+    .object({
+      protocolVersion: z.literal(desktopProtocolVersion),
+      state: z.literal("canceled"),
+    })
+    .strict(),
+  z
+    .object({
+      protocolVersion: z.literal(desktopProtocolVersion),
+      state: z.enum([
+        "queued",
+        "running",
+        "canceling",
+        "canceled",
+        "interrupted",
+        "completed",
+        "failed",
+      ]),
+      meetingId: z.number().int().positive(),
+      jobId: z.number().int().positive(),
+      mediaSha256: sha256Schema,
+      inserted: z.boolean(),
+      progressFraction: z.number().min(0).max(1),
+    })
+    .strict(),
+]);
+
+export const processingTaskDeltaSchema = z
+  .object({
+    state: processingTaskStateSchema,
+    phase: processingTaskPhaseSchema.optional(),
+    progressFraction: z.number().min(0).max(1).optional(),
+  })
+  .strict();
+
 export const operationEventSchema = z
   .object({
     protocolVersion: z.literal(desktopProtocolVersion),
     jobId: z.number().int().positive(),
-    state: z.enum([
-      "queued",
-      "running",
-      "canceling",
-      "canceled",
-      "interrupted",
-      "completed",
-      "failed",
-    ]),
+    attempt: z.number().int().nonnegative(),
+    ...processingTaskDeltaSchema.shape,
   })
   .strict();
 
@@ -78,6 +145,11 @@ export type CancelProcessingResponse = z.infer<
   typeof cancelProcessingResponseSchema
 >;
 export type OperationEvent = z.infer<typeof operationEventSchema>;
+export type ProcessingTaskDelta = z.infer<typeof processingTaskDeltaSchema>;
+export type RetryProcessingResponse = z.infer<
+  typeof retryProcessingResponseSchema
+>;
+export type ImportMeetingResponse = z.infer<typeof importMeetingResponseSchema>;
 export type DesktopError = z.infer<typeof desktopErrorSchema>;
 
 export interface Voice2TextDesktopApi {
@@ -97,5 +169,13 @@ export interface Voice2TextDesktopApi {
   ): () => void;
   workerHealth(): Promise<WorkerHealthResponse>;
   cancelProcessing(jobId: number): Promise<CancelProcessingResponse>;
+  retryProcessing(
+    jobId: number,
+    expectedAttempt: number,
+  ): Promise<RetryProcessingResponse>;
+  listProcessingTasks(): Promise<
+    import("./import_processing").ProcessingTask[]
+  >;
+  importMeeting(): Promise<ImportMeetingResponse>;
   onOperationEvent(listener: (event: OperationEvent) => void): () => void;
 }

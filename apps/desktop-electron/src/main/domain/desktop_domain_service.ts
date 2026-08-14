@@ -2,9 +2,11 @@ import type {
   ExecutionIntent,
   IdempotentResult,
   MeetingRecord,
+  ProcessingPhase,
   ProcessingJobRecord,
   PublicationRecord,
 } from "./models";
+import type { ProcessingTask } from "../../shared/contracts";
 import {
   AttemptFenceError,
   type DesktopRepository,
@@ -59,12 +61,118 @@ export class DesktopDomainService {
     idempotencyKey: string;
     operationId: string;
     resourceIdentity: string;
+    phase?: ProcessingPhase;
+    protocolIdentity?: string;
+    sourceSha256?: string;
+    modelSha256?: string;
+    runtimeSha256?: string;
   }): IdempotentResult<ProcessingJobRecord> {
     requirePositiveInteger(command.meetingId, "meeting id");
     requireText(command.idempotencyKey, "job idempotency key");
     requireText(command.operationId, "operation id");
     requireText(command.resourceIdentity, "resource identity");
+    for (const [value, label] of [
+      [command.protocolIdentity, "protocol identity"],
+      [command.sourceSha256, "source hash"],
+      [command.modelSha256, "model hash"],
+      [command.runtimeSha256, "runtime hash"],
+    ] as const) {
+      if (value !== undefined) requireText(value, label);
+    }
     return this.repository.enqueueProcessingJob(command, this.now());
+  }
+
+  commitValidatedImport(command: {
+    displayName: string;
+    normalizedPath: string;
+    normalizedSha256: string;
+    sourceSha256: string;
+    normalizedSizeBytes: number;
+    durationMs: number;
+    receipt: Record<string, unknown>;
+    resourceIdentity: string;
+    phase: ProcessingPhase;
+    protocolIdentity: string;
+    modelSha256: string;
+    runtimeSha256: string;
+  }) {
+    requireText(command.displayName, "meeting display name");
+    requireText(command.normalizedPath, "normalized media path");
+    for (const [value, label] of [
+      [command.normalizedSha256, "normalized media hash"],
+      [command.sourceSha256, "source hash"],
+      [command.resourceIdentity, "resource identity"],
+      [command.protocolIdentity, "protocol identity"],
+      [command.modelSha256, "model hash"],
+      [command.runtimeSha256, "runtime hash"],
+    ] as const) {
+      requireText(value, label);
+    }
+    return this.repository.commitValidatedImport(command, this.now());
+  }
+
+  recordProcessingProgress(
+    intent: ExecutionIntent,
+    progress: { phase: ProcessingPhase; fraction: number },
+  ): boolean {
+    if (
+      !Number.isFinite(progress.fraction) ||
+      progress.fraction < 0 ||
+      progress.fraction > 1 ||
+      progress.phase !== intent.phase
+    ) {
+      throw new DomainValidationError("Processing progress is invalid");
+    }
+    try {
+      return this.repository.recordProcessingProgress(
+        intent,
+        progress.fraction,
+        this.now(),
+      );
+    } catch (error) {
+      if (error instanceof AttemptFenceError) {
+        throw new AttemptIdentityError({ cause: error });
+      }
+      throw error;
+    }
+  }
+
+  advanceProcessingPhase(
+    intent: ExecutionIntent,
+    next: Pick<
+      ExecutionIntent,
+      | "operationId"
+      | "resourceIdentity"
+      | "phase"
+      | "protocolIdentity"
+      | "modelSha256"
+      | "runtimeSha256"
+    >,
+  ): ExecutionIntent {
+    if (
+      intent.phase !== "asr" ||
+      intent.operationId !== "asr" ||
+      next.phase !== "diarization" ||
+      next.operationId !== "diarization"
+    ) {
+      throw new DomainValidationError("Processing phase transition is invalid");
+    }
+    for (const [value, label] of [
+      [next.resourceIdentity, "resource identity"],
+      [next.protocolIdentity, "protocol identity"],
+      [next.modelSha256, "model hash"],
+      [next.runtimeSha256, "runtime hash"],
+    ] as const) {
+      requireText(value, label);
+    }
+    try {
+      return this.repository.advanceProcessingPhase(intent, next, this.now());
+    } catch (error) {
+      if (error instanceof AttemptFenceError) {
+        throw new AttemptIdentityError({ cause: error });
+      }
+      throw error;
+    }
   }
 
   saveMeetingNote(command: {
@@ -118,6 +226,12 @@ export class DesktopDomainService {
     },
   ): PublicationRecord {
     if (!command.complete) throw new PartialPublicationError();
+    if (
+      command.operationId !== "diarization" ||
+      command.phase !== "diarization"
+    ) {
+      throw new AttemptIdentityError();
+    }
     try {
       return this.repository.publishProcessingResult(
         command,
@@ -145,14 +259,54 @@ export class DesktopDomainService {
     return this.repository.reconcileStartup(this.now());
   }
 
-  retryInterruptedJob(jobId: number, expectedAttempt: number): boolean {
+  retryInterruptedJob(
+    jobId: number,
+    expectedAttempt: number,
+    reset: Pick<
+      ExecutionIntent,
+      | "operationId"
+      | "resourceIdentity"
+      | "phase"
+      | "protocolIdentity"
+      | "modelSha256"
+      | "runtimeSha256"
+    >,
+  ): boolean {
     requirePositiveInteger(jobId, "job id");
     requirePositiveInteger(expectedAttempt, "expected attempt");
+    if (reset.operationId !== "asr" || reset.phase !== "asr") {
+      throw new DomainValidationError("Retry must restart from ASR");
+    }
+    for (const [value, label] of [
+      [reset.resourceIdentity, "resource identity"],
+      [reset.protocolIdentity, "protocol identity"],
+      [reset.modelSha256, "model hash"],
+      [reset.runtimeSha256, "runtime hash"],
+    ] as const) {
+      requireText(value, label);
+    }
     return this.repository.retryInterruptedJob(
       jobId,
       expectedAttempt,
+      reset,
       this.now(),
     );
+  }
+
+  interruptProcessingAttempt(
+    intent: ExecutionIntent,
+    errorCode: string,
+  ): boolean {
+    requireText(errorCode, "processing error code");
+    return this.repository.interruptProcessingAttempt(
+      intent,
+      errorCode,
+      this.now(),
+    );
+  }
+
+  listProcessingTasks(): ProcessingTask[] {
+    return this.repository.listProcessingTasks();
   }
 }
 

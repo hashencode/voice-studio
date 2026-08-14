@@ -5,6 +5,7 @@ import {
   IpcContractError,
   createDesktopIpcHandlers,
 } from "../../src/main/ipc/desktop_ipc";
+import { createDesktopApi } from "../../src/preload/api";
 
 const trustedEvent = {
   senderId: 41,
@@ -41,6 +42,16 @@ function handlers() {
         requestBootstrapAction: async () => applicationSnapshot(),
         workerHealth,
         cancelProcessing,
+        retryProcessing: vi.fn(async (jobId: number) => ({
+          protocolVersion: 1 as const,
+          jobId,
+          state: "queued" as const,
+        })),
+        listProcessingTasks: vi.fn(async () => []),
+        importMeeting: vi.fn(async () => ({
+          protocolVersion: 1 as const,
+          state: "canceled" as const,
+        })),
       },
       maximumPayloadBytes: 1024,
     }),
@@ -109,6 +120,33 @@ describe("Main IPC validation", () => {
     ).resolves.toEqual({ protocolVersion: 1, jobId: 23, state: "canceled" });
     expect(fixture.cancelProcessing).toHaveBeenCalledOnce();
     expect(fixture.cancelProcessing).toHaveBeenCalledWith(23);
+    await expect(
+      fixture.handlers.invoke(ipcChannels.importMeeting, trustedEvent, {}),
+    ).resolves.toEqual({ protocolVersion: 1, state: "canceled" });
+    await expect(
+      fixture.handlers.invoke(ipcChannels.importMeeting, trustedEvent, {
+        sourcePath: "/etc/passwd",
+      }),
+    ).rejects.toBeInstanceOf(IpcContractError);
+  });
+
+  it("wraps processing tasks in the versioned Main envelope consumed by preload", async () => {
+    const fixture = handlers();
+    const bridge = {
+      invoke: async (channel: string, payload: unknown) =>
+        await fixture.handlers.invoke(channel, trustedEvent, payload),
+      on: vi.fn(),
+      off: vi.fn(),
+    };
+
+    await expect(
+      createDesktopApi(bridge).listProcessingTasks(),
+    ).resolves.toEqual([]);
+    await expect(
+      fixture.handlers.invoke(ipcChannels.processingTasks, trustedEvent, {
+        expectedProtocolVersion: 1,
+      }),
+    ).resolves.toEqual({ protocolVersion: 1, tasks: [] });
   });
 
   it("exposes only validated application snapshot and navigation commands", async () => {
@@ -157,6 +195,12 @@ describe("Main IPC validation", () => {
         requestBootstrapAction: async () => applicationSnapshot(),
         workerHealth,
         cancelProcessing: vi.fn(),
+        retryProcessing: vi.fn(),
+        listProcessingTasks: vi.fn(async () => []),
+        importMeeting: vi.fn(async () => ({
+          protocolVersion: 1 as const,
+          state: "canceled" as const,
+        })),
       },
     });
     const payload = { expectedProtocolVersion: 1 };

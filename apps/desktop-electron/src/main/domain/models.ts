@@ -7,6 +7,16 @@ export type ProcessingJobState =
   | "failed"
   | "canceled";
 
+export type ProcessingPhase = "asr" | "diarization";
+
+export interface ProcessingFence {
+  phase: ProcessingPhase;
+  protocolIdentity: string;
+  sourceSha256: string;
+  modelSha256: string;
+  runtimeSha256: string;
+}
+
 export interface MeetingRecord {
   id: number;
   idempotencyKey: string;
@@ -17,7 +27,7 @@ export interface MeetingRecord {
   activePublicationId: number | null;
 }
 
-export interface ProcessingJobRecord {
+export interface ProcessingJobRecord extends ProcessingFence {
   id: number;
   meetingId: number;
   idempotencyKey: string;
@@ -29,9 +39,10 @@ export interface ProcessingJobRecord {
   deadlineAtMs: number | null;
   cancelRequestedAtMs: number | null;
   errorCode: string | null;
+  progressFraction: number;
 }
 
-export interface ExecutionIntent {
+export interface ExecutionIntent extends ProcessingFence {
   jobId: number;
   meetingId: number;
   operationId: string;
@@ -39,6 +50,16 @@ export interface ExecutionIntent {
   sourceIdentity: string;
   deadlineAtMs: number;
   resourceIdentity: string;
+}
+
+export interface MediaAuthorityRecord {
+  id: number;
+  contentSha256: string;
+  normalizedPath: string;
+  sourceSha256: string;
+  sizeBytes: number;
+  durationMs: number;
+  receipt: Record<string, unknown>;
 }
 
 export interface PublicationRecord {

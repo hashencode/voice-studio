@@ -2,6 +2,7 @@
 src/renderer/.vite/
 node_modules/
 out/
+resources/native/
 resources/worker/
 *.log
 *.tsbuildinfo

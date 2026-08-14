@@ -23,12 +23,25 @@ export class ProcessDeadlineError extends Error {
   }
 }
 
+export class WorkerReportedError extends Error {
+  constructor(readonly code: string) {
+    super(`worker failed with ${code}`);
+    this.name = "WorkerReportedError";
+  }
+}
+
 export interface OwnedProcessRun {
   intent: ExecutionIntent;
   command: ResolvedResourceCommand;
   attemptOutputDirectory: string;
   inputFrame?: Record<string, unknown>;
-  onProgress?: (frame: Extract<WorkerFrame, { type: "progress" }>) => void;
+  onProgress?: (
+    frame: Extract<WorkerFrame, { type: "progress" }>,
+  ) => void | Promise<void>;
+  frameAdapter?: (
+    frame: unknown,
+    intent: ExecutionIntent,
+  ) => Record<string, unknown>;
 }
 
 export interface OwnedProcessSupervisorOptions {
@@ -127,6 +140,7 @@ export class OwnedProcessSupervisor {
       let terminalPayload: Record<string, unknown> | null = null;
       let failure: Error | null = null;
       let settled = false;
+      let progressWork: Promise<void> = Promise.resolve();
 
       const settle = (
         error: Error | null,
@@ -140,7 +154,11 @@ export class OwnedProcessSupervisor {
       };
       const failAndTerminate = (error: Error) => {
         failure ??= error;
-        void this.terminateOwned(owned);
+        void this.terminateOwned(owned).catch((terminationError: unknown) => {
+          failure ??= new Error("owned process termination failed", {
+            cause: terminationError,
+          });
+        });
       };
       const parseLine = (line: Buffer) => {
         if (line.byteLength > this.maximumFrameBytes) {
@@ -158,7 +176,18 @@ export class OwnedProcessSupervisor {
           );
           return;
         }
-        const parsed = workerFrameSchema.safeParse(decoded);
+        let adapted: unknown = decoded;
+        try {
+          adapted = run.frameAdapter
+            ? run.frameAdapter(decoded, run.intent)
+            : decoded;
+        } catch (error) {
+          failAndTerminate(
+            new Error("worker frame adapter rejected output", { cause: error }),
+          );
+          return;
+        }
+        const parsed = workerFrameSchema.safeParse(adapted);
         if (!parsed.success) {
           failAndTerminate(
             new Error("worker emitted an invalid protocol frame", {
@@ -171,7 +200,12 @@ export class OwnedProcessSupervisor {
         if (
           frame.operationId !== run.intent.operationId ||
           frame.attempt !== run.intent.attempt ||
-          frame.sourceIdentity !== run.intent.sourceIdentity
+          frame.sourceIdentity !== run.intent.sourceIdentity ||
+          frame.phase !== run.intent.phase ||
+          frame.protocolIdentity !== run.intent.protocolIdentity ||
+          frame.sourceSha256 !== run.intent.sourceSha256 ||
+          frame.modelSha256 !== run.intent.modelSha256 ||
+          frame.runtimeSha256 !== run.intent.runtimeSha256
         ) {
           failAndTerminate(
             new Error("worker frame failed the attempt/source fence"),
@@ -179,9 +213,24 @@ export class OwnedProcessSupervisor {
           return;
         }
         if (owned.cancellationRequested || failure) return;
-        if (frame.type === "progress") run.onProgress?.(frame);
+        if (frame.type === "progress" && run.onProgress) {
+          progressWork = progressWork
+            .then(async () => {
+              if (owned.cancellationRequested || failure) return;
+              await run.onProgress?.(frame);
+            })
+            .catch((error: unknown) => {
+              const progressFailure = new Error(
+                "worker progress callback failed",
+                { cause: error },
+              );
+              failAndTerminate(progressFailure);
+              throw progressFailure;
+            });
+          void progressWork.catch(() => undefined);
+        }
         if (frame.type === "error") {
-          failAndTerminate(new Error(`worker failed with ${frame.code}`));
+          failAndTerminate(new WorkerReportedError(frame.code));
         }
         if (frame.type === "result") {
           if (terminalPayload) {
@@ -196,7 +245,11 @@ export class OwnedProcessSupervisor {
       const deadlineDelay = Math.max(0, run.intent.deadlineAtMs - Date.now());
       const deadline = setTimeout(() => {
         failure = new ProcessDeadlineError();
-        void this.terminateOwned(owned);
+        void this.terminateOwned(owned).catch((terminationError: unknown) => {
+          failure ??= new Error("owned process termination failed", {
+            cause: terminationError,
+          });
+        });
       }, deadlineDelay);
 
       child.once("error", (error) => {
@@ -229,7 +282,7 @@ export class OwnedProcessSupervisor {
           chunk.subarray(0, this.maximumStderrBytes - stderr.byteLength),
         ]);
       });
-      child.once("close", (code) => {
+      const finishAfterClose = (code: number | null) => {
         if (owned.cancellationRequested) {
           settle(new ProcessCanceledError());
           return;
@@ -257,6 +310,25 @@ export class OwnedProcessSupervisor {
           return;
         }
         settle(null, terminalPayload);
+      };
+      child.once("close", (code) => {
+        void (async () => {
+          try {
+            await progressWork;
+          } catch (error) {
+            failure ??= new Error("worker progress callback failed", {
+              cause: error,
+            });
+          }
+          try {
+            await owned.termination;
+          } catch (error) {
+            failure ??= new Error("owned process termination failed", {
+              cause: error,
+            });
+          }
+          finishAfterClose(code);
+        })();
       });
 
       child.stdin.end(
@@ -399,7 +471,11 @@ async function waitForGroupGone(
     try {
       process.kill(-pid, 0);
     } catch (error) {
-      if ((error as NodeJS.ErrnoException).code === "ESRCH") return true;
+      const code = (error as NodeJS.ErrnoException).code;
+      // Supervised workers keep our uid. EPERM therefore means this numeric
+      // process-group id no longer identifies a group we own (macOS can retain
+      // or reuse the id briefly after the leader exits).
+      if (code === "ESRCH" || code === "EPERM") return true;
       throw error;
     }
     await new Promise((resolve) => setTimeout(resolve, 20));

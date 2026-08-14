@@ -11,6 +11,8 @@ import {
   ELECTRON_APPLICATION_ID,
   ELECTRON_SCHEMA_VERSION,
   migrateSchemaV1ToV2,
+  migrateSchemaV2ToV3,
+  migrateSchemaV3ToV4,
   REQUIRED_SCHEMA_TABLES,
 } from "./schema";
 
@@ -119,6 +121,20 @@ function migrate(database: DatabaseSync): void {
     withTransaction(database, () => {
       migrateSchemaV1ToV2(database);
       database.exec("PRAGMA user_version = 2");
+    });
+    version = 2;
+  }
+  if (version === 2) {
+    withTransaction(database, () => {
+      migrateSchemaV2ToV3(database);
+      database.exec("PRAGMA user_version = 3");
+    });
+    version = 3;
+  }
+  if (version === 3) {
+    withTransaction(database, () => {
+      migrateSchemaV3ToV4(database);
+      database.exec("PRAGMA user_version = 4");
     });
   }
 }

@@ -10,7 +10,10 @@ const config: ForgeConfig = {
     appCategoryType: "public.app-category.productivity",
     asar: true,
     executableName: "Voice2Text",
-    extraResource: [path.resolve("resources/worker")],
+    extraResource: [
+      path.resolve("resources/worker"),
+      path.resolve("resources/native"),
+    ],
     osxSign: {},
   },
   rebuildConfig: {},

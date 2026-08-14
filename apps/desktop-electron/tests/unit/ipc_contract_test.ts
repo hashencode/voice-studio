@@ -8,6 +8,7 @@ import {
   cancelProcessingRequestSchema,
   desktopErrorSchema,
   desktopProtocolVersion,
+  importMeetingResponseSchema,
   ipcChannels,
   operationEventSchema,
   workerHealthRequestSchema,
@@ -28,6 +29,29 @@ describe("shared IPC contracts", () => {
       }),
     ).toThrow();
     expect(
+      importMeetingResponseSchema.parse({
+        protocolVersion: 1,
+        state: "failed",
+        meetingId: 3,
+        jobId: 7,
+        mediaSha256: "a".repeat(64),
+        inserted: false,
+        progressFraction: 0.4,
+      }),
+    ).toEqual(expect.objectContaining({ state: "failed", inserted: false }));
+    expect(() =>
+      importMeetingResponseSchema.parse({
+        protocolVersion: 1,
+        state: "queued",
+        meetingId: 3,
+        jobId: 7,
+        mediaSha256: "a".repeat(64),
+        inserted: true,
+        progressFraction: 0,
+        attempt: 0,
+      }),
+    ).toThrow();
+    expect(
       desktopErrorSchema.parse({
         protocolVersion: 1,
         code: "INVALID_PAYLOAD",
@@ -42,6 +66,24 @@ describe("shared IPC contracts", () => {
       operationEventSchema.parse({
         protocolVersion: 1,
         jobId: 7,
+        state: "running",
+      }),
+    ).toThrow();
+    expect(
+      operationEventSchema.parse({
+        protocolVersion: 1,
+        jobId: 7,
+        attempt: 0,
+        state: "running",
+      }),
+    ).toEqual(
+      expect.objectContaining({ jobId: 7, attempt: 0, state: "running" }),
+    );
+    expect(() =>
+      operationEventSchema.parse({
+        protocolVersion: 1,
+        jobId: 7,
+        attempt: 2,
         state: "running",
         rawEvent: {},
       }),
@@ -90,7 +132,12 @@ describe("shared IPC contracts", () => {
 
     expect(listeners.get(ipcChannels.operationEvent)?.size).toBe(2);
     for (const listener of listeners.get(ipcChannels.operationEvent) ?? []) {
-      listener({ protocolVersion: 1, jobId: 11, state: "running" });
+      listener({
+        protocolVersion: 1,
+        jobId: 11,
+        attempt: 1,
+        state: "running",
+      });
     }
     expect(received).toEqual([11, 11]);
 

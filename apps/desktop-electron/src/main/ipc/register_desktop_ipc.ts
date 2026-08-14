@@ -37,6 +37,9 @@ export function registerDesktopIpc(
     ipcChannels.applicationBootstrapAction,
     ipcChannels.workerHealth,
     ipcChannels.cancelProcessing,
+    ipcChannels.retryProcessing,
+    ipcChannels.processingTasks,
+    ipcChannels.importMeeting,
   ] as const;
   for (const channel of channels) {
     ipcMain.handle(channel, async (event, payload: unknown) => {
@@ -52,8 +55,14 @@ export function registerDesktopIpc(
       window.webContents.send(ipcChannels.applicationSnapshotEvent, snapshot);
     }
   });
+  const unsubscribeOperation = services.onOperationEvent?.((event) => {
+    if (!window.isDestroyed()) {
+      window.webContents.send(ipcChannels.operationEvent, event);
+    }
+  });
   return () => {
     unsubscribeSnapshot?.();
+    unsubscribeOperation?.();
     for (const channel of channels) ipcMain.removeHandler(channel);
   };
 }

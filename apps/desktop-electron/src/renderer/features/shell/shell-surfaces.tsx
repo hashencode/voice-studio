@@ -91,9 +91,12 @@ export function OfflineBanner() {
 
 export function ReconciliationSurface({
   items,
+  onNavigateTasks,
 }: {
   items: ApplicationSnapshot["reconciliation"];
+  onNavigateTasks: () => void;
 }) {
+  const hasProcessing = items.some((item) => item.kind === "processing");
   return (
     <section role="alert" className="rounded-xl border bg-card p-6 shadow-sm">
       <h1 className="text-xl font-semibold">启动恢复需要确认</h1>
@@ -112,10 +115,14 @@ export function ReconciliationSurface({
           </li>
         ))}
       </ul>
-      <div className="mt-4 flex gap-2">
-        <Button>逐项检查</Button>
-        <Button variant="outline">稍后处理</Button>
-      </div>
+      {hasProcessing ? (
+        <Button className="mt-4" onClick={onNavigateTasks}>
+          前往转写任务并选择重试
+        </Button>
+      ) : null}
+      <p className="mt-4 text-sm text-muted-foreground">
+        其余恢复项目会保持显式待处理状态，不会在后台自动启动。
+      </p>
     </section>
   );
 }
@@ -123,9 +130,13 @@ export function ReconciliationSurface({
 export function LibrarySurface({
   state,
   writable,
+  importPending,
+  onImport,
 }: {
   state: ApplicationSnapshot["library"];
   writable: boolean;
+  importPending: boolean;
+  onImport?: () => void;
 }) {
   return (
     <section className="space-y-5">
@@ -138,8 +149,13 @@ export function LibrarySurface({
         </div>
         <div className="flex gap-2">
           <Button disabled={!writable}>开始会议</Button>
-          <Button variant="outline" disabled={!writable}>
-            导入会议
+          <Button
+            variant="outline"
+            disabled={!writable || importPending}
+            aria-busy={importPending}
+            onClick={onImport}
+          >
+            {importPending ? "正在导入会议" : "导入会议"}
           </Button>
         </div>
       </div>

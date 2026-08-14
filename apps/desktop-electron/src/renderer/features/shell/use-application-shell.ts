@@ -5,6 +5,7 @@ import type {
   BootstrapAction,
   ShellSection,
 } from "@shared/contracts";
+import { useProcessingTasks } from "@/features/tasks/use-processing-tasks";
 
 export function useApplicationShell() {
   const [snapshot, setSnapshot] = React.useState<ApplicationSnapshot | null>(
@@ -15,9 +16,13 @@ export function useApplicationShell() {
 
   const accept = React.useCallback((next: ApplicationSnapshot) => {
     setSnapshot((current) =>
-      !current || next.revision >= current.revision ? next : current,
+      !current || next.revision > current.revision ? next : current,
     );
   }, []);
+  const processing = useProcessingTasks(
+    accept,
+    snapshot?.profile.phase === "ready",
+  );
 
   React.useEffect(() => {
     let active = true;
@@ -68,7 +73,13 @@ export function useApplicationShell() {
     [accept],
   );
 
-  return { snapshot, loadError, navigate, requestBootstrapAction };
+  return {
+    snapshot,
+    loadError,
+    ...processing,
+    navigate,
+    requestBootstrapAction,
+  };
 }
 
 export function parseShellDeepLink(hash: string): ShellSection | null {

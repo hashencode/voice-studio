@@ -75,6 +75,24 @@ describe("Electron SQLite v1", () => {
           )
           .run(999, "missing-meeting", "operation", "resource"),
       ).toThrow();
+
+      database.exec(`
+        INSERT INTO meetings (idempotency_key, source_identity, display_name, media_path, duration_ms, created_at_ms, updated_at_ms)
+        VALUES
+          ('meeting-a', 'source-a', 'Meeting A', '/media-a.wav', 1, 1, 1),
+          ('meeting-b', 'source-b', 'Meeting B', '/media-b.wav', 1, 1, 1);
+        INSERT INTO processing_jobs (meeting_id, idempotency_key, operation_id, resource_identity, state, attempt, created_at_ms, updated_at_ms)
+        VALUES
+          (1, 'job-a', 'asr', 'resource', 'queued', 0, 1, 1),
+          (2, 'job-b', 'asr', 'resource', 'queued', 0, 1, 1);
+      `);
+      expect(
+        database
+          .prepare(
+            "SELECT COUNT(*) AS count FROM processing_jobs WHERE operation_id = 'asr'",
+          )
+          .get()?.count,
+      ).toBe(2);
     } finally {
       database.close();
     }
@@ -113,6 +131,11 @@ describe("Electron SQLite v1", () => {
       VALUES ('meeting', 'source', 'Meeting', '/media.wav', 1, 1, 1);
       INSERT INTO processing_jobs (meeting_id, idempotency_key, operation_id, resource_identity, state, attempt, source_identity, deadline_at_ms, created_at_ms, updated_at_ms)
       VALUES (1, 'job', 'operation', 'resource', 'running', 1, 'worker', 5000, 1, 1);
+      INSERT INTO result_publications (meeting_id, job_id, operation_id, attempt, source_identity, payload_json, created_at_ms)
+      VALUES (1, 1, 'operation', 1, 'worker', '{"segments":[]}', 1);
+      UPDATE meetings SET active_publication_id = 1 WHERE id = 1;
+      CREATE UNIQUE INDEX legacy_processing_jobs_operation_unique
+        ON processing_jobs(operation_id);
       PRAGMA application_id = ${ELECTRON_APPLICATION_ID};
       PRAGMA user_version = 1;
     `);
@@ -130,9 +153,60 @@ describe("Electron SQLite v1", () => {
           .map((column) => column.name),
       ).toContain("cancel_requested_at_ms");
       expect(
-        migrated.prepare("SELECT state FROM processing_jobs WHERE id = 1").get()
-          ?.state,
-      ).toBe("running");
+        migrated
+          .prepare(
+            "SELECT meeting_id, idempotency_key, operation_id, resource_identity, state, attempt, source_identity, deadline_at_ms FROM processing_jobs WHERE id = 1",
+          )
+          .get(),
+      ).toEqual({
+        meeting_id: 1,
+        idempotency_key: "job",
+        operation_id: "operation",
+        resource_identity: "resource",
+        state: "running",
+        attempt: 1,
+        source_identity: "worker",
+        deadline_at_ms: 5000,
+      });
+      expect(
+        migrated
+          .prepare(
+            "SELECT id, meeting_id, job_id, operation_id, attempt, source_identity, payload_json FROM result_publications WHERE id = 1",
+          )
+          .get(),
+      ).toEqual({
+        id: 1,
+        meeting_id: 1,
+        job_id: 1,
+        operation_id: "operation",
+        attempt: 1,
+        source_identity: "worker",
+        payload_json: '{"segments":[]}',
+      });
+      expect(
+        migrated.prepare("SELECT active_publication_id FROM meetings").get()
+          ?.active_publication_id,
+      ).toBe(1);
+      expect(migrated.prepare("PRAGMA foreign_key_check").all()).toEqual([]);
+      expect(
+        migrated
+          .prepare(
+            "SELECT name FROM sqlite_master WHERE type = 'index' AND tbl_name IN ('processing_jobs', 'result_publications') ORDER BY name",
+          )
+          .all()
+          .map((row) => row.name),
+      ).toEqual(
+        expect.arrayContaining([
+          "processing_jobs_claim_order",
+          "result_publications_meeting_order",
+        ]),
+      );
+      migrated.exec(`
+        INSERT INTO meetings (idempotency_key, source_identity, display_name, media_path, duration_ms, created_at_ms, updated_at_ms)
+        VALUES ('meeting-2', 'source-2', 'Meeting 2', '/media-2.wav', 1, 2, 2);
+        INSERT INTO processing_jobs (meeting_id, idempotency_key, operation_id, resource_identity, state, attempt, created_at_ms, updated_at_ms)
+        VALUES (2, 'job-2', 'operation', 'resource-2', 'queued', 0, 2, 2);
+      `);
     } finally {
       migrated.close();
     }

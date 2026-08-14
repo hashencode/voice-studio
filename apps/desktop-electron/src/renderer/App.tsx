@@ -10,7 +10,6 @@ import {
 import { CaptureWorkspaceOverlay } from "@/features/shell/capture-workspace-overlay";
 import {
   CapabilityUnavailable,
-  LibrarySurface,
   LoadingShell,
   OfflineBanner,
   ProfileBlocker,
@@ -18,13 +17,26 @@ import {
   ShellLoadError,
 } from "@/features/shell/shell-surfaces";
 import { useApplicationShell } from "@/features/shell/use-application-shell";
+import { LibraryFeature } from "@/features/library/library-feature";
+import { TasksFeature } from "@/features/tasks/tasks-feature";
 import type { ApplicationSnapshot } from "@shared/contracts";
 
 const SIDEBAR_STORAGE_KEY = "voice2text.shell.sidebar-open.v1";
 
 export default function App() {
-  const { snapshot, loadError, navigate, requestBootstrapAction } =
-    useApplicationShell();
+  const {
+    snapshot,
+    loadError,
+    operationError,
+    importPending,
+    tasks,
+    pendingJobActions,
+    navigate,
+    requestBootstrapAction,
+    importMeeting,
+    cancelProcessing,
+    retryProcessing,
+  } = useApplicationShell();
   const [sidebarOpen, setSidebarOpen] = React.useState(() =>
     readSidebarPreference(),
   );
@@ -56,7 +68,15 @@ export default function App() {
         <main id="main-content" className="flex-1 overflow-auto p-4 sm:p-6">
           <ShellContent
             snapshot={snapshot}
+            onNavigate={navigate}
             onBootstrapAction={requestBootstrapAction}
+            tasks={tasks}
+            pendingJobActions={pendingJobActions}
+            operationError={operationError}
+            importPending={importPending}
+            onImport={importMeeting}
+            onCancel={cancelProcessing}
+            onRetry={retryProcessing}
           />
         </main>
       </SidebarInset>
@@ -67,10 +87,26 @@ export default function App() {
 
 function ShellContent({
   snapshot,
+  onNavigate,
   onBootstrapAction,
+  tasks,
+  pendingJobActions,
+  operationError,
+  importPending,
+  onImport,
+  onCancel,
+  onRetry,
 }: {
   snapshot: ApplicationSnapshot;
+  onNavigate: (section: ApplicationSnapshot["navigation"]["section"]) => void;
   onBootstrapAction: Parameters<typeof ProfileBlocker>[0]["onAction"];
+  tasks: Parameters<typeof TasksFeature>[0]["tasks"];
+  pendingJobActions: Parameters<typeof TasksFeature>[0]["pendingJobActions"];
+  operationError: string | null;
+  importPending: boolean;
+  onImport: () => void;
+  onCancel: Parameters<typeof TasksFeature>[0]["onCancel"];
+  onRetry: Parameters<typeof TasksFeature>[0]["onRetry"];
 }) {
   if (snapshot.profile.phase === "initializing") {
     return (
@@ -109,34 +145,51 @@ function ShellContent({
       <ProfileBlocker profile={snapshot.profile} onAction={onBootstrapAction} />
     );
   }
-  if (snapshot.reconciliation.length > 0) {
-    return <ReconciliationSurface items={snapshot.reconciliation} />;
-  }
+  const navigateToTasks = () => onNavigate("tasks");
+  const recovery =
+    snapshot.reconciliation.length > 0 ? (
+      <ReconciliationSurface
+        items={snapshot.reconciliation}
+        onNavigateTasks={() => void navigateToTasks()}
+      />
+    ) : null;
 
+  let section: React.ReactNode;
   switch (snapshot.navigation.section) {
     case "library":
-      return <LibrarySurface state={snapshot.library} writable />;
-    case "tasks":
-      return (
-        <section className="space-y-5">
-          <div>
-            <p className="text-sm font-medium text-muted-foreground">
-              长任务由应用状态持续持有
-            </p>
-            <h1 className="text-2xl font-semibold tracking-tight">转写任务</h1>
-          </div>
+      section = (
+        <div className="space-y-4">
+          {operationError ? <OperationError message={operationError} /> : null}
           {snapshot.capability.processing === "unavailable" ? (
             <CapabilityUnavailable reason={snapshot.capability.reason} />
-          ) : (
-            <Placeholder
-              title="暂无转写任务"
-              description="导入或录制会议后，任务进度会在这里持续显示。"
-            />
-          )}
-        </section>
+          ) : null}
+          <LibraryFeature
+            state={snapshot.library}
+            writable={snapshot.capability.processing === "available"}
+            importPending={importPending}
+            onImport={onImport}
+          />
+        </div>
       );
+      break;
+    case "tasks":
+      section = (
+        <div className="space-y-4">
+          {operationError ? <OperationError message={operationError} /> : null}
+          {snapshot.capability.processing === "unavailable" ? (
+            <CapabilityUnavailable reason={snapshot.capability.reason} />
+          ) : null}
+          <TasksFeature
+            tasks={tasks}
+            pendingJobActions={pendingJobActions}
+            onCancel={onCancel}
+            onRetry={onRetry}
+          />
+        </div>
+      );
+      break;
     case "companion":
-      return (
+      section = (
         <Page title="Companion" eyebrow="手机交接">
           <Placeholder
             title="尚未连接手机"
@@ -144,8 +197,9 @@ function ShellContent({
           />
         </Page>
       );
+      break;
     case "settings":
-      return (
+      section = (
         <Page title="设置" eyebrow="本机与隐私">
           <Placeholder
             title="桌面设置"
@@ -153,7 +207,22 @@ function ShellContent({
           />
         </Page>
       );
+      break;
   }
+  return (
+    <div className="space-y-4">
+      {recovery}
+      {section}
+    </div>
+  );
+}
+
+function OperationError({ message }: { message: string }) {
+  return (
+    <div role="alert" className="rounded-lg border bg-card px-4 py-3 text-sm">
+      操作未完成：{message}
+    </div>
+  );
 }
 
 function Page({

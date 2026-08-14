@@ -30,6 +30,9 @@ function applicationApi(initial: ApplicationSnapshot) {
   const api: Voice2TextDesktopApi = {
     workerHealth: vi.fn(),
     cancelProcessing: vi.fn(),
+    retryProcessing: vi.fn(),
+    listProcessingTasks: vi.fn(async () => []),
+    importMeeting: vi.fn(),
     onOperationEvent: vi.fn(() => () => undefined),
     getApplicationSnapshot: vi.fn(async () => snapshot),
     navigate,

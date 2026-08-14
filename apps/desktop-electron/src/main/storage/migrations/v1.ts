@@ -19,7 +19,7 @@ export function createSchemaV1(database: DatabaseSync): void {
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       meeting_id INTEGER NOT NULL,
       idempotency_key TEXT NOT NULL UNIQUE,
-      operation_id TEXT NOT NULL UNIQUE,
+      operation_id TEXT NOT NULL,
       resource_identity TEXT NOT NULL,
       state TEXT NOT NULL CHECK (
         state IN ('queued', 'running', 'interrupted', 'completed', 'failed', 'canceled')

@@ -1,8 +1,10 @@
 import { createHash } from "node:crypto";
-import { readFile, realpath } from "node:fs/promises";
+import { readFile, readdir, realpath } from "node:fs/promises";
 import path from "node:path";
 
 import { z } from "zod";
+import { sha256Schema } from "../../shared/contracts";
+import { sha256File } from "../security/sha256_file";
 
 export interface ResourceRootInput {
   appRoot: string;
@@ -18,7 +20,26 @@ export interface ResolvedResourceCommand {
   readonly args: readonly string[];
 }
 
+export interface ProcessingResourceIdentity {
+  protocolIdentity: string;
+  modelSha256: string;
+  runtimeSha256: string;
+  resourceIdentity: string;
+}
+
+export interface ProcessingPipelineIdentities {
+  asr: ProcessingResourceIdentity;
+  diarization: ProcessingResourceIdentity;
+}
+
 const authorizedCommands = new WeakSet<object>();
+interface ArtifactExpectation {
+  path: string;
+  sha256: string;
+}
+const commandArtifacts = new WeakMap<object, readonly ArtifactExpectation[]>();
+const commandInventories = new WeakMap<object, readonly string[]>();
+const supportedResourceTarget = "darwin-arm64";
 
 const relativeArtifactPathSchema = z
   .string()
@@ -41,7 +62,7 @@ const manifestSchema = z
       z
         .object({
           path: relativeArtifactPathSchema,
-          sha256: z.string().regex(/^[a-f0-9]{64}$/),
+          sha256: sha256Schema,
         })
         .strict(),
     ),
@@ -52,6 +73,15 @@ const manifestSchema = z
             operation: z.string().regex(/^[a-zA-Z][a-zA-Z0-9._-]{0,127}$/),
             executable: relativeArtifactPathSchema,
             arguments: z.array(z.string().max(4096)),
+            protocolIdentity: z.string().min(1).max(256).optional(),
+            modelArtifacts: z
+              .array(relativeArtifactPathSchema)
+              .max(64)
+              .optional(),
+            runtimeArtifacts: z
+              .array(relativeArtifactPathSchema)
+              .max(64)
+              .optional(),
           })
           .strict(),
       )
@@ -78,19 +108,30 @@ export class ResourceCatalog {
   static async load(root: string): Promise<ResourceCatalog> {
     const resolvedRoot = path.resolve(root);
     const canonicalRoot = await realpath(resolvedRoot);
-    const manifestBytes = await readFile(
-      path.join(canonicalRoot, "manifest.json"),
-    );
+    const manifestPath = path.join(canonicalRoot, "manifest.json");
+    const manifestBytes = await readFile(manifestPath);
+    const manifestIdentity = createHash("sha256")
+      .update(manifestBytes)
+      .digest("hex");
     const manifest = manifestSchema.parse(
       JSON.parse(manifestBytes.toString("utf8")) as unknown,
     );
+    if (
+      process.platform !== "darwin" ||
+      process.arch !== "arm64" ||
+      manifest.target !== supportedResourceTarget
+    ) {
+      throw new Error(
+        `resource manifest target must match ${supportedResourceTarget}`,
+      );
+    }
     assertUniqueManifestEntries(manifest);
-    await verifyArtifacts(canonicalRoot, manifest);
-    return new ResourceCatalog(
-      resolvedRoot,
-      createHash("sha256").update(manifestBytes).digest("hex"),
-      manifest,
+    await assertExactInventory(
+      canonicalRoot,
+      manifest.artifacts.map((artifact) => artifact.path),
     );
+    await verifyArtifacts(canonicalRoot, manifest);
+    return new ResourceCatalog(resolvedRoot, manifestIdentity, manifest);
   }
 
   command(
@@ -108,6 +149,24 @@ export class ResourceCatalog {
     if (!artifact) {
       throw new Error("resource operation executable is absent from manifest");
     }
+    const referencedArtifacts = [
+      operationEntry.executable,
+      ...(operationEntry.modelArtifacts ?? []),
+      ...(operationEntry.runtimeArtifacts ?? []),
+    ].map((artifactPath) => {
+      const referenced = this.manifest.artifacts.find(
+        (candidate) => candidate.path === artifactPath,
+      );
+      if (!referenced) {
+        throw new Error(
+          `resource operation artifact is absent from manifest: ${artifactPath}`,
+        );
+      }
+      return Object.freeze({
+        path: containedResourcePath(this.root, referenced.path),
+        sha256: referenced.sha256,
+      });
+    });
     const executable = containedResourcePath(this.root, artifact.path);
     const command = Object.freeze({
       catalogIdentity: this.identity,
@@ -121,13 +180,92 @@ export class ResourceCatalog {
       ),
     });
     authorizedCommands.add(command);
+    commandArtifacts.set(command, Object.freeze(referencedArtifacts));
+    commandInventories.set(
+      command,
+      Object.freeze(this.manifest.artifacts.map((artifact) => artifact.path)),
+    );
     return command;
   }
 
-  artifactHash(relativePath: string): string | null {
-    return (
-      this.manifest.artifacts.find((artifact) => artifact.path === relativePath)
-        ?.sha256 ?? null
+  processingIdentity(operation: string): ProcessingResourceIdentity | null {
+    const entry = this.manifest.operations.find(
+      (candidate) => candidate.operation === operation,
+    );
+    if (
+      !entry?.protocolIdentity ||
+      !entry.modelArtifacts?.length ||
+      !entry.runtimeArtifacts?.length
+    ) {
+      return null;
+    }
+    return {
+      protocolIdentity: entry.protocolIdentity,
+      modelSha256: combinedArtifactHash(this.manifest, entry.modelArtifacts),
+      runtimeSha256: combinedArtifactHash(
+        this.manifest,
+        entry.runtimeArtifacts,
+      ),
+      resourceIdentity: this.identity,
+    };
+  }
+
+  processingPipelineIdentities(): ProcessingPipelineIdentities | null {
+    const asr = this.processingIdentity("asr");
+    const diarization = this.processingIdentity("diarization");
+    if (
+      !asr ||
+      !diarization ||
+      asr.protocolIdentity !== diarization.protocolIdentity ||
+      asr.modelSha256 !== diarization.modelSha256 ||
+      asr.runtimeSha256 !== diarization.runtimeSha256 ||
+      asr.resourceIdentity !== diarization.resourceIdentity
+    ) {
+      return null;
+    }
+    return { asr, diarization };
+  }
+}
+
+export function requireProcessingPipelineIdentities(
+  catalog: ResourceCatalog | null,
+): ProcessingPipelineIdentities {
+  const pipeline = catalog?.processingPipelineIdentities();
+  if (!pipeline) {
+    throw new Error(
+      "processing catalog must contain matching ASR and diarization identities",
+    );
+  }
+  return pipeline;
+}
+
+async function assertExactInventory(
+  root: string,
+  artifactPaths: readonly string[],
+): Promise<void> {
+  const expected = new Set(["manifest.json", ...artifactPaths]);
+  const visit = async (directory: string): Promise<void> => {
+    for (const entry of await readdir(directory, { withFileTypes: true })) {
+      const candidate = path.join(directory, entry.name);
+      if (entry.isDirectory()) {
+        await visit(candidate);
+        continue;
+      }
+      if (!entry.isFile()) {
+        throw new Error("resource catalog contains a non-regular entry");
+      }
+      const relative = path.relative(root, candidate);
+      if (!expected.delete(relative)) {
+        throw new Error(
+          `resource catalog contains an unmanifested file: ${relative}`,
+        );
+      }
+    }
+  };
+  await visit(root);
+  if (expected.size > 0) {
+    throw new Error(
+      `resource catalog is missing manifest inventory: ${[...expected].join(", ")}`,
     );
   }
 }
@@ -142,9 +280,7 @@ async function verifyArtifacts(
     if (!isInside(root, canonicalArtifact)) {
       throw new Error("resource artifact resolves outside the catalog root");
     }
-    const actual = createHash("sha256")
-      .update(await readFile(canonicalArtifact))
-      .digest("hex");
+    const actual = await sha256File(canonicalArtifact);
     if (actual !== artifact.sha256) {
       throw new Error(`resource artifact hash mismatch: ${artifact.path}`);
     }
@@ -157,10 +293,24 @@ export async function assertAuthorizedResourceCommand(
   if (!authorizedCommands.has(command)) {
     throw new Error("resource command was not issued by the catalog");
   }
+  const expectedArtifacts = commandArtifacts.get(command);
+  if (!expectedArtifacts) {
+    throw new Error("resource command verification metadata is unavailable");
+  }
   const canonicalRoot = await realpath(command.resourceRoot);
-  const canonicalExecutable = await realpath(command.executable);
-  if (!isInside(canonicalRoot, canonicalExecutable)) {
-    throw new Error("resource executable escapes the catalog root");
+  const expectedInventory = commandInventories.get(command);
+  if (!expectedInventory) {
+    throw new Error("resource command inventory metadata is unavailable");
+  }
+  await assertExactInventory(canonicalRoot, expectedInventory);
+  for (const artifact of expectedArtifacts) {
+    const canonicalArtifact = await realpath(artifact.path);
+    if (!isInside(canonicalRoot, canonicalArtifact)) {
+      throw new Error("resource command artifact escapes the catalog root");
+    }
+    if ((await sha256File(canonicalArtifact)) !== artifact.sha256) {
+      throw new Error("resource command artifact hash mismatch before spawn");
+    }
   }
 }
 
@@ -195,6 +345,13 @@ function substituteArgument(
     }
     return variables.attemptOutput;
   }
+  if (argument === "{resourceRoot}") return resourceRoot;
+  if (argument.startsWith("{resourceRoot}/")) {
+    return containedResourcePath(
+      resourceRoot,
+      argument.slice("{resourceRoot}/".length),
+    );
+  }
   if (argument.includes("{") || argument.includes("}")) {
     throw new Error("resource operation contains an unknown argument template");
   }
@@ -214,4 +371,26 @@ function assertUniqueManifestEntries(manifest: ResourceManifest): void {
   ) {
     throw new Error("resource manifest contains duplicate operations");
   }
+}
+
+function combinedArtifactHash(
+  manifest: ResourceManifest,
+  paths: readonly string[],
+): string {
+  const hash = createHash("sha256");
+  for (const artifactPath of [...paths].sort()) {
+    const artifact = manifest.artifacts.find(
+      (item) => item.path === artifactPath,
+    );
+    if (!artifact)
+      throw new Error(
+        `processing identity artifact is absent: ${artifactPath}`,
+      );
+    hash
+      .update(artifact.path)
+      .update("\0")
+      .update(artifact.sha256)
+      .update("\0");
+  }
+  return hash.digest("hex");
 }

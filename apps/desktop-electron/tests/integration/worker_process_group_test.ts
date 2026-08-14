@@ -23,6 +23,7 @@ import { OwnedProcessSupervisor } from "../../src/main/processes/owned_process_s
 import { initializeElectronProfile } from "../../src/main/profile/electron_profile";
 import {
   ResourceCatalog,
+  requireProcessingPipelineIdentities,
   resolveResourceRoot,
 } from "../../src/main/resources/resource_catalog";
 import { DesktopRepository } from "../../src/main/storage/desktop_repository";
@@ -53,10 +54,18 @@ echo $$ > "$VOICE2TEXT_ATTEMPT_OUTPUT/leader.pid"
 ) &
 echo $! > "$VOICE2TEXT_ATTEMPT_OUTPUT/descendant.pid"
 trap '' TERM
-printf '%s\\n' '{"schemaVersion":1,"type":"progress","operationId":"fixture-operation","attempt":1,"sourceIdentity":"fixture-source","fraction":0.5}'
+printf '%s\\n' '{"schemaVersion":1,"type":"progress","operationId":"fixture-operation","attempt":1,"sourceIdentity":"fixture-source","phase":"asr","protocolIdentity":"desktop-sherpa-worker/v1","sourceSha256":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","modelSha256":"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb","runtimeSha256":"cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc","fraction":0.5}'
 sleep 30
-printf '%s\\n' '{"schemaVersion":1,"type":"result","operationId":"fixture-operation","attempt":1,"sourceIdentity":"fixture-source","payload":{"late":true}}'
+printf '%s\\n' '{"schemaVersion":1,"type":"result","operationId":"fixture-operation","attempt":1,"sourceIdentity":"fixture-source","phase":"asr","protocolIdentity":"desktop-sherpa-worker/v1","sourceSha256":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","modelSha256":"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb","runtimeSha256":"cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc","payload":{"late":true}}'
 `;
+  const progressFailureScript = `#!/bin/sh
+set -eu
+printf '%s\\n' '{"schemaVersion":1,"type":"progress","operationId":"progress-failure-operation","attempt":1,"sourceIdentity":"fixture-source","phase":"asr","protocolIdentity":"desktop-sherpa-worker/v1","sourceSha256":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","modelSha256":"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb","runtimeSha256":"cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc","fraction":0.5}'
+sleep 1
+printf '%s\\n' '{"schemaVersion":1,"type":"result","operationId":"progress-failure-operation","attempt":1,"sourceIdentity":"fixture-source","phase":"asr","protocolIdentity":"desktop-sherpa-worker/v1","sourceSha256":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","modelSha256":"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb","runtimeSha256":"cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc","payload":{"mustNotPublish":true}}'
+`;
+  const modelBytes = "fixture-model-v1";
+  const runtimeBytes = "fixture-runtime-v1";
   const manifest = {
     schemaVersion: 1,
     target: "darwin-arm64",
@@ -66,23 +75,66 @@ printf '%s\\n' '{"schemaVersion":1,"type":"result","operationId":"fixture-operat
         path: "bin/process-tree-fixture",
         sha256: createHash("sha256").update(script).digest("hex"),
       },
+      {
+        path: "bin/progress-failure-fixture",
+        sha256: createHash("sha256")
+          .update(progressFailureScript)
+          .digest("hex"),
+      },
+      {
+        path: "model.bin",
+        sha256: createHash("sha256").update(modelBytes).digest("hex"),
+      },
+      {
+        path: "runtime.bin",
+        sha256: createHash("sha256").update(runtimeBytes).digest("hex"),
+      },
     ],
     operations: [
+      {
+        operation: "asr",
+        executable: "bin/process-tree-fixture",
+        arguments: [],
+        protocolIdentity: "desktop-sherpa-worker/v1",
+        modelArtifacts: ["model.bin"],
+        runtimeArtifacts: ["runtime.bin"],
+      },
       {
         operation: "fixture-operation",
         executable: "bin/process-tree-fixture",
         arguments: [],
+        protocolIdentity: "desktop-sherpa-worker/v1",
+        modelArtifacts: ["model.bin"],
+        runtimeArtifacts: ["runtime.bin"],
       },
       {
         operation: "unsafe-operation",
         executable: "bin/process-tree-fixture",
         arguments: ["/etc/passwd"],
       },
+      {
+        operation: "resource-path-operation",
+        executable: "bin/process-tree-fixture",
+        arguments: ["{resourceRoot}/model.bin"],
+        modelArtifacts: ["model.bin"],
+      },
+      {
+        operation: "progress-failure-operation",
+        executable: "bin/progress-failure-fixture",
+        arguments: [],
+      },
     ],
   };
   for (const resourceRoot of [developmentRoot, packagedRoot]) {
     writeFileSync(join(resourceRoot, "bin", "process-tree-fixture"), script);
     chmodSync(join(resourceRoot, "bin", "process-tree-fixture"), 0o700);
+    writeFileSync(
+      join(resourceRoot, "bin", "progress-failure-fixture"),
+      progressFailureScript,
+    );
+    chmodSync(join(resourceRoot, "bin", "progress-failure-fixture"), 0o700);
+    writeFileSync(join(resourceRoot, "model.bin"), modelBytes);
+    writeFileSync(join(resourceRoot, "runtime.bin"), runtimeBytes);
     writeFileSync(
       join(resourceRoot, "manifest.json"),
       `${JSON.stringify(manifest)}\n`,
@@ -121,6 +173,11 @@ function intent(resourceIdentity: string, jobId = 1): ExecutionIntent {
     sourceIdentity: "fixture-source",
     deadlineAtMs: Date.now() + 15_000,
     resourceIdentity,
+    phase: "asr",
+    protocolIdentity: "desktop-sherpa-worker/v1",
+    sourceSha256: "a".repeat(64),
+    modelSha256: "b".repeat(64),
+    runtimeSha256: "c".repeat(64),
   };
 }
 
@@ -147,6 +204,11 @@ describe.skipIf(process.platform !== "darwin")(
           }),
         );
         expect(development.identity).toBe(packaged.identity);
+        expect(development.processingIdentity("asr")).not.toBeNull();
+        expect(development.processingPipelineIdentities()).toBeNull();
+        expect(() => requireProcessingPipelineIdentities(development)).toThrow(
+          /ASR and diarization/i,
+        );
         expect(development.command("fixture-operation").executable).toBe(
           join(
             paths.developmentAppRoot,
@@ -154,9 +216,32 @@ describe.skipIf(process.platform !== "darwin")(
           ),
         );
         expect(() => development.command("../../bin/sh")).toThrow();
+        expect(development.command("resource-path-operation").args).toEqual([
+          join(paths.developmentAppRoot, "resources/worker/model.bin"),
+        ]);
       } finally {
         process.chdir(previousCwd);
       }
+    });
+
+    it("rejects a catalog built for a different target", async () => {
+      const paths = fixture();
+      const resourceRoot = resolveResourceRoot({
+        appRoot: paths.developmentAppRoot,
+        packaged: false,
+        resourcesPath: "/not-used",
+      });
+      const manifestPath = join(resourceRoot, "manifest.json");
+      const manifest = JSON.parse(readFileSync(manifestPath, "utf8")) as Record<
+        string,
+        unknown
+      >;
+      manifest.target = "darwin-x64";
+      writeFileSync(manifestPath, `${JSON.stringify(manifest)}\n`);
+
+      await expect(ResourceCatalog.load(resourceRoot)).rejects.toThrow(
+        /target.*darwin-arm64/i,
+      );
     });
 
     it("persists cancel intent before killing descendants, cleans output, and rejects late results", async () => {
@@ -189,6 +274,11 @@ describe.skipIf(process.platform !== "darwin")(
         idempotencyKey: "fixture-job",
         operationId: "fixture-operation",
         resourceIdentity: catalog.identity,
+        phase: "asr",
+        protocolIdentity: "desktop-sherpa-worker/v1",
+        sourceSha256: "a".repeat(64),
+        modelSha256: "b".repeat(64),
+        runtimeSha256: "c".repeat(64),
       });
       const executionIntent = service.claimNextProcessingJob({
         sourceIdentity: "fixture-source",
@@ -240,8 +330,14 @@ describe.skipIf(process.platform !== "darwin")(
         command: catalog.command("fixture-operation"),
         attemptOutputDirectory: attemptOutput,
       });
-      const runCanceled =
-        expect(run).rejects.toBeInstanceOf(ProcessCanceledError);
+      const runCanceled = run.then(
+        () => {
+          throw new Error("canceled worker unexpectedly completed");
+        },
+        (error: unknown) => {
+          expect(error).toBeInstanceOf(ProcessCanceledError);
+        },
+      );
       await waitForFile(join(attemptOutput, "descendant.pid"));
       const leaderPid = Number(
         readFileSync(join(attemptOutput, "leader.pid"), "utf8"),
@@ -335,6 +431,81 @@ describe.skipIf(process.platform !== "darwin")(
       expect(processExists(deadlineDescendant)).toBe(false);
     });
 
+    it("rehashes the executable and operation model/runtime artifacts immediately before spawn", async () => {
+      const replacements = [
+        "bin/process-tree-fixture",
+        "model.bin",
+        "runtime.bin",
+      ];
+      for (const relativePath of replacements) {
+        const paths = fixture();
+        const resourceRoot = resolveResourceRoot({
+          appRoot: paths.developmentAppRoot,
+          packaged: false,
+          resourcesPath: "/not-used",
+        });
+        const catalog = await ResourceCatalog.load(resourceRoot);
+        const command = catalog.command("fixture-operation");
+        writeFileSync(join(resourceRoot, relativePath), "replacement");
+        const attemptOutput = join(
+          paths.root,
+          "replacement-profile",
+          relativePath.replaceAll("/", "-"),
+        );
+        mkdirSync(attemptOutput, { recursive: true });
+        const supervisor = new OwnedProcessSupervisor({
+          workspaceRoot: join(paths.root, "replacement-profile"),
+        });
+
+        await expect(
+          supervisor.run({
+            intent: intent(catalog.identity),
+            command,
+            attemptOutputDirectory: attemptOutput,
+          }),
+        ).rejects.toThrow(/hash mismatch/i);
+        expect(existsSync(join(attemptOutput, "leader.pid"))).toBe(false);
+      }
+    });
+
+    it("rejects files that are not bound into the resource manifest", async () => {
+      const paths = fixture();
+      const resourceRoot = resolveResourceRoot({
+        appRoot: paths.developmentAppRoot,
+        packaged: false,
+        resourcesPath: "/not-used",
+      });
+      writeFileSync(join(resourceRoot, "unmanifested-tokenizer.json"), "{}");
+      await expect(ResourceCatalog.load(resourceRoot)).rejects.toThrow(
+        /unmanifested file/i,
+      );
+    });
+
+    it("rechecks exact resource inventory immediately before spawn", async () => {
+      const paths = fixture();
+      const resourceRoot = resolveResourceRoot({
+        appRoot: paths.developmentAppRoot,
+        packaged: false,
+        resourcesPath: "/not-used",
+      });
+      const catalog = await ResourceCatalog.load(resourceRoot);
+      const command = catalog.command("fixture-operation");
+      writeFileSync(join(resourceRoot, "unmanifested-tokenizer.json"), "{}");
+      const attemptOutput = join(paths.root, "inventory-profile", "attempt");
+      mkdirSync(attemptOutput, { recursive: true });
+      const supervisor = new OwnedProcessSupervisor({
+        workspaceRoot: join(paths.root, "inventory-profile"),
+      });
+      await expect(
+        supervisor.run({
+          intent: intent(catalog.identity),
+          command,
+          attemptOutputDirectory: attemptOutput,
+        }),
+      ).rejects.toThrow(/unmanifested file/i);
+      expect(existsSync(join(attemptOutput, "leader.pid"))).toBe(false);
+    });
+
     it("tears every owned process down once on repeated application quit", async () => {
       const paths = fixture();
       const catalog = await ResourceCatalog.load(
@@ -381,6 +552,45 @@ describe.skipIf(process.platform !== "darwin")(
       await Promise.all(attempts.map(({ canceled }) => canceled));
       expect(terminated.sort()).toEqual([1, 2]);
       expect(descendants.every((pid) => !processExists(pid))).toBe(true);
+    });
+
+    it("fails and terminates a run when durable progress persistence rejects", async () => {
+      const paths = fixture();
+      const catalog = await ResourceCatalog.load(
+        resolveResourceRoot({
+          appRoot: paths.developmentAppRoot,
+          packaged: false,
+          resourcesPath: "/not-used",
+        }),
+      );
+      const workspaceRoot = join(paths.root, "profile-progress-failure");
+      const attemptOutput = join(workspaceRoot, "attempts", "failure");
+      mkdirSync(attemptOutput, { recursive: true });
+      const publishResult = vi.fn();
+      const supervisor = new OwnedProcessSupervisor({
+        workspaceRoot,
+        terminationGraceMs: 100,
+      });
+      const coordinator = new DurableProcessCoordinator(supervisor, {
+        requestCancellation: async () => null,
+        completeCancellation: async () => undefined,
+        publishResult,
+        recordProgress: async () => {
+          throw new Error("progress persistence failed");
+        },
+      });
+
+      await expect(
+        coordinator.run({
+          intent: {
+            ...intent(catalog.identity, 90),
+            operationId: "progress-failure-operation",
+          },
+          command: catalog.command("progress-failure-operation"),
+          attemptOutputDirectory: attemptOutput,
+        }),
+      ).rejects.toThrow(/progress callback/i);
+      expect(publishResult).not.toHaveBeenCalled();
     });
   },
 );

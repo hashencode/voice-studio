@@ -7,6 +7,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import App from "../../../src/renderer/App";
 import type {
   ApplicationSnapshot,
+  ProcessingTask,
   Voice2TextDesktopApi,
 } from "../../../src/shared/contracts";
 
@@ -39,6 +40,9 @@ function installApi(
   const api: Voice2TextDesktopApi = {
     workerHealth: vi.fn(),
     cancelProcessing: vi.fn(),
+    retryProcessing: vi.fn(),
+    listProcessingTasks: vi.fn(async () => []),
+    importMeeting: vi.fn(),
     onOperationEvent: vi.fn(() => () => undefined),
     getApplicationSnapshot: vi.fn(async () => snapshot),
     navigate: vi.fn(async (section) => ({
@@ -144,29 +148,61 @@ describe("application shell", () => {
   });
 
   it("surfaces reconciliation as explicit recovery without auto-retry", async () => {
-    installApi({
-      ...readySnapshot,
-      capture: { phase: "idle" },
-      reconciliation: [
-        {
-          kind: "capture",
-          identity: "capture-interrupted",
-          state: "repairable",
-          requiresExplicitAction: true,
-        },
-        {
-          kind: "processing",
-          identity: "job-41",
-          state: "interrupted",
-          requiresExplicitAction: true,
-        },
-      ],
-    });
+    const api = installApi(
+      {
+        ...readySnapshot,
+        capture: { phase: "idle" },
+        reconciliation: [
+          {
+            kind: "capture",
+            identity: "capture-interrupted",
+            state: "repairable",
+            requiresExplicitAction: true,
+          },
+          {
+            kind: "processing",
+            identity: "job-41",
+            state: "interrupted",
+            requiresExplicitAction: true,
+          },
+        ],
+      },
+      {
+        listProcessingTasks: vi.fn(
+          async () =>
+            [
+              {
+                id: 41,
+                meetingId: 9,
+                displayName: "中断的周会.wav",
+                state: "interrupted",
+                phase: "asr",
+                progressFraction: 0.4,
+                attempt: 2,
+                errorCode: "PROCESS_INTERRUPTED",
+              },
+            ] satisfies ProcessingTask[],
+        ),
+      },
+    );
+    const user = userEvent.setup();
     render(<App />);
     const recovery = await screen.findByRole("alert");
     expect(recovery).toHaveTextContent("启动恢复需要确认");
     expect(recovery).toHaveTextContent("不会自动重试");
-    expect(screen.getByRole("button", { name: "逐项检查" })).toBeEnabled();
-    expect(screen.getByRole("button", { name: "稍后处理" })).toBeEnabled();
+    expect(
+      screen.getByRole("heading", { name: "还没有本机会议" }),
+    ).toBeVisible();
+
+    const reviewTasks = screen.getByRole("button", {
+      name: "前往转写任务并选择重试",
+    });
+    reviewTasks.focus();
+    await user.keyboard("{Enter}");
+    await waitFor(() => expect(api.navigate).toHaveBeenCalledWith("tasks"));
+    expect(
+      await screen.findByRole("button", { name: "重试 中断的周会.wav" }),
+    ).toBeEnabled();
+    expect(api.retryProcessing).not.toHaveBeenCalled();
   });
 });

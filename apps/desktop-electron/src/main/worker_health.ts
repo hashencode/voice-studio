@@ -1,5 +1,3 @@
-import { createHash } from "node:crypto";
-import { createReadStream } from "node:fs";
 import { spawn, type ChildProcessWithoutNullStreams } from "node:child_process";
 
 import {
@@ -11,6 +9,7 @@ import {
   assertAuthorizedResourceCommand,
   type ResolvedResourceCommand,
 } from "./resources/resource_catalog";
+import { sha256File } from "./security/sha256_file";
 
 const maximumOutputBytes = 64 * 1024;
 const healthDeadlineMs = 10_000;
@@ -213,10 +212,4 @@ async function waitForChildExit(
     new Promise<void>((resolve) => child.once("close", () => resolve())),
     new Promise<void>((resolve) => setTimeout(resolve, timeoutMs)),
   ]);
-}
-
-async function sha256File(filePath: string): Promise<string> {
-  const hash = createHash("sha256");
-  for await (const chunk of createReadStream(filePath)) hash.update(chunk);
-  return hash.digest("hex");
 }

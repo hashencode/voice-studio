@@ -2,6 +2,9 @@ import {
   applicationSnapshotSchema,
   bootstrapActionSchema,
   cancelProcessingResponseSchema,
+  retryProcessingResponseSchema,
+  processingTasksResponseSchema,
+  importMeetingResponseSchema,
   desktopProtocolVersion,
   shellSectionSchema,
   ipcChannels,
@@ -66,6 +69,23 @@ export function createDesktopApi(
         jobId,
       });
       return cancelProcessingResponseSchema.parse(response);
+    },
+    async retryProcessing(jobId: number, expectedAttempt: number) {
+      const response = await bridge.invoke(ipcChannels.retryProcessing, {
+        jobId,
+        expectedAttempt,
+      });
+      return retryProcessingResponseSchema.parse(response);
+    },
+    async listProcessingTasks() {
+      const response = await bridge.invoke(ipcChannels.processingTasks, {
+        expectedProtocolVersion: desktopProtocolVersion,
+      });
+      return processingTasksResponseSchema.parse(response).tasks;
+    },
+    async importMeeting() {
+      const response = await bridge.invoke(ipcChannels.importMeeting, {});
+      return importMeetingResponseSchema.parse(response);
     },
     onOperationEvent(listener: (event: OperationEvent) => void) {
       let subscribed = true;

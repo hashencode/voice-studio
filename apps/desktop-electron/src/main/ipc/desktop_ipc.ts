@@ -3,6 +3,9 @@ import type { ZodType } from "zod";
 import {
   bootstrapActionRequestSchema,
   cancelProcessingRequestSchema,
+  retryProcessingRequestSchema,
+  processingTasksRequestSchema,
+  importMeetingRequestSchema,
   desktopProtocolVersion,
   getApplicationSnapshotRequestSchema,
   ipcChannels,
@@ -11,6 +14,10 @@ import {
   type ApplicationSnapshot,
   type BootstrapAction,
   type CancelProcessingResponse,
+  type RetryProcessingResponse,
+  type ImportMeetingResponse,
+  type ProcessingTask,
+  type OperationEvent,
   type ShellSection,
   type WorkerHealthResponse,
 } from "../../shared/contracts";
@@ -37,6 +44,13 @@ export interface DesktopIpcServices {
   ): () => void;
   workerHealth(): Promise<WorkerHealthResponse>;
   cancelProcessing(jobId: number): Promise<CancelProcessingResponse>;
+  retryProcessing(
+    jobId: number,
+    expectedAttempt: number,
+  ): Promise<RetryProcessingResponse>;
+  listProcessingTasks(): Promise<ProcessingTask[]>;
+  importMeeting(): Promise<ImportMeetingResponse>;
+  onOperationEvent?(listener: (event: OperationEvent) => void): () => void;
 }
 
 export class IpcContractError extends Error {
@@ -140,6 +154,34 @@ export function createDesktopIpcHandlers(options: {
           await options.services.cancelProcessing(payload.jobId),
       } as RegisteredHandler,
     ],
+    [
+      ipcChannels.retryProcessing,
+      {
+        schema: retryProcessingRequestSchema,
+        invoke: async (payload: { jobId: number; expectedAttempt: number }) =>
+          await options.services.retryProcessing(
+            payload.jobId,
+            payload.expectedAttempt,
+          ),
+      } as RegisteredHandler,
+    ],
+    [
+      ipcChannels.processingTasks,
+      {
+        schema: processingTasksRequestSchema,
+        invoke: async () => ({
+          protocolVersion: desktopProtocolVersion,
+          tasks: await options.services.listProcessingTasks(),
+        }),
+      },
+    ],
+    [
+      ipcChannels.importMeeting,
+      {
+        schema: importMeetingRequestSchema,
+        invoke: async () => await options.services.importMeeting(),
+      },
+    ],
   ]);
   return new DesktopIpcHandlers(
     options.trust,
@@ -150,6 +192,10 @@ export function createDesktopIpcHandlers(options: {
 
 export function canceledResponse(jobId: number): CancelProcessingResponse {
   return { protocolVersion: desktopProtocolVersion, jobId, state: "canceled" };
+}
+
+export function queuedResponse(jobId: number): RetryProcessingResponse {
+  return { protocolVersion: desktopProtocolVersion, jobId, state: "queued" };
 }
 
 function assertTrustedInvocation(

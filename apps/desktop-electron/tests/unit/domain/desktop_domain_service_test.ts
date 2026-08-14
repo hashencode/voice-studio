@@ -193,7 +193,12 @@ describe("attempt and source fenced publication", () => {
   it("rejects partial, wrong-source, and late results before atomic publication", () => {
     const { database, meetingCommand, repository, service } = openService();
     try {
-      const { job } = seedMeetingAndJob(service, meetingCommand);
+      const meeting = service.createMeeting(meetingCommand);
+      const job = service.enqueueProcessingJob({
+        ...fixture.job,
+        meetingId: meeting.value.id,
+        operationId: "asr",
+      });
       const firstIntent = service.claimNextProcessingJob({
         sourceIdentity: "worker:first",
         deadlineAtMs: 5000,
@@ -217,8 +222,36 @@ describe("attempt and source fenced publication", () => {
       ).toThrow(AttemptIdentityError);
       expect(rowCount(database, "result_publications")).toBe(0);
 
+      const diarizationIntent = service.advanceProcessingPhase(firstIntent!, {
+        operationId: "diarization",
+        resourceIdentity: "diarization-resource",
+        phase: "diarization",
+        protocolIdentity: "desktop-sherpa-worker/v1",
+        modelSha256: "d".repeat(64),
+        runtimeSha256: "e".repeat(64),
+      });
+      expect(diarizationIntent.phase).toBe("diarization");
       expect(service.reconcileStartup()).toBe(1);
-      expect(service.retryInterruptedJob(job.value.id, 1)).toBe(true);
+      expect(
+        service.retryInterruptedJob(job.value.id, 1, {
+          operationId: "asr",
+          resourceIdentity: "current-asr-resource",
+          phase: "asr",
+          protocolIdentity: "desktop-sherpa-worker/v1",
+          modelSha256: "f".repeat(64),
+          runtimeSha256: "1".repeat(64),
+        }),
+      ).toBe(true);
+      expect(repository.findJob(job.value.id)).toEqual(
+        expect.objectContaining({
+          state: "queued",
+          operationId: "asr",
+          resourceIdentity: "current-asr-resource",
+          phase: "asr",
+          modelSha256: "f".repeat(64),
+          runtimeSha256: "1".repeat(64),
+        }),
+      );
       const secondIntent = service.claimNextProcessingJob({
         sourceIdentity: "worker:second",
         deadlineAtMs: 6000,
@@ -226,14 +259,39 @@ describe("attempt and source fenced publication", () => {
       expect(secondIntent?.attempt).toBe(2);
       expect(() =>
         service.publishProcessingResult({
+          ...secondIntent!,
+          complete: true,
+          payload: fixture.publication,
+        }),
+      ).toThrow(AttemptIdentityError);
+      expect(() =>
+        service.publishProcessingResult({
           ...firstIntent!,
           complete: true,
           payload: fixture.publication,
         }),
       ).toThrow(AttemptIdentityError);
+      expect(() =>
+        service.publishProcessingResult({
+          ...diarizationIntent,
+          complete: true,
+          payload: fixture.publication,
+        }),
+      ).toThrow(AttemptIdentityError);
 
+      const secondDiarizationIntent = service.advanceProcessingPhase(
+        secondIntent!,
+        {
+          operationId: "diarization",
+          resourceIdentity: "current-diarization-resource",
+          phase: "diarization",
+          protocolIdentity: "desktop-sherpa-worker/v1",
+          modelSha256: "2".repeat(64),
+          runtimeSha256: "3".repeat(64),
+        },
+      );
       const publication = service.publishProcessingResult({
-        ...secondIntent!,
+        ...secondDiarizationIntent,
         complete: true,
         payload: fixture.publication,
       });
