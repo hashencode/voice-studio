@@ -1,0 +1,31 @@
+{
+  "schemaVersion": 1,
+  "meeting": {
+    "idempotencyKey": "import:sha256:fixture-meeting",
+    "sourceIdentity": "sha256:fixture-meeting",
+    "displayName": "Project weekly sync.wav",
+    "mediaPath": "/electron-profile/media/fixture-meeting.wav",
+    "durationMs": 42000
+  },
+  "job": {
+    "idempotencyKey": "transcription:sha256:fixture-meeting",
+    "operationId": "transcribe:fixture-meeting",
+    "resourceIdentity": "sha256:fixture-meeting"
+  },
+  "note": {
+    "idempotencyKey": "note:fixture-meeting:summary",
+    "body": "Ship the desktop foundation."
+  },
+  "receipt": {
+    "idempotencyKey": "receipt:fixture-meeting:import",
+    "kind": "media_import",
+    "payload": {
+      "sha256": "fixture-meeting",
+      "bytes": 4096
+    }
+  },
+  "publication": {
+    "transcript": "The complete transcript is published atomically.",
+    "segmentCount": 1
+  }
+}
