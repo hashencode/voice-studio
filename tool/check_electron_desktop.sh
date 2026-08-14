@@ -38,10 +38,10 @@ run_gate() {
 }
 
 run_stage cache-guard python3 tool/build_cache_guard.py --wait-for-idle
-run_stage bun-install bun --cwd apps/desktop-electron ci
-run_stage electron-check bun --cwd apps/desktop-electron run check
-run_stage electron-package bun --cwd apps/desktop-electron run package
-run_stage package-smoke bun --cwd apps/desktop-electron run smoke:package
+run_stage bun-install bun install --cwd apps/desktop-electron --frozen-lockfile
+run_stage electron-check bun run --cwd apps/desktop-electron check
+run_stage electron-package bun run --cwd apps/desktop-electron package
+run_stage package-smoke bun run --cwd apps/desktop-electron smoke:package
 
 source_revision="$(git -C "${repository_root}" rev-parse HEAD)"
 relevant_source_sha256="$(cd "${repository_root}" && python3 -c 'from tool.validate_electron_desktop_scope import _relevant_source_sha256; print(_relevant_source_sha256(__import__("pathlib").Path.cwd(), "HEAD"))')"

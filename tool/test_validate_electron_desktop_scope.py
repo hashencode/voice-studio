@@ -936,6 +936,10 @@ class ElectronDesktopScopeValidatorTest(unittest.TestCase):
     def test_closure_script_disables_capture_initialize_only_bypass(self) -> None:
         script = (ROOT / "tool/check_electron_desktop.sh").read_text(encoding="utf-8")
         self.assertIn(
+            "bun install --cwd apps/desktop-electron --frozen-lockfile",
+            script,
+        )
+        self.assertIn(
             "RUN_PACKAGED_CAPTURE_INITIALIZE_ONLY=0 RUN_PACKAGED_CAPTURE_SMOKE=1",
             script,
         )
