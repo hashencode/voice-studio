@@ -16,6 +16,7 @@ import path from "node:path";
 import { describe, expect, it } from "vitest";
 
 import { MacOSNativeHelperClient } from "../../src/main/features/importing/macos_native_helper_client";
+import { ELECTRON_SCHEMA_VERSION } from "../../src/main/storage/database";
 
 const packagedIt =
   process.env.RUN_PACKAGED_CAPTURE_SMOKE === "1" ? it : it.skip;
@@ -85,7 +86,7 @@ describe("packaged macOS capture recovery", () => {
         expect(JSON.parse(readFileSync(initializeReceipt, "utf8"))).toEqual(
           expect.objectContaining({
             phase: "profile-initialized",
-            databaseUserVersion: 7,
+            databaseUserVersion: ELECTRON_SCHEMA_VERSION,
             transport: "inherited-stdio",
           }),
         );
@@ -97,11 +98,22 @@ describe("packaged macOS capture recovery", () => {
         const sessionId = "session-packaged-123456";
         const sessionRoot = path.join(captureRoot, sessionId);
         const trackRoot = path.join(sessionRoot, "system");
+        const captionRoot = path.join(sessionRoot, "caption");
         mkdirSync(trackRoot, { recursive: true, mode: 0o700 });
+        mkdirSync(captionRoot, { mode: 0o700 });
         const chunk = Buffer.from("bounded packaged capture authority\n");
         const chunkPath = path.join(trackRoot, "chunk-000000.caf");
         writeFileSync(chunkPath, chunk, { mode: 0o600 });
         const chunkSha256 = createHash("sha256").update(chunk).digest("hex");
+        const captionSpool = Buffer.alloc(32_000);
+        writeFileSync(
+          path.join(captionRoot, "live-caption.pcmspool"),
+          captionSpool,
+          { mode: 0o600 },
+        );
+        const captionSpoolSha256 = createHash("sha256")
+          .update(captionSpool)
+          .digest("hex");
         writeFileSync(
           path.join(sessionRoot, "journal.json"),
           JSON.stringify({
@@ -140,6 +152,21 @@ describe("packaged macOS capture recovery", () => {
               },
             ],
             events: [],
+            spool: {
+              relativePath: "caption/live-caption.pcmspool",
+              format: "s16le",
+              sampleRate: 16_000,
+              channels: 1,
+              frameDurationMs: 100,
+              disposable: true,
+              complete: true,
+              formalEligible: true,
+              bytes: captionSpool.byteLength,
+              sha256: captionSpoolSha256,
+              durationMs: 1_000,
+              captureTimelineMs: 1_000,
+              gapCount: 0,
+            },
           }),
           { mode: 0o600 },
         );
@@ -213,7 +240,7 @@ describe("packaged macOS capture recovery", () => {
             trackCount: 2,
             chunkCount: 1,
             receiptCount: 2,
-            databaseUserVersion: 7,
+            databaseUserVersion: ELECTRON_SCHEMA_VERSION,
             recordingSha256: expect.stringMatching(/^[a-f0-9]{64}$/),
             journalSha256: expect.stringMatching(/^[a-f0-9]{64}$/),
             sessionIdentitySha256: expect.stringMatching(/^[a-f0-9]{64}$/),
