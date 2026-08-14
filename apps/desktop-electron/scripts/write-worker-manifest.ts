@@ -1,6 +1,9 @@
 import { createHash } from "node:crypto";
-import { readdir, readFile, writeFile } from "node:fs/promises";
+import { createReadStream } from "node:fs";
+import { readdir, writeFile } from "node:fs/promises";
 import path from "node:path";
+
+import { desktopWorkerHealthProtocol } from "../src/shared/contracts";
 
 const root = path.resolve(process.argv[2] ?? "resources/worker");
 
@@ -16,21 +19,31 @@ async function files(directory: string): Promise<string[]> {
   return nested.flat().sort();
 }
 
-const artifacts = await Promise.all(
-  (await files(root)).map(async (file) => ({
-    path: path.relative(root, file),
-    sha256: createHash("sha256")
-      .update(await readFile(file))
-      .digest("hex"),
-  })),
-);
+async function sha256(file: string): Promise<string> {
+  const hash = createHash("sha256");
+  for await (const chunk of createReadStream(file)) hash.update(chunk);
+  return hash.digest("hex");
+}
+
+const artifacts: Array<{ path: string; sha256: string }> = [];
+const artifactFiles = await files(root);
+for (let index = 0; index < artifactFiles.length; index += 4) {
+  artifacts.push(
+    ...(await Promise.all(
+      artifactFiles.slice(index, index + 4).map(async (file) => ({
+        path: path.relative(root, file),
+        sha256: await sha256(file),
+      })),
+    )),
+  );
+}
 await writeFile(
   path.join(root, "manifest.json"),
   `${JSON.stringify(
     {
       schemaVersion: 1,
       target: `darwin-${process.arch}`,
-      workerProtocol: "desktop-sherpa-worker-health/v1",
+      workerProtocol: desktopWorkerHealthProtocol,
       artifacts,
     },
     null,

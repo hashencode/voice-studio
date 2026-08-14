@@ -18,7 +18,7 @@ import {
   StorageError,
   openElectronProfileDatabase,
 } from "../storage/database";
-import { writeJsonAtomically } from "./atomic_json";
+import { syncDirectory, writeJsonAtomically } from "./atomic_json";
 import {
   ElectronProfileError,
   assertElectronProfilePaths,
@@ -219,15 +219,6 @@ function removeReadyMarker(path: string): void {
     unlinkSync(path);
   } catch (error) {
     if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error;
-  }
-}
-
-function syncDirectory(path: string): void {
-  const descriptor = openSync(path, "r");
-  try {
-    fsyncSync(descriptor);
-  } finally {
-    closeSync(descriptor);
   }
 }
 

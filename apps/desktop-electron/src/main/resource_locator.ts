@@ -7,7 +7,6 @@ export interface ResourceLocatorInput {
 }
 
 export interface WorkerResources {
-  root: string;
   runtimeRoot: string;
   workerPath: string;
 }
@@ -20,7 +19,6 @@ export function resolveWorkerResources(
     : path.join(input.appRoot, "resources", "worker");
 
   return {
-    root,
     runtimeRoot: path.join(root, "runtime"),
     workerPath: path.join(root, "bin", "desktop_sherpa_worker"),
   };

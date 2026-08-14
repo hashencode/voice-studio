@@ -54,7 +54,7 @@ export function writeJsonAtomically(
   }
 }
 
-function syncDirectory(path: string): void {
+export function syncDirectory(path: string): void {
   let descriptor: number | undefined;
   try {
     descriptor = openSync(path, "r");

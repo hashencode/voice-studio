@@ -35,34 +35,7 @@ export function profilePathsForApplicationData(
 }
 
 export function profilePathsForRoot(rootPath: string): ElectronProfilePaths {
-  const root = resolve(rootPath);
-  const databaseDirectory = join(root, "database");
-  const mediaDirectory = join(root, "media");
-  const workspaceDirectory = join(root, "workspaces");
-  const profile: ElectronProfilePaths = {
-    root,
-    databaseDirectory,
-    databasePath: join(databaseDirectory, "meetings.sqlite3"),
-    mediaDirectory,
-    workspaceDirectory,
-    captureDirectory: join(workspaceDirectory, "capture"),
-    stagingDirectory: join(workspaceDirectory, "staging"),
-    aiWorkspaceDirectory: join(workspaceDirectory, "ai"),
-    transferDirectory: join(workspaceDirectory, "transfers"),
-    reconciliationDirectory: join(workspaceDirectory, "reconciliation"),
-    readyMarkerPath: join(root, ".profile-ready.json"),
-    requiredDirectories: [],
-  };
-  profile.requiredDirectories = [
-    profile.databaseDirectory,
-    profile.mediaDirectory,
-    profile.workspaceDirectory,
-    profile.captureDirectory,
-    profile.stagingDirectory,
-    profile.aiWorkspaceDirectory,
-    profile.transferDirectory,
-    profile.reconciliationDirectory,
-  ];
+  const profile = profilePathsWithoutValidation(rootPath);
   assertElectronProfilePaths(profile);
   return profile;
 }
@@ -169,21 +142,39 @@ export function pathEntryExists(path: string): boolean {
   }
 }
 
-function profilePathsWithoutValidation(root: string) {
-  const resolvedRoot = resolve(root);
-  const databaseDirectory = join(resolvedRoot, "database");
-  const workspaceDirectory = join(resolvedRoot, "workspaces");
+function profilePathsWithoutValidation(rootPath: string): ElectronProfilePaths {
+  const root = resolve(rootPath);
+  const databaseDirectory = join(root, "database");
+  const mediaDirectory = join(root, "media");
+  const workspaceDirectory = join(root, "workspaces");
+  const captureDirectory = join(workspaceDirectory, "capture");
+  const stagingDirectory = join(workspaceDirectory, "staging");
+  const aiWorkspaceDirectory = join(workspaceDirectory, "ai");
+  const transferDirectory = join(workspaceDirectory, "transfers");
+  const reconciliationDirectory = join(workspaceDirectory, "reconciliation");
+
   return {
+    root,
     databaseDirectory,
     databasePath: join(databaseDirectory, "meetings.sqlite3"),
-    mediaDirectory: join(resolvedRoot, "media"),
+    mediaDirectory,
     workspaceDirectory,
-    captureDirectory: join(workspaceDirectory, "capture"),
-    stagingDirectory: join(workspaceDirectory, "staging"),
-    aiWorkspaceDirectory: join(workspaceDirectory, "ai"),
-    transferDirectory: join(workspaceDirectory, "transfers"),
-    reconciliationDirectory: join(workspaceDirectory, "reconciliation"),
-    readyMarkerPath: join(resolvedRoot, ".profile-ready.json"),
+    captureDirectory,
+    stagingDirectory,
+    aiWorkspaceDirectory,
+    transferDirectory,
+    reconciliationDirectory,
+    readyMarkerPath: join(root, ".profile-ready.json"),
+    requiredDirectories: [
+      databaseDirectory,
+      mediaDirectory,
+      workspaceDirectory,
+      captureDirectory,
+      stagingDirectory,
+      aiWorkspaceDirectory,
+      transferDirectory,
+      reconciliationDirectory,
+    ],
   };
 }
 

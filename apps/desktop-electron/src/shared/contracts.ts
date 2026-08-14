@@ -1,6 +1,8 @@
 import { z } from "zod";
 
 export const desktopProtocolVersion = 1 as const;
+export const desktopWorkerHealthProtocol =
+  "desktop-sherpa-worker-health/v1" as const;
 
 export const ipcChannels = {
   workerHealth: "desktop.worker.health.v1",
@@ -15,7 +17,7 @@ export const workerHealthRequestSchema = z
 export const workerHealthResponseSchema = z
   .object({
     protocolVersion: z.literal(desktopProtocolVersion),
-    protocol: z.literal("desktop-sherpa-worker-health/v1"),
+    protocol: z.literal(desktopWorkerHealthProtocol),
     runtime: z.literal("sherpa-onnx"),
     workerSha256: z.string().regex(/^[a-f0-9]{64}$/),
   })
