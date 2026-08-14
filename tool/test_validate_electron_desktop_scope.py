@@ -685,6 +685,12 @@ class ElectronDesktopScopeValidatorTest(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "unsafe|sensitive"):
             self._validate()
 
+        self.evidence = self._valid_evidence()
+        self.evidence["artifacts"]["signing"]["credentialBase64"] = "YWFhYQ=="
+        self._write_documents()
+        with self.assertRaisesRegex(ValueError, "privacy-sensitive"):
+            self._validate()
+
     def test_validation_sessions_are_bounded_to_thirty_minutes(self) -> None:
         session = self.evidence["validationSessions"][0]
         session["elapsedMilliseconds"] = 1_800_001

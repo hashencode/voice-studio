@@ -45,6 +45,30 @@ ACCESSIBILITY_CHECK_IDS = (
     "non-drag-alternatives",
 )
 
+EXPECTED_U12_TARGET = {
+    "modelIdentifier": "Mac14,3",
+    "operatingSystem": "macOS",
+    "operatingSystemVersion": "15.7.5",
+    "operatingSystemBuild": "24G624",
+    "architecture": "arm64",
+    "cpuModel": "Apple M2",
+    "logicalCpuCount": 8,
+    "memoryBytes": 17179869184,
+    "buildMode": "development-package",
+}
+
+RELEVANT_SOURCE_PATHS = (
+    "apps/desktop-electron",
+    "packages/companion_protocol",
+    "packages/desktop_macos_native",
+    "packages/desktop_sherpa_worker",
+    "docs/architecture/desktop-client-transition.md",
+    "docs/product/desktop-electron-parity-baseline.json",
+    "tool/check_electron_desktop.sh",
+    "tool/test_validate_electron_desktop_scope.py",
+    "tool/validate_electron_desktop_scope.py",
+)
+
 _SCOPE_FIELDS = {
     "$schema",
     "schema",
@@ -77,6 +101,14 @@ _EVIDENCE_FIELDS = {
 }
 _SHA256 = re.compile(r"^[0-9a-f]{64}$")
 _REVISION = re.compile(r"^[0-9a-f]{40}$")
+_PRIVACY_STATUS_KEYS = {
+    "sensitiveKeyDetected",
+    "fullSensitivePathDetected",
+    "repositoryPathDetected",
+    "rawAudioOrTranscriptDetected",
+    "reusableTokenDetected",
+    "secretCanaryDetected",
+}
 
 
 def _require(condition: bool, message: str) -> None:
@@ -119,6 +151,38 @@ def _json_sha256(value: object) -> str:
 def _load(path: Path, label: str) -> dict[str, Any]:
     _require(path.is_file(), f"{label} is missing")
     return _mapping(json.loads(path.read_text(encoding="utf-8")), label)
+
+
+def _scan_sensitive_evidence(value: Any, *, root: Path, path: str = "evidence") -> None:
+    if isinstance(value, dict):
+        for key, nested in value.items():
+            lowered = key.lower()
+            if key not in _PRIVACY_STATUS_KEYS and (
+                lowered in {
+                    "secret",
+                    "token",
+                    "credential",
+                    "credentialbase64",
+                    "transcripttext",
+                    "utterances",
+                    "audiopayload",
+                    "rawaudio",
+                }
+                or lowered.endswith("secret")
+                or lowered.endswith("token")
+            ):
+                raise ValueError(f"privacy-sensitive evidence key: {path}.{key}")
+            _scan_sensitive_evidence(nested, root=root, path=f"{path}.{key}")
+    elif isinstance(value, list):
+        for index, nested in enumerate(value):
+            _scan_sensitive_evidence(nested, root=root, path=f"{path}[{index}]")
+    elif isinstance(value, str):
+        _require(
+            str(root) not in value
+            and not value.startswith("/Users/")
+            and "SECRET_CANARY" not in value,
+            f"privacy-sensitive evidence value: {path}",
+        )
 
 
 def _safe_repository_path(
@@ -225,6 +289,24 @@ def _run_git(root: Path, *arguments: str) -> str:
     return result.stdout.strip()
 
 
+def _relevant_source_sha256(root: Path, revision: str) -> str:
+    result = subprocess.run(
+        [
+            "git",
+            "ls-tree",
+            "-r",
+            "--full-tree",
+            revision,
+            "--",
+            *RELEVANT_SOURCE_PATHS,
+        ],
+        cwd=root,
+        check=True,
+        capture_output=True,
+    )
+    return hashlib.sha256(result.stdout).hexdigest()
+
+
 def validate_electron_desktop_scope(
     scope_path: Path = DEFAULT_SCOPE,
     *,
@@ -237,6 +319,7 @@ def validate_electron_desktop_scope(
     root = root.resolve()
     scope = _load(scope_path, "Electron desktop scope")
     evidence = _load(evidence_path, "Electron desktop evidence")
+    _scan_sensitive_evidence(evidence, root=root)
     _exact_fields(scope, _SCOPE_FIELDS, "scope")
     _exact_fields(evidence, _EVIDENCE_FIELDS, "evidence")
     _require(scope.get("schema") == "voice2text-desktop-electron-scope/v1", "scope schema mismatch")
@@ -290,14 +373,17 @@ def validate_electron_desktop_scope(
     source = _mapping(evidence.get("source"), "source")
     _require(_REVISION.fullmatch(str(source.get("revision", ""))) is not None, "source revision is invalid")
     _require(_REVISION.fullmatch(str(source.get("tree", ""))) is not None, "source tree is invalid")
+    _sha(source.get("relevantSourceSha256"), "relevant source hash")
     for field, label in (("packageManifest", "package manifest"), ("dependencyLock", "dependency lock")):
         binding = _mapping(source.get(field), label)
         path = _safe_repository_path(root, binding.get("path"), label)
         _require(_sha256(path) == _sha(binding.get("sha256"), f"{label} hash"), f"{label} hash drift")
 
     target = _mapping(evidence.get("target"), "target")
-    if current_target is not None:
-        _require(target == current_target, "target fingerprint mismatch")
+    _require(
+        target == (current_target or EXPECTED_U12_TARGET),
+        "target fingerprint mismatch",
+    )
     target_hash = _json_sha256(target)
 
     artifacts = _mapping(evidence.get("artifacts"), "artifacts")
@@ -313,6 +399,7 @@ def validate_electron_desktop_scope(
     _require(len(identifiers) == len(set(identifiers)), "artifact binding IDs must be unique")
     required_kinds = {"application", "renderer", "helper", "worker", "runtime", "manifest", "model"}
     _require(required_kinds <= {item.get("kind") for item in bindings}, "artifact classes are incomplete")
+    artifacts_by_id = {str(item.get("id")): item for item in bindings}
     for item in bindings:
         path = _safe_repository_path(root, item.get("path"), f"artifact {item.get('id')}")
         _require(_sha256(path) == _sha(item.get("sha256"), "artifact hash"), f"artifact hash drift: {item.get('id')}")
@@ -355,10 +442,16 @@ def validate_electron_desktop_scope(
             path = _safe_repository_path(root, item.get("path"), "automated evidence")
             _require(_sha256(path) == _sha(item.get("sha256"), "automated evidence hash"), "automated evidence hash drift")
         elif item.get("mode") == "bounded-manual":
-            _require(item.get("status") == "PASS", "manual evidence is not complete")
             _require(isinstance(item.get("procedureId"), str) and item.get("procedureId"), "manual procedure is missing")
             maximum = item.get("maximumMinutes")
             _require(isinstance(maximum, int) and 0 < maximum <= 30 and elapsed <= maximum * 60_000, "manual evidence exceeds its bound")
+            if passing:
+                _require(item.get("status") == "PASS", "manual evidence is not complete")
+            else:
+                _require(
+                    item.get("status") in {"PASS", "NOT_RUN"},
+                    "manual evidence status is invalid",
+                )
         else:
             raise ValueError("evidence binding mode is invalid")
     for item in evidence_capabilities.values():
@@ -400,8 +493,41 @@ def validate_electron_desktop_scope(
         tree = str(source.get("tree"))
         _require(_run_git(root, "cat-file", "-t", revision) == "commit", "source revision is not a commit")
         _require(_run_git(root, "show", "-s", "--format=%T", revision) == tree, "source tree drift")
+        _require(
+            _relevant_source_sha256(root, revision)
+            == source.get("relevantSourceSha256"),
+            "relevant source hash drift",
+        )
         ancestry = subprocess.run(["git", "merge-base", "--is-ancestor", revision, "HEAD"], cwd=root)
         _require(ancestry.returncode == 0, "source revision is not an ancestor of HEAD")
+        if signing.get("appVerification") == "PASS":
+            subprocess.run(
+                ["codesign", "--verify", "--deep", "--strict", str(bundle_path)],
+                cwd=root,
+                check=True,
+                capture_output=True,
+            )
+        if signing.get("helperVerification") == "PASS":
+            helper_path = _safe_repository_path(
+                root,
+                _mapping(artifacts_by_id.get("native-helper"), "native helper").get("path"),
+                "native helper",
+            )
+            subprocess.run(
+                ["codesign", "--verify", "--strict", str(helper_path)],
+                cwd=root,
+                check=True,
+                capture_output=True,
+            )
+        app_asar = _safe_repository_path(
+            root,
+            _mapping(artifacts_by_id.get("app-asar"), "app ASAR").get("path"),
+            "app ASAR",
+        )
+        _require(
+            b'require("node:sqlite")' in app_asar.read_bytes(),
+            "packaged Main does not externalize node:sqlite",
+        )
 
     return {"target": "macos", "status": "PASS" if passing else "BLOCKED", "disposition": expected_disposition}
 
