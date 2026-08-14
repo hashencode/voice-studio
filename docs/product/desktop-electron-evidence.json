@@ -5,11 +5,11 @@
   "status": "BLOCKED",
   "disposition": "MACOS_ELECTRON_CLOSURE_BLOCKED",
   "developmentPosture": "DEVELOPMENT_ONLY",
-  "capturedAt": "2026-08-15T06:44:01+08:00",
+  "capturedAt": "2026-08-15T06:46:25+08:00",
   "source": {
-    "revision": "0e3f72d6a19ee35b1c0d4b17b2b6b3a41d4d1a04",
-    "tree": "7151db8805a7488eed41a347c9a5bbb85844d100",
-    "relevantSourceSha256": "318e0b51973c86d8b3d48ebee107916b00af86ecc31d145c13365907757697d8",
+    "revision": "a732eec91b4afe0c098cf7ae42341566bbcc4092",
+    "tree": "7d05dc8373b981cad95c0be68287381ceb86d3a4",
+    "relevantSourceSha256": "57a9ca4b3b541b2c8505a833bf180b6aabf0d6e7c78d6e0c3dd0d9258f6a3dff",
     "packageManifest": {
       "path": "apps/desktop-electron/package.json",
       "sha256": "d74c0e299a2807b8883521828e2be34d2d1d95f2549aa22ac8e8916cdbc1d13d"

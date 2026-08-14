@@ -28,7 +28,7 @@
       "closureDisposition": "MACOS_ELECTRON_CLOSURE_BLOCKED",
       "evidence": {
         "path": "docs/product/desktop-electron-evidence.json",
-        "sha256": "8530c6a29c210d7228730cd9213805b6e02f1071346e07eeba422d03196b71f7"
+        "sha256": "c4a755626178017e42164e6e03a7d81cb93e8982077beecb33600e7a435ca785"
       }
     },
     "windows": {
