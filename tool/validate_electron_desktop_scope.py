@@ -4,9 +4,12 @@
 from __future__ import annotations
 
 import argparse
+import datetime as dt
 import hashlib
 import json
 import os
+import platform
+import plistlib
 import re
 import subprocess
 from pathlib import Path, PurePosixPath
@@ -57,6 +60,80 @@ EXPECTED_U12_TARGET = {
     "buildMode": "development-package",
 }
 
+EXPECTED_ARTIFACTS = {
+    "app-executable": ("application", "Contents/MacOS/Voice2Text", False),
+    "app-asar": ("renderer", "Contents/Resources/app.asar", False),
+    "info-plist": ("application", "Contents/Info.plist", False),
+    "native-helper": (
+        "helper",
+        "Contents/Resources/native/macos/bin/desktop_macos_native_helper",
+        True,
+    ),
+    "asr-worker": (
+        "worker",
+        "Contents/Resources/worker/bin/desktop_sherpa_worker",
+        True,
+    ),
+    "caption-worker": (
+        "worker",
+        "Contents/Resources/worker/bin/desktop_sensevoice_caption_worker",
+        True,
+    ),
+    "process-group-launcher": (
+        "worker",
+        "Contents/Resources/worker/bin/native_process_group_launcher",
+        True,
+    ),
+    "onnxruntime": (
+        "runtime",
+        "Contents/Resources/worker/runtime/libonnxruntime.1.27.0.dylib",
+        True,
+    ),
+    "sherpa-c-api": (
+        "runtime",
+        "Contents/Resources/worker/runtime/libsherpa-onnx-c-api.dylib",
+        True,
+    ),
+    "sherpa-cxx-api": (
+        "runtime",
+        "Contents/Resources/worker/runtime/libsherpa-onnx-cxx-api.dylib",
+        True,
+    ),
+    "worker-manifest": (
+        "manifest",
+        "Contents/Resources/worker/manifest.json",
+        True,
+    ),
+    "asr-model": (
+        "model",
+        "Contents/Resources/worker/models/asr/encoder.int8.onnx",
+        True,
+    ),
+    "caption-model": (
+        "model",
+        "Contents/Resources/worker/models/live-caption/model.int8.onnx",
+        True,
+    ),
+}
+
+EXPECTED_CAPABILITY_BINDINGS = {
+    identifier: [f"gate-{identifier}"] for identifier in CAPABILITY_IDS
+}
+EXPECTED_CAPABILITY_BINDINGS["accessibility.desktop"] = [
+    "gate-accessibility.desktop",
+    "manual-voiceover",
+]
+
+EXPECTED_ACCESSIBILITY_BINDINGS = {
+    "keyboard": ["gate-accessibility.desktop"],
+    "focus": ["gate-accessibility.desktop"],
+    "voiceover": ["manual-voiceover"],
+    "minimum-window": ["gate-accessibility.desktop"],
+    "text-scaling-200-percent": ["gate-accessibility.desktop"],
+    "reduced-motion": ["gate-accessibility.desktop"],
+    "non-drag-alternatives": ["gate-accessibility.desktop"],
+}
+
 RELEVANT_SOURCE_PATHS = (
     "apps/desktop-electron",
     "packages/companion_protocol",
@@ -65,6 +142,8 @@ RELEVANT_SOURCE_PATHS = (
     "docs/architecture/desktop-client-transition.md",
     "docs/product/desktop-electron-parity-baseline.json",
     "tool/check_electron_desktop.sh",
+    "tool/run_electron_desktop_gate.py",
+    "tool/test_run_electron_desktop_gate.py",
     "tool/test_validate_electron_desktop_scope.py",
     "tool/validate_electron_desktop_scope.py",
 )
@@ -109,6 +188,39 @@ _PRIVACY_STATUS_KEYS = {
     "reusableTokenDetected",
     "secretCanaryDetected",
 }
+_EVIDENCE_BINDING_FIELDS = {
+    "id",
+    "mode",
+    "status",
+    "definitionPath",
+    "definitionSha256",
+    "receiptPath",
+    "receiptSha256",
+    "procedureId",
+    "maximumMinutes",
+    "elapsedMilliseconds",
+    "targetFingerprintSha256",
+    "packageManifestSha256",
+}
+_RECEIPT_FIELDS = {
+    "schema",
+    "id",
+    "mode",
+    "status",
+    "sourceRevision",
+    "relevantSourceSha256",
+    "targetFingerprintSha256",
+    "packageManifestSha256",
+    "definitionPath",
+    "definitionSha256",
+    "startedAt",
+    "finishedAt",
+    "elapsedMilliseconds",
+    "exitCode",
+    "commandId",
+    "procedureId",
+    "checks",
+}
 
 
 def _require(condition: bool, message: str) -> None:
@@ -150,6 +262,7 @@ def _json_sha256(value: object) -> str:
 
 def _load(path: Path, label: str) -> dict[str, Any]:
     _require(path.is_file(), f"{label} is missing")
+    _require(path.stat().st_size <= 1024 * 1024, f"{label} exceeds 1 MiB")
     return _mapping(json.loads(path.read_text(encoding="utf-8")), label)
 
 
@@ -226,6 +339,88 @@ def _bundle_manifest_sha256(bundle: Path) -> str:
     return digest.hexdigest()
 
 
+def _command_output(*arguments: str) -> str:
+    return subprocess.run(
+        list(arguments),
+        check=True,
+        capture_output=True,
+        text=True,
+    ).stdout.strip()
+
+
+def _current_target() -> dict[str, Any]:
+    _require(platform.system() == "Darwin", "macOS target validation requires Darwin")
+    return {
+        "modelIdentifier": _command_output("sysctl", "-n", "hw.model"),
+        "operatingSystem": "macOS",
+        "operatingSystemVersion": _command_output("sw_vers", "-productVersion"),
+        "operatingSystemBuild": _command_output("sw_vers", "-buildVersion"),
+        "architecture": platform.machine(),
+        "cpuModel": _command_output("sysctl", "-n", "machdep.cpu.brand_string"),
+        "logicalCpuCount": int(_command_output("sysctl", "-n", "hw.logicalcpu")),
+        "memoryBytes": int(_command_output("sysctl", "-n", "hw.memsize")),
+        "buildMode": "development-package",
+    }
+
+
+def _validate_receipt(
+    receipt: dict[str, Any],
+    *,
+    binding: dict[str, Any],
+    source: dict[str, Any],
+    target_hash: str,
+    bundle_hash: str,
+) -> None:
+    _exact_fields(receipt, _RECEIPT_FIELDS, f"receipt {binding.get('id')}")
+    _require(
+        receipt.get("schema") == "voice2text-desktop-electron-gate-receipt/v1",
+        "receipt schema mismatch",
+    )
+    for field in ("id", "mode", "definitionPath", "definitionSha256"):
+        _require(receipt.get(field) == binding.get(field), f"receipt {field} mismatch")
+    _require(receipt.get("status") == binding.get("status") == "PASS", "receipt did not pass")
+    _require(receipt.get("sourceRevision") == source.get("revision"), "receipt source revision mismatch")
+    _require(
+        receipt.get("relevantSourceSha256") == source.get("relevantSourceSha256"),
+        "receipt relevant source mismatch",
+    )
+    _require(receipt.get("targetFingerprintSha256") == target_hash, "receipt target mismatch")
+    _require(receipt.get("packageManifestSha256") == bundle_hash, "receipt package mismatch")
+    elapsed = receipt.get("elapsedMilliseconds")
+    _require(
+        isinstance(elapsed, int)
+        and 0 < elapsed <= 1_800_000
+        and elapsed == binding.get("elapsedMilliseconds"),
+        "receipt elapsed time is invalid",
+    )
+    _require(
+        isinstance(receipt.get("startedAt"), str)
+        and receipt.get("startedAt")
+        and isinstance(receipt.get("finishedAt"), str)
+        and receipt.get("finishedAt"),
+        "receipt timestamps are missing",
+    )
+    try:
+        started = dt.datetime.fromisoformat(str(receipt["startedAt"]))
+        finished = dt.datetime.fromisoformat(str(receipt["finishedAt"]))
+    except ValueError as error:
+        raise ValueError("receipt timestamps are invalid") from error
+    measured_elapsed = int((finished - started).total_seconds() * 1000)
+    _require(
+        measured_elapsed >= 0 and abs(measured_elapsed - elapsed) <= 2_000,
+        "receipt timestamps do not match elapsed time",
+    )
+    _require(receipt.get("exitCode") == 0, "receipt exit code is not zero")
+    if binding.get("mode") == "automated":
+        _require(isinstance(receipt.get("commandId"), str) and receipt.get("commandId"), "receipt command is missing")
+        _require(receipt.get("procedureId") is None and receipt.get("checks") == [], "automated receipt contains manual fields")
+    else:
+        _require(receipt.get("commandId") is None, "manual receipt contains a command")
+        _require(receipt.get("procedureId") == binding.get("procedureId"), "manual procedure mismatch")
+        checks = receipt.get("checks")
+        _require(isinstance(checks, list) and checks and all(isinstance(item, str) and item for item in checks), "manual checks are missing")
+
+
 def _validate_capability_rows(rows: Any, label: str, *, allow_blocked: bool) -> dict[str, dict[str, Any]]:
     items = [_mapping(item, f"{label} item") for item in _array(rows, label)]
     identifiers = [item.get("id") for item in items]
@@ -235,6 +430,10 @@ def _validate_capability_rows(rows: Any, label: str, *, allow_blocked: bool) -> 
         _require(item.get("status") in ({"PASS", "BLOCKED"} if allow_blocked else {"PASS"}), f"{label} capability is not complete")
         bindings = item.get("evidenceBindingIds")
         _require(isinstance(bindings, list) and all(isinstance(value, str) and value for value in bindings), f"{label} evidence bindings are invalid")
+        _require(
+            bindings == EXPECTED_CAPABILITY_BINDINGS[item["id"]],
+            f"{label} evidence binding identity mismatch: {item['id']}",
+        )
     return {str(item["id"]): item for item in items}
 
 
@@ -245,6 +444,8 @@ def _validate_reference(
     expected_path: str,
     expected_sha: str,
     passing: bool,
+    source_revision: str,
+    validate_repository: bool,
 ) -> None:
     _require(reference.get("path") == expected_path, "reference baseline path mismatch")
     baseline_path = _safe_repository_path(root, reference.get("path"), "reference baseline")
@@ -276,6 +477,20 @@ def _validate_reference(
         _require(isinstance(evidence, list), "reference change evidence is invalid")
         if passing:
             _require(change.get("disposition") == "adopted-with-electron-evidence" and evidence, "reference change blocks Electron closure")
+    if validate_repository:
+        protected_paths = ["apps/desktop", *baseline_fixtures]
+        discovered = set(
+            _run_git(
+                root,
+                "log",
+                "--format=%H",
+                f"{expected_base}..{source_revision}",
+                "--",
+                *protected_paths,
+            ).splitlines()
+        ) - {""}
+        recorded = {str(item.get("flutterRevision")) for item in changes}
+        _require(recorded == discovered, "reference change disposition coverage drift")
 
 
 def _run_git(root: Path, *arguments: str) -> str:
@@ -305,6 +520,32 @@ def _relevant_source_sha256(root: Path, revision: str) -> str:
         capture_output=True,
     )
     return hashlib.sha256(result.stdout).hexdigest()
+
+
+def _validate_live_source_binding(root: Path, source: dict[str, Any]) -> None:
+    revision = str(source.get("revision"))
+    tree = str(source.get("tree"))
+    _require(_run_git(root, "cat-file", "-t", revision) == "commit", "source revision is not a commit")
+    _require(_run_git(root, "show", "-s", "--format=%T", revision) == tree, "source tree drift")
+    _require(_relevant_source_sha256(root, revision) == source.get("relevantSourceSha256"), "relevant source hash drift")
+    ancestry = subprocess.run(
+        ["git", "merge-base", "--is-ancestor", revision, "HEAD"],
+        cwd=root,
+        capture_output=True,
+    )
+    _require(ancestry.returncode == 0, "source revision is not an ancestor of HEAD")
+    _require(
+        _relevant_source_sha256(root, "HEAD") == source.get("relevantSourceSha256"),
+        "relevant source changed after the bound revision",
+    )
+    relevant_diff = subprocess.run(
+        ["git", "diff", "--quiet", revision, "--", *RELEVANT_SOURCE_PATHS],
+        cwd=root,
+        capture_output=True,
+    )
+    _require(relevant_diff.returncode == 0, "relevant source worktree is dirty")
+    untracked = _run_git(root, "ls-files", "--others", "--exclude-standard", "--", *RELEVANT_SOURCE_PATHS)
+    _require(not untracked, "untracked relevant source is present")
 
 
 def validate_electron_desktop_scope(
@@ -381,7 +622,11 @@ def validate_electron_desktop_scope(
 
     target = _mapping(evidence.get("target"), "target")
     _require(
-        target == (current_target or EXPECTED_U12_TARGET),
+        target
+        == (
+            current_target
+            or (_current_target() if validate_repository else EXPECTED_U12_TARGET)
+        ),
         "target fingerprint mismatch",
     )
     target_hash = _json_sha256(target)
@@ -397,15 +642,32 @@ def validate_electron_desktop_scope(
     bindings = [_mapping(item, "artifact binding") for item in _array(artifacts.get("bindings"), "artifact bindings")]
     identifiers = [item.get("id") for item in bindings]
     _require(len(identifiers) == len(set(identifiers)), "artifact binding IDs must be unique")
-    required_kinds = {"application", "renderer", "helper", "worker", "runtime", "manifest", "model"}
-    _require(required_kinds <= {item.get("kind") for item in bindings}, "artifact classes are incomplete")
+    _require(set(identifiers) == set(EXPECTED_ARTIFACTS), "artifact binding set is incomplete")
     artifacts_by_id = {str(item.get("id")): item for item in bindings}
     for item in bindings:
+        expected_kind, relative_path, expected_outside_asar = EXPECTED_ARTIFACTS[str(item.get("id"))]
+        expected_path = bundle_path / PurePosixPath(relative_path)
         path = _safe_repository_path(root, item.get("path"), f"artifact {item.get('id')}")
+        _require(path == expected_path, f"artifact package location drift: {item.get('id')}")
+        _require(item.get("kind") == expected_kind, f"artifact kind drift: {item.get('id')}")
+        _require(item.get("outsideAsar") is expected_outside_asar, f"artifact ASAR disposition drift: {item.get('id')}")
         _require(_sha256(path) == _sha(item.get("sha256"), "artifact hash"), f"artifact hash drift: {item.get('id')}")
-        if item.get("kind") not in {"application", "renderer"}:
-            _require(item.get("outsideAsar") is True, "helper/worker/runtime/model must remain outside ASAR")
     signing = _mapping(artifacts.get("signing"), "signing")
+    _exact_fields(
+        signing,
+        {
+            "appVerification",
+            "helperVerification",
+            "mode",
+            "signatureMode",
+            "productionEntitlementsRequired",
+            "helperEntitlementsPath",
+            "helperEntitlementsSha256",
+        },
+        "signing",
+    )
+    _require(signing.get("mode") == "development", "signing mode drift")
+    _require(signing.get("productionEntitlementsRequired") is False, "development signing entitlement posture drift")
     entitlements = _safe_repository_path(root, signing.get("helperEntitlementsPath"), "helper entitlements")
     _require(_sha256(entitlements) == _sha(signing.get("helperEntitlementsSha256"), "helper entitlements hash"), "helper entitlements hash drift")
     if passing:
@@ -425,22 +687,35 @@ def validate_electron_desktop_scope(
         "copy-or-migrate-flutter-runtime-profile",
         "use-flutter-as-runtime-fallback",
     ], "Flutter reference prohibited actions drift")
-    _validate_reference(reference, root=root, expected_path=str(scope_reference.get("path")), expected_sha=str(scope_reference.get("sha256")), passing=passing)
+    _validate_reference(
+        reference,
+        root=root,
+        expected_path=str(scope_reference.get("path")),
+        expected_sha=str(scope_reference.get("sha256")),
+        passing=passing,
+        source_revision=str(source.get("revision")),
+        validate_repository=validate_repository,
+    )
 
     raw_bindings = [_mapping(item, "evidence binding") for item in _array(evidence.get("evidenceBindings"), "evidence bindings")]
     binding_ids = [item.get("id") for item in raw_bindings]
     _require(len(binding_ids) == len(set(binding_ids)), "evidence binding IDs must be unique")
     evidence_bindings = {str(item.get("id")): item for item in raw_bindings}
     for item in raw_bindings:
+        _exact_fields(item, _EVIDENCE_BINDING_FIELDS, f"evidence binding {item.get('id')}")
         if passing and item.get("mode") != "bounded-manual":
             _require(item.get("status") == "PASS", "evidence binding is not complete")
         _require(item.get("targetFingerprintSha256") == target_hash, "manual target binding mismatch" if item.get("mode") == "bounded-manual" else "target binding mismatch")
         _require(item.get("packageManifestSha256") == bundle_hash, "manual package binding mismatch" if item.get("mode") == "bounded-manual" else "package binding mismatch")
         elapsed = item.get("elapsedMilliseconds")
         _require(isinstance(elapsed, int) and elapsed >= 0, "evidence elapsed time is invalid")
+        definition_path = _safe_repository_path(root, item.get("definitionPath"), "evidence definition")
+        _require(
+            _sha256(definition_path) == _sha(item.get("definitionSha256"), "evidence definition hash"),
+            "evidence definition hash drift",
+        )
         if item.get("mode") == "automated":
-            path = _safe_repository_path(root, item.get("path"), "automated evidence")
-            _require(_sha256(path) == _sha(item.get("sha256"), "automated evidence hash"), "automated evidence hash drift")
+            _require(item.get("procedureId") is None and item.get("maximumMinutes") is None, "automated evidence contains manual fields")
         elif item.get("mode") == "bounded-manual":
             _require(isinstance(item.get("procedureId"), str) and item.get("procedureId"), "manual procedure is missing")
             maximum = item.get("maximumMinutes")
@@ -454,6 +729,22 @@ def validate_electron_desktop_scope(
                 )
         else:
             raise ValueError("evidence binding mode is invalid")
+        receipt_path_value = item.get("receiptPath")
+        receipt_sha_value = item.get("receiptSha256")
+        if item.get("status") == "PASS":
+            receipt_path = _safe_repository_path(root, receipt_path_value, "execution receipt")
+            _require(_sha256(receipt_path) == _sha(receipt_sha_value, "execution receipt hash"), "execution receipt hash drift")
+            receipt = _load(receipt_path, "execution receipt")
+            _scan_sensitive_evidence(receipt, root=root, path=f"receipt.{item.get('id')}")
+            _validate_receipt(
+                receipt,
+                binding=item,
+                source=source,
+                target_hash=target_hash,
+                bundle_hash=bundle_hash,
+            )
+        else:
+            _require(receipt_path_value is None and receipt_sha_value is None and elapsed == 0, "uncaptured evidence has a receipt")
     for item in evidence_capabilities.values():
         _require(all(value in evidence_bindings for value in item["evidenceBindingIds"]), "capability references missing evidence")
 
@@ -463,16 +754,31 @@ def validate_electron_desktop_scope(
     if passing:
         _require(accessibility.get("status") == "PASS" and all(item.get("status") == "PASS" for item in checks), "accessibility evidence is incomplete")
     for item in checks:
-        _require(all(value in evidence_bindings for value in item.get("evidenceBindingIds", [])), "accessibility evidence binding is missing")
+        bindings_for_check = item.get("evidenceBindingIds")
+        _require(
+            bindings_for_check == EXPECTED_ACCESSIBILITY_BINDINGS[item.get("id")],
+            "accessibility evidence binding identity mismatch",
+        )
+        _require(all(value in evidence_bindings for value in bindings_for_check), "accessibility evidence binding is missing")
+        if item.get("status") == "PASS":
+            _require(all(evidence_bindings[value].get("status") == "PASS" for value in bindings_for_check), "accessibility evidence receipt did not pass")
 
     privacy = _mapping(evidence.get("privacy"), "privacy")
     privacy_flags = ("sensitiveKeyDetected", "fullSensitivePathDetected", "repositoryPathDetected", "rawAudioOrTranscriptDetected", "reusableTokenDetected", "secretCanaryDetected")
     if passing:
         _require(privacy.get("status") == "PASS" and privacy.get("schemaAllowlistEnforced") is True, "privacy validation is incomplete")
     _require(all(privacy.get(field) is False for field in privacy_flags), "privacy finding detected")
-    _require(set(privacy.get("scannedEvidenceBindingIds", [])) == set(evidence_bindings), "privacy scan coverage is incomplete")
+    captured_bindings = {identifier for identifier, item in evidence_bindings.items() if item.get("status") == "PASS"}
+    _require(set(privacy.get("scannedEvidenceBindingIds", [])) == captured_bindings, "privacy scan coverage is incomplete")
 
-    for session in _array(evidence.get("validationSessions"), "validation sessions"):
+    sessions = _array(evidence.get("validationSessions"), "validation sessions")
+    if passing:
+        _require(
+            [item.get("id") for item in sessions if isinstance(item, dict)]
+            == ["macos-packaged-closure"],
+            "validation session set is invalid",
+        )
+    for session in sessions:
         item = _mapping(session, "validation session")
         elapsed = item.get("elapsedMilliseconds")
         maximum = item.get("maximumMilliseconds")
@@ -486,20 +792,15 @@ def validate_electron_desktop_scope(
         _require(all(verification.get(field) == "PASS" for field in required), "root dev_check or required verification did not pass")
         _require(evidence.get("status") == "PASS" and evidence.get("disposition") == expected_disposition and evidence.get("blockers") == [], "PASS evidence disposition is inconsistent")
     else:
-        _require(evidence.get("status") == "BLOCKED" and evidence.get("blockers"), "blocked evidence must name blockers")
+        _require(
+            evidence.get("status") == "BLOCKED"
+            and evidence.get("disposition") == expected_disposition
+            and evidence.get("blockers"),
+            "blocked evidence must name blockers and the blocked disposition",
+        )
 
     if validate_repository:
-        revision = str(source.get("revision"))
-        tree = str(source.get("tree"))
-        _require(_run_git(root, "cat-file", "-t", revision) == "commit", "source revision is not a commit")
-        _require(_run_git(root, "show", "-s", "--format=%T", revision) == tree, "source tree drift")
-        _require(
-            _relevant_source_sha256(root, revision)
-            == source.get("relevantSourceSha256"),
-            "relevant source hash drift",
-        )
-        ancestry = subprocess.run(["git", "merge-base", "--is-ancestor", revision, "HEAD"], cwd=root)
-        _require(ancestry.returncode == 0, "source revision is not an ancestor of HEAD")
+        _validate_live_source_binding(root, source)
         if signing.get("appVerification") == "PASS":
             subprocess.run(
                 ["codesign", "--verify", "--deep", "--strict", str(bundle_path)],
@@ -507,6 +808,22 @@ def validate_electron_desktop_scope(
                 check=True,
                 capture_output=True,
             )
+            info_plist = _safe_repository_path(root, artifacts_by_id["info-plist"].get("path"), "Info.plist")
+            with info_plist.open("rb") as source_plist:
+                plist = plistlib.load(source_plist)
+            _require(plist.get("CFBundleIdentifier") == "com.voice2text.desktop", "app bundle identifier drift")
+            app_details = subprocess.run(
+                ["codesign", "-dv", "--verbose=4", str(bundle_path)],
+                cwd=root,
+                check=True,
+                capture_output=True,
+                text=True,
+            ).stderr
+            _require("Identifier=com.voice2text.desktop" in app_details, "app signing identifier drift")
+            if signing.get("signatureMode") == "adhoc":
+                _require("Signature=adhoc" in app_details and "TeamIdentifier=not set" in app_details, "app signature mode drift")
+            else:
+                raise ValueError("unsupported development signature mode")
         if signing.get("helperVerification") == "PASS":
             helper_path = _safe_repository_path(
                 root,
@@ -519,6 +836,16 @@ def validate_electron_desktop_scope(
                 check=True,
                 capture_output=True,
             )
+            helper_details = subprocess.run(
+                ["codesign", "-dv", "--verbose=4", str(helper_path)],
+                cwd=root,
+                check=True,
+                capture_output=True,
+                text=True,
+            ).stderr
+            if signing.get("signatureMode") == "adhoc":
+                _require("Signature=adhoc" in helper_details and "TeamIdentifier=not set" in helper_details, "helper signature mode drift")
+                _require("Identifier=desktop_macos_native_helper-" in helper_details, "helper signing identifier drift")
         app_asar = _safe_repository_path(
             root,
             _mapping(artifacts_by_id.get("app-asar"), "app ASAR").get("path"),

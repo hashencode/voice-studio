@@ -4,6 +4,7 @@ import copy
 import hashlib
 import json
 import os
+import subprocess
 import tempfile
 import unittest
 from pathlib import Path
@@ -11,11 +12,16 @@ from pathlib import Path
 from tool.validate_electron_desktop_scope import (
     ACCESSIBILITY_CHECK_IDS,
     CAPABILITY_IDS,
+    EXPECTED_CAPABILITY_BINDINGS,
+    RELEVANT_SOURCE_PATHS,
+    _relevant_source_sha256,
+    _validate_live_source_binding,
     validate_electron_desktop_scope,
 )
 
 
 SHA256 = "a" * 64
+ROOT = Path(__file__).resolve().parents[1]
 TARGET = {
     "modelIdentifier": "Mac14,3",
     "operatingSystem": "macOS",
@@ -252,7 +258,11 @@ class ElectronDesktopScopeValidatorTest(unittest.TestCase):
                 "model",
             ),
         ]
-        gate_path = self._write("evidence/automated-gate.txt", b"PASS\n")
+        gate_path = self._write("evidence/automated-gate.txt", b"gate definition\n")
+        manual_definition = self._write(
+            "evidence/manual-voiceover-procedure.txt",
+            b"bounded VoiceOver procedure\n",
+        )
         source_manifest = self._write("source/source-manifest.txt", b"source\n")
         package_json = self._write("apps/desktop-electron/package.json", b"{}\n")
         bun_lock = self._write("apps/desktop-electron/bun.lock", b"lock\n")
@@ -262,15 +272,42 @@ class ElectronDesktopScopeValidatorTest(unittest.TestCase):
         )
         target_sha = _json_sha256(TARGET)
         bundle_sha = _bundle_manifest_sha256(self.bundle)
+        revision = "e" * 40
+        relevant_source_sha = _sha256(source_manifest)
         evidence_bindings = []
         for capability in CAPABILITY_IDS:
+            binding_id = f"gate-{capability}"
+            receipt_path = self.root / f"evidence/receipts/{binding_id}.json"
+            receipt_path.parent.mkdir(parents=True, exist_ok=True)
+            receipt = {
+                "schema": "voice2text-desktop-electron-gate-receipt/v1",
+                "id": binding_id,
+                "mode": "automated",
+                "status": "PASS",
+                "sourceRevision": revision,
+                "relevantSourceSha256": relevant_source_sha,
+                "targetFingerprintSha256": target_sha,
+                "packageManifestSha256": bundle_sha,
+                "definitionPath": gate_path.relative_to(self.root).as_posix(),
+                "definitionSha256": _sha256(gate_path),
+                "startedAt": "2026-08-15T12:00:00+08:00",
+                "finishedAt": "2026-08-15T12:00:01+08:00",
+                "elapsedMilliseconds": 1,
+                "exitCode": 0,
+                "commandId": binding_id,
+                "procedureId": None,
+                "checks": [],
+            }
+            receipt_path.write_text(json.dumps(receipt), encoding="utf-8")
             evidence_bindings.append(
                 {
-                    "id": f"gate-{capability}",
+                    "id": binding_id,
                     "mode": "automated",
                     "status": "PASS",
-                    "path": gate_path.relative_to(self.root).as_posix(),
-                    "sha256": _sha256(gate_path),
+                    "definitionPath": gate_path.relative_to(self.root).as_posix(),
+                    "definitionSha256": _sha256(gate_path),
+                    "receiptPath": receipt_path.relative_to(self.root).as_posix(),
+                    "receiptSha256": _sha256(receipt_path),
                     "procedureId": None,
                     "maximumMinutes": None,
                     "elapsedMilliseconds": 1,
@@ -278,13 +315,36 @@ class ElectronDesktopScopeValidatorTest(unittest.TestCase):
                     "packageManifestSha256": bundle_sha,
                 }
             )
+        manual_receipt_path = self.root / "evidence/receipts/manual-voiceover.json"
+        manual_receipt = {
+            "schema": "voice2text-desktop-electron-gate-receipt/v1",
+            "id": "manual-voiceover",
+            "mode": "bounded-manual",
+            "status": "PASS",
+            "sourceRevision": revision,
+            "relevantSourceSha256": relevant_source_sha,
+            "targetFingerprintSha256": target_sha,
+            "packageManifestSha256": bundle_sha,
+            "definitionPath": manual_definition.relative_to(self.root).as_posix(),
+            "definitionSha256": _sha256(manual_definition),
+            "startedAt": "2026-08-15T12:00:00+08:00",
+            "finishedAt": "2026-08-15T12:01:00+08:00",
+            "elapsedMilliseconds": 60_000,
+            "exitCode": 0,
+            "commandId": None,
+            "procedureId": "macos-voiceover-navigation-v1",
+            "checks": ["voiceover-navigation-observed"],
+        }
+        manual_receipt_path.write_text(json.dumps(manual_receipt), encoding="utf-8")
         evidence_bindings.append(
             {
                 "id": "manual-voiceover",
                 "mode": "bounded-manual",
                 "status": "PASS",
-                "path": None,
-                "sha256": None,
+                "definitionPath": manual_definition.relative_to(self.root).as_posix(),
+                "definitionSha256": _sha256(manual_definition),
+                "receiptPath": manual_receipt_path.relative_to(self.root).as_posix(),
+                "receiptSha256": _sha256(manual_receipt_path),
                 "procedureId": "macos-voiceover-navigation-v1",
                 "maximumMinutes": 10,
                 "elapsedMilliseconds": 60_000,
@@ -301,9 +361,9 @@ class ElectronDesktopScopeValidatorTest(unittest.TestCase):
             "developmentPosture": "DEVELOPMENT_ONLY",
             "capturedAt": "2026-08-15T12:00:00+08:00",
             "source": {
-                "revision": "e" * 40,
+                "revision": revision,
                 "tree": "f" * 40,
-                "relevantSourceSha256": _sha256(source_manifest),
+                "relevantSourceSha256": relevant_source_sha,
                 "packageManifest": {
                     "path": package_json.relative_to(self.root).as_posix(),
                     "sha256": _sha256(package_json),
@@ -326,6 +386,7 @@ class ElectronDesktopScopeValidatorTest(unittest.TestCase):
                     "appVerification": "PASS",
                     "helperVerification": "PASS",
                     "mode": "development",
+                    "signatureMode": "adhoc",
                     "productionEntitlementsRequired": False,
                     "helperEntitlementsPath": entitlements.relative_to(
                         self.root
@@ -357,7 +418,7 @@ class ElectronDesktopScopeValidatorTest(unittest.TestCase):
                 {
                     "id": capability,
                     "status": "PASS",
-                    "evidenceBindingIds": [f"gate-{capability}"],
+                    "evidenceBindingIds": EXPECTED_CAPABILITY_BINDINGS[capability],
                 }
                 for capability in CAPABILITY_IDS
             ],
@@ -460,7 +521,7 @@ class ElectronDesktopScopeValidatorTest(unittest.TestCase):
                 {
                     "id": capability,
                     "status": "PASS",
-                    "evidenceBindingIds": [f"gate-{capability}"],
+                    "evidenceBindingIds": EXPECTED_CAPABILITY_BINDINGS[capability],
                 }
                 for capability in CAPABILITY_IDS
             ],
@@ -524,8 +585,20 @@ class ElectronDesktopScopeValidatorTest(unittest.TestCase):
             evidence["artifacts"]["status"] = "NOT_RUN"
             for capability in evidence["capabilityEvidence"]:
                 capability["status"] = "BLOCKED"
+            for binding in evidence["evidenceBindings"]:
+                binding["status"] = (
+                    "NOT_RUN"
+                    if binding["mode"] == "bounded-manual"
+                    else "DEFINED_NOT_CAPTURED"
+                )
+                binding["receiptPath"] = None
+                binding["receiptSha256"] = None
+                binding["elapsedMilliseconds"] = 0
             evidence["accessibility"]["status"] = "NOT_RUN"
+            for check in evidence["accessibility"]["checks"]:
+                check["status"] = "NOT_RUN"
             evidence["privacy"]["status"] = "NOT_RUN"
+            evidence["privacy"]["scannedEvidenceBindingIds"] = []
             evidence["validationSessions"] = []
             evidence["verification"]["packagedMacos"] = "NOT_RUN"
             evidence["verification"]["packagedProductFlows"] = "NOT_RUN"
@@ -754,6 +827,118 @@ class ElectronDesktopScopeValidatorTest(unittest.TestCase):
         self._write_documents()
         with self.assertRaisesRegex(ValueError, "root dev_check"):
             self._validate()
+
+    def test_pass_requires_hash_bound_execution_receipt(self) -> None:
+        binding = self.evidence["evidenceBindings"][0]
+        binding["receiptPath"] = None
+        binding["receiptSha256"] = None
+        self._write_documents()
+        with self.assertRaisesRegex(ValueError, "execution receipt"):
+            self._validate()
+
+    def test_sensitive_execution_receipt_is_rejected(self) -> None:
+        binding = self.evidence["evidenceBindings"][0]
+        receipt_path = self.root / binding["receiptPath"]
+        receipt = json.loads(receipt_path.read_text(encoding="utf-8"))
+        receipt["secret"] = "SECRET_CANARY"
+        receipt_path.write_text(json.dumps(receipt), encoding="utf-8")
+        binding["receiptSha256"] = _sha256(receipt_path)
+        self._write_documents()
+        with self.assertRaisesRegex(ValueError, "privacy-sensitive"):
+            self._validate()
+
+    def test_artifact_identity_and_bundle_location_are_exact(self) -> None:
+        helper = next(
+            item
+            for item in self.evidence["artifacts"]["bindings"]
+            if item["id"] == "native-helper"
+        )
+        outside = self._write("outside-helper", b"helper")
+        helper["path"] = outside.relative_to(self.root).as_posix()
+        helper["sha256"] = _sha256(outside)
+        self._write_documents()
+        with self.assertRaisesRegex(ValueError, "package location"):
+            self._validate()
+
+    def test_capability_and_accessibility_bindings_are_exact(self) -> None:
+        self.scope["capabilities"][0]["evidenceBindingIds"] = [
+            "gate-companion.transfer"
+        ]
+        self._write_documents()
+        with self.assertRaisesRegex(ValueError, "binding identity"):
+            self._validate()
+
+        self.scope = self._valid_scope(self.evidence)
+        voiceover = next(
+            item
+            for item in self.evidence["accessibility"]["checks"]
+            if item["id"] == "voiceover"
+        )
+        voiceover["evidenceBindingIds"] = []
+        self._write_documents()
+        with self.assertRaisesRegex(ValueError, "accessibility evidence binding"):
+            self._validate()
+
+    def test_blocked_evidence_requires_blocked_disposition(self) -> None:
+        self.scope["targets"]["macos"].update(
+            status="BLOCKED",
+            closureDisposition="MACOS_ELECTRON_CLOSURE_BLOCKED",
+        )
+        self.scope["targets"]["windows"]["status"] = "BLOCKED_BY_MACOS_CLOSURE"
+        for capability in self.scope["capabilities"]:
+            capability["status"] = "BLOCKED"
+        self.evidence["status"] = "BLOCKED"
+        self.evidence["disposition"] = "MACOS_ELECTRON_CLOSED_FOR_WINDOWS_ENTRY"
+        self.evidence["blockers"] = ["NOT_CAPTURED"]
+        for capability in self.evidence["capabilityEvidence"]:
+            capability["status"] = "BLOCKED"
+        self._write_documents()
+        with self.assertRaisesRegex(ValueError, "blocked disposition"):
+            self._validate(allow_blocked=True)
+
+    def test_live_source_binding_rejects_committed_dirty_and_untracked_drift(self) -> None:
+        repository = self.root / "repository"
+        repository.mkdir()
+        subprocess.run(["git", "init", "-q"], cwd=repository, check=True)
+        subprocess.run(["git", "config", "user.email", "test@example.com"], cwd=repository, check=True)
+        subprocess.run(["git", "config", "user.name", "Test"], cwd=repository, check=True)
+        relevant = repository / RELEVANT_SOURCE_PATHS[0] / "source.ts"
+        relevant.parent.mkdir(parents=True)
+        relevant.write_text("one\n", encoding="utf-8")
+        subprocess.run(["git", "add", "."], cwd=repository, check=True)
+        subprocess.run(["git", "commit", "-qm", "initial"], cwd=repository, check=True)
+        revision = subprocess.run(["git", "rev-parse", "HEAD"], cwd=repository, check=True, capture_output=True, text=True).stdout.strip()
+        tree = subprocess.run(["git", "show", "-s", "--format=%T", revision], cwd=repository, check=True, capture_output=True, text=True).stdout.strip()
+        source = {
+            "revision": revision,
+            "tree": tree,
+            "relevantSourceSha256": _relevant_source_sha256(repository, revision),
+        }
+        _validate_live_source_binding(repository, source)
+
+        relevant.write_text("dirty\n", encoding="utf-8")
+        with self.assertRaisesRegex(ValueError, "dirty"):
+            _validate_live_source_binding(repository, source)
+        relevant.write_text("one\n", encoding="utf-8")
+
+        untracked = relevant.parent / "untracked.ts"
+        untracked.write_text("new\n", encoding="utf-8")
+        with self.assertRaisesRegex(ValueError, "untracked"):
+            _validate_live_source_binding(repository, source)
+        untracked.unlink()
+
+        relevant.write_text("two\n", encoding="utf-8")
+        subprocess.run(["git", "add", "."], cwd=repository, check=True)
+        subprocess.run(["git", "commit", "-qm", "later"], cwd=repository, check=True)
+        with self.assertRaisesRegex(ValueError, "changed after"):
+            _validate_live_source_binding(repository, source)
+
+    def test_closure_script_disables_capture_initialize_only_bypass(self) -> None:
+        script = (ROOT / "tool/check_electron_desktop.sh").read_text(encoding="utf-8")
+        self.assertIn(
+            "RUN_PACKAGED_CAPTURE_INITIALIZE_ONLY=0 RUN_PACKAGED_CAPTURE_SMOKE=1",
+            script,
+        )
 
 
 if __name__ == "__main__":
