@@ -1,105 +1,219 @@
-import { useState } from "react";
-import { CheckCircle2, LoaderCircle, ShieldCheck } from "lucide-react";
+import * as React from "react";
 
 import { AppSidebar } from "@/components/app-sidebar";
-import {
-  Breadcrumb,
-  BreadcrumbItem,
-  BreadcrumbList,
-  BreadcrumbPage,
-} from "@/components/ui/breadcrumb";
-import { Button } from "@/components/ui/button";
-import { Separator } from "@/components/ui/separator";
 import {
   SidebarInset,
   SidebarProvider,
   SidebarTrigger,
+  useSidebar,
 } from "@/components/ui/sidebar";
+import { CaptureWorkspaceOverlay } from "@/features/shell/capture-workspace-overlay";
+import {
+  CapabilityUnavailable,
+  LibrarySurface,
+  LoadingShell,
+  OfflineBanner,
+  ProfileBlocker,
+  ReconciliationSurface,
+  ShellLoadError,
+} from "@/features/shell/shell-surfaces";
+import { useApplicationShell } from "@/features/shell/use-application-shell";
+import type { ApplicationSnapshot } from "@shared/contracts";
 
-type HealthState = "idle" | "checking" | "healthy" | "failed";
+const SIDEBAR_STORAGE_KEY = "voice2text.shell.sidebar-open.v1";
 
 export default function App() {
-  const [health, setHealth] = useState<HealthState>("idle");
-  const [detail, setDetail] = useState("尚未检查打包 worker");
+  const { snapshot, loadError, navigate, requestBootstrapAction } =
+    useApplicationShell();
+  const [sidebarOpen, setSidebarOpen] = React.useState(() =>
+    readSidebarPreference(),
+  );
 
-  const checkWorker = async () => {
-    setHealth("checking");
-    setDetail("正在通过受限 Preload API 请求 Main 启动 worker…");
-    try {
-      const result = await window.voice2text.workerHealth();
-      setHealth("healthy");
-      setDetail(`${result.protocol} · ${result.workerSha256.slice(0, 12)}…`);
-    } catch (error) {
-      setHealth("failed");
-      setDetail(error instanceof Error ? error.message : "worker 健康检查失败");
-    }
+  if (loadError) return <ShellLoadError message={loadError} />;
+  if (!snapshot) return <LoadingShell />;
+
+  const updateSidebar = (open: boolean) => {
+    setSidebarOpen(open);
+    window.localStorage.setItem(SIDEBAR_STORAGE_KEY, String(open));
   };
 
   return (
-    <SidebarProvider>
-      <AppSidebar />
+    <SidebarProvider open={sidebarOpen} onOpenChange={updateSidebar}>
+      <AppSidebar current={snapshot.navigation.section} onNavigate={navigate} />
       <SidebarInset>
-        <header className="flex h-16 shrink-0 items-center gap-2 border-b px-4">
-          <SidebarTrigger className="-ml-1" />
-          <Separator orientation="vertical" className="mr-2 h-4" />
-          <Breadcrumb>
-            <BreadcrumbList>
-              <BreadcrumbItem>
-                <BreadcrumbPage>会议库</BreadcrumbPage>
-              </BreadcrumbItem>
-            </BreadcrumbList>
-          </Breadcrumb>
+        <header className="flex min-h-16 shrink-0 flex-wrap items-center gap-3 border-b px-4 py-2">
+          <AccessibleSidebarTrigger />
+          <div className="min-w-0">
+            <p className="truncate text-sm font-medium">
+              {sectionTitle(snapshot.navigation.section)}
+            </p>
+            <p className="truncate text-xs text-muted-foreground">
+              Electron 独立资料库 · Flutter Desktop 仅作行为参考
+            </p>
+          </div>
         </header>
-        <main className="flex flex-1 flex-col gap-6 p-6">
-          <section className="rounded-xl border bg-card p-6 shadow-sm">
-            <div className="flex flex-col gap-5 sm:flex-row sm:items-center sm:justify-between">
-              <div className="space-y-2">
-                <p className="text-sm font-medium text-muted-foreground">
-                  Electron macOS feasibility
-                </p>
-                <h1 className="text-2xl font-semibold tracking-tight">
-                  本地会议工作台
-                </h1>
-                <p className="max-w-2xl text-sm text-muted-foreground">
-                  Renderer 保持 sandbox；所有进程与资源访问只通过 Main
-                  中的固定、版本化接口。
-                </p>
-              </div>
-              <Button onClick={checkWorker} disabled={health === "checking"}>
-                {health === "checking" ? (
-                  <LoaderCircle className="animate-spin" />
-                ) : health === "healthy" ? (
-                  <CheckCircle2 />
-                ) : (
-                  <ShieldCheck />
-                )}
-                检查本地 worker
-              </Button>
-            </div>
-            <div
-              className="mt-6 rounded-lg bg-muted px-4 py-3 text-sm text-muted-foreground"
-              role="status"
-              aria-live="polite"
-            >
-              {detail}
-            </div>
-          </section>
-          <section className="grid gap-4 md:grid-cols-3">
-            {[
-              ["会议", "导入或录制后的会议将在这里显示"],
-              ["转写任务", "运行中、可恢复和已完成任务"],
-              ["Companion", "配对与局域网传输状态"],
-            ].map(([title, description]) => (
-              <article key={title} className="rounded-xl border bg-card p-5">
-                <h2 className="font-medium">{title}</h2>
-                <p className="mt-2 text-sm text-muted-foreground">
-                  {description}
-                </p>
-              </article>
-            ))}
-          </section>
+        {snapshot.connectivity === "offline" ? <OfflineBanner /> : null}
+        <main id="main-content" className="flex-1 overflow-auto p-4 sm:p-6">
+          <ShellContent
+            snapshot={snapshot}
+            onBootstrapAction={requestBootstrapAction}
+          />
         </main>
       </SidebarInset>
+      <CaptureWorkspaceOverlay capture={snapshot.capture} />
     </SidebarProvider>
   );
+}
+
+function ShellContent({
+  snapshot,
+  onBootstrapAction,
+}: {
+  snapshot: ApplicationSnapshot;
+  onBootstrapAction: Parameters<typeof ProfileBlocker>[0]["onAction"];
+}) {
+  if (snapshot.profile.phase === "initializing") {
+    return (
+      <section
+        role="status"
+        aria-label="正在初始化本机资料库"
+        className="grid min-h-96 place-items-center text-center"
+      >
+        <div>
+          <h1 className="text-xl font-semibold">正在初始化本机资料库</h1>
+          <p className="mt-2 text-sm text-muted-foreground">
+            创建 Electron 专属目录、数据库与安全边界。
+          </p>
+        </div>
+      </section>
+    );
+  }
+  if (snapshot.profile.phase === "reconciling") {
+    return (
+      <section
+        role="status"
+        aria-label="正在核对启动状态"
+        className="grid min-h-96 place-items-center text-center"
+      >
+        <div>
+          <h1 className="text-xl font-semibold">正在核对启动状态</h1>
+          <p className="mt-2 text-sm text-muted-foreground">
+            中断任务只会标记为待确认，不会自动重试。
+          </p>
+        </div>
+      </section>
+    );
+  }
+  if (snapshot.profile.phase === "blocked") {
+    return (
+      <ProfileBlocker profile={snapshot.profile} onAction={onBootstrapAction} />
+    );
+  }
+  if (snapshot.reconciliation.length > 0) {
+    return <ReconciliationSurface items={snapshot.reconciliation} />;
+  }
+
+  switch (snapshot.navigation.section) {
+    case "library":
+      return <LibrarySurface state={snapshot.library} writable />;
+    case "tasks":
+      return (
+        <section className="space-y-5">
+          <div>
+            <p className="text-sm font-medium text-muted-foreground">
+              长任务由应用状态持续持有
+            </p>
+            <h1 className="text-2xl font-semibold tracking-tight">转写任务</h1>
+          </div>
+          {snapshot.capability.processing === "unavailable" ? (
+            <CapabilityUnavailable reason={snapshot.capability.reason} />
+          ) : (
+            <Placeholder
+              title="暂无转写任务"
+              description="导入或录制会议后，任务进度会在这里持续显示。"
+            />
+          )}
+        </section>
+      );
+    case "companion":
+      return (
+        <Page title="Companion" eyebrow="手机交接">
+          <Placeholder
+            title="尚未连接手机"
+            description="配对与局域网传输将在后续迁移单元接入。"
+          />
+        </Page>
+      );
+    case "settings":
+      return (
+        <Page title="设置" eyebrow="本机与隐私">
+          <Placeholder
+            title="桌面设置"
+            description="运行时、隐私、网络和可选 AI 设置将在这里提供。"
+          />
+        </Page>
+      );
+  }
+}
+
+function Page({
+  title,
+  eyebrow,
+  children,
+}: React.PropsWithChildren<{ title: string; eyebrow: string }>) {
+  return (
+    <section className="space-y-5">
+      <div>
+        <p className="text-sm font-medium text-muted-foreground">{eyebrow}</p>
+        <h1 className="text-2xl font-semibold tracking-tight">{title}</h1>
+      </div>
+      {children}
+    </section>
+  );
+}
+
+function Placeholder({
+  title,
+  description,
+}: {
+  title: string;
+  description: string;
+}) {
+  return (
+    <div className="grid min-h-64 place-items-center rounded-xl border bg-card p-8 text-center">
+      <div>
+        <h2 className="text-lg font-semibold">{title}</h2>
+        <p className="mt-2 max-w-md text-sm text-muted-foreground">
+          {description}
+        </p>
+      </div>
+    </div>
+  );
+}
+
+function AccessibleSidebarTrigger() {
+  const { state } = useSidebar();
+  const label = state === "expanded" ? "折叠侧边栏" : "展开侧边栏";
+  return (
+    <SidebarTrigger aria-label={label} title={label} className="shrink-0" />
+  );
+}
+
+function sectionTitle(
+  section: ApplicationSnapshot["navigation"]["section"],
+): string {
+  return {
+    library: "会议库",
+    tasks: "转写任务",
+    companion: "Companion",
+    settings: "设置",
+  }[section];
+}
+
+function readSidebarPreference(): boolean {
+  try {
+    return window.localStorage.getItem(SIDEBAR_STORAGE_KEY) !== "false";
+  } catch {
+    return true;
+  }
 }

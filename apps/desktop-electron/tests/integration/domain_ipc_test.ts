@@ -32,7 +32,16 @@ function handlers() {
         frameId: trustedEvent.frameId,
         origins: new Set([trustedEvent.origin]),
       },
-      services: { workerHealth, cancelProcessing },
+      services: {
+        applicationSnapshot: () => applicationSnapshot(),
+        navigate: (section) => ({
+          ...applicationSnapshot(),
+          navigation: { section },
+        }),
+        requestBootstrapAction: async () => applicationSnapshot(),
+        workerHealth,
+        cancelProcessing,
+      },
       maximumPayloadBytes: 1024,
     }),
     workerHealth,
@@ -102,6 +111,29 @@ describe("Main IPC validation", () => {
     expect(fixture.cancelProcessing).toHaveBeenCalledWith(23);
   });
 
+  it("exposes only validated application snapshot and navigation commands", async () => {
+    const fixture = handlers();
+    await expect(
+      fixture.handlers.invoke(ipcChannels.applicationSnapshot, trustedEvent, {
+        expectedProtocolVersion: 1,
+      }),
+    ).resolves.toEqual(
+      expect.objectContaining({ navigation: { section: "library" } }),
+    );
+    await expect(
+      fixture.handlers.invoke(ipcChannels.applicationNavigate, trustedEvent, {
+        section: "settings",
+      }),
+    ).resolves.toEqual(
+      expect.objectContaining({ navigation: { section: "settings" } }),
+    );
+    await expect(
+      fixture.handlers.invoke(ipcChannels.applicationNavigate, trustedEvent, {
+        section: "raw-filesystem",
+      }),
+    ).rejects.toBeInstanceOf(IpcContractError);
+  });
+
   it("allows only the exact packaged renderer file URL", async () => {
     const workerHealth = vi.fn(async () => ({
       protocolVersion: 1 as const,
@@ -117,6 +149,12 @@ describe("Main IPC validation", () => {
         fileUrls: new Set(["file:///Voice2Text/renderer/index.html"]),
       },
       services: {
+        applicationSnapshot: () => applicationSnapshot(),
+        navigate: (section) => ({
+          ...applicationSnapshot(),
+          navigation: { section },
+        }),
+        requestBootstrapAction: async () => applicationSnapshot(),
         workerHealth,
         cancelProcessing: vi.fn(),
       },
@@ -147,3 +185,17 @@ describe("Main IPC validation", () => {
     expect(workerHealth).toHaveBeenCalledOnce();
   });
 });
+
+function applicationSnapshot() {
+  return {
+    protocolVersion: 1 as const,
+    revision: 1,
+    navigation: { section: "library" as const },
+    profile: { phase: "ready" as const },
+    connectivity: "online" as const,
+    capability: { processing: "available" as const },
+    library: { phase: "empty" as const },
+    reconciliation: [],
+    capture: { phase: "idle" as const },
+  };
+}

@@ -1,11 +1,17 @@
 import type { ZodType } from "zod";
 
 import {
+  bootstrapActionRequestSchema,
   cancelProcessingRequestSchema,
   desktopProtocolVersion,
+  getApplicationSnapshotRequestSchema,
   ipcChannels,
+  navigateRequestSchema,
   workerHealthRequestSchema,
+  type ApplicationSnapshot,
+  type BootstrapAction,
   type CancelProcessingResponse,
+  type ShellSection,
   type WorkerHealthResponse,
 } from "../../shared/contracts";
 
@@ -23,6 +29,12 @@ export interface IpcTrustPolicy {
 }
 
 export interface DesktopIpcServices {
+  applicationSnapshot(): ApplicationSnapshot;
+  navigate(section: ShellSection): ApplicationSnapshot;
+  requestBootstrapAction(action: BootstrapAction): Promise<ApplicationSnapshot>;
+  onApplicationSnapshot?(
+    listener: (snapshot: ApplicationSnapshot) => void,
+  ): () => void;
   workerHealth(): Promise<WorkerHealthResponse>;
   cancelProcessing(jobId: number): Promise<CancelProcessingResponse>;
 }
@@ -90,6 +102,29 @@ export function createDesktopIpcHandlers(options: {
   maximumPayloadBytes?: number;
 }): DesktopIpcHandlers {
   const handlers = new Map<string, RegisteredHandler>([
+    [
+      ipcChannels.applicationSnapshot,
+      {
+        schema: getApplicationSnapshotRequestSchema,
+        invoke: async () => options.services.applicationSnapshot(),
+      },
+    ],
+    [
+      ipcChannels.applicationNavigate,
+      {
+        schema: navigateRequestSchema,
+        invoke: async (payload: { section: ShellSection }) =>
+          options.services.navigate(payload.section),
+      } as RegisteredHandler,
+    ],
+    [
+      ipcChannels.applicationBootstrapAction,
+      {
+        schema: bootstrapActionRequestSchema,
+        invoke: async (payload: { action: BootstrapAction }) =>
+          await options.services.requestBootstrapAction(payload.action),
+      } as RegisteredHandler,
+    ],
     [
       ipcChannels.workerHealth,
       {

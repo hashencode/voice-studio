@@ -1,10 +1,16 @@
 import {
+  applicationSnapshotSchema,
+  bootstrapActionSchema,
   cancelProcessingResponseSchema,
   desktopProtocolVersion,
+  shellSectionSchema,
   ipcChannels,
   operationEventSchema,
   workerHealthResponseSchema,
+  type ApplicationSnapshot,
+  type BootstrapAction,
   type OperationEvent,
+  type ShellSection,
   type Voice2TextDesktopApi,
 } from "../shared/contracts";
 
@@ -18,6 +24,37 @@ export function createDesktopApi(
   bridge: PreloadIpcBridge,
 ): Voice2TextDesktopApi {
   return Object.freeze({
+    async getApplicationSnapshot() {
+      const response = await bridge.invoke(ipcChannels.applicationSnapshot, {
+        expectedProtocolVersion: desktopProtocolVersion,
+      });
+      return applicationSnapshotSchema.parse(response);
+    },
+    async navigate(section: ShellSection) {
+      const response = await bridge.invoke(ipcChannels.applicationNavigate, {
+        section: shellSectionSchema.parse(section),
+      });
+      return applicationSnapshotSchema.parse(response);
+    },
+    async requestBootstrapAction(action: BootstrapAction) {
+      const response = await bridge.invoke(
+        ipcChannels.applicationBootstrapAction,
+        { action: bootstrapActionSchema.parse(action) },
+      );
+      return applicationSnapshotSchema.parse(response);
+    },
+    onApplicationSnapshot(listener: (snapshot: ApplicationSnapshot) => void) {
+      let subscribed = true;
+      const validatedListener = (payload: unknown) => {
+        listener(applicationSnapshotSchema.parse(payload));
+      };
+      bridge.on(ipcChannels.applicationSnapshotEvent, validatedListener);
+      return () => {
+        if (!subscribed) return;
+        subscribed = false;
+        bridge.off(ipcChannels.applicationSnapshotEvent, validatedListener);
+      };
+    },
     async workerHealth() {
       const response = await bridge.invoke(ipcChannels.workerHealth, {
         expectedProtocolVersion: desktopProtocolVersion,

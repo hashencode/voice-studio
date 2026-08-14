@@ -32,6 +32,9 @@ export function registerDesktopIpc(
     services,
   });
   const channels = [
+    ipcChannels.applicationSnapshot,
+    ipcChannels.applicationNavigate,
+    ipcChannels.applicationBootstrapAction,
     ipcChannels.workerHealth,
     ipcChannels.cancelProcessing,
   ] as const;
@@ -44,7 +47,13 @@ export function registerDesktopIpc(
       );
     });
   }
+  const unsubscribeSnapshot = services.onApplicationSnapshot?.((snapshot) => {
+    if (!window.isDestroyed()) {
+      window.webContents.send(ipcChannels.applicationSnapshotEvent, snapshot);
+    }
+  });
   return () => {
+    unsubscribeSnapshot?.();
     for (const channel of channels) ipcMain.removeHandler(channel);
   };
 }

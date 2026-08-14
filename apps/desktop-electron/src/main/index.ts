@@ -4,6 +4,8 @@ import type { DatabaseSync } from "node:sqlite";
 
 import { app, BrowserWindow, session } from "electron";
 
+import type { BootstrapAction } from "../shared/contracts";
+import { DesktopApplicationState } from "./application/application_state";
 import { registerDesktopIpc } from "./ipc";
 import { canceledResponse } from "./ipc/desktop_ipc";
 import { DesktopDomainService } from "./domain/desktop_domain_service";
@@ -27,6 +29,8 @@ let processCoordinator: DurableProcessCoordinator | null = null;
 let profileDatabase: DatabaseSync | null = null;
 let teardownPromise: Promise<void> | null = null;
 let teardownComplete = false;
+let bootstrapPromise: Promise<void> | null = null;
+const applicationState = new DesktopApplicationState();
 
 function createMainWindow(): BrowserWindow {
   const window = new BrowserWindow({
@@ -114,16 +118,20 @@ async function runBootstrapSmokeIfRequested(): Promise<void> {
 }
 
 function bindDesktopIpc(window: BrowserWindow): void {
-  const health = workerSupervisor;
-  const processes = processCoordinator;
-  if (!health || !processes) {
-    throw new Error("desktop IPC services are not initialized");
-  }
   unregisterIpc?.();
   unregisterIpc = registerDesktopIpc(window, {
-    workerHealth: async () => await health.check(),
+    applicationSnapshot: () => applicationState.snapshot(),
+    navigate: (section) => applicationState.navigate(section),
+    requestBootstrapAction: async (action) =>
+      await requestBootstrapAction(action),
+    onApplicationSnapshot: (listener) => applicationState.subscribe(listener),
+    workerHealth: async () => {
+      if (!workerSupervisor)
+        throw new Error("worker capability is unavailable");
+      return await workerSupervisor.check();
+    },
     cancelProcessing: async (jobId) => {
-      if (!(await processes.cancel(jobId))) {
+      if (!processCoordinator || !(await processCoordinator.cancel(jobId))) {
         throw new Error("processing job is not running or canceling");
       }
       return canceledResponse(jobId);
@@ -131,8 +139,27 @@ function bindDesktopIpc(window: BrowserWindow): void {
   });
 }
 
-void app.whenReady().then(async () => {
+async function requestBootstrapAction(action: BootstrapAction) {
+  if (action === "repair-guidance") return applicationState.snapshot();
+  await bootstrapApplication();
+  return applicationState.snapshot();
+}
+
+async function bootstrapApplication(): Promise<void> {
+  if (bootstrapPromise) return await bootstrapPromise;
+  if (profileDatabase) return;
+  bootstrapPromise = initializeApplication();
+  try {
+    await bootstrapPromise;
+  } finally {
+    bootstrapPromise = null;
+  }
+}
+
+async function initializeApplication(): Promise<void> {
+  applicationState.beginBootstrap();
   const profile = initializeElectronProfile(app.getPath("appData"));
+  applicationState.completeBootstrap(profile);
   if (profile.status === "blocked") {
     console.error(
       JSON.stringify({
@@ -142,7 +169,6 @@ void app.whenReady().then(async () => {
         repairable: profile.repairable,
       }),
     );
-    app.quit();
     return;
   }
   profileDatabase = profile.database;
@@ -170,29 +196,39 @@ void app.whenReady().then(async () => {
       });
     },
   });
+  try {
+    const resourceCatalog = await ResourceCatalog.load(
+      resolveResourceRoot({
+        appRoot: app.getAppPath(),
+        packaged: app.isPackaged,
+        resourcesPath: process.resourcesPath,
+      }),
+    );
+    workerSupervisor = new WorkerHealthSupervisor(
+      resourceCatalog.command("worker-health"),
+    );
+    applicationState.setProcessingCapability();
+  } catch (error) {
+    applicationState.setProcessingCapability(
+      error instanceof Error ? error.message : "本地处理运行时不可用",
+    );
+  }
+  await runBootstrapSmokeIfRequested();
+}
+
+void app.whenReady().then(async () => {
   configureSessionSecurity();
-  const resourceCatalog = await ResourceCatalog.load(
-    resolveResourceRoot({
-      appRoot: app.getAppPath(),
-      packaged: app.isPackaged,
-      resourcesPath: process.resourcesPath,
-    }),
-  );
-  workerSupervisor = new WorkerHealthSupervisor(
-    resourceCatalog.command("worker-health"),
-  );
   mainWindow = createMainWindow();
   bindDesktopIpc(mainWindow);
-  await runBootstrapSmokeIfRequested();
+  await new Promise<void>((resolve) => setImmediate(resolve));
+  await bootstrapApplication();
 });
 
 app.on("activate", () => {
   if (teardownPromise) return;
   if (BrowserWindow.getAllWindows().length === 0) {
     mainWindow = createMainWindow();
-    if (workerSupervisor) {
-      bindDesktopIpc(mainWindow);
-    }
+    bindDesktopIpc(mainWindow);
   }
 });
 

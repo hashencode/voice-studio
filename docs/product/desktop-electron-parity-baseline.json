@@ -1,0 +1,150 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "schema": "voice2text-desktop-electron-parity-baseline/v1",
+  "frozenAt": "2026-08-14",
+  "status": "frozen",
+  "flutterReference": {
+    "repositoryRevision": "8333ffe07017cde582c036fb83816dd0f8dfd603",
+    "desktopSourceLastChangeRevision": "6a9a27732ebdc8271d15006b1b05d2be5e9db61e",
+    "sourceRoot": "apps/desktop",
+    "runtimeUse": "reference-only",
+    "prohibitedActions": [
+      "launch-flutter-desktop",
+      "inspect-flutter-runtime-profile",
+      "copy-or-migrate-flutter-runtime-profile",
+      "use-flutter-as-runtime-fallback"
+    ]
+  },
+  "capabilityInventory": [
+    {
+      "id": "shell.navigation",
+      "scope": "library, tasks, companion, settings; responsive expanded and compact sidebar; keyboard-reachable selection"
+    },
+    {
+      "id": "library.meetings",
+      "scope": "empty, loading, error and populated meeting library states with local-only ownership messaging"
+    },
+    {
+      "id": "library.import",
+      "scope": "secure local media import with explicit progress and failures"
+    },
+    {
+      "id": "processing.tasks",
+      "scope": "model-missing, installing, queued, preparing, ASR, diarization, partial success, complete, canceling, canceled, retryable, terminal and interrupted states"
+    },
+    {
+      "id": "meeting.review",
+      "scope": "playback, transcript virtualization, edit, undo/redo, search, speaker assignment/merge and export"
+    },
+    {
+      "id": "capture.workspace",
+      "scope": "preflight, recording, pause/resume, captions, stop/finalize and failure as an application-owned long-lived workspace"
+    },
+    {
+      "id": "capture.recovery",
+      "scope": "durable journals, recoverable partial sessions, keep/discard and idempotent restart reconciliation"
+    },
+    {
+      "id": "captions.live",
+      "scope": "live caption worker lifecycle, restart and formal transcript handoff"
+    },
+    {
+      "id": "settings.runtime",
+      "scope": "truthful local processing capability, model installation, unsupported-platform and runtime status"
+    },
+    {
+      "id": "settings.ai",
+      "scope": "provider selection, secret lifecycle, probe, consent and optional AI notes"
+    },
+    {
+      "id": "settings.security",
+      "scope": "truthful disk-encryption and local-data posture without claiming application-level database encryption"
+    },
+    {
+      "id": "companion.pairing",
+      "scope": "receiver identity, short-code/QR pairing, peer trust and unpair"
+    },
+    {
+      "id": "companion.transfer",
+      "scope": "LAN transfer checkpoints, receipts and history"
+    },
+    {
+      "id": "lifecycle.application",
+      "scope": "window close/activate, renderer reload independence, coordinated quit and active-capture confirmation"
+    },
+    {
+      "id": "accessibility.desktop",
+      "scope": "minimum window size, 200% text, focus order, keyboard commands, reduced motion, high contrast and screen-reader labels"
+    }
+  ],
+  "fixtures": [
+    {
+      "path": "apps/desktop-electron/tests/fixtures/flutter-reference/desktop_domain_v1.json",
+      "sha256": "7f4f906f2472c96b1e88d932f7efb64334f472f1bbc553cc0b7487315f14375d",
+      "purpose": "frozen TypeScript-domain characterization input derived from Flutter behavior"
+    },
+    {
+      "path": "apps/desktop/test/features/capture/desktop_capture_contract_test.dart",
+      "sha256": "fd251db8a7696afc90f4e472604fc7d3f6a2fd0ba22bdb54be7b9dcc9027e13c",
+      "purpose": "capture protocol and fail-closed snapshot behavior"
+    },
+    {
+      "path": "apps/desktop/test/features/capture/desktop_capture_recovery_test.dart",
+      "sha256": "100eecb07d8c15a66a437601061539665c7e754960e1f05144e6e68b92eb3933",
+      "purpose": "capture journal reconciliation and idempotent recovery behavior"
+    }
+  ],
+  "acceptanceEvidence": [
+    {
+      "path": "apps/desktop/test/desktop_workstation_widget_test.dart",
+      "sha256": "4ef121b9f2046508ff113a1feb8b254a084f653ed62fc282abb9a029edf98df7",
+      "covers": [
+        "default-library-navigation",
+        "200-percent-text",
+        "keyboard-focus",
+        "dark-mode",
+        "capability-unavailable",
+        "task-state-inventory",
+        "companion-pairing-and-receipts"
+      ]
+    },
+    {
+      "path": "apps/desktop/integration_test/macos_workstation_regression_test.dart",
+      "sha256": "d3c809b5ae1ca563ea3cb5337d7d22f4835ec62b6df96c14f8aed0d23e5cefcd",
+      "covers": [
+        "macos-keyboard-reachability",
+        "200-percent-text",
+        "long-transcript-performance",
+        "real-playback-seek"
+      ]
+    },
+    {
+      "path": "apps/desktop/integration_test/macos_capture_recovery_test.dart",
+      "sha256": "ea5ae70aff5672f7d8c502a5b2d03bdb1896c13754cd63d7b41767000b1d93d7",
+      "covers": ["durable-native-capture-faults", "idempotent-recovery"]
+    },
+    {
+      "path": "docs/REAL_DESKTOP_REGRESSION_MATRIX.md",
+      "sha256": "a77a2801b339bbb672c3e7c54e5507cd7a63bc3ae4e89392bb616fbecd959917",
+      "covers": ["bounded-real-device-and-packaged-acceptance-matrix"]
+    }
+  ],
+  "referenceChangePolicy": {
+    "comparisonBaseRevision": "8333ffe07017cde582c036fb83816dd0f8dfd603",
+    "rule": "Every later change under apps/desktop or to referenced fixtures/evidence requires an explicit Electron disposition before parity can pass.",
+    "allowedDispositions": [
+      "adopted-with-electron-evidence",
+      "not-applicable-with-rationale",
+      "deferred-and-parity-blocked",
+      "rejected-as-reference-regression"
+    ],
+    "requiredFields": [
+      "flutterRevision",
+      "changedCapabilityIds",
+      "disposition",
+      "rationale",
+      "electronEvidence"
+    ],
+    "changes": []
+  }
+}

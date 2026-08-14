@@ -1,146 +1,67 @@
-"use client";
-
-import * as React from "react";
 import {
-  AudioLines,
-  CircleUserRound,
   ClipboardList,
-  FolderClock,
-  GalleryVerticalEnd,
   Library,
   RadioTower,
   Settings2,
+  Waves,
 } from "lucide-react";
 
-import { NavMain } from "@/components/nav-main";
-import { NavProjects } from "@/components/nav-projects";
-import { NavUser } from "@/components/nav-user";
-import { TeamSwitcher } from "@/components/team-switcher";
+import { NavMain, type ShellNavigationItem } from "@/components/nav-main";
 import {
   Sidebar,
   SidebarContent,
   SidebarFooter,
   SidebarHeader,
+  SidebarMenu,
+  SidebarMenuItem,
   SidebarRail,
 } from "@/components/ui/sidebar";
+import type { ShellSection } from "@shared/contracts";
 
-const data = {
-  user: {
-    name: "本机用户",
-    email: "仅本地数据",
-    avatar: "",
-  },
-  teams: [
-    {
-      name: "Voice2Text",
-      logo: GalleryVerticalEnd,
-      plan: "Local workspace",
-    },
-  ],
-  navMain: [
-    {
-      title: "会议库",
-      url: "#",
-      icon: Library,
-      isActive: true,
-      items: [
-        {
-          title: "最近会议",
-          url: "#",
-        },
-        {
-          title: "已收藏",
-          url: "#",
-        },
-      ],
-    },
-    {
-      title: "转写任务",
-      url: "#",
-      icon: ClipboardList,
-      items: [
-        {
-          title: "运行中",
-          url: "#",
-        },
-        {
-          title: "可恢复",
-          url: "#",
-        },
-        {
-          title: "已完成",
-          url: "#",
-        },
-      ],
-    },
-    {
-      title: "Companion",
-      url: "#",
-      icon: RadioTower,
-      items: [
-        {
-          title: "接收器",
-          url: "#",
-        },
-        {
-          title: "传输记录",
-          url: "#",
-        },
-      ],
-    },
-    {
-      title: "Settings",
-      url: "#",
-      icon: Settings2,
-      items: [
-        {
-          title: "通用",
-          url: "#",
-        },
-        {
-          title: "模型与运行时",
-          url: "#",
-        },
-        {
-          title: "隐私与网络",
-          url: "#",
-        },
-      ],
-    },
-  ],
-  projects: [
-    {
-      name: "录制与恢复",
-      url: "#",
-      icon: AudioLines,
-    },
-    {
-      name: "处理工作区",
-      url: "#",
-      icon: FolderClock,
-    },
-    {
-      name: "本机身份",
-      url: "#",
-      icon: CircleUserRound,
-    },
-  ],
-};
+const navigation: readonly ShellNavigationItem[] = [
+  { section: "library", title: "会议库", icon: Library },
+  { section: "tasks", title: "转写任务", icon: ClipboardList },
+  { section: "companion", title: "Companion", icon: RadioTower },
+  { section: "settings", title: "设置", icon: Settings2 },
+];
 
-export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
+export function AppSidebar({
+  current,
+  onNavigate,
+}: {
+  current: ShellSection;
+  onNavigate: (section: ShellSection) => void;
+}) {
   return (
-    <Sidebar collapsible="icon" {...props}>
+    <Sidebar collapsible="icon" role="navigation" aria-label="工作站主导航">
       <SidebarHeader>
-        <TeamSwitcher teams={data.teams} />
+        <div className="flex min-h-10 items-center gap-2 px-2 group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:px-0">
+          <span className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-sidebar-primary text-sidebar-primary-foreground">
+            <Waves className="size-4" aria-hidden="true" />
+          </span>
+          <span className="min-w-0 group-data-[collapsible=icon]:hidden">
+            <span className="block truncate text-sm font-semibold">
+              Voice2Text
+            </span>
+            <span className="block truncate text-xs text-muted-foreground">
+              本机工作区
+            </span>
+          </span>
+        </div>
       </SidebarHeader>
       <SidebarContent>
-        <NavMain items={data.navMain} />
-        <NavProjects projects={data.projects} />
+        <NavMain items={navigation} current={current} onNavigate={onNavigate} />
       </SidebarContent>
       <SidebarFooter>
-        <NavUser user={data.user} />
+        <SidebarMenu>
+          <SidebarMenuItem>
+            <p className="px-2 py-1 text-xs text-muted-foreground group-data-[collapsible=icon]:sr-only">
+              Electron 独立资料库
+            </p>
+          </SidebarMenuItem>
+        </SidebarMenu>
       </SidebarFooter>
-      <SidebarRail />
+      <SidebarRail aria-label="切换侧边栏" title="切换侧边栏" />
     </Sidebar>
   );
 }

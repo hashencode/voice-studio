@@ -1,69 +1,68 @@
-import { ChevronRight, type LucideIcon } from "lucide-react";
+import * as React from "react";
+import type { LucideIcon } from "lucide-react";
 
-import {
-  Collapsible,
-  CollapsibleContent,
-  CollapsibleTrigger,
-} from "@/components/ui/collapsible";
 import {
   SidebarGroup,
   SidebarGroupLabel,
   SidebarMenu,
   SidebarMenuButton,
   SidebarMenuItem,
-  SidebarMenuSub,
-  SidebarMenuSubButton,
-  SidebarMenuSubItem,
 } from "@/components/ui/sidebar";
+import type { ShellSection } from "@shared/contracts";
+
+export interface ShellNavigationItem {
+  section: ShellSection;
+  title: string;
+  icon: LucideIcon;
+}
 
 export function NavMain({
   items,
+  current,
+  onNavigate,
 }: {
-  items: {
-    title: string;
-    url: string;
-    icon?: LucideIcon;
-    isActive?: boolean;
-    items?: {
-      title: string;
-      url: string;
-    }[];
-  }[];
+  items: readonly ShellNavigationItem[];
+  current: ShellSection;
+  onNavigate: (section: ShellSection) => void;
 }) {
+  const buttons = React.useRef<Array<HTMLButtonElement | null>>([]);
+
+  const handleKeyDown = (
+    event: React.KeyboardEvent<HTMLButtonElement>,
+    index: number,
+  ) => {
+    let target = index;
+    if (event.key === "ArrowDown") target = (index + 1) % items.length;
+    else if (event.key === "ArrowUp")
+      target = (index - 1 + items.length) % items.length;
+    else if (event.key === "Home") target = 0;
+    else if (event.key === "End") target = items.length - 1;
+    else return;
+    event.preventDefault();
+    buttons.current[target]?.focus();
+  };
+
   return (
     <SidebarGroup>
       <SidebarGroupLabel>工作台</SidebarGroupLabel>
       <SidebarMenu>
-        {items.map((item) => (
-          <Collapsible
-            key={item.title}
-            asChild
-            defaultOpen={item.isActive}
-            className="group/collapsible"
-          >
-            <SidebarMenuItem>
-              <CollapsibleTrigger asChild>
-                <SidebarMenuButton tooltip={item.title}>
-                  {item.icon && <item.icon />}
-                  <span>{item.title}</span>
-                  <ChevronRight className="ml-auto transition-transform duration-200 group-data-[state=open]/collapsible:rotate-90" />
-                </SidebarMenuButton>
-              </CollapsibleTrigger>
-              <CollapsibleContent>
-                <SidebarMenuSub>
-                  {item.items?.map((subItem) => (
-                    <SidebarMenuSubItem key={subItem.title}>
-                      <SidebarMenuSubButton asChild>
-                        <a href={subItem.url}>
-                          <span>{subItem.title}</span>
-                        </a>
-                      </SidebarMenuSubButton>
-                    </SidebarMenuSubItem>
-                  ))}
-                </SidebarMenuSub>
-              </CollapsibleContent>
-            </SidebarMenuItem>
-          </Collapsible>
+        {items.map((item, index) => (
+          <SidebarMenuItem key={item.section}>
+            <SidebarMenuButton
+              ref={(node) => {
+                buttons.current[index] = node;
+              }}
+              type="button"
+              tooltip={item.title}
+              isActive={current === item.section}
+              aria-current={current === item.section ? "page" : undefined}
+              onClick={() => onNavigate(item.section)}
+              onKeyDown={(event) => handleKeyDown(event, index)}
+            >
+              <item.icon aria-hidden="true" />
+              <span>{item.title}</span>
+            </SidebarMenuButton>
+          </SidebarMenuItem>
         ))}
       </SidebarMenu>
     </SidebarGroup>

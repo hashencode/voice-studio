@@ -5,6 +5,10 @@ export const desktopWorkerHealthProtocol =
   "desktop-sherpa-worker-health/v1" as const;
 
 export const ipcChannels = {
+  applicationSnapshot: "desktop.application.snapshot.v1",
+  applicationNavigate: "desktop.application.navigate.v1",
+  applicationBootstrapAction: "desktop.application.bootstrap-action.v1",
+  applicationSnapshotEvent: "desktop.application.snapshot-event.v1",
   workerHealth: "desktop.worker.health.v1",
   cancelProcessing: "desktop.processing.cancel.v1",
   operationEvent: "desktop.processing.event.v1",
@@ -77,6 +81,20 @@ export type OperationEvent = z.infer<typeof operationEventSchema>;
 export type DesktopError = z.infer<typeof desktopErrorSchema>;
 
 export interface Voice2TextDesktopApi {
+  getApplicationSnapshot(): Promise<
+    import("./application_state").ApplicationSnapshot
+  >;
+  navigate(
+    section: import("./application_state").ShellSection,
+  ): Promise<import("./application_state").ApplicationSnapshot>;
+  requestBootstrapAction(
+    action: import("./application_state").BootstrapAction,
+  ): Promise<import("./application_state").ApplicationSnapshot>;
+  onApplicationSnapshot(
+    listener: (
+      snapshot: import("./application_state").ApplicationSnapshot,
+    ) => void,
+  ): () => void;
   workerHealth(): Promise<WorkerHealthResponse>;
   cancelProcessing(jobId: number): Promise<CancelProcessingResponse>;
   onOperationEvent(listener: (event: OperationEvent) => void): () => void;
