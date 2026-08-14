@@ -1,0 +1,64 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "schema": "voice2text-desktop-electron-scope/v1",
+  "developmentPosture": "DEVELOPMENT_ONLY",
+  "application": {
+    "compositionRoot": "apps/desktop-electron",
+    "packageManager": "bun",
+    "rendererBuild": "vite",
+    "desktopPackaging": "electron-forge",
+    "rendererStack": "react-typescript-shadcn-tailwind-sidebar-07",
+    "flutterRuntimeFallback": false,
+    "sharedRuntimeDatabase": false
+  },
+  "referenceBaseline": {
+    "path": "docs/product/desktop-electron-parity-baseline.json",
+    "sha256": "b430173b3300b553b04cfc542f0fa9987ac712116c4ae8734935078d380376ce",
+    "runtimeUse": "reference-only",
+    "prohibitedActions": [
+      "launch-flutter-desktop",
+      "inspect-flutter-runtime-profile",
+      "copy-or-migrate-flutter-runtime-profile",
+      "use-flutter-as-runtime-fallback"
+    ]
+  },
+  "targets": {
+    "macos": {
+      "status": "BLOCKED",
+      "closureDisposition": "MACOS_ELECTRON_CLOSURE_BLOCKED",
+      "evidence": {
+        "path": "docs/product/desktop-electron-evidence.json",
+        "sha256": "8530c6a29c210d7228730cd9213805b6e02f1071346e07eeba422d03196b71f7"
+      }
+    },
+    "windows": {
+      "status": "BLOCKED_BY_MACOS_CLOSURE",
+      "inheritsMacosPass": false,
+      "evidence": null
+    }
+  },
+  "capabilities": [
+    {"id": "shell.navigation", "status": "BLOCKED", "evidenceBindingIds": ["gate-shell.navigation"]},
+    {"id": "library.meetings", "status": "BLOCKED", "evidenceBindingIds": ["gate-library.meetings"]},
+    {"id": "library.import", "status": "BLOCKED", "evidenceBindingIds": ["gate-library.import"]},
+    {"id": "processing.tasks", "status": "BLOCKED", "evidenceBindingIds": ["gate-processing.tasks"]},
+    {"id": "meeting.review", "status": "BLOCKED", "evidenceBindingIds": ["gate-meeting.review"]},
+    {"id": "capture.workspace", "status": "BLOCKED", "evidenceBindingIds": ["gate-capture.workspace"]},
+    {"id": "capture.recovery", "status": "BLOCKED", "evidenceBindingIds": ["gate-capture.recovery"]},
+    {"id": "captions.live", "status": "BLOCKED", "evidenceBindingIds": ["gate-captions.live"]},
+    {"id": "settings.runtime", "status": "BLOCKED", "evidenceBindingIds": ["gate-settings.runtime"]},
+    {"id": "settings.ai", "status": "BLOCKED", "evidenceBindingIds": ["gate-settings.ai"]},
+    {"id": "settings.security", "status": "BLOCKED", "evidenceBindingIds": ["gate-settings.security"]},
+    {"id": "companion.pairing", "status": "BLOCKED", "evidenceBindingIds": ["gate-companion.pairing"]},
+    {"id": "companion.transfer", "status": "BLOCKED", "evidenceBindingIds": ["gate-companion.transfer"]},
+    {"id": "lifecycle.application", "status": "BLOCKED", "evidenceBindingIds": ["gate-lifecycle.application"]},
+    {"id": "accessibility.desktop", "status": "BLOCKED", "evidenceBindingIds": ["gate-accessibility.desktop", "manual-voiceover"]}
+  ],
+  "releaseExclusions": {
+    "maximumValidationSessionMinutes": 30,
+    "productionNotarization": false,
+    "automaticUpdates": false,
+    "storeSubmission": false,
+    "releaseCandidateDeviceMatrix": false
+  }
+}
