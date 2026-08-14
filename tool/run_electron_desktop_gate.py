@@ -5,7 +5,6 @@ from __future__ import annotations
 
 import argparse
 import datetime as dt
-import hashlib
 import json
 import os
 import re
@@ -15,6 +14,8 @@ import sys
 import tempfile
 import time
 from pathlib import Path, PurePosixPath
+
+from validate_electron_desktop_scope import _sha256
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -40,14 +41,6 @@ def _safe_path(root: Path, value: str, label: str, *, must_exist: bool) -> Path:
     if must_exist and not path.is_file():
         _fail(f"{label} is missing")
     return path
-
-
-def _sha256(path: Path) -> str:
-    digest = hashlib.sha256()
-    with path.open("rb") as source:
-        while chunk := source.read(1024 * 1024):
-            digest.update(chunk)
-    return digest.hexdigest()
 
 
 def _timestamp() -> str:
@@ -125,13 +118,18 @@ def main() -> int:
         _fail("command is missing")
 
     parsed_bindings: list[tuple[str, str, Path, str]] = []
+    definition_hashes: dict[Path, str] = {}
     for raw in arguments.binding:
         parts = raw.split(":", 2)
         if len(parts) != 3 or not _IDENTIFIER.fullmatch(parts[0]):
             _fail("binding is invalid")
         definition = _safe_path(root, parts[1], "gate definition", must_exist=True)
         receipt = _safe_path(root, parts[2], "gate receipt", must_exist=False)
-        parsed_bindings.append((parts[0], parts[1], receipt, _sha256(definition)))
+        definition_sha = definition_hashes.get(definition)
+        if definition_sha is None:
+            definition_sha = _sha256(definition)
+            definition_hashes[definition] = definition_sha
+        parsed_bindings.append((parts[0], parts[1], receipt, definition_sha))
     if parsed_bindings:
         for value, pattern, label in (
             (arguments.source_revision, _REVISION, "source revision"),

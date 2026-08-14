@@ -930,7 +930,7 @@ class ElectronDesktopScopeValidatorTest(unittest.TestCase):
         relevant.write_text("two\n", encoding="utf-8")
         subprocess.run(["git", "add", "."], cwd=repository, check=True)
         subprocess.run(["git", "commit", "-qm", "later"], cwd=repository, check=True)
-        with self.assertRaisesRegex(ValueError, "changed after"):
+        with self.assertRaisesRegex(ValueError, "dirty"):
             _validate_live_source_binding(repository, source)
 
     def test_closure_script_disables_capture_initialize_only_bypass(self) -> None:

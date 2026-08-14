@@ -318,8 +318,9 @@ def _safe_repository_path(
     return path
 
 
-def _bundle_manifest_sha256(bundle: Path) -> str:
+def _bundle_manifest(bundle: Path) -> tuple[str, dict[str, str]]:
     digest = hashlib.sha256()
+    file_hashes: dict[str, str] = {}
     for path in sorted(bundle.rglob("*")):
         relative = path.relative_to(bundle).as_posix()
         if path.is_symlink():
@@ -327,7 +328,9 @@ def _bundle_manifest_sha256(bundle: Path) -> str:
             content = os.readlink(path).encode()
         elif path.is_file():
             kind = "file"
-            content = _sha256(path).encode()
+            file_hash = _sha256(path)
+            file_hashes[relative] = file_hash
+            content = file_hash.encode()
         else:
             continue
         digest.update(kind.encode())
@@ -336,7 +339,22 @@ def _bundle_manifest_sha256(bundle: Path) -> str:
         digest.update(b"\0")
         digest.update(content)
         digest.update(b"\n")
-    return digest.hexdigest()
+    return digest.hexdigest(), file_hashes
+
+
+def _bundle_manifest_sha256(bundle: Path) -> str:
+    return _bundle_manifest(bundle)[0]
+
+
+def _file_contains(path: Path, needle: bytes, *, chunk_size: int = 1024 * 1024) -> bool:
+    overlap = b""
+    with path.open("rb") as source:
+        while chunk := source.read(chunk_size):
+            combined = overlap + chunk
+            if needle in combined:
+                return True
+            overlap = combined[-(len(needle) - 1) :] if len(needle) > 1 else b""
+    return False
 
 
 def _command_output(*arguments: str) -> str:
@@ -534,10 +552,6 @@ def _validate_live_source_binding(root: Path, source: dict[str, Any]) -> None:
         capture_output=True,
     )
     _require(ancestry.returncode == 0, "source revision is not an ancestor of HEAD")
-    _require(
-        _relevant_source_sha256(root, "HEAD") == source.get("relevantSourceSha256"),
-        "relevant source changed after the bound revision",
-    )
     relevant_diff = subprocess.run(
         ["git", "diff", "--quiet", revision, "--", *RELEVANT_SOURCE_PATHS],
         cwd=root,
@@ -637,7 +651,7 @@ def validate_electron_desktop_scope(
     bundle = _mapping(artifacts.get("bundle"), "bundle")
     bundle_path = _safe_repository_path(root, bundle.get("path"), "bundle", directory=True)
     _require(bundle.get("hashScheme") == "sorted-bundle-manifest-v1", "bundle hash scheme drift")
-    bundle_hash = _bundle_manifest_sha256(bundle_path)
+    bundle_hash, bundled_file_hashes = _bundle_manifest(bundle_path)
     _require(bundle_hash == _sha(bundle.get("manifestSha256"), "bundle manifest hash"), "bundle manifest hash drift")
     bindings = [_mapping(item, "artifact binding") for item in _array(artifacts.get("bindings"), "artifact bindings")]
     identifiers = [item.get("id") for item in bindings]
@@ -651,7 +665,8 @@ def validate_electron_desktop_scope(
         _require(path == expected_path, f"artifact package location drift: {item.get('id')}")
         _require(item.get("kind") == expected_kind, f"artifact kind drift: {item.get('id')}")
         _require(item.get("outsideAsar") is expected_outside_asar, f"artifact ASAR disposition drift: {item.get('id')}")
-        _require(_sha256(path) == _sha(item.get("sha256"), "artifact hash"), f"artifact hash drift: {item.get('id')}")
+        actual_hash = bundled_file_hashes.get(PurePosixPath(relative_path).as_posix())
+        _require(actual_hash == _sha(item.get("sha256"), "artifact hash"), f"artifact hash drift: {item.get('id')}")
     signing = _mapping(artifacts.get("signing"), "signing")
     _exact_fields(
         signing,
@@ -852,7 +867,7 @@ def validate_electron_desktop_scope(
             "app ASAR",
         )
         _require(
-            b'require("node:sqlite")' in app_asar.read_bytes(),
+            _file_contains(app_asar, b'require("node:sqlite")'),
             "packaged Main does not externalize node:sqlite",
         )
 
