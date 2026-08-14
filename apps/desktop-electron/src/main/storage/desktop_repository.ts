@@ -300,7 +300,7 @@ export class DesktopRepository {
       const publicationId = Number(inserted.lastInsertRowid);
       const completed = this.database
         .prepare(
-          "UPDATE processing_jobs SET state = 'completed', updated_at_ms = ? WHERE id = ? AND state = 'running' AND attempt = ? AND source_identity = ?",
+          "UPDATE processing_jobs SET state = 'completed', updated_at_ms = ? WHERE id = ? AND state = 'running' AND cancel_requested_at_ms IS NULL AND attempt = ? AND source_identity = ?",
         )
         .run(nowMs, job.id, job.attempt, intent.sourceIdentity);
       if (completed.changes !== 1) throw new AttemptFenceError();
@@ -321,14 +321,74 @@ export class DesktopRepository {
     });
   }
 
-  reconcileStartup(nowMs: number): number {
-    return Number(
+  requestProcessingCancellation(
+    jobId: number,
+    nowMs: number,
+  ): ExecutionIntent | null {
+    return withTransaction(this.database, () => {
+      const job = this.findJob(jobId);
+      if (!job || (job.state !== "running" && job.state !== "canceling")) {
+        return null;
+      }
+      if (
+        job.sourceIdentity == null ||
+        job.deadlineAtMs == null ||
+        job.attempt <= 0
+      ) {
+        throw new AttemptFenceError();
+      }
+      if (job.state === "running") {
+        const updated = this.database
+          .prepare(
+            "UPDATE processing_jobs SET cancel_requested_at_ms = ?, error_code = 'CANCEL_REQUESTED', updated_at_ms = ? WHERE id = ? AND state = 'running' AND cancel_requested_at_ms IS NULL AND attempt = ? AND source_identity = ?",
+          )
+          .run(nowMs, nowMs, job.id, job.attempt, job.sourceIdentity);
+        if (updated.changes !== 1) throw new AttemptFenceError();
+      }
+      return executionIntentForJob(job);
+    });
+  }
+
+  completeProcessingCancellation(
+    intent: ExecutionIntent,
+    nowMs: number,
+  ): boolean {
+    return (
       this.database
         .prepare(
-          "UPDATE processing_jobs SET state = 'interrupted', error_code = 'PROCESS_INTERRUPTED', updated_at_ms = ? WHERE state = 'running'",
+          "UPDATE processing_jobs SET state = 'canceled', error_code = 'CANCELED', updated_at_ms = ? WHERE id = ? AND state = 'running' AND cancel_requested_at_ms IS NOT NULL AND meeting_id = ? AND operation_id = ? AND resource_identity = ? AND attempt = ? AND source_identity = ? AND deadline_at_ms = ?",
         )
-        .run(nowMs).changes,
+        .run(
+          nowMs,
+          intent.jobId,
+          intent.meetingId,
+          intent.operationId,
+          intent.resourceIdentity,
+          intent.attempt,
+          intent.sourceIdentity,
+          intent.deadlineAtMs,
+        ).changes === 1
     );
+  }
+
+  reconcileStartup(nowMs: number): number {
+    return withTransaction(this.database, () => {
+      const interrupted = Number(
+        this.database
+          .prepare(
+            "UPDATE processing_jobs SET state = 'interrupted', error_code = 'PROCESS_INTERRUPTED', updated_at_ms = ? WHERE state = 'running' AND cancel_requested_at_ms IS NULL",
+          )
+          .run(nowMs).changes,
+      );
+      const canceled = Number(
+        this.database
+          .prepare(
+            "UPDATE processing_jobs SET state = 'canceled', error_code = 'CANCELED_DURING_RESTART', updated_at_ms = ? WHERE state = 'running' AND cancel_requested_at_ms IS NOT NULL",
+          )
+          .run(nowMs).changes,
+      );
+      return interrupted + canceled;
+    });
   }
 
   retryInterruptedJob(
@@ -339,7 +399,7 @@ export class DesktopRepository {
     return (
       this.database
         .prepare(
-          "UPDATE processing_jobs SET state = 'queued', source_identity = NULL, deadline_at_ms = NULL, error_code = NULL, updated_at_ms = ? WHERE id = ? AND state = 'interrupted' AND attempt = ?",
+          "UPDATE processing_jobs SET state = 'queued', source_identity = NULL, deadline_at_ms = NULL, cancel_requested_at_ms = NULL, error_code = NULL, updated_at_ms = ? WHERE id = ? AND state = 'interrupted' AND attempt = ?",
         )
         .run(nowMs, jobId, expectedAttempt).changes === 1
     );
@@ -381,6 +441,21 @@ export class DesktopRepository {
   }
 }
 
+function executionIntentForJob(job: ProcessingJobRecord): ExecutionIntent {
+  if (job.sourceIdentity == null || job.deadlineAtMs == null) {
+    throw new AttemptFenceError();
+  }
+  return {
+    jobId: job.id,
+    meetingId: job.meetingId,
+    operationId: job.operationId,
+    attempt: job.attempt,
+    sourceIdentity: job.sourceIdentity,
+    deadlineAtMs: job.deadlineAtMs,
+    resourceIdentity: job.resourceIdentity,
+  };
+}
+
 function mapMeeting(row: Record<string, unknown>): MeetingRecord {
   return {
     id: Number(row.id),
@@ -397,18 +472,27 @@ function mapMeeting(row: Record<string, unknown>): MeetingRecord {
 }
 
 function mapJob(row: Record<string, unknown>): ProcessingJobRecord {
+  const persistedState = String(row.state);
+  const cancelRequestedAtMs =
+    row.cancel_requested_at_ms == null
+      ? null
+      : Number(row.cancel_requested_at_ms);
   return {
     id: Number(row.id),
     meetingId: Number(row.meeting_id),
     idempotencyKey: String(row.idempotency_key),
     operationId: String(row.operation_id),
     resourceIdentity: String(row.resource_identity),
-    state: String(row.state) as ProcessingJobRecord["state"],
+    state:
+      persistedState === "running" && cancelRequestedAtMs != null
+        ? "canceling"
+        : (persistedState as ProcessingJobRecord["state"]),
     attempt: Number(row.attempt),
     sourceIdentity:
       row.source_identity == null ? null : String(row.source_identity),
     deadlineAtMs:
       row.deadline_at_ms == null ? null : Number(row.deadline_at_ms),
+    cancelRequestedAtMs,
     errorCode: row.error_code == null ? null : String(row.error_code),
   };
 }

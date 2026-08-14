@@ -162,6 +162,34 @@ describe("DesktopDomainService idempotency", () => {
 });
 
 describe("attempt and source fenced publication", () => {
+  it("records cancellation durably before completion and rejects late output", () => {
+    const { database, meetingCommand, repository, service } = openService();
+    try {
+      const { job } = seedMeetingAndJob(service, meetingCommand);
+      const intent = service.claimNextProcessingJob({
+        sourceIdentity: "worker:cancel",
+        deadlineAtMs: 5000,
+      });
+
+      expect(service.requestProcessingCancellation(job.value.id)).toEqual(
+        intent,
+      );
+      expect(repository.findJob(job.value.id)?.state).toBe("canceling");
+      expect(() =>
+        service.publishProcessingResult({
+          ...intent!,
+          complete: true,
+          payload: fixture.publication,
+        }),
+      ).toThrow(AttemptIdentityError);
+      expect(service.completeProcessingCancellation(intent!)).toBe(true);
+      expect(repository.findJob(job.value.id)?.state).toBe("canceled");
+      expect(rowCount(database, "result_publications")).toBe(0);
+    } finally {
+      database.close();
+    }
+  });
+
   it("rejects partial, wrong-source, and late results before atomic publication", () => {
     const { database, meetingCommand, repository, service } = openService();
     try {

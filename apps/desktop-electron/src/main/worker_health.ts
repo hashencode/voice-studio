@@ -7,7 +7,10 @@ import {
   workerHealthResponseSchema,
   type WorkerHealthResponse,
 } from "../shared/contracts";
-import type { WorkerResources } from "./resource_locator";
+import {
+  assertAuthorizedResourceCommand,
+  type ResolvedResourceCommand,
+} from "./resources/resource_catalog";
 
 const maximumOutputBytes = 64 * 1024;
 const healthDeadlineMs = 10_000;
@@ -22,20 +25,21 @@ interface WorkerHealthFrame {
 
 export class WorkerHealthSupervisor {
   private readonly active = new Set<ChildProcessWithoutNullStreams>();
+  private readonly terminations = new WeakMap<
+    ChildProcessWithoutNullStreams,
+    Promise<void>
+  >();
 
-  constructor(private readonly resources: WorkerResources) {}
+  constructor(private readonly command: ResolvedResourceCommand) {}
 
   async check(): Promise<WorkerHealthResponse> {
-    const workerSha256 = await sha256File(this.resources.workerPath);
-    const child = spawn(
-      this.resources.workerPath,
-      ["--phase", "health", "--runtime-root", this.resources.runtimeRoot],
-      {
-        detached: process.platform !== "win32",
-        env: minimalWorkerEnvironment(),
-        stdio: ["pipe", "pipe", "pipe"],
-      },
-    );
+    await assertAuthorizedResourceCommand(this.command);
+    const workerSha256 = await sha256File(this.command.executable);
+    const child = spawn(this.command.executable, [...this.command.args], {
+      detached: process.platform !== "win32",
+      env: minimalWorkerEnvironment(),
+      stdio: ["pipe", "pipe", "pipe"],
+    });
     this.active.add(child);
 
     try {
@@ -48,24 +52,36 @@ export class WorkerHealthSupervisor {
       });
     } finally {
       this.active.delete(child);
-      terminateProcessGroup(child);
+      await this.terminateOnce(child);
     }
   }
 
-  shutdown(): void {
-    for (const child of this.active) terminateProcessGroup(child);
+  async shutdown(): Promise<void> {
+    await Promise.all(
+      [...this.active].map(async (child) => this.terminateOnce(child)),
+    );
     this.active.clear();
+  }
+
+  private terminateOnce(child: ChildProcessWithoutNullStreams): Promise<void> {
+    const existing = this.terminations.get(child);
+    if (existing) return existing;
+    const termination = terminateProcessGroup(child);
+    this.terminations.set(child, termination);
+    return termination;
   }
 }
 
 function minimalWorkerEnvironment(): NodeJS.ProcessEnv {
-  return {
-    HOME: process.env.HOME,
-    LANG: "en_US.UTF-8",
-    LC_ALL: "en_US.UTF-8",
-    PATH: "/usr/bin:/bin:/usr/sbin:/sbin",
-    TMPDIR: process.env.TMPDIR,
-  };
+  return Object.fromEntries(
+    Object.entries({
+      HOME: process.env.HOME,
+      LANG: "C.UTF-8",
+      LC_ALL: "C.UTF-8",
+      PATH: "/usr/bin:/bin:/usr/sbin:/sbin",
+      TMPDIR: process.env.TMPDIR,
+    }).filter((entry): entry is [string, string] => entry[1] !== undefined),
+  );
 }
 
 async function readHealthFrame(
@@ -92,7 +108,6 @@ async function readHealthFrame(
     };
     const timer = setTimeout(() => {
       finish(new Error("worker health deadline exceeded"));
-      terminateProcessGroup(child);
     }, healthDeadlineMs);
 
     child.once("error", (error) => finish(error));
@@ -145,15 +160,59 @@ async function readHealthFrame(
   });
 }
 
-function terminateProcessGroup(child: ChildProcessWithoutNullStreams): void {
+async function terminateProcessGroup(
+  child: ChildProcessWithoutNullStreams,
+): Promise<void> {
   if (child.exitCode !== null || child.pid === undefined) return;
   try {
-    if (process.platform === "win32") child.kill();
-    else process.kill(-child.pid, "SIGTERM");
+    if (process.platform === "win32") {
+      child.kill();
+      await waitForChildExit(child, 2000);
+      return;
+    }
+    process.kill(-child.pid, "SIGTERM");
   } catch (error) {
     const code = (error as NodeJS.ErrnoException).code;
     if (code !== "ESRCH") throw error;
+    return;
   }
+  if (await waitForProcessGroupExit(child.pid, 500)) return;
+  try {
+    process.kill(-child.pid, "SIGKILL");
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code !== "ESRCH") throw error;
+  }
+  if (!(await waitForProcessGroupExit(child.pid, 2000))) {
+    throw new Error("worker health process group survived SIGKILL");
+  }
+}
+
+async function waitForProcessGroupExit(
+  pid: number,
+  timeoutMs: number,
+): Promise<boolean> {
+  const deadline = Date.now() + timeoutMs;
+  while (Date.now() <= deadline) {
+    try {
+      process.kill(-pid, 0);
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code === "ESRCH") return true;
+      throw error;
+    }
+    await new Promise((resolve) => setTimeout(resolve, 20));
+  }
+  return false;
+}
+
+async function waitForChildExit(
+  child: ChildProcessWithoutNullStreams,
+  timeoutMs: number,
+): Promise<void> {
+  if (child.exitCode !== null) return;
+  await Promise.race([
+    new Promise<void>((resolve) => child.once("close", () => resolve())),
+    new Promise<void>((resolve) => setTimeout(resolve, timeoutMs)),
+  ]);
 }
 
 async function sha256File(filePath: string): Promise<string> {

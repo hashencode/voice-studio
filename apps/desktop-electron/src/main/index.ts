@@ -5,9 +5,17 @@ import type { DatabaseSync } from "node:sqlite";
 import { app, BrowserWindow, session } from "electron";
 
 import { registerDesktopIpc } from "./ipc";
+import { canceledResponse } from "./ipc/desktop_ipc";
+import { DesktopDomainService } from "./domain/desktop_domain_service";
+import { DurableProcessCoordinator } from "./processes/durable_process_coordinator";
+import { OwnedProcessSupervisor } from "./processes/owned_process_supervisor";
 import { initializeElectronProfile } from "./profile/electron_profile";
-import { resolveWorkerResources } from "./resource_locator";
+import {
+  ResourceCatalog,
+  resolveResourceRoot,
+} from "./resources/resource_catalog";
 import { secureWebPreferences } from "./security";
+import { DesktopRepository } from "./storage/desktop_repository";
 import { WorkerHealthSupervisor } from "./worker_health";
 
 app.enableSandbox();
@@ -15,7 +23,10 @@ app.enableSandbox();
 let mainWindow: BrowserWindow | null = null;
 let unregisterIpc: (() => void) | null = null;
 let workerSupervisor: WorkerHealthSupervisor | null = null;
+let processCoordinator: DurableProcessCoordinator | null = null;
 let profileDatabase: DatabaseSync | null = null;
+let teardownPromise: Promise<void> | null = null;
+let teardownComplete = false;
 
 function createMainWindow(): BrowserWindow {
   const window = new BrowserWindow({
@@ -31,10 +42,7 @@ function createMainWindow(): BrowserWindow {
   window.webContents.setWindowOpenHandler(() => ({ action: "deny" }));
   window.webContents.on("will-navigate", (event, targetUrl) => {
     const currentUrl = window.webContents.getURL();
-    if (
-      currentUrl &&
-      new URL(targetUrl).origin !== new URL(currentUrl).origin
-    ) {
+    if (currentUrl && !isTrustedNavigation(currentUrl, targetUrl)) {
       event.preventDefault();
     }
   });
@@ -51,6 +59,15 @@ function createMainWindow(): BrowserWindow {
     );
   }
   return window;
+}
+
+function isTrustedNavigation(current: string, target: string): boolean {
+  const currentUrl = new URL(current);
+  const targetUrl = new URL(target);
+  if (currentUrl.protocol === "file:" || targetUrl.protocol === "file:") {
+    return currentUrl.href === targetUrl.href;
+  }
+  return currentUrl.origin === targetUrl.origin;
 }
 
 function configureSessionSecurity(): void {
@@ -96,6 +113,24 @@ async function runBootstrapSmokeIfRequested(): Promise<void> {
   app.quit();
 }
 
+function bindDesktopIpc(window: BrowserWindow): void {
+  const health = workerSupervisor;
+  const processes = processCoordinator;
+  if (!health || !processes) {
+    throw new Error("desktop IPC services are not initialized");
+  }
+  unregisterIpc?.();
+  unregisterIpc = registerDesktopIpc(window, {
+    workerHealth: async () => await health.check(),
+    cancelProcessing: async (jobId) => {
+      if (!(await processes.cancel(jobId))) {
+        throw new Error("processing job is not running or canceling");
+      }
+      return canceledResponse(jobId);
+    },
+  });
+}
+
 void app.whenReady().then(async () => {
   const profile = initializeElectronProfile(app.getPath("appData"));
   if (profile.status === "blocked") {
@@ -111,25 +146,52 @@ void app.whenReady().then(async () => {
     return;
   }
   profileDatabase = profile.database;
+  const domainService = new DesktopDomainService(
+    new DesktopRepository(profile.database, profile.profile),
+  );
+  const processSupervisor = new OwnedProcessSupervisor({
+    workspaceRoot: profile.profile.workspaceDirectory,
+  });
+  processCoordinator = new DurableProcessCoordinator(processSupervisor, {
+    requestCancellation: async (jobId) =>
+      domainService.requestProcessingCancellation(jobId),
+    completeCancellation: async (intent) => {
+      if (!domainService.completeProcessingCancellation(intent)) {
+        throw new Error(
+          "durable cancellation completion lost its attempt fence",
+        );
+      }
+    },
+    publishResult: async (intent, payload) => {
+      domainService.publishProcessingResult({
+        ...intent,
+        complete: true,
+        payload,
+      });
+    },
+  });
   configureSessionSecurity();
-  workerSupervisor = new WorkerHealthSupervisor(
-    resolveWorkerResources({
+  const resourceCatalog = await ResourceCatalog.load(
+    resolveResourceRoot({
       appRoot: app.getAppPath(),
       packaged: app.isPackaged,
       resourcesPath: process.resourcesPath,
     }),
   );
+  workerSupervisor = new WorkerHealthSupervisor(
+    resourceCatalog.command("worker-health"),
+  );
   mainWindow = createMainWindow();
-  unregisterIpc = registerDesktopIpc(mainWindow, workerSupervisor);
+  bindDesktopIpc(mainWindow);
   await runBootstrapSmokeIfRequested();
 });
 
 app.on("activate", () => {
+  if (teardownPromise) return;
   if (BrowserWindow.getAllWindows().length === 0) {
     mainWindow = createMainWindow();
     if (workerSupervisor) {
-      unregisterIpc?.();
-      unregisterIpc = registerDesktopIpc(mainWindow, workerSupervisor);
+      bindDesktopIpc(mainWindow);
     }
   }
 });
@@ -138,10 +200,30 @@ app.on("window-all-closed", () => {
   if (process.platform !== "darwin") app.quit();
 });
 
-app.on("before-quit", () => {
+app.on("before-quit", (event) => {
+  if (teardownComplete) return;
+  event.preventDefault();
+  teardownPromise ??= teardownOwnedResources()
+    .then(() => {
+      teardownComplete = true;
+      app.quit();
+    })
+    .catch((error: unknown) => {
+      teardownPromise = null;
+      console.error(
+        "Voice2Text process teardown failed; quit was stopped",
+        error,
+      );
+    });
+});
+
+async function teardownOwnedResources(): Promise<void> {
   unregisterIpc?.();
   unregisterIpc = null;
-  workerSupervisor?.shutdown();
+  await processCoordinator?.shutdown();
+  processCoordinator = null;
+  await workerSupervisor?.shutdown();
+  workerSupervisor = null;
   profileDatabase?.close();
   profileDatabase = null;
-});
+}

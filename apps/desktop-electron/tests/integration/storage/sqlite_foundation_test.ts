@@ -19,6 +19,7 @@ import {
   openElectronProfileDatabase,
   withTransaction,
 } from "../../../src/main/storage/database";
+import { createSchemaV1 } from "../../../src/main/storage/migrations/v1";
 
 const temporaryRoots: string[] = [];
 
@@ -98,6 +99,40 @@ describe("Electron SQLite v1", () => {
       expect(
         migrated.prepare("SELECT value FROM migration_probe").get()?.value,
       ).toBe("preserved");
+    } finally {
+      migrated.close();
+    }
+  });
+
+  it("migrates v1 jobs forward with a durable cancellation-intent column", () => {
+    const databasePath = join(temporaryRoot(), "schema-v1.db");
+    const versionOne = new DatabaseSync(databasePath);
+    createSchemaV1(versionOne);
+    versionOne.exec(`
+      INSERT INTO meetings (idempotency_key, source_identity, display_name, media_path, duration_ms, created_at_ms, updated_at_ms)
+      VALUES ('meeting', 'source', 'Meeting', '/media.wav', 1, 1, 1);
+      INSERT INTO processing_jobs (meeting_id, idempotency_key, operation_id, resource_identity, state, attempt, source_identity, deadline_at_ms, created_at_ms, updated_at_ms)
+      VALUES (1, 'job', 'operation', 'resource', 'running', 1, 'worker', 5000, 1, 1);
+      PRAGMA application_id = ${ELECTRON_APPLICATION_ID};
+      PRAGMA user_version = 1;
+    `);
+    versionOne.close();
+
+    const migrated = openElectronDatabase(databasePath);
+    try {
+      expect(migrated.prepare("PRAGMA user_version").get()?.user_version).toBe(
+        ELECTRON_SCHEMA_VERSION,
+      );
+      expect(
+        migrated
+          .prepare("PRAGMA table_info(processing_jobs)")
+          .all()
+          .map((column) => column.name),
+      ).toContain("cancel_requested_at_ms");
+      expect(
+        migrated.prepare("SELECT state FROM processing_jobs WHERE id = 1").get()
+          ?.state,
+      ).toBe("running");
     } finally {
       migrated.close();
     }

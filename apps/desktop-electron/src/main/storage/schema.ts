@@ -1,6 +1,7 @@
-export const ELECTRON_SCHEMA_VERSION = 1;
+export const ELECTRON_SCHEMA_VERSION = 2;
 export const ELECTRON_APPLICATION_ID = 0x56325445;
 export { createSchemaV1 } from "./migrations/v1";
+export { migrateSchemaV1ToV2 } from "./migrations/v2";
 
 export const REQUIRED_SCHEMA_TABLES = [
   "meetings",

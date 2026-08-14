@@ -45,6 +45,13 @@ await writeFile(
       target: `darwin-${process.arch}`,
       workerProtocol: desktopWorkerHealthProtocol,
       artifacts,
+      operations: [
+        {
+          operation: "worker-health",
+          executable: "bin/desktop_sherpa_worker",
+          arguments: ["--phase", "health", "--runtime-root", "{runtimeRoot}"],
+        },
+      ],
     },
     null,
     2,

@@ -1,5 +1,11 @@
 export type ProcessingJobState =
-  "queued" | "running" | "interrupted" | "completed" | "failed" | "canceled";
+  | "queued"
+  | "running"
+  | "canceling"
+  | "interrupted"
+  | "completed"
+  | "failed"
+  | "canceled";
 
 export interface MeetingRecord {
   id: number;
@@ -21,6 +27,7 @@ export interface ProcessingJobRecord {
   attempt: number;
   sourceIdentity: string | null;
   deadlineAtMs: number | null;
+  cancelRequestedAtMs: number | null;
   errorCode: string | null;
 }
 

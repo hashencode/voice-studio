@@ -10,6 +10,7 @@ import {
   createSchemaV1,
   ELECTRON_APPLICATION_ID,
   ELECTRON_SCHEMA_VERSION,
+  migrateSchemaV1ToV2,
   REQUIRED_SCHEMA_TABLES,
 } from "./schema";
 
@@ -31,7 +32,9 @@ export class StorageCorruptionError extends StorageError {
 
 export class UnsupportedSchemaVersionError extends StorageError {
   constructor(version: number) {
-    super(`Electron database schema ${version} is newer than supported v1`);
+    super(
+      `Electron database schema ${version} is newer than supported v${ELECTRON_SCHEMA_VERSION}`,
+    );
     this.name = "UnsupportedSchemaVersionError";
   }
 }
@@ -94,7 +97,7 @@ function configure(database: DatabaseSync): void {
 }
 
 function migrate(database: DatabaseSync): void {
-  const version = pragmaNumber(database, "user_version");
+  let version = pragmaNumber(database, "user_version");
   const applicationId = pragmaNumber(database, "application_id");
   if (version > ELECTRON_SCHEMA_VERSION) {
     throw new UnsupportedSchemaVersionError(version);
@@ -108,7 +111,14 @@ function migrate(database: DatabaseSync): void {
     withTransaction(database, () => {
       createSchemaV1(database);
       database.exec(`PRAGMA application_id = ${ELECTRON_APPLICATION_ID}`);
-      database.exec(`PRAGMA user_version = ${ELECTRON_SCHEMA_VERSION}`);
+      database.exec("PRAGMA user_version = 1");
+    });
+    version = 1;
+  }
+  if (version === 1) {
+    withTransaction(database, () => {
+      migrateSchemaV1ToV2(database);
+      database.exec("PRAGMA user_version = 2");
     });
   }
 }

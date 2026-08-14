@@ -132,6 +132,15 @@ export class DesktopDomainService {
     }
   }
 
+  requestProcessingCancellation(jobId: number): ExecutionIntent | null {
+    requirePositiveInteger(jobId, "job id");
+    return this.repository.requestProcessingCancellation(jobId, this.now());
+  }
+
+  completeProcessingCancellation(intent: ExecutionIntent): boolean {
+    return this.repository.completeProcessingCancellation(intent, this.now());
+  }
+
   reconcileStartup(): number {
     return this.repository.reconcileStartup(this.now());
   }

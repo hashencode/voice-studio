@@ -1,21 +1,25 @@
 import { contextBridge, ipcRenderer } from "electron";
 
-import {
-  desktopProtocolVersion,
-  ipcChannels,
-  workerHealthResponseSchema,
-  type Voice2TextDesktopApi,
-} from "../shared/contracts";
+import { createDesktopApi } from "./api";
 
-const api: Voice2TextDesktopApi = Object.freeze({
-  async workerHealth() {
-    const response: unknown = await ipcRenderer.invoke(
-      ipcChannels.workerHealth,
-      {
-        expectedProtocolVersion: desktopProtocolVersion,
-      },
-    );
-    return workerHealthResponseSchema.parse(response);
+const subscriptionWrappers = new Map<
+  (payload: unknown) => void,
+  (event: Electron.IpcRendererEvent, payload: unknown) => void
+>();
+const api = createDesktopApi({
+  invoke: async (channel, payload) =>
+    await ipcRenderer.invoke(channel, payload),
+  on: (channel, listener) => {
+    const wrapper = (_event: Electron.IpcRendererEvent, payload: unknown) =>
+      listener(payload);
+    subscriptionWrappers.set(listener, wrapper);
+    ipcRenderer.on(channel, wrapper);
+  },
+  off: (channel, listener) => {
+    const wrapper = subscriptionWrappers.get(listener);
+    if (!wrapper) return;
+    subscriptionWrappers.delete(listener);
+    ipcRenderer.removeListener(channel, wrapper);
   },
 });
 
