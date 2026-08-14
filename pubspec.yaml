@@ -22,6 +22,7 @@ environment:
   sdk: ^3.11.5
 
 workspace:
+  - apps/codex_ui_reproduction
   - apps/desktop
   - packages/companion_protocol
   - packages/desktop_sherpa_worker
