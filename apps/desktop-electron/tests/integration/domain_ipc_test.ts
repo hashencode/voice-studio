@@ -34,6 +34,14 @@ function handlers() {
         origins: new Set([trustedEvent.origin]),
       },
       services: {
+        getAiSettings: vi.fn(),
+        saveAiSettings: vi.fn(),
+        replaceAiProviderSecret: vi.fn(),
+        deleteAiProviderSecret: vi.fn(),
+        prepareMeetingAi: vi.fn(),
+        getMeetingAiSnapshot: vi.fn(async () => null),
+        generateMeetingAi: vi.fn(),
+        retryMeetingAi: vi.fn(),
         applicationSnapshot: () => applicationSnapshot(),
         navigate: (section) => ({
           ...applicationSnapshot(),
@@ -217,6 +225,14 @@ describe("Main IPC validation", () => {
         fileUrls: new Set(["file:///Voice2Text/renderer/index.html"]),
       },
       services: {
+        getAiSettings: vi.fn(),
+        saveAiSettings: vi.fn(),
+        replaceAiProviderSecret: vi.fn(),
+        deleteAiProviderSecret: vi.fn(),
+        prepareMeetingAi: vi.fn(),
+        getMeetingAiSnapshot: vi.fn(async () => null),
+        generateMeetingAi: vi.fn(),
+        retryMeetingAi: vi.fn(),
         applicationSnapshot: () => applicationSnapshot(),
         navigate: (section) => ({
           ...applicationSnapshot(),

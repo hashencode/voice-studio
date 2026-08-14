@@ -38,6 +38,15 @@ function installApi(
   overrides: Partial<Voice2TextDesktopApi> = {},
 ) {
   const api: Voice2TextDesktopApi = {
+    getAiSettings: vi.fn(async () => testAiSettings()),
+    saveAiSettings: vi.fn(async () => testAiSettings()),
+    replaceAiProviderSecret: vi.fn(async () => testAiSettings()),
+    deleteAiProviderSecret: vi.fn(async () => testAiSettings()),
+    prepareMeetingAi: vi.fn(),
+    getMeetingAiSnapshot: vi.fn(async () => null),
+    generateMeetingAi: vi.fn(),
+    retryMeetingAi: vi.fn(),
+    onMeetingAiSnapshot: vi.fn(() => () => undefined),
     workerHealth: vi.fn(),
     cancelProcessing: vi.fn(),
     retryProcessing: vi.fn(),
@@ -78,6 +87,27 @@ function installApi(
     value: api,
   });
   return api;
+}
+
+function testAiSettings() {
+  return {
+    revision: 1,
+    config: {
+      providerId: "deepseek" as const,
+      displayName: "DeepSeek",
+      modelId: "deepseek-chat",
+      endpoint: "https://api.deepseek.com",
+      endpointOrigin: "https://api.deepseek.com",
+      processingLocation: "cloudDirect" as const,
+      requiresConsent: true as const,
+    },
+    secretState: "missing" as const,
+    deviceSecurity: {
+      kind: "device-security" as const,
+      fileVaultState: "unknown" as const,
+      applicationLayerEncryption: "not-claimed" as const,
+    },
+  };
 }
 
 describe("application shell", () => {

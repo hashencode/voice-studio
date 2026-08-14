@@ -34,11 +34,36 @@ const config: ForgeConfig = {
         if (!existsSync(appPath)) {
           throw new Error("unexpected macOS package output");
         }
+        const helperPath = path.join(
+          appPath,
+          "Contents/Resources/native/macos/bin/desktop_macos_native_helper",
+        );
+        const signingIdentity =
+          process.env.VOICE2TEXT_MACOS_SIGN_IDENTITY ?? "-";
         execFileSync("/usr/bin/codesign", [
           "--force",
           "--deep",
           "--sign",
-          "-",
+          signingIdentity,
+          appPath,
+        ]);
+        const helperSignArguments = ["--force", "--sign", signingIdentity];
+        if (signingIdentity === "-") {
+          helperSignArguments.push("--timestamp=none");
+        } else {
+          helperSignArguments.push(
+            "--entitlements",
+            path.resolve(
+              "native/macos/desktop-macos-native-helper.entitlements",
+            ),
+          );
+        }
+        helperSignArguments.push(helperPath);
+        execFileSync("/usr/bin/codesign", helperSignArguments);
+        execFileSync("/usr/bin/codesign", [
+          "--force",
+          "--sign",
+          signingIdentity,
           appPath,
         ]);
       }

@@ -81,6 +81,11 @@ const snapshot: MeetingWorkspaceSnapshot = {
 
 function api(overrides: Partial<Voice2TextDesktopApi> = {}) {
   return {
+    getMeetingAiSnapshot: vi.fn(async () => null),
+    prepareMeetingAi: vi.fn(),
+    generateMeetingAi: vi.fn(),
+    retryMeetingAi: vi.fn(),
+    onMeetingAiSnapshot: vi.fn(() => () => undefined),
     listMeetings: vi.fn(async () => [snapshot.summary]),
     openMeeting: vi.fn(async () => snapshot),
     searchTranscript: vi.fn(async () => [snapshot.segments[0]!]),

@@ -3,6 +3,7 @@ import { Download, Pause, Play, Redo2, Search, Undo2 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { MeetingAiFeature } from "@/features/meeting-ai/meeting-ai-feature";
 import type {
   MeetingExportFormat,
   MeetingPlaybackSnapshot,
@@ -584,6 +585,14 @@ function WorkspaceView({
         </div>
 
         <aside aria-label="会议操作" className="space-y-4">
+          {workspace.summary.generationId !== null ? (
+            <MeetingAiFeature
+              key={`${workspace.summary.meetingId}:${workspace.summary.generationId}`}
+              api={api}
+              meetingId={workspace.summary.meetingId}
+              generationId={workspace.summary.generationId}
+            />
+          ) : null}
           <PlaybackPanel
             playback={playback}
             durationMs={workspace.summary.durationMs}

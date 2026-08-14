@@ -19,6 +19,7 @@ import {
 import { useApplicationShell } from "@/features/shell/use-application-shell";
 import { LibraryFeature } from "@/features/library/library-feature";
 import { MeetingWorkspaceFeature } from "@/features/meetings/meeting-workspace-feature";
+import { AiSettingsFeature } from "@/features/settings/ai-settings-feature";
 import { TasksFeature } from "@/features/tasks/tasks-feature";
 import type { ApplicationSnapshot } from "@shared/contracts";
 
@@ -206,10 +207,7 @@ function ShellContent({
     case "settings":
       section = (
         <Page title="设置" eyebrow="本机与隐私">
-          <Placeholder
-            title="桌面设置"
-            description="运行时、隐私、网络和可选 AI 设置将在这里提供。"
-          />
+          <AiSettingsFeature />
         </Page>
       );
       break;

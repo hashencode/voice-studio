@@ -10,6 +10,6 @@ it("routes every packaged smoke through its isolated appData and fails blocked p
   );
   expect(source).toContain('smokeAppDataPath ?? app.getPath("appData")');
   expect(source).toMatch(
-    /if \(\s*processingSmokeRequest \|\|\s*captureSmokeRequest \|\|\s*captionFormalSmokeRequest\s*\)/,
+    /if \(\s*processingSmokeRequest \|\|\s*captureSmokeRequest \|\|\s*captionFormalSmokeRequest \|\|\s*aiBoundarySmokeRequest\s*\)/,
   );
 });

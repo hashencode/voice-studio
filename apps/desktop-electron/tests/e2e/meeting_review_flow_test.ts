@@ -122,6 +122,14 @@ it("reviews a completed meeting through validated Main and Preload contracts wit
   });
   const snapshot = applicationSnapshot();
   const services: DesktopIpcServices = {
+    getAiSettings: vi.fn(),
+    saveAiSettings: vi.fn(),
+    replaceAiProviderSecret: vi.fn(),
+    deleteAiProviderSecret: vi.fn(),
+    prepareMeetingAi: vi.fn(),
+    getMeetingAiSnapshot: vi.fn(async () => null),
+    generateMeetingAi: vi.fn(),
+    retryMeetingAi: vi.fn(),
     applicationSnapshot: () => snapshot,
     navigate: () => snapshot,
     requestBootstrapAction: async () => snapshot,

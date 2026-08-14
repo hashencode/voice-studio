@@ -43,6 +43,18 @@ import {
   captionFormalRetryRequestSchema,
   captionSnapshotSchema,
   type CaptionSnapshot,
+  getAiSettingsRequestSchema,
+  saveAiSettingsRequestSchema,
+  replaceAiProviderSecretRequestSchema,
+  deleteAiProviderSecretRequestSchema,
+  prepareMeetingAiRequestSchema,
+  getMeetingAiSnapshotRequestSchema,
+  generateMeetingAiRequestSchema,
+  retryMeetingAiRequestSchema,
+  aiSettingsSnapshotSchema,
+  meetingAiConsentPreviewSchema,
+  meetingAiSnapshotSchema,
+  type MeetingAiSnapshot,
 } from "../shared/contracts";
 
 export interface PreloadIpcBridge {
@@ -55,6 +67,82 @@ export function createDesktopApi(
   bridge: PreloadIpcBridge,
 ): Voice2TextDesktopApi {
   return Object.freeze({
+    async getAiSettings() {
+      const payload = getAiSettingsRequestSchema.parse({});
+      return aiSettingsSnapshotSchema.parse(
+        await bridge.invoke(ipcChannels.aiSettingsGet, payload),
+      );
+    },
+    async saveAiSettings(
+      options: Parameters<Voice2TextDesktopApi["saveAiSettings"]>[0],
+    ) {
+      const payload = saveAiSettingsRequestSchema.parse(options);
+      return aiSettingsSnapshotSchema.parse(
+        await bridge.invoke(ipcChannels.aiSettingsSave, payload),
+      );
+    },
+    async replaceAiProviderSecret(
+      options: Parameters<Voice2TextDesktopApi["replaceAiProviderSecret"]>[0],
+    ) {
+      const payload = replaceAiProviderSecretRequestSchema.parse(options);
+      return aiSettingsSnapshotSchema.parse(
+        await bridge.invoke(ipcChannels.aiSecretReplace, payload),
+      );
+    },
+    async deleteAiProviderSecret(
+      options: Parameters<Voice2TextDesktopApi["deleteAiProviderSecret"]>[0],
+    ) {
+      const payload = deleteAiProviderSecretRequestSchema.parse(options);
+      return aiSettingsSnapshotSchema.parse(
+        await bridge.invoke(ipcChannels.aiSecretDelete, payload),
+      );
+    },
+    async prepareMeetingAi(
+      options: Parameters<Voice2TextDesktopApi["prepareMeetingAi"]>[0],
+    ) {
+      const payload = prepareMeetingAiRequestSchema.parse(options);
+      return meetingAiConsentPreviewSchema.parse(
+        await bridge.invoke(ipcChannels.meetingAiPrepare, payload),
+      );
+    },
+    async getMeetingAiSnapshot(
+      options: Parameters<Voice2TextDesktopApi["getMeetingAiSnapshot"]>[0],
+    ) {
+      const payload = getMeetingAiSnapshotRequestSchema.parse(options);
+      const response = await bridge.invoke(
+        ipcChannels.meetingAiSnapshotGet,
+        payload,
+      );
+      return response === null ? null : meetingAiSnapshotSchema.parse(response);
+    },
+    async generateMeetingAi(
+      options: Parameters<Voice2TextDesktopApi["generateMeetingAi"]>[0],
+    ) {
+      const payload = generateMeetingAiRequestSchema.parse(options);
+      return meetingAiSnapshotSchema.parse(
+        await bridge.invoke(ipcChannels.meetingAiGenerate, payload),
+      );
+    },
+    async retryMeetingAi(
+      options: Parameters<Voice2TextDesktopApi["retryMeetingAi"]>[0],
+    ) {
+      const payload = retryMeetingAiRequestSchema.parse(options);
+      return meetingAiSnapshotSchema.parse(
+        await bridge.invoke(ipcChannels.meetingAiRetry, payload),
+      );
+    },
+    onMeetingAiSnapshot(listener: (snapshot: MeetingAiSnapshot) => void) {
+      let subscribed = true;
+      const validatedListener = (payload: unknown) => {
+        listener(meetingAiSnapshotSchema.parse(payload));
+      };
+      bridge.on(ipcChannels.meetingAiSnapshotEvent, validatedListener);
+      return () => {
+        if (!subscribed) return;
+        subscribed = false;
+        bridge.off(ipcChannels.meetingAiSnapshotEvent, validatedListener);
+      };
+    },
     async getApplicationSnapshot() {
       const response = await bridge.invoke(ipcChannels.applicationSnapshot, {
         expectedProtocolVersion: desktopProtocolVersion,

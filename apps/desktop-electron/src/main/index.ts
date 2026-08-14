@@ -29,6 +29,7 @@ import {
   type OperationEvent,
   type CaptureSnapshot,
   type CaptionSnapshot,
+  type MeetingAiSnapshot,
 } from "../shared/contracts";
 import { DesktopApplicationState } from "./application/application_state";
 import {
@@ -100,15 +101,21 @@ import { CaptionWorkerSupervisor } from "./processes/caption_worker_supervisor";
 import { FormalTranscriptHandoffService } from "./domain/captions/formal_transcript_handoff_service";
 import { prepareFormalCaptureMedia } from "./domain/captions/formal_capture_media";
 import { finalizeCommittedCaptureTranscript } from "./domain/captions/capture_formal_completion";
+import { MeetingAiService } from "./domain/meeting-intelligence/meeting_ai_service";
+import { AiJobRepository } from "./storage/repositories/ai_job_repository";
+import { MacOSHelperSecretStore } from "./features/secrets/macos_helper_secret_store";
+import { UnavailableDesktopSecretStore } from "./features/secrets/secret_store_port";
 import { WorkerHealthSupervisor } from "./worker_health";
 
 let processingSmokeRequest: ProcessingSmokeRequest | null = null;
 let captureSmokeRequest: CaptureSmokeRequest | null = null;
 let captionFormalSmokeRequest: CaptionFormalSmokeRequest | null = null;
+let aiBoundarySmokeRequest: AiBoundarySmokeRequest | null = null;
 try {
   processingSmokeRequest = readProcessingSmokeRequest();
   captureSmokeRequest = readCaptureSmokeRequest();
   captionFormalSmokeRequest = readCaptionFormalSmokeRequest();
+  aiBoundarySmokeRequest = readAiBoundarySmokeRequest();
 } catch (error) {
   reportBootstrapFailure("request-parse", error);
   app.exit(78);
@@ -118,6 +125,7 @@ if (
     processingSmokeRequest,
     captureSmokeRequest,
     captionFormalSmokeRequest,
+    aiBoundarySmokeRequest,
   ].filter(Boolean).length > 1
 ) {
   throw new Error("packaged smoke modes are mutually exclusive");
@@ -125,7 +133,8 @@ if (
 const smokeAppDataPath =
   processingSmokeRequest?.appDataPath ??
   captureSmokeRequest?.appDataPath ??
-  captionFormalSmokeRequest?.appDataPath;
+  captionFormalSmokeRequest?.appDataPath ??
+  aiBoundarySmokeRequest?.appDataPath;
 if (smokeAppDataPath) {
   const smokeUserData = path.join(smokeAppDataPath, "electron-user-data");
   mkdirSync(smokeUserData, { recursive: true, mode: 0o700 });
@@ -155,6 +164,11 @@ interface CaptionFormalSmokeRequest {
   phase: "run" | "verify";
 }
 
+interface AiBoundarySmokeRequest {
+  appDataPath: string;
+  outputPath: string;
+}
+
 let captionFormalSmokeAuthority: {
   sessionId: string;
   recordingSha256: string;
@@ -175,6 +189,7 @@ let formalTranscriptHandoff: FormalTranscriptHandoffService | null = null;
 let meetingWorkspaceService: MeetingWorkspaceService | null = null;
 let meetingExportService: MeetingExportService | null = null;
 let meetingPlaybackService: MeetingPlaybackService | null = null;
+let meetingAiService: MeetingAiService | null = null;
 let resourceCatalog: ResourceCatalog | null = null;
 let captureService: DesktopCaptureService | null = null;
 let captureNativeSession: MacOSNativeHelperSession | null = null;
@@ -196,6 +211,7 @@ let processingLoop: Promise<void> | null = null;
 const applicationState = new DesktopApplicationState();
 const operationListeners = new Set<(event: OperationEvent) => void>();
 const captionListeners = new Set<(snapshot: CaptionSnapshot) => void>();
+const meetingAiListeners = new Set<(snapshot: MeetingAiSnapshot) => void>();
 
 function createMainWindow(): BrowserWindow {
   const window = new BrowserWindow({
@@ -405,6 +421,32 @@ function readCaptionFormalSmokeRequest(): CaptionFormalSmokeRequest | null {
     throw new Error("packaged caption formal smoke paths are not private");
   }
   return { appDataPath, outputPath, sourcePath, phase: phaseRaw };
+}
+
+function readAiBoundarySmokeRequest(): AiBoundarySmokeRequest | null {
+  const values = [
+    process.env.VOICE2TEXT_AI_BOUNDARY_SMOKE_APP_DATA,
+    process.env.VOICE2TEXT_AI_BOUNDARY_SMOKE_OUTPUT,
+  ];
+  if (values.every((value) => value === undefined)) return null;
+  if (!app.isPackaged || values.some((value) => !value)) {
+    throw new Error(
+      "packaged AI boundary smoke requires a complete packaged-only request",
+    );
+  }
+  const [appDataRaw, outputRaw] = values as [string, string];
+  const temporaryRoot = realpathSync(tmpdir());
+  const appDataPath = realpathSync(path.resolve(appDataRaw));
+  const outputPath = path.resolve(outputRaw);
+  const outputParent = realpathSync(path.dirname(outputPath));
+  if (
+    lstatSync(appDataPath).isSymbolicLink() ||
+    !isPathInside(temporaryRoot, appDataPath) ||
+    !isPathInside(temporaryRoot, outputParent)
+  ) {
+    throw new Error("packaged AI boundary smoke paths are not private");
+  }
+  return { appDataPath, outputPath };
 }
 
 async function runProcessingSmokeIfRequested(): Promise<void> {
@@ -1536,6 +1578,47 @@ async function prepareCaptureForQuit(): Promise<boolean> {
 function bindDesktopIpc(window: BrowserWindow): void {
   unregisterIpc?.();
   unregisterIpc = registerDesktopIpc(window, {
+    getAiSettings: async () => {
+      if (!meetingAiService)
+        throw new Error("meeting AI settings are unavailable");
+      return await meetingAiService.getSettings();
+    },
+    saveAiSettings: async (options) => {
+      if (!meetingAiService)
+        throw new Error("meeting AI settings are unavailable");
+      return await meetingAiService.saveSettings(options);
+    },
+    replaceAiProviderSecret: async (options) => {
+      if (!meetingAiService)
+        throw new Error("secure secret storage is unavailable");
+      return await meetingAiService.replaceSecret(
+        options.providerId,
+        options.secret,
+      );
+    },
+    deleteAiProviderSecret: async (options) => {
+      if (!meetingAiService)
+        throw new Error("secure secret storage is unavailable");
+      return await meetingAiService.deleteSecret(options.providerId);
+    },
+    prepareMeetingAi: async (options) => {
+      if (!meetingAiService) throw new Error("meeting AI is unavailable");
+      return meetingAiService.prepare(options);
+    },
+    getMeetingAiSnapshot: async ({ meetingId }) =>
+      meetingAiService?.snapshot(meetingId) ?? null,
+    generateMeetingAi: async (options) => {
+      if (!meetingAiService) throw new Error("meeting AI is unavailable");
+      return await meetingAiService.generate(options);
+    },
+    retryMeetingAi: async (options) => {
+      if (!meetingAiService) throw new Error("meeting AI is unavailable");
+      return await meetingAiService.retry(options);
+    },
+    onMeetingAiSnapshot: (listener) => {
+      meetingAiListeners.add(listener);
+      return () => meetingAiListeners.delete(listener);
+    },
     applicationSnapshot: () => applicationState.snapshot(),
     navigate: (section) => applicationState.navigate(section),
     requestBootstrapAction: async (action) =>
@@ -1838,7 +1921,8 @@ async function initializeApplication(): Promise<void> {
     if (
       processingSmokeRequest ||
       captureSmokeRequest ||
-      captionFormalSmokeRequest
+      captionFormalSmokeRequest ||
+      aiBoundarySmokeRequest
     )
       throw new Error(`Electron smoke profile blocked: ${profile.code}`);
     return;
@@ -1863,6 +1947,15 @@ async function initializeApplication(): Promise<void> {
     captureNativeSession = null;
     captureService = null;
   }
+  const secretStore = captureNativeSession
+    ? new MacOSHelperSecretStore(captureNativeSession)
+    : new UnavailableDesktopSecretStore();
+  meetingAiService = new MeetingAiService(
+    new AiJobRepository(profile.database),
+    secretStore,
+  );
+  meetingAiService.reconcileInterrupted();
+  meetingAiService.subscribe(publishMeetingAi);
   setupCaptureLifecycle();
   const workspaceRepository = new MeetingWorkspaceRepository(
     profile.database,
@@ -2072,8 +2165,92 @@ async function initializeApplication(): Promise<void> {
     traceCaptureSmoke("capture-smoke-start");
     await runCaptureSmokeIfRequested();
   }
-  if (!processingSmokeRequest && !captionFormalSmokeRequest)
+  if (aiBoundarySmokeRequest) {
+    await runAiBoundarySmokeIfRequested();
+  }
+  if (
+    !processingSmokeRequest &&
+    !captionFormalSmokeRequest &&
+    !aiBoundarySmokeRequest
+  )
     await runBootstrapSmokeIfRequested();
+}
+
+async function runAiBoundarySmokeIfRequested(): Promise<void> {
+  const request = aiBoundarySmokeRequest;
+  if (!request) return;
+  if (!meetingAiService || !profileDatabase || !captureNativeSession) {
+    throw new Error("packaged AI boundary smoke services are unavailable");
+  }
+  const before = profileDatabase
+    .prepare(
+      `SELECT
+        (SELECT COUNT(*) FROM ai_consents) AS consents,
+        (SELECT COUNT(*) FROM ai_jobs) AS jobs,
+        (SELECT COUNT(*) FROM ai_notes) AS notes`,
+    )
+    .get();
+  const originalFetch = globalThis.fetch;
+  let networkRequestCount = 0;
+  globalThis.fetch = ((...args: Parameters<typeof fetch>) => {
+    networkRequestCount += 1;
+    return originalFetch(...args);
+  }) as typeof fetch;
+  let settings;
+  let invalidEndpointRejected = false;
+  try {
+    settings = await meetingAiService.getSettings();
+    try {
+      await meetingAiService.saveSettings({
+        providerId: "openai-compatible",
+        modelId: "invalid-smoke-model",
+        endpoint: "http://untrusted.example.com",
+      });
+    } catch {
+      invalidEndpointRejected = true;
+    }
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+  if (!settings)
+    throw new Error("packaged AI settings snapshot is unavailable");
+  const after = profileDatabase
+    .prepare(
+      `SELECT
+        (SELECT COUNT(*) FROM ai_consents) AS consents,
+        (SELECT COUNT(*) FROM ai_jobs) AS jobs,
+        (SELECT COUNT(*) FROM ai_notes) AS notes`,
+    )
+    .get();
+  const receipt = {
+    schemaVersion: 1,
+    phase: "packaged-ai-local-boundary",
+    transport: captureNativeSession.transport,
+    providerId: settings.config.providerId,
+    modelId: settings.config.modelId,
+    endpointIdentitySha256: createHash("sha256")
+      .update(settings.config.endpoint)
+      .digest("hex"),
+    secretState: settings.secretState,
+    deviceSecurity: settings.deviceSecurity,
+    invalidEndpointRejected,
+    networkRequestCount,
+    before,
+    after,
+    databaseUserVersion: Number(
+      profileDatabase.prepare("PRAGMA user_version").get()?.user_version,
+    ),
+  };
+  const encoded = `${JSON.stringify(receipt, null, 2)}\n`;
+  if (Buffer.byteLength(encoded, "utf8") > 16 * 1024) {
+    throw new Error(
+      "AI boundary smoke receipt exceeded its privacy-safe bound",
+    );
+  }
+  const temporaryPath = `${request.outputPath}.tmp-${process.pid}`;
+  await writeFile(temporaryPath, encoded, { mode: 0o600 });
+  await rename(temporaryPath, request.outputPath);
+  app.quit();
 }
 
 async function initializeCapture(
@@ -2425,6 +2602,8 @@ async function teardownOwnedResources(): Promise<void> {
   meetingPlaybackService = null;
   meetingExportService = null;
   meetingWorkspaceService = null;
+  await meetingAiService?.shutdown();
+  meetingAiService = null;
   if (capturePollTimer) clearInterval(capturePollTimer);
   capturePollTimer = null;
   await liveCaptionService?.shutdown();
@@ -2442,6 +2621,10 @@ async function teardownOwnedResources(): Promise<void> {
   desktopRepository = null;
   transcriptRepository = null;
   resourceCatalog = null;
+}
+
+function publishMeetingAi(snapshot: MeetingAiSnapshot): void {
+  for (const listener of meetingAiListeners) listener(snapshot);
 }
 
 function emitOperation(event: Omit<OperationEvent, "protocolVersion">): void {

@@ -1,5 +1,6 @@
-import Foundation
 import CaptureCore
+import Foundation
+import NativeSecurity
 import SecureImport
 
 private let protocolIdentity = "voice2text-macos-helper/v1"
@@ -29,6 +30,15 @@ struct CaptureControlRequest: Codable {
   let reason: String?
 }
 
+struct SecretProviderRequest: Codable {
+  let providerId: String
+}
+
+struct SecretReplaceRequest: Codable {
+  let providerId: String
+  let secret: String
+}
+
 struct Handshake: Codable {
   let schemaVersion: Int
   let command: String
@@ -48,7 +58,9 @@ func emit(_ value: [String: Any]) {
 
 func nonce() -> String {
   var generator = SystemRandomNumberGenerator()
-  return (0..<32).map { _ in String(format: "%02x", UInt8.random(in: .min ... .max, using: &generator)) }.joined()
+  return (0..<32).map { _ in
+    String(format: "%02x", UInt8.random(in: .min ... .max, using: &generator))
+  }.joined()
 }
 
 func readLine() -> Data? {
@@ -81,18 +93,26 @@ guard let handshakeData = readLine(),
   handshake.capabilities.exactSourcePaths.count <= 32,
   handshake.capabilities.destinationRoots.count <= 8
 else {
-  emit(["schemaVersion": 1, "type": "error", "code": "HELPER_HANDSHAKE_REJECTED", "message": "helper handshake rejected"])
+  emit([
+    "schemaVersion": 1, "type": "error", "code": "HELPER_HANDSHAKE_REJECTED",
+    "message": "helper handshake rejected",
+  ])
   exit(64)
 }
 
-let exactSources = Set(handshake.capabilities.exactSourcePaths.map { URL(filePath: $0).standardizedFileURL.path })
-let destinationRoots = Set(handshake.capabilities.destinationRoots.map { URL(filePath: $0).standardizedFileURL.path })
+let exactSources = Set(
+  handshake.capabilities.exactSourcePaths.map { URL(filePath: $0).standardizedFileURL.path })
+let destinationRoots = Set(
+  handshake.capabilities.destinationRoots.map { URL(filePath: $0).standardizedFileURL.path })
 let captureController: CaptureController?
 if let captureRoot = handshake.capabilities.captureSessionRoot {
   do {
     captureController = try CaptureController(captureRootPath: captureRoot)
   } catch {
-    emit(["schemaVersion": 1, "type": "error", "code": "HELPER_HANDSHAKE_REJECTED", "message": "capture capability was invalid"])
+    emit([
+      "schemaVersion": 1, "type": "error", "code": "HELPER_HANDSHAKE_REJECTED",
+      "message": "capture capability was invalid",
+    ])
     exit(64)
   }
 } else {
@@ -115,6 +135,19 @@ func decodeRequest<T: Decodable>(_ type: T.Type, from object: [String: Any]) thr
   return try decoder.decode(T.self, from: JSONSerialization.data(withJSONObject: raw))
 }
 
+func decodeSecurityRequest<T: Decodable>(_ type: T.Type, from object: [String: Any]) throws -> T {
+  guard let raw = object["request"] as? [String: Any],
+    JSONSerialization.isValidJSONObject(raw),
+    let decoded = try? decoder.decode(T.self, from: JSONSerialization.data(withJSONObject: raw))
+  else {
+    throw NativeSecurityFailure(
+      "KEYCHAIN_ARGUMENTS_INVALID",
+      "Keychain arguments are invalid"
+    )
+  }
+  return decoded
+}
+
 func encodedObject<T: Encodable>(_ value: T) throws -> Any {
   try JSONSerialization.jsonObject(with: encoder.encode(value))
 }
@@ -133,7 +166,13 @@ let captureCommands: Set<String> = [
   "capture-stop", "capture-snapshot", "capture-recover", "capture-discard",
   "capture-system-sleep", "capture-system-wake",
 ]
-var seenCaptureCommandIds = Set<String>()
+let securityCommands: Set<String> = [
+  "secret-read", "secret-replace", "secret-delete", "filevault-status",
+]
+let replayProtectedCommands = captureCommands.union(securityCommands)
+let providerSecretStore = ProviderSecretStore()
+let fileVaultStatusProbe = FileVaultStatusProbe()
+var seenCommandIds = Set<String>()
 
 while let commandData = readLine() {
   do {
@@ -146,15 +185,26 @@ while let commandData = readLine() {
     else {
       throw SecureImportFailure("HELPER_SESSION_REJECTED", "helper session identity rejected")
     }
-    if captureCommands.contains(command) {
-      guard captureController != nil,
-        let commandId = object["commandId"] as? String,
+    if replayProtectedCommands.contains(command) {
+      guard let commandId = object["commandId"] as? String,
         commandId.range(of: #"^[a-zA-Z0-9-]{12,160}$"#, options: .regularExpression) != nil
       else {
-        throw CaptureFailure("HELPER_CAPABILITY_DENIED", "capture capability or command receipt is missing")
+        throw SecureImportFailure(
+          "HELPER_CAPABILITY_DENIED",
+          "command receipt is missing"
+        )
       }
-      guard seenCaptureCommandIds.insert(commandId).inserted else {
-        throw CaptureFailure("HELPER_COMMAND_REPLAYED", "capture command was replayed")
+      if captureCommands.contains(command), captureController == nil {
+        throw CaptureFailure(
+          "HELPER_CAPABILITY_DENIED",
+          "capture capability is missing"
+        )
+      }
+      guard seenCommandIds.insert(commandId).inserted else {
+        throw SecureImportFailure(
+          "HELPER_COMMAND_REPLAYED",
+          "helper command was replayed"
+        )
       }
     }
     switch command {
@@ -167,7 +217,8 @@ while let commandData = readLine() {
       guard exactSources.contains(URL(filePath: request.sourcePath).standardizedFileURL.path),
         destinationRoots.contains(URL(filePath: request.destinationRoot).standardizedFileURL.path)
       else {
-        throw SecureImportFailure("HELPER_CAPABILITY_DENIED", "path is outside the session capability")
+        throw SecureImportFailure(
+          "HELPER_CAPABILITY_DENIED", "path is outside the session capability")
       }
       let receipt = try SecureImporter().importMedia(request)
       let receiptObject = try JSONSerialization.jsonObject(with: encoder.encode(receipt))
@@ -176,13 +227,19 @@ while let commandData = readLine() {
       guard let path = object["path"] as? String,
         let root = object["destinationRoot"] as? String,
         destinationRoots.contains(URL(filePath: root).standardizedFileURL.path)
-      else { throw SecureImportFailure("HELPER_CAPABILITY_DENIED", "path is outside the session capability") }
+      else {
+        throw SecureImportFailure(
+          "HELPER_CAPABILITY_DENIED", "path is outside the session capability")
+      }
       try discardSecureImportedFile(path: path, destinationRoot: root)
       emitSession(["type": "result", "command": command])
     case "cleanup-import-temporary":
       guard let root = object["destinationRoot"] as? String,
         destinationRoots.contains(URL(filePath: root).standardizedFileURL.path)
-      else { throw SecureImportFailure("HELPER_CAPABILITY_DENIED", "path is outside the session capability") }
+      else {
+        throw SecureImportFailure(
+          "HELPER_CAPABILITY_DENIED", "path is outside the session capability")
+      }
       let removed = try cleanupSecureImportTemporaryFiles(destinationRoot: root)
       emitSession(["type": "result", "command": command, "removed": removed])
     case "capture-preflight":
@@ -231,14 +288,59 @@ while let commandData = readLine() {
       let request = try decodeRequest(CaptureControlRequest.self, from: object)
       try captureController!.discard(sessionId: request.sessionId)
       emitSession(["type": "result", "command": command])
+    case "secret-read":
+      let request = try decodeSecurityRequest(SecretProviderRequest.self, from: object)
+      let value = try providerSecretStore.read(providerId: request.providerId)
+      let receipt: [String: Any]
+      switch value {
+      case .available(let secret):
+        receipt = ["schemaVersion": 1, "state": "available", "secret": secret]
+      case .missing:
+        receipt = ["schemaVersion": 1, "state": "missing"]
+      case .denied:
+        receipt = ["schemaVersion": 1, "state": "denied"]
+      case .corrupt:
+        receipt = ["schemaVersion": 1, "state": "corrupt"]
+      }
+      emitSession(["type": "result", "command": command, "secret": receipt])
+    case "secret-replace":
+      let request = try decodeSecurityRequest(SecretReplaceRequest.self, from: object)
+      let state = try providerSecretStore.replace(
+        providerId: request.providerId,
+        secret: request.secret
+      )
+      emitSession([
+        "type": "result",
+        "command": command,
+        "secret": ["schemaVersion": 1, "state": state.rawValue],
+      ])
+    case "secret-delete":
+      let request = try decodeSecurityRequest(SecretProviderRequest.self, from: object)
+      let state = try providerSecretStore.delete(providerId: request.providerId)
+      emitSession([
+        "type": "result",
+        "command": command,
+        "secret": ["schemaVersion": 1, "state": state.rawValue],
+      ])
+    case "filevault-status":
+      emitSession([
+        "type": "result",
+        "command": command,
+        "security": try encodedObject(fileVaultStatusProbe.status()),
+      ])
     default:
-      throw SecureImportFailure("HELPER_COMMAND_NOT_ALLOWLISTED", "helper command is not allowlisted")
+      throw SecureImportFailure(
+        "HELPER_COMMAND_NOT_ALLOWLISTED", "helper command is not allowlisted")
     }
   } catch let failure as SecureImportFailure {
     emitSession(["type": "error", "code": failure.code, "message": failure.message])
   } catch let failure as CaptureFailure {
     emitSession(["type": "error", "code": failure.code, "message": failure.message])
+  } catch let failure as NativeSecurityFailure {
+    emitSession(["type": "error", "code": failure.code, "message": failure.message])
   } catch {
-    emitSession(["type": "error", "code": "HELPER_REQUEST_INVALID", "message": "helper request was invalid"])
+    emitSession([
+      "type": "error", "code": "HELPER_REQUEST_INVALID", "message": "helper request was invalid",
+    ])
   }
 }

@@ -50,6 +50,19 @@ import {
   type MeetingSummary,
   type MeetingWorkspaceSnapshot,
   type PlaybackAction,
+  getAiSettingsRequestSchema,
+  saveAiSettingsRequestSchema,
+  replaceAiProviderSecretRequestSchema,
+  deleteAiProviderSecretRequestSchema,
+  prepareMeetingAiRequestSchema,
+  getMeetingAiSnapshotRequestSchema,
+  generateMeetingAiRequestSchema,
+  retryMeetingAiRequestSchema,
+  type AiSettingsSnapshot,
+  type GenerateMeetingAiRequest,
+  type MeetingAiConsentPreview,
+  type MeetingAiSnapshot,
+  type RetryMeetingAiRequest,
 } from "../../shared/contracts";
 
 export interface IpcInvocationContext {
@@ -66,6 +79,34 @@ export interface IpcTrustPolicy {
 }
 
 export interface DesktopIpcServices {
+  getAiSettings(): Promise<AiSettingsSnapshot>;
+  saveAiSettings(options: {
+    providerId: "deepseek" | "openai-compatible";
+    modelId: string;
+    endpoint: string;
+  }): Promise<AiSettingsSnapshot>;
+  replaceAiProviderSecret(options: {
+    providerId: "deepseek" | "openai-compatible";
+    secret: string;
+  }): Promise<AiSettingsSnapshot>;
+  deleteAiProviderSecret(options: {
+    providerId: "deepseek" | "openai-compatible";
+  }): Promise<AiSettingsSnapshot>;
+  prepareMeetingAi(options: {
+    meetingId: number;
+    generationId: number;
+    templateId: string;
+  }): Promise<MeetingAiConsentPreview>;
+  getMeetingAiSnapshot(options: {
+    meetingId: number;
+  }): Promise<MeetingAiSnapshot | null>;
+  generateMeetingAi(
+    options: GenerateMeetingAiRequest,
+  ): Promise<MeetingAiSnapshot>;
+  retryMeetingAi(options: RetryMeetingAiRequest): Promise<MeetingAiSnapshot>;
+  onMeetingAiSnapshot?(
+    listener: (snapshot: MeetingAiSnapshot) => void,
+  ): () => void;
   applicationSnapshot(): ApplicationSnapshot;
   navigate(section: ShellSection): ApplicationSnapshot;
   requestBootstrapAction(action: BootstrapAction): Promise<ApplicationSnapshot>;
@@ -223,6 +264,74 @@ export function createDesktopIpcHandlers(options: {
   maximumPayloadBytes?: number;
 }): DesktopIpcHandlers {
   const handlers = new Map<string, RegisteredHandler>([
+    [
+      ipcChannels.aiSettingsGet,
+      {
+        schema: getAiSettingsRequestSchema,
+        invoke: async () => options.services.getAiSettings(),
+      },
+    ],
+    [
+      ipcChannels.aiSettingsSave,
+      {
+        schema: saveAiSettingsRequestSchema,
+        invoke: async (
+          payload: Parameters<DesktopIpcServices["saveAiSettings"]>[0],
+        ) => options.services.saveAiSettings(payload),
+      } as RegisteredHandler,
+    ],
+    [
+      ipcChannels.aiSecretReplace,
+      {
+        schema: replaceAiProviderSecretRequestSchema,
+        invoke: async (
+          payload: Parameters<DesktopIpcServices["replaceAiProviderSecret"]>[0],
+        ) => options.services.replaceAiProviderSecret(payload),
+      } as RegisteredHandler,
+    ],
+    [
+      ipcChannels.aiSecretDelete,
+      {
+        schema: deleteAiProviderSecretRequestSchema,
+        invoke: async (
+          payload: Parameters<DesktopIpcServices["deleteAiProviderSecret"]>[0],
+        ) => options.services.deleteAiProviderSecret(payload),
+      } as RegisteredHandler,
+    ],
+    [
+      ipcChannels.meetingAiPrepare,
+      {
+        schema: prepareMeetingAiRequestSchema,
+        invoke: async (
+          payload: Parameters<DesktopIpcServices["prepareMeetingAi"]>[0],
+        ) => options.services.prepareMeetingAi(payload),
+      } as RegisteredHandler,
+    ],
+    [
+      ipcChannels.meetingAiSnapshotGet,
+      {
+        schema: getMeetingAiSnapshotRequestSchema,
+        invoke: async (
+          payload: Parameters<DesktopIpcServices["getMeetingAiSnapshot"]>[0],
+        ) => options.services.getMeetingAiSnapshot(payload),
+      } as RegisteredHandler,
+    ],
+    [
+      ipcChannels.meetingAiGenerate,
+      {
+        schema: generateMeetingAiRequestSchema,
+        invoke: async (payload: GenerateMeetingAiRequest) =>
+          options.services.generateMeetingAi(payload),
+      } as RegisteredHandler,
+    ],
+    [
+      ipcChannels.meetingAiRetry,
+      {
+        schema: retryMeetingAiRequestSchema,
+        invoke: async (payload: RetryMeetingAiRequest) =>
+          options.services.retryMeetingAi(payload),
+      } as RegisteredHandler,
+    ],
     [
       ipcChannels.applicationSnapshot,
       {

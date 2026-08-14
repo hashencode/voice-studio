@@ -21,6 +21,13 @@ import type {
   CaptionSnapshot,
   CaptionSnapshotRequest,
 } from "./captions";
+import type {
+  AiSettingsSnapshot,
+  GenerateMeetingAiRequest,
+  MeetingAiConsentPreview,
+  MeetingAiSnapshot,
+  RetryMeetingAiRequest,
+} from "./meeting_ai";
 
 export const desktopProtocolVersion = 1 as const;
 export const desktopWorkerHealthProtocol =
@@ -56,6 +63,15 @@ export const ipcChannels = {
   captionSnapshotGet: "desktop.captions.snapshot.get.v1",
   captionFormalRetry: "desktop.captions.formal.retry.v1",
   captionSnapshotEvent: "desktop.captions.snapshot.v1",
+  aiSettingsGet: "desktop.ai.settings.get.v1",
+  aiSettingsSave: "desktop.ai.settings.save.v1",
+  aiSecretReplace: "desktop.ai.secret.replace.v1",
+  aiSecretDelete: "desktop.ai.secret.delete.v1",
+  meetingAiPrepare: "desktop.ai.meeting.prepare.v1",
+  meetingAiSnapshotGet: "desktop.ai.meeting.snapshot.get.v1",
+  meetingAiGenerate: "desktop.ai.meeting.generate.v1",
+  meetingAiRetry: "desktop.ai.meeting.retry.v1",
+  meetingAiSnapshotEvent: "desktop.ai.meeting.snapshot.v1",
 } as const;
 
 export const workerHealthRequestSchema = z
@@ -187,6 +203,34 @@ export type ImportMeetingResponse = z.infer<typeof importMeetingResponseSchema>;
 export type DesktopError = z.infer<typeof desktopErrorSchema>;
 
 export interface Voice2TextDesktopApi {
+  getAiSettings(): Promise<AiSettingsSnapshot>;
+  saveAiSettings(options: {
+    providerId: "deepseek" | "openai-compatible";
+    modelId: string;
+    endpoint: string;
+  }): Promise<AiSettingsSnapshot>;
+  replaceAiProviderSecret(options: {
+    providerId: "deepseek" | "openai-compatible";
+    secret: string;
+  }): Promise<AiSettingsSnapshot>;
+  deleteAiProviderSecret(options: {
+    providerId: "deepseek" | "openai-compatible";
+  }): Promise<AiSettingsSnapshot>;
+  prepareMeetingAi(options: {
+    meetingId: number;
+    generationId: number;
+    templateId: string;
+  }): Promise<MeetingAiConsentPreview>;
+  getMeetingAiSnapshot(options: {
+    meetingId: number;
+  }): Promise<MeetingAiSnapshot | null>;
+  generateMeetingAi(
+    options: GenerateMeetingAiRequest,
+  ): Promise<MeetingAiSnapshot>;
+  retryMeetingAi(options: RetryMeetingAiRequest): Promise<MeetingAiSnapshot>;
+  onMeetingAiSnapshot(
+    listener: (snapshot: MeetingAiSnapshot) => void,
+  ): () => void;
   getApplicationSnapshot(): Promise<
     import("./application_state").ApplicationSnapshot
   >;

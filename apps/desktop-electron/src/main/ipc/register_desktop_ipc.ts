@@ -32,6 +32,14 @@ export function registerDesktopIpc(
     services,
   });
   const channels = [
+    ipcChannels.aiSettingsGet,
+    ipcChannels.aiSettingsSave,
+    ipcChannels.aiSecretReplace,
+    ipcChannels.aiSecretDelete,
+    ipcChannels.meetingAiPrepare,
+    ipcChannels.meetingAiSnapshotGet,
+    ipcChannels.meetingAiGenerate,
+    ipcChannels.meetingAiRetry,
     ipcChannels.applicationSnapshot,
     ipcChannels.applicationNavigate,
     ipcChannels.applicationBootstrapAction,
@@ -83,10 +91,16 @@ export function registerDesktopIpc(
       window.webContents.send(ipcChannels.captionSnapshotEvent, snapshot);
     }
   });
+  const unsubscribeMeetingAi = services.onMeetingAiSnapshot?.((snapshot) => {
+    if (!window.isDestroyed()) {
+      window.webContents.send(ipcChannels.meetingAiSnapshotEvent, snapshot);
+    }
+  });
   return () => {
     unsubscribeSnapshot?.();
     unsubscribeOperation?.();
     unsubscribeCaption?.();
+    unsubscribeMeetingAi?.();
     for (const channel of channels) ipcMain.removeHandler(channel);
   };
 }
