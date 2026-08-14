@@ -1,17 +1,25 @@
 import { randomBytes, randomUUID } from "node:crypto";
+import path from "node:path";
 import { spawn, type ChildProcessWithoutNullStreams } from "node:child_process";
 import { createInterface, type Interface } from "node:readline";
 
 import {
+  capturePreflightSchema,
+  captureSnapshotSchema,
   secureImportReceiptSchema,
   secureImportRequestSchema,
   type SecureImportReceipt,
   type SecureImportRequest,
+  type CapturePreflight,
+  type CaptureSnapshot,
+  type CaptureStartCommand,
+  type CaptureControlCommand,
 } from "../../../shared/contracts";
 
-interface HelperCapabilities {
+export interface HelperCapabilities {
   exactSourcePaths: string[];
   destinationRoots: string[];
+  captureSessionRoot?: string;
 }
 
 interface HelperFrame {
@@ -36,7 +44,10 @@ export class MacOSNativeHelperClient {
   ): Promise<MacOSNativeHelperSession> {
     if (
       capabilities.exactSourcePaths.length > 32 ||
-      capabilities.destinationRoots.length > 8
+      capabilities.destinationRoots.length > 8 ||
+      (capabilities.captureSessionRoot !== undefined &&
+        (!path.isAbsolute(capabilities.captureSessionRoot) ||
+          Buffer.byteLength(capabilities.captureSessionRoot, "utf8") > 2_048))
     ) {
       throw new Error("helper capability set exceeded the session limit");
     }
@@ -153,6 +164,76 @@ export class MacOSNativeHelperSession {
     return Number(response.removed);
   }
 
+  async capturePreflight(request: {
+    minimumFreeBytes: number;
+    captionModelAvailable: boolean;
+    requestPermissions: boolean;
+  }): Promise<CapturePreflight> {
+    const response = await this.invoke({
+      command: "capture-preflight",
+      request,
+    });
+    return capturePreflightSchema.parse(response.capture);
+  }
+
+  async captureStart(command: CaptureStartCommand): Promise<CaptureSnapshot> {
+    const response = await this.invoke({
+      command: "capture-start",
+      commandId: command.idempotencyKey,
+      request: {
+        sessionId: command.sessionId,
+        minimumFreeBytes: command.minimumFreeBytes,
+        microphoneDeviceId: command.microphoneDeviceId,
+      },
+    });
+    return captureSnapshotSchema.parse(response.capture);
+  }
+
+  async captureControl(
+    command: CaptureControlCommand,
+  ): Promise<CaptureSnapshot> {
+    const response = await this.invoke({
+      command: `capture-${command.action}`,
+      commandId: command.idempotencyKey,
+      request: { sessionId: command.sessionId },
+    });
+    return captureSnapshotSchema.parse(response.capture);
+  }
+
+  async captureLifecycle(
+    action: "system-sleep" | "system-wake",
+    sessionId: string,
+    commandId: string,
+  ): Promise<CaptureSnapshot> {
+    const response = await this.invoke({
+      command: `capture-${action}`,
+      commandId,
+      request: { sessionId },
+    });
+    return captureSnapshotSchema.parse(response.capture);
+  }
+
+  async captureSnapshot(sessionId: string): Promise<CaptureSnapshot> {
+    const response = await this.invoke({
+      command: "capture-snapshot",
+      request: { sessionId },
+    });
+    return captureSnapshotSchema.parse(response.capture);
+  }
+
+  async captureRecover(): Promise<CaptureSnapshot[]> {
+    const response = await this.invoke({ command: "capture-recover" });
+    return captureSnapshotSchema.array().max(256).parse(response.captures);
+  }
+
+  async captureDiscard(sessionId: string, commandId: string): Promise<void> {
+    await this.invoke({
+      command: "capture-discard",
+      commandId,
+      request: { sessionId },
+    });
+  }
+
   async invokeRaw(command: Record<string, unknown>): Promise<HelperFrame> {
     return await this.invoke(command);
   }
@@ -173,6 +254,7 @@ export class MacOSNativeHelperSession {
             helperNonce: this.helperNonce,
             clientNonce: this.clientNonce,
             sessionId: this.sessionId,
+            commandId: randomUUID(),
             ...command,
           });
           response = await withTimeout(

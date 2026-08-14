@@ -75,6 +75,11 @@ function installOperationsApi(overrides: Partial<Voice2TextDesktopApi> = {}) {
     assignMeetingSpeaker: vi.fn(),
     controlMeetingPlayback: vi.fn(),
     exportMeeting: vi.fn(),
+    preflightCapture: vi.fn(),
+    startCapture: vi.fn(),
+    controlCapture: vi.fn(),
+    listCaptureRecoveries: vi.fn(async () => []),
+    actOnCaptureRecovery: vi.fn(),
     onOperationEvent: vi.fn((listener) => {
       operationListener = listener;
       return unsubscribeOperation;

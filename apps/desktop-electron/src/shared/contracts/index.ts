@@ -1,4 +1,5 @@
 export * from "./application_state";
+export * from "./capture";
 export * from "./ipc";
 export * from "./import_processing";
 export * from "./meeting_workspace";

@@ -15,6 +15,7 @@ import type {
   MeetingWorkspaceSnapshot,
   PlaybackAction,
 } from "./meeting_workspace";
+import type { CapturePreflight, CaptureSnapshot } from "./capture";
 
 export const desktopProtocolVersion = 1 as const;
 export const desktopWorkerHealthProtocol =
@@ -42,6 +43,11 @@ export const ipcChannels = {
   meetingAssignSpeaker: "desktop.meetings.assign-speaker.v1",
   meetingPlayback: "desktop.meetings.playback.v1",
   meetingExport: "desktop.meetings.export.v1",
+  capturePreflight: "desktop.capture.preflight.v1",
+  captureStart: "desktop.capture.start.v1",
+  captureControl: "desktop.capture.control.v1",
+  captureRecoveryList: "desktop.capture.recovery-list.v1",
+  captureRecoveryAction: "desktop.capture.recovery-action.v1",
 } as const;
 
 export const workerHealthRequestSchema = z
@@ -256,4 +262,25 @@ export interface Voice2TextDesktopApi {
     meetingId: number,
     format: MeetingExportFormat,
   ): Promise<ExportMeetingResponse>;
+  preflightCapture(options: {
+    requestPermissions: boolean;
+    captionEnabled: boolean;
+  }): Promise<CapturePreflight>;
+  startCapture(options: {
+    title: string;
+    microphoneDeviceId?: string;
+    captionEnabled: boolean;
+    idempotencyKey: string;
+  }): Promise<CaptureSnapshot>;
+  controlCapture(options: {
+    action: "pause" | "resume" | "stop";
+    sessionId: string;
+    idempotencyKey: string;
+  }): Promise<CaptureSnapshot>;
+  listCaptureRecoveries(): Promise<CaptureSnapshot[]>;
+  actOnCaptureRecovery(options: {
+    action: "keep" | "discard";
+    sessionId: string;
+    idempotencyKey: string;
+  }): Promise<CaptureSnapshot | null>;
 }

@@ -1,9 +1,11 @@
 import {
   chmodSync,
+  mkdirSync,
   mkdtempSync,
   readFileSync,
   realpathSync,
   rmSync,
+  symlinkSync,
   writeFileSync,
 } from "node:fs";
 import { tmpdir } from "node:os";
@@ -75,6 +77,100 @@ describe.skipIf(process.platform !== "darwin")(
         false,
       );
       await session.close();
+    });
+
+    it("recovers only its declared capture root and rejects replay", async () => {
+      const root = mkdtempSync(
+        join(realpathSync(tmpdir()), "voice2text-capture-helper-"),
+      );
+      roots.push(root);
+      const captureRoot = join(root, "captures");
+      const capture = join(captureRoot, "session-recovery-123456");
+      mkdirSync(capture, { recursive: true, mode: 0o700 });
+      writeFileSync(
+        join(capture, "journal.json"),
+        JSON.stringify({
+          schemaVersion: 1,
+          schema: "desktop-capture-session/v1",
+          sessionId: "session-recovery-123456",
+          state: "recording",
+          captureMode: "dual_track",
+          captureTimelineMs: 20,
+          chunks: [],
+          events: [],
+        }),
+      );
+      const session = await new MacOSNativeHelperClient(
+        nativeHelperPath(),
+      ).openSession({
+        exactSourcePaths: [],
+        destinationRoots: [],
+        captureSessionRoot: captureRoot,
+      });
+      try {
+        await expect(session.captureRecover()).resolves.toEqual([
+          expect.objectContaining({
+            sessionId: "session-recovery-123456",
+            state: "recoverable",
+          }),
+        ]);
+        const replay = {
+          command: "capture-recover",
+          commandId: "capture-replay-123456",
+        };
+        await expect(session.invokeRaw(replay)).resolves.toMatchObject({
+          type: "result",
+        });
+        await expect(session.invokeRaw(replay)).rejects.toThrow(
+          /HELPER_COMMAND_REPLAYED/,
+        );
+        await expect(
+          session.invokeRaw({
+            command: "capture-recover",
+            helperNonce: "0".repeat(64),
+          }),
+        ).rejects.toThrow(/HELPER_SESSION_REJECTED/);
+        await expect(
+          session.invokeRaw({ command: "capture-delete-root" }),
+        ).rejects.toThrow(/HELPER_COMMAND_NOT_ALLOWLISTED/);
+        await expect(
+          session.captureDiscard("../outside", "discard-escape-123456"),
+        ).rejects.toThrow(/CAPTURE_ARGUMENTS_INVALID/);
+      } finally {
+        await session.close();
+      }
+    });
+
+    it("rejects capture commands without a capture capability", async () => {
+      const session = await new MacOSNativeHelperClient(
+        nativeHelperPath(),
+      ).openSession({ exactSourcePaths: [], destinationRoots: [] });
+      try {
+        await expect(session.captureRecover()).rejects.toThrow(
+          /HELPER_CAPABILITY_DENIED/,
+        );
+      } finally {
+        await session.close();
+      }
+    });
+
+    it("rejects a symbolic-link capture root during handshake", async () => {
+      const root = mkdtempSync(
+        join(realpathSync(tmpdir()), "voice2text-capture-link-"),
+      );
+      roots.push(root);
+      const outside = join(root, "outside");
+      mkdirSync(outside);
+      const link = join(root, "capture-link");
+      // A root capability is never allowed to acquire authority through a link.
+      symlinkSync(outside, link);
+      await expect(
+        new MacOSNativeHelperClient(nativeHelperPath()).openSession({
+          exactSourcePaths: [],
+          destinationRoots: [],
+          captureSessionRoot: link,
+        }),
+      ).rejects.toThrow();
     });
   },
 );
@@ -180,4 +276,11 @@ async function waitForFile(path: string): Promise<void> {
       throw new Error(`timed out waiting for ${path}`);
     await new Promise((resolve) => setTimeout(resolve, 10));
   }
+}
+
+function nativeHelperPath(): string {
+  return join(
+    import.meta.dirname,
+    "../../../../packages/desktop_macos_native/.build/debug/desktop_macos_native_helper",
+  );
 }

@@ -36,6 +36,15 @@ function temporaryRoot(): string {
 }
 
 describe("Electron SQLite v1", () => {
+  it("keeps SQLite's in-memory sentinel off disk", () => {
+    const database = openElectronDatabase(":memory:");
+    try {
+      expect(database.prepare("PRAGMA database_list").get()?.file).toBe("");
+    } finally {
+      database.close();
+    }
+  });
+
   it("creates the fresh schema with its application identity and foreign keys", () => {
     const initialized = initializeElectronProfile(temporaryRoot());
     if (initialized.status !== "ready") throw new Error(initialized.message);

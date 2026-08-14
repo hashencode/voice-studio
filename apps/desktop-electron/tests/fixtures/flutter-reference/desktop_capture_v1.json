@@ -1,0 +1,56 @@
+{
+  "schemaVersion": 1,
+  "authority": "apps/desktop capture/recovery source",
+  "protocol": "voice2text-macos-helper/v1",
+  "captureSchema": "desktop-capture-session/v1",
+  "states": [
+    "idle",
+    "preflight",
+    "preparing",
+    "recording",
+    "paused",
+    "finalizing",
+    "completed",
+    "recoverable",
+    "partial_capture",
+    "failed"
+  ],
+  "commands": [
+    "capture-preflight",
+    "capture-start",
+    "capture-pause",
+    "capture-resume",
+    "capture-stop",
+    "capture-snapshot",
+    "capture-recover",
+    "capture-discard"
+  ],
+  "preflightBranches": {
+    "permissionDenied": "microphone_permission_denied",
+    "unsupportedRuntime": "system_audio_runtime_unsupported",
+    "missingDevice": "microphone_device_missing",
+    "lowDisk": "disk_space_low",
+    "captionUnavailable": "caption_model_unavailable"
+  },
+  "tracks": ["system_audio", "microphone"],
+  "healthyTrackFailure": {
+    "state": "partial_capture",
+    "requiresGap": true,
+    "preservesHealthyTrack": true
+  },
+  "journal": {
+    "maximumChunks": 100000,
+    "maximumEvents": 100000,
+    "chunkDurationMs": 5000,
+    "hash": "sha256",
+    "corruptTailDisposition": "quarantine"
+  },
+  "lifecycle": {
+    "rendererLossKeepsCapture": true,
+    "sleepPauses": true,
+    "wakeRequiresExplicitResume": true,
+    "quitDefault": "continue_recording",
+    "quitCommitAction": "stop_finalize_quit",
+    "quitOffersDiscard": false
+  }
+}

@@ -15,6 +15,7 @@ import {
   migrateSchemaV3ToV4,
   migrateSchemaV4ToV5,
   migrateSchemaV5ToV6,
+  migrateSchemaV6ToV7,
   REQUIRED_SCHEMA_TABLES,
 } from "./schema";
 
@@ -51,8 +52,11 @@ export function openElectronProfileDatabase(
 }
 
 export function openElectronDatabase(databasePath: string): DatabaseSync {
-  const resolvedPath = resolve(databasePath);
-  mkdirSync(dirname(resolvedPath), { recursive: true });
+  const resolvedPath =
+    databasePath === ":memory:" ? databasePath : resolve(databasePath);
+  if (resolvedPath !== ":memory:") {
+    mkdirSync(dirname(resolvedPath), { recursive: true });
+  }
   let database: DatabaseSync | undefined;
   try {
     database = new DatabaseSync(resolvedPath);
@@ -171,6 +175,13 @@ function migrate(database: DatabaseSync): void {
     withTransaction(database, () => {
       migrateSchemaV5ToV6(database);
       database.exec("PRAGMA user_version = 6");
+    });
+    version = 6;
+  }
+  if (version === 6) {
+    withTransaction(database, () => {
+      migrateSchemaV6ToV7(database);
+      database.exec("PRAGMA user_version = 7");
     });
   }
 }

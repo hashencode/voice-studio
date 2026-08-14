@@ -7,7 +7,7 @@ import {
   SidebarTrigger,
   useSidebar,
 } from "@/components/ui/sidebar";
-import { CaptureWorkspaceOverlay } from "@/features/shell/capture-workspace-overlay";
+import { CaptureWorkspace } from "@/features/capture/capture-workspace";
 import {
   CapabilityUnavailable,
   LoadingShell,
@@ -81,7 +81,10 @@ export default function App() {
           />
         </main>
       </SidebarInset>
-      <CaptureWorkspaceOverlay capture={snapshot.capture} />
+      <CaptureWorkspace
+        capture={snapshot.capture}
+        applicationRevision={snapshot.revision}
+      />
     </SidebarProvider>
   );
 }

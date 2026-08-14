@@ -1,17 +1,33 @@
 import path from "node:path";
 import { readFile, writeFile, rename, rm } from "node:fs/promises";
-import { existsSync, lstatSync, mkdirSync, realpathSync } from "node:fs";
-import { randomBytes } from "node:crypto";
+import {
+  appendFileSync,
+  existsSync,
+  lstatSync,
+  mkdirSync,
+  realpathSync,
+} from "node:fs";
+import { createHash, randomBytes, randomUUID } from "node:crypto";
 import { tmpdir } from "node:os";
 import type { DatabaseSync } from "node:sqlite";
 
-import { app, BrowserWindow, dialog, session } from "electron";
+import {
+  app,
+  BrowserWindow,
+  dialog,
+  Menu,
+  nativeImage,
+  powerMonitor,
+  session,
+  Tray,
+} from "electron";
 
 import {
   desktopProtocolVersion,
   type BootstrapAction,
   type ImportMeetingResponse,
   type OperationEvent,
+  type CaptureSnapshot,
 } from "../shared/contracts";
 import { DesktopApplicationState } from "./application/application_state";
 import {
@@ -29,7 +45,23 @@ import {
   cleanupExpiredTemporaryWorkspaces,
 } from "./domain/processing/temporary_workspace_cleanup";
 import { resolveMacOSNativeHelper } from "./features/importing/helper_locator";
-import { MacOSNativeHelperClient } from "./features/importing/macos_native_helper_client";
+import {
+  MacOSNativeHelperClient,
+  type MacOSNativeHelperSession,
+} from "./features/importing/macos_native_helper_client";
+import { DesktopCaptureService } from "./domain/capture/desktop_capture_service";
+import type { CaptureNativePort } from "./domain/capture/capture_native_port";
+import { MacOSCaptureNativePort } from "./domain/capture/macos_capture_native_port";
+import {
+  activeCaptureQuitDialog,
+  captureIsRunning,
+  captureRequiresQuitConfirmation,
+} from "./domain/capture/capture_lifecycle_policy";
+import {
+  capturePreflightAllowsStart,
+  hasVerifiedLiveCaptionCapability,
+} from "./domain/capture/capture_capability";
+import { listAvailableCaptureRecoveries } from "./domain/capture/capture_availability";
 import { BrowserWindowPlaybackPort } from "./features/playback/browser_window_playback_port";
 import { MeetingPlaybackService } from "./features/playback/meeting_playback_service";
 import { MeetingExportService } from "./domain/workspace/meeting_export_service";
@@ -60,16 +92,27 @@ import { secureWebPreferences } from "./security";
 import { sha256File } from "./security/sha256_file";
 import { DesktopRepository } from "./storage/desktop_repository";
 import { MeetingWorkspaceRepository } from "./storage/repositories/meeting_workspace_repository";
+import { CaptureRepository } from "./storage/repositories/capture_repository";
 import { WorkerHealthSupervisor } from "./worker_health";
 
-const processingSmokeRequest = readProcessingSmokeRequest();
-if (processingSmokeRequest) {
-  const smokeUserData = path.join(
-    processingSmokeRequest.appDataPath,
-    "electron-user-data",
-  );
+let processingSmokeRequest: ProcessingSmokeRequest | null = null;
+let captureSmokeRequest: CaptureSmokeRequest | null = null;
+try {
+  processingSmokeRequest = readProcessingSmokeRequest();
+  captureSmokeRequest = readCaptureSmokeRequest();
+} catch (error) {
+  reportBootstrapFailure("request-parse", error);
+  app.exit(78);
+}
+if (processingSmokeRequest && captureSmokeRequest) {
+  throw new Error("packaged smoke modes are mutually exclusive");
+}
+const smokeAppDataPath =
+  processingSmokeRequest?.appDataPath ?? captureSmokeRequest?.appDataPath;
+if (smokeAppDataPath) {
+  const smokeUserData = path.join(smokeAppDataPath, "electron-user-data");
   mkdirSync(smokeUserData, { recursive: true, mode: 0o700 });
-  app.setPath("appData", processingSmokeRequest.appDataPath);
+  app.setPath("appData", smokeAppDataPath);
   app.setPath("userData", smokeUserData);
 }
 const isPrimaryInstance = runPrimaryInstance(app, () => app.enableSandbox());
@@ -80,6 +123,12 @@ interface ProcessingSmokeRequest {
   sourcePath: string;
   referenceBindings: ProcessingSmokeReferenceBindings;
   workstationOutputPath: string | null;
+}
+
+interface CaptureSmokeRequest {
+  appDataPath: string;
+  outputPath: string;
+  phase: "initialize" | "crash" | "verify";
 }
 
 let mainWindow: BrowserWindow | null = null;
@@ -94,6 +143,19 @@ let meetingWorkspaceService: MeetingWorkspaceService | null = null;
 let meetingExportService: MeetingExportService | null = null;
 let meetingPlaybackService: MeetingPlaybackService | null = null;
 let resourceCatalog: ResourceCatalog | null = null;
+let captureService: DesktopCaptureService | null = null;
+let captureNativeSession: MacOSNativeHelperSession | null = null;
+let captureTray: Tray | null = null;
+let activeCaptureTitle = "会议录制";
+let captureLifecycleBound = false;
+let capturePollTimer: ReturnType<typeof setInterval> | null = null;
+let capturePollInFlight = false;
+let captureSmokeQuitChoices: number[] = [];
+let captureSmokeQuitEvidence: Record<string, unknown> | null = null;
+let captureSmokeBeforeQuitAttempts = 0;
+let captureSmokeContinueObserved = false;
+let captureSmokeStopCalls = 0;
+let teardownStarted = false;
 let teardownPromise: Promise<void> | null = null;
 let teardownComplete = false;
 let bootstrapPromise: Promise<void> | null = null;
@@ -235,6 +297,40 @@ function readProcessingSmokeRequest(): ProcessingSmokeRequest | null {
     referenceBindings: parseProcessingSmokeReferenceBindings(bindingsRaw),
     workstationOutputPath,
   };
+}
+
+function readCaptureSmokeRequest(): CaptureSmokeRequest | null {
+  const values = [
+    process.env.VOICE2TEXT_CAPTURE_SMOKE_APP_DATA,
+    process.env.VOICE2TEXT_CAPTURE_SMOKE_OUTPUT,
+    process.env.VOICE2TEXT_CAPTURE_SMOKE_PHASE,
+  ];
+  if (values.every((value) => value === undefined)) return null;
+  if (!app.isPackaged || values.some((value) => !value)) {
+    throw new Error(
+      "packaged capture smoke requires a complete packaged-only request",
+    );
+  }
+  const [appDataRaw, outputRaw, phaseRaw] = values as [string, string, string];
+  if (
+    phaseRaw !== "initialize" &&
+    phaseRaw !== "crash" &&
+    phaseRaw !== "verify"
+  ) {
+    throw new Error("packaged capture smoke phase is invalid");
+  }
+  const temporaryRoot = realpathSync(tmpdir());
+  const appDataPath = realpathSync(path.resolve(appDataRaw));
+  const outputPath = path.resolve(outputRaw);
+  const outputParent = realpathSync(path.dirname(outputPath));
+  if (
+    lstatSync(appDataPath).isSymbolicLink() ||
+    !isPathInside(temporaryRoot, appDataPath) ||
+    !isPathInside(temporaryRoot, outputParent)
+  ) {
+    throw new Error("packaged capture smoke paths are not private");
+  }
+  return { appDataPath, outputPath, phase: phaseRaw };
 }
 
 async function runProcessingSmokeIfRequested(): Promise<void> {
@@ -775,6 +871,248 @@ function isPathInside(root: string, candidate: string): boolean {
   );
 }
 
+const minimumCaptureFreeBytes = 2 * 1024 * 1024 * 1024;
+
+async function preflightCapture(options: {
+  requestPermissions: boolean;
+  captionEnabled: boolean;
+}) {
+  if (!captureService) throw new Error("macOS capture helper is unavailable");
+  return await captureService.preflight({
+    minimumFreeBytes: minimumCaptureFreeBytes,
+    captionModelAvailable:
+      !options.captionEnabled ||
+      hasVerifiedLiveCaptionCapability(resourceCatalog),
+    requestPermissions: options.requestPermissions,
+  });
+}
+
+async function startCapture(options: {
+  title: string;
+  microphoneDeviceId?: string;
+  captionEnabled: boolean;
+  idempotencyKey: string;
+}): Promise<CaptureSnapshot> {
+  if (!captureService) throw new Error("macOS capture helper is unavailable");
+  const preflight = await preflightCapture({
+    requestPermissions: false,
+    captionEnabled: options.captionEnabled,
+  });
+  if (!capturePreflightAllowsStart(preflight, options.captionEnabled)) {
+    throw new Error(
+      `capture preflight failed: ${preflight.blockingReasons.join(",")}`,
+    );
+  }
+  const result = await captureService.start({
+    sessionId: `session-${randomUUID()}`,
+    title: options.title,
+    idempotencyKey: options.idempotencyKey,
+    minimumFreeBytes: minimumCaptureFreeBytes,
+    microphoneDeviceId: options.microphoneDeviceId,
+    captionEnabled: options.captionEnabled,
+  });
+  activeCaptureTitle = options.title;
+  publishCapture(result);
+  return result;
+}
+
+async function controlCapture(options: {
+  action: "pause" | "resume" | "stop";
+  sessionId: string;
+  idempotencyKey: string;
+}): Promise<CaptureSnapshot> {
+  if (!captureService) throw new Error("macOS capture helper is unavailable");
+  const result = await captureService.control(options);
+  publishCapture(result);
+  return result;
+}
+
+function publishCapture(snapshot: CaptureSnapshot | null): void {
+  applicationState.setCapture(snapshot, activeCaptureTitle);
+  updateCaptureTray(snapshot);
+}
+
+function setupCaptureLifecycle(): void {
+  if (captureLifecycleBound) return;
+  captureLifecycleBound = true;
+  if (process.platform === "darwin") {
+    const image = nativeImage.createFromNamedImage("NSStatusAvailable");
+    image.setTemplateImage(true);
+    captureTray = new Tray(image);
+    captureTray.setToolTip("Voice2Text 会议录制");
+    updateCaptureTray(captureService?.snapshot() ?? null);
+  }
+  powerMonitor.on("suspend", () => {
+    void applyCaptureLifecycle("system-sleep");
+  });
+  powerMonitor.on("resume", () => {
+    void applyCaptureLifecycle("system-wake");
+  });
+  capturePollTimer = setInterval(() => void pollCaptureSnapshot(), 500);
+}
+
+async function pollCaptureSnapshot(): Promise<void> {
+  const current = captureService?.snapshot();
+  if (
+    !captureService ||
+    !current ||
+    capturePollInFlight ||
+    ![
+      "preparing",
+      "recording",
+      "paused",
+      "finalizing",
+      "partial_capture",
+    ].includes(current.state)
+  ) {
+    return;
+  }
+  capturePollInFlight = true;
+  try {
+    publishCapture(await captureService.refresh(current.sessionId));
+  } catch (error) {
+    console.error("Capture snapshot refresh failed", error);
+  } finally {
+    capturePollInFlight = false;
+  }
+}
+
+async function applyCaptureLifecycle(
+  action: "system-sleep" | "system-wake",
+): Promise<void> {
+  const current = captureService?.snapshot();
+  if (!captureService || !current) return;
+  if (action === "system-sleep" && !captureIsRunning(current)) return;
+  if (
+    action === "system-wake" &&
+    (current.state !== "paused" ||
+      current.interruptionReason !== "system_sleep")
+  ) {
+    return;
+  }
+  try {
+    publishCapture(
+      await captureService.lifecycle(
+        action,
+        current.sessionId,
+        captureService.nextLifecycleIdempotencyKey(action, current.sessionId),
+      ),
+    );
+  } catch (error) {
+    console.error("Capture lifecycle transition failed", error);
+  }
+}
+
+function updateCaptureTray(snapshot: CaptureSnapshot | null): void {
+  if (!captureTray) return;
+  const running = snapshot ? captureIsRunning(snapshot) : false;
+  const paused = snapshot?.state === "paused";
+  captureTray.setContextMenu(
+    Menu.buildFromTemplate([
+      {
+        label: running ? `正在录制 · ${activeCaptureTitle}` : "当前没有录制",
+        enabled: false,
+      },
+      { type: "separator" },
+      {
+        label: paused ? "继续录制" : "暂停录制",
+        enabled: Boolean(snapshot && (running || paused)),
+        click: () => {
+          if (!snapshot) return;
+          void controlCapture({
+            action: paused ? "resume" : "pause",
+            sessionId: snapshot.sessionId,
+            idempotencyKey: `${paused ? "resume" : "pause"}-menu-${randomUUID()}`,
+          }).catch((error: unknown) =>
+            console.error("Capture menu action failed", error),
+          );
+        },
+      },
+      {
+        label: "停止并保存",
+        enabled: Boolean(snapshot && (running || paused)),
+        click: () => {
+          if (!snapshot) return;
+          void controlCapture({
+            action: "stop",
+            sessionId: snapshot.sessionId,
+            idempotencyKey: `stop-menu-${randomUUID()}`,
+          }).catch((error: unknown) =>
+            console.error("Capture menu stop failed", error),
+          );
+        },
+      },
+      { type: "separator" },
+      {
+        label: "打开 Voice2Text",
+        click: () => {
+          if (!mainWindow) {
+            mainWindow = createMainWindow();
+            bindDesktopIpc(mainWindow);
+          }
+          mainWindow.show();
+          mainWindow.focus();
+        },
+      },
+    ]),
+  );
+}
+
+async function prepareCaptureForQuit(): Promise<boolean> {
+  const current = captureService?.snapshot();
+  const requiresConfirmation = captureRequiresQuitConfirmation(current ?? null);
+  if (!current || !requiresConfirmation) return true;
+  captureSmokeBeforeQuitAttempts += captureSmokeQuitEvidence ? 1 : 0;
+  const injectedChoice = captureSmokeQuitEvidence
+    ? captureSmokeQuitChoices.shift()
+    : undefined;
+  const choice =
+    injectedChoice === undefined
+      ? mainWindow
+        ? await dialog.showMessageBox(mainWindow, activeCaptureQuitDialog)
+        : await dialog.showMessageBox(activeCaptureQuitDialog)
+      : { response: injectedChoice };
+  if (choice.response === 0) {
+    if (captureSmokeQuitEvidence) {
+      captureSmokeContinueObserved =
+        !teardownStarted &&
+        profileDatabase !== null &&
+        captureIsRunning(current);
+      setTimeout(() => app.quit(), 25);
+    }
+    return false;
+  }
+  try {
+    await controlCapture({
+      action: "stop",
+      sessionId: current.sessionId,
+      idempotencyKey: `stop-quit-${current.sessionId}`,
+    });
+    if (captureSmokeQuitEvidence && captureSmokeRequest) {
+      const durableStop = profileDatabase
+        ?.prepare(
+          "SELECT COUNT(*) AS count FROM capture_command_receipts WHERE session_id = ? AND action = 'stop'",
+        )
+        .get(current.sessionId);
+      await writeCaptureSmokeReceipt(captureSmokeRequest.outputPath, {
+        ...captureSmokeQuitEvidence,
+        quitLifecycle: {
+          beforeQuitAttempts: captureSmokeBeforeQuitAttempts,
+          continueCanceledTeardown: captureSmokeContinueObserved,
+          stopCalls: captureSmokeStopCalls,
+          stopReceiptObservedBeforeTeardown:
+            Number(durableStop?.count ?? 0) === 1 && !teardownStarted,
+          databaseOpenBeforeTeardown: profileDatabase !== null,
+        },
+      });
+    }
+    return true;
+  } catch (error) {
+    console.error("Capture could not be committed; quit was stopped", error);
+    return false;
+  }
+}
+
 function bindDesktopIpc(window: BrowserWindow): void {
   unregisterIpc?.();
   unregisterIpc = registerDesktopIpc(window, {
@@ -831,6 +1169,30 @@ function bindDesktopIpc(window: BrowserWindow): void {
     },
     listProcessingTasks: async () => domainService?.listProcessingTasks() ?? [],
     importMeeting: async () => await chooseAndImportMeeting(),
+    preflightCapture: async (options) => await preflightCapture(options),
+    startCapture: async (options) => await startCapture(options),
+    controlCapture: async (options) => await controlCapture(options),
+    listCaptureRecoveries: async () => {
+      return listAvailableCaptureRecoveries(captureService);
+    },
+    actOnCaptureRecovery: async (options) => {
+      if (!captureService) throw new Error("capture recovery is unavailable");
+      if (options.action === "discard") {
+        await captureService.discardRecovered(
+          options.sessionId,
+          options.idempotencyKey,
+        );
+        const next = captureService.listRecoveries()[0] ?? null;
+        publishCapture(next);
+        return next;
+      }
+      const kept = captureService.keepRecovered(
+        options.sessionId,
+        options.idempotencyKey,
+      );
+      publishCapture(kept);
+      return kept;
+    },
     listMeetings: async (options) => {
       if (!meetingWorkspaceService)
         throw new Error("meeting workspace is unavailable");
@@ -1014,12 +1376,13 @@ async function bootstrapApplication(): Promise<void> {
 }
 
 async function initializeApplication(): Promise<void> {
+  traceCaptureSmoke("initialize-start");
   applicationState.beginBootstrap();
   const profile = initializeElectronProfile(
-    processingSmokeRequest?.appDataPath ?? app.getPath("appData"),
+    smokeAppDataPath ?? app.getPath("appData"),
   );
-  applicationState.completeBootstrap(profile);
   if (profile.status === "blocked") {
+    applicationState.completeBootstrap(profile);
     console.error(
       JSON.stringify({
         event: "electron-profile-initialization-blocked",
@@ -1028,14 +1391,25 @@ async function initializeApplication(): Promise<void> {
         repairable: profile.repairable,
       }),
     );
-    if (processingSmokeRequest)
+    if (processingSmokeRequest || captureSmokeRequest)
       throw new Error(`Electron smoke profile blocked: ${profile.code}`);
     return;
   }
   profileDatabase = profile.database;
+  traceCaptureSmoke("profile-ready");
   profilePaths = profile.profile;
   desktopRepository = new DesktopRepository(profile.database, profile.profile);
   domainService = new DesktopDomainService(desktopRepository);
+  try {
+    await initializeCapture(profile.database, profile.profile);
+    traceCaptureSmoke("capture-ready");
+  } catch (error) {
+    console.error("macOS capture initialization failed", error);
+    await captureNativeSession?.close().catch(() => undefined);
+    captureNativeSession = null;
+    captureService = null;
+  }
+  setupCaptureLifecycle();
   const workspaceRepository = new MeetingWorkspaceRepository(
     profile.database,
     profile.profile,
@@ -1092,6 +1466,7 @@ async function initializeApplication(): Promise<void> {
       }
     },
   );
+  applicationState.completeBootstrap(profile);
   applicationState.setLibraryCount(desktopRepository.countMeetings());
   const attemptsRoot = path.join(
     profile.profile.workspaceDirectory,
@@ -1134,6 +1509,7 @@ async function initializeApplication(): Promise<void> {
     },
   });
   try {
+    traceCaptureSmoke("catalog-start");
     resourceCatalog = await ResourceCatalog.load(
       resolveResourceRoot({
         appRoot: app.getAppPath(),
@@ -1155,13 +1531,259 @@ async function initializeApplication(): Promise<void> {
     } else {
       scheduleProcessing();
     }
+    traceCaptureSmoke("catalog-ready");
   } catch (error) {
     applicationState.setProcessingCapability(
       error instanceof Error ? error.message : "本地处理运行时不可用",
     );
     if (processingSmokeRequest) throw error;
   }
+  if (captureSmokeRequest) {
+    traceCaptureSmoke("capture-smoke-start");
+    await runCaptureSmokeIfRequested();
+  }
   if (!processingSmokeRequest) await runBootstrapSmokeIfRequested();
+}
+
+async function initializeCapture(
+  database: DatabaseSync,
+  profile: ElectronProfilePaths,
+): Promise<void> {
+  const helperPath = resolveMacOSNativeHelper({
+    appRoot: app.getAppPath(),
+    packaged: app.isPackaged,
+    resourcesPath: process.resourcesPath,
+  });
+  if (!existsSync(helperPath))
+    throw new Error("macOS capture helper is missing");
+  const helper = new MacOSNativeHelperClient(helperPath, {
+    handshakeTimeoutMs: 10_000,
+    invokeTimeoutMs: 30_000,
+  });
+  captureNativeSession = await helper.openSession({
+    exactSourcePaths: [],
+    destinationRoots: [],
+    captureSessionRoot: profile.captureDirectory,
+  });
+  captureService = new DesktopCaptureService(
+    new CaptureRepository(database),
+    new MacOSCaptureNativePort(captureNativeSession),
+    profile.captureDirectory,
+  );
+  const recoveries = await captureService.recover();
+  activeCaptureTitle = recoveries.length > 0 ? "中断的会议录制" : "会议录制";
+  publishCapture(recoveries[0] ?? captureService.snapshot());
+}
+
+async function runCaptureSmokeIfRequested(): Promise<void> {
+  const request = captureSmokeRequest;
+  if (!request) return;
+  if (!captureService || !captureNativeSession || !profileDatabase) {
+    throw new Error("packaged capture smoke services are unavailable");
+  }
+  if (request.phase === "initialize") {
+    await writeCaptureSmokeReceipt(request.outputPath, {
+      schemaVersion: 1,
+      phase: "profile-initialized",
+      databaseUserVersion: Number(
+        profileDatabase.prepare("PRAGMA user_version").get()?.user_version,
+      ),
+      transport: captureNativeSession.transport,
+    });
+    app.exit(85);
+    return;
+  }
+  const recoveries = captureService.listRecoveries();
+  if (recoveries.length !== 1) {
+    throw new Error("packaged capture smoke expected one recovery");
+  }
+  const recovery = recoveries[0]!;
+  const recoveryReceiptCount = Number(
+    profileDatabase
+      .prepare(
+        "SELECT COUNT(*) AS count FROM capture_command_receipts WHERE session_id = ? AND action = 'recover'",
+      )
+      .get(recovery.sessionId)?.count ?? -1,
+  );
+  if (recoveryReceiptCount !== 1) {
+    throw new Error("packaged recovery receipt was not idempotent");
+  }
+  if (request.phase === "crash") {
+    profileDatabase.exec("PRAGMA wal_checkpoint(FULL)");
+    await writeCaptureSmokeReceipt(request.outputPath, {
+      schemaVersion: 1,
+      phase: "recovered-before-crash",
+      recoveryReceiptCount,
+      transport: captureNativeSession.transport,
+      sessionIdentitySha256: createHash("sha256")
+        .update(recovery.sessionId)
+        .digest("hex"),
+    });
+    app.exit(86);
+    return;
+  }
+  const kept = captureService.keepRecovered(
+    recovery.sessionId,
+    `keep-smoke-${recovery.sessionId}`,
+  );
+  const row = profileDatabase
+    .prepare(
+      `SELECT state, recording_sha256, journal_sha256, recovery_disposition
+       FROM capture_sessions WHERE session_id = ?`,
+    )
+    .get(recovery.sessionId);
+  const counts = profileDatabase
+    .prepare(
+      `SELECT
+        (SELECT COUNT(*) FROM capture_tracks WHERE session_id = ?) AS tracks,
+        (SELECT COUNT(*) FROM capture_chunks WHERE session_id = ?) AS chunks,
+        (SELECT COUNT(*) FROM capture_events WHERE session_id = ?) AS events,
+        (SELECT COUNT(*) FROM capture_command_receipts WHERE session_id = ?) AS receipts`,
+    )
+    .get(
+      recovery.sessionId,
+      recovery.sessionId,
+      recovery.sessionId,
+      recovery.sessionId,
+    );
+  const trackCount = Number(counts?.tracks ?? -1);
+  const chunkCount = Number(counts?.chunks ?? -1);
+  const eventCount = Number(counts?.events ?? -1);
+  const receiptCount = Number(counts?.receipts ?? -1);
+  if (
+    row?.state !== "partial_capture" ||
+    row.recovery_disposition !== "kept" ||
+    row.recording_sha256 !== kept.recordingSha256 ||
+    row.journal_sha256 !== kept.journalSha256 ||
+    trackCount < 1 ||
+    chunkCount < 1 ||
+    receiptCount !== 2
+  ) {
+    throw new Error("packaged capture DB authority did not commit atomically");
+  }
+  captureSmokeQuitEvidence = {
+    schemaVersion: 1,
+    phase: "recovered-kept-after-restart",
+    transport: captureNativeSession.transport,
+    sessionIdentitySha256: createHash("sha256")
+      .update(recovery.sessionId)
+      .digest("hex"),
+    recordingSha256: kept.recordingSha256,
+    journalSha256: kept.journalSha256,
+    recoveryReceiptCount,
+    trackCount,
+    chunkCount,
+    eventCount,
+    receiptCount,
+    databaseUserVersion: Number(
+      profileDatabase.prepare("PRAGMA user_version").get()?.user_version,
+    ),
+    quitPolicy: {
+      defaultAction:
+        activeCaptureQuitDialog.buttons[activeCaptureQuitDialog.defaultId],
+      cancelAction:
+        activeCaptureQuitDialog.buttons[activeCaptureQuitDialog.cancelId],
+      offersDiscard: activeCaptureQuitDialog.buttons.some((button) =>
+        /discard|丢弃/i.test(button),
+      ),
+    },
+  };
+  const smokeSessionId = "session-quit-lifecycle-123456";
+  const smokeHash = createHash("sha256")
+    .update("packaged-quit-lifecycle-authority")
+    .digest("hex");
+  const recording = (): CaptureSnapshot => ({
+    sessionId: smokeSessionId,
+    state: "recording",
+    captureMode: "microphone_only",
+    captureTimelineMs: 1,
+    systemAudioHealthy: false,
+    microphoneHealthy: true,
+    partialCapture: false,
+    finalizedChunkCount: 0,
+    eventCount: 0,
+    gapCount: 0,
+    interruptionReason: null,
+    recordingSha256: null,
+    journalSha256: null,
+  });
+  const smokeNative: CaptureNativePort = {
+    preflight: async () => {
+      throw new Error("smoke preflight is unavailable");
+    },
+    start: async () => recording(),
+    pause: async () => ({ ...recording(), state: "paused" }),
+    resume: async () => recording(),
+    stop: async () => {
+      captureSmokeStopCalls += 1;
+      return {
+        ...recording(),
+        state: "completed",
+        microphoneHealthy: false,
+        recordingSha256: smokeHash,
+        journalSha256: smokeHash,
+      };
+    },
+    systemSleep: async () => ({ ...recording(), state: "paused" }),
+    systemWake: async () => ({ ...recording(), state: "paused" }),
+    snapshot: async () => recording(),
+    recover: async () => [],
+    discard: async () => undefined,
+  };
+  captureService = new DesktopCaptureService(
+    new CaptureRepository(profileDatabase),
+    smokeNative,
+    profilePaths!.captureDirectory,
+    Date.now,
+    async () => ({
+      schema: "desktop-capture-session/v1",
+      sessionId: smokeSessionId,
+      captureMode: "microphone_only",
+      tracks: [
+        {
+          kind: "microphone",
+          healthy: false,
+          sampleRate: 48_000,
+          channels: 1,
+          format: "float32",
+        },
+      ],
+      chunks: [],
+      events: [],
+    }),
+  );
+  publishCapture(
+    await captureService.start({
+      sessionId: smokeSessionId,
+      title: "Packaged quit lifecycle",
+      idempotencyKey: "start-quit-lifecycle-123456",
+      minimumFreeBytes: 0,
+      captionEnabled: false,
+    }),
+  );
+  captureSmokeQuitChoices = [0, 1];
+  app.quit();
+}
+
+async function writeCaptureSmokeReceipt(
+  outputPath: string,
+  receipt: Record<string, unknown>,
+): Promise<void> {
+  const encoded = `${JSON.stringify(receipt, null, 2)}\n`;
+  if (Buffer.byteLength(encoded, "utf8") > 16 * 1024) {
+    throw new Error("capture smoke receipt exceeded its privacy-safe bound");
+  }
+  const temporaryPath = `${outputPath}.tmp-${process.pid}`;
+  await writeFile(temporaryPath, encoded, { mode: 0o600 });
+  await rename(temporaryPath, outputPath);
+}
+
+function traceCaptureSmoke(stage: string): void {
+  if (!captureSmokeRequest) return;
+  appendFileSync(`${captureSmokeRequest.outputPath}.trace`, `${stage}\n`, {
+    encoding: "utf8",
+    mode: 0o600,
+  });
 }
 
 if (isPrimaryInstance) {
@@ -1203,10 +1825,20 @@ if (isPrimaryInstance) {
   });
 
   app.on("before-quit", (event) => {
+    if (
+      captureSmokeRequest?.phase === "initialize" ||
+      captureSmokeRequest?.phase === "crash"
+    )
+      return;
     if (teardownComplete) return;
     event.preventDefault();
-    teardownPromise ??= teardownOwnedResources()
-      .then(() => {
+    teardownPromise ??= prepareCaptureForQuit()
+      .then(async (shouldQuit) => {
+        if (!shouldQuit) {
+          teardownPromise = null;
+          return;
+        }
+        await teardownOwnedResources();
         teardownComplete = true;
         app.quit();
       })
@@ -1220,7 +1852,32 @@ if (isPrimaryInstance) {
   });
 }
 
+function reportBootstrapFailure(stage: string, error: unknown): void {
+  if (!process.env.VOICE2TEXT_CAPTURE_SMOKE_PHASE) return;
+  const record = error instanceof Error ? error : new Error("unknown error");
+  const candidateCode = (error as NodeJS.ErrnoException | undefined)?.code;
+  const code = typeof candidateCode === "string" ? candidateCode : "none";
+  const sanitize = (value: string): string =>
+    value
+      .replace(/(?:\/[^\s:]+)+/g, "<path>")
+      .replace(/\b(?:nonce|secret|token)=[^\s]+/gi, "$1=<redacted>")
+      .replace(/[^\x20-\x7e]/g, "?")
+      .slice(0, 240);
+  const receipt = JSON.stringify({
+    stage: sanitize(stage),
+    name: sanitize(record.name),
+    code: sanitize(code),
+    message: sanitize(record.message),
+  });
+  try {
+    process.stderr.write(`[capture-bootstrap-error] ${receipt}\n`);
+  } catch {
+    // A diagnostic failure must not replace the original bootstrap failure.
+  }
+}
+
 async function teardownOwnedResources(): Promise<void> {
+  teardownStarted = true;
   unregisterIpc?.();
   unregisterIpc = null;
   await processCoordinator?.shutdown();
@@ -1233,6 +1890,13 @@ async function teardownOwnedResources(): Promise<void> {
   meetingPlaybackService = null;
   meetingExportService = null;
   meetingWorkspaceService = null;
+  if (capturePollTimer) clearInterval(capturePollTimer);
+  capturePollTimer = null;
+  await captureNativeSession?.close();
+  captureNativeSession = null;
+  captureService = null;
+  captureTray?.destroy();
+  captureTray = null;
   profileDatabase?.close();
   profileDatabase = null;
   profilePaths = null;

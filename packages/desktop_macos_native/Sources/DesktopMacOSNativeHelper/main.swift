@@ -1,4 +1,5 @@
 import Foundation
+import CaptureCore
 import SecureImport
 
 private let protocolIdentity = "voice2text-macos-helper/v1"
@@ -8,6 +9,24 @@ private let decoder = JSONDecoder()
 struct Capabilities: Codable {
   let exactSourcePaths: [String]
   let destinationRoots: [String]
+  let captureSessionRoot: String?
+}
+
+struct CapturePreflightRequest: Codable {
+  let minimumFreeBytes: Int64
+  let captionModelAvailable: Bool
+  let requestPermissions: Bool
+}
+
+struct CaptureStartRequest: Codable {
+  let sessionId: String
+  let minimumFreeBytes: Int64
+  let microphoneDeviceId: String?
+}
+
+struct CaptureControlRequest: Codable {
+  let sessionId: String
+  let reason: String?
 }
 
 struct Handshake: Codable {
@@ -68,6 +87,17 @@ else {
 
 let exactSources = Set(handshake.capabilities.exactSourcePaths.map { URL(filePath: $0).standardizedFileURL.path })
 let destinationRoots = Set(handshake.capabilities.destinationRoots.map { URL(filePath: $0).standardizedFileURL.path })
+let captureController: CaptureController?
+if let captureRoot = handshake.capabilities.captureSessionRoot {
+  do {
+    captureController = try CaptureController(captureRootPath: captureRoot)
+  } catch {
+    emit(["schemaVersion": 1, "type": "error", "code": "HELPER_HANDSHAKE_REJECTED", "message": "capture capability was invalid"])
+    exit(64)
+  }
+} else {
+  captureController = nil
+}
 emit([
   "schemaVersion": 1,
   "type": "ready",
@@ -78,6 +108,17 @@ emit([
   "sessionId": handshake.sessionId,
 ])
 
+func decodeRequest<T: Decodable>(_ type: T.Type, from object: [String: Any]) throws -> T {
+  guard let raw = object["request"] as? [String: Any],
+    JSONSerialization.isValidJSONObject(raw)
+  else { throw CaptureFailure("CAPTURE_ARGUMENTS_INVALID", "capture arguments are invalid") }
+  return try decoder.decode(T.self, from: JSONSerialization.data(withJSONObject: raw))
+}
+
+func encodedObject<T: Encodable>(_ value: T) throws -> Any {
+  try JSONSerialization.jsonObject(with: encoder.encode(value))
+}
+
 func emitSession(_ fields: [String: Any]) {
   var frame = fields
   frame["schemaVersion"] = 1
@@ -86,6 +127,13 @@ func emitSession(_ fields: [String: Any]) {
   frame["sessionId"] = handshake.sessionId
   emit(frame)
 }
+
+let captureCommands: Set<String> = [
+  "capture-preflight", "capture-start", "capture-pause", "capture-resume",
+  "capture-stop", "capture-snapshot", "capture-recover", "capture-discard",
+  "capture-system-sleep", "capture-system-wake",
+]
+var seenCaptureCommandIds = Set<String>()
 
 while let commandData = readLine() {
   do {
@@ -97,6 +145,17 @@ while let commandData = readLine() {
       let command = object["command"] as? String
     else {
       throw SecureImportFailure("HELPER_SESSION_REJECTED", "helper session identity rejected")
+    }
+    if captureCommands.contains(command) {
+      guard captureController != nil,
+        let commandId = object["commandId"] as? String,
+        commandId.range(of: #"^[a-zA-Z0-9-]{12,160}$"#, options: .regularExpression) != nil
+      else {
+        throw CaptureFailure("HELPER_CAPABILITY_DENIED", "capture capability or command receipt is missing")
+      }
+      guard seenCaptureCommandIds.insert(commandId).inserted else {
+        throw CaptureFailure("HELPER_COMMAND_REPLAYED", "capture command was replayed")
+      }
     }
     switch command {
     case "secure-import":
@@ -126,10 +185,58 @@ while let commandData = readLine() {
       else { throw SecureImportFailure("HELPER_CAPABILITY_DENIED", "path is outside the session capability") }
       let removed = try cleanupSecureImportTemporaryFiles(destinationRoot: root)
       emitSession(["type": "result", "command": command, "removed": removed])
+    case "capture-preflight":
+      let request = try decodeRequest(CapturePreflightRequest.self, from: object)
+      let value = try captureController!.preflight(
+        minimumFreeBytes: request.minimumFreeBytes,
+        captionModelAvailable: request.captionModelAvailable,
+        requestPermissions: request.requestPermissions
+      )
+      emitSession(["type": "result", "command": command, "capture": try encodedObject(value)])
+    case "capture-start":
+      let request = try decodeRequest(CaptureStartRequest.self, from: object)
+      let value = try captureController!.start(
+        sessionId: request.sessionId,
+        minimumFreeBytes: request.minimumFreeBytes,
+        microphoneDeviceId: request.microphoneDeviceId
+      )
+      emitSession(["type": "result", "command": command, "capture": try encodedObject(value)])
+    case "capture-pause", "capture-system-sleep":
+      let request = try decodeRequest(CaptureControlRequest.self, from: object)
+      let value = try captureController!.pause(
+        sessionId: request.sessionId,
+        reason: command == "capture-system-sleep" ? "system_sleep" : request.reason
+      )
+      emitSession(["type": "result", "command": command, "capture": try encodedObject(value)])
+    case "capture-resume":
+      let request = try decodeRequest(CaptureControlRequest.self, from: object)
+      let value = try captureController!.resume(sessionId: request.sessionId)
+      emitSession(["type": "result", "command": command, "capture": try encodedObject(value)])
+    case "capture-system-wake":
+      let request = try decodeRequest(CaptureControlRequest.self, from: object)
+      let value = try captureController!.markWake(sessionId: request.sessionId)
+      emitSession(["type": "result", "command": command, "capture": try encodedObject(value)])
+    case "capture-stop":
+      let request = try decodeRequest(CaptureControlRequest.self, from: object)
+      let value = try captureController!.stop(sessionId: request.sessionId)
+      emitSession(["type": "result", "command": command, "capture": try encodedObject(value)])
+    case "capture-snapshot":
+      let request = try decodeRequest(CaptureControlRequest.self, from: object)
+      let value = try captureController!.currentSnapshot(sessionId: request.sessionId)
+      emitSession(["type": "result", "command": command, "capture": try encodedObject(value)])
+    case "capture-recover":
+      let values = try captureController!.recover()
+      emitSession(["type": "result", "command": command, "captures": try encodedObject(values)])
+    case "capture-discard":
+      let request = try decodeRequest(CaptureControlRequest.self, from: object)
+      try captureController!.discard(sessionId: request.sessionId)
+      emitSession(["type": "result", "command": command])
     default:
       throw SecureImportFailure("HELPER_COMMAND_NOT_ALLOWLISTED", "helper command is not allowlisted")
     }
   } catch let failure as SecureImportFailure {
+    emitSession(["type": "error", "code": failure.code, "message": failure.message])
+  } catch let failure as CaptureFailure {
     emitSession(["type": "error", "code": failure.code, "message": failure.message])
   } catch {
     emitSession(["type": "error", "code": "HELPER_REQUEST_INVALID", "message": "helper request was invalid"])

@@ -1,4 +1,6 @@
 import path from "node:path";
+import { execFileSync } from "node:child_process";
+import { existsSync } from "node:fs";
 
 import type { ForgeConfig } from "@electron-forge/shared-types";
 import { MakerZIP } from "@electron-forge/maker-zip";
@@ -10,12 +12,37 @@ const config: ForgeConfig = {
     appCategoryType: "public.app-category.productivity",
     asar: true,
     executableName: "Voice2Text",
+    extendInfo: {
+      NSMicrophoneUsageDescription:
+        "Voice2Text uses the selected microphone for meetings you explicitly record.",
+      NSAudioCaptureUsageDescription:
+        "Voice2Text captures system audio only while you explicitly record a meeting.",
+    },
     extraResource: [
       path.resolve("resources/worker"),
       path.resolve("resources/native"),
       path.resolve("resources/playback"),
     ],
-    osxSign: {},
+  },
+  hooks: {
+    postPackage: async (_forgeConfig, result) => {
+      if (result.platform !== "darwin") return;
+      for (const outputPath of result.outputPaths) {
+        const appPath = outputPath.endsWith(".app")
+          ? outputPath
+          : path.join(outputPath, "Voice2Text.app");
+        if (!existsSync(appPath)) {
+          throw new Error("unexpected macOS package output");
+        }
+        execFileSync("/usr/bin/codesign", [
+          "--force",
+          "--deep",
+          "--sign",
+          "-",
+          appPath,
+        ]);
+      }
+    },
   },
   rebuildConfig: {},
   makers: [new MakerZIP({}, ["darwin"])],

@@ -33,6 +33,12 @@ import {
   meetingWorkspaceSnapshotSchema,
   type MeetingExportFormat,
   type PlaybackAction,
+  capturePreflightRequestSchema,
+  captureStartRequestSchema,
+  captureControlRequestSchema,
+  captureRecoveryActionRequestSchema,
+  capturePreflightSchema,
+  captureSnapshotSchema,
 } from "../shared/contracts";
 
 export interface PreloadIpcBridge {
@@ -104,6 +110,46 @@ export function createDesktopApi(
     async importMeeting() {
       const response = await bridge.invoke(ipcChannels.importMeeting, {});
       return importMeetingResponseSchema.parse(response);
+    },
+    async preflightCapture(
+      options: Parameters<Voice2TextDesktopApi["preflightCapture"]>[0],
+    ) {
+      const payload = capturePreflightRequestSchema.parse(options);
+      return capturePreflightSchema.parse(
+        await bridge.invoke(ipcChannels.capturePreflight, payload),
+      );
+    },
+    async startCapture(
+      options: Parameters<Voice2TextDesktopApi["startCapture"]>[0],
+    ) {
+      const payload = captureStartRequestSchema.parse(options);
+      return captureSnapshotSchema.parse(
+        await bridge.invoke(ipcChannels.captureStart, payload),
+      );
+    },
+    async controlCapture(
+      options: Parameters<Voice2TextDesktopApi["controlCapture"]>[0],
+    ) {
+      const payload = captureControlRequestSchema.parse(options);
+      return captureSnapshotSchema.parse(
+        await bridge.invoke(ipcChannels.captureControl, payload),
+      );
+    },
+    async listCaptureRecoveries() {
+      return captureSnapshotSchema
+        .array()
+        .max(256)
+        .parse(await bridge.invoke(ipcChannels.captureRecoveryList, {}));
+    },
+    async actOnCaptureRecovery(
+      options: Parameters<Voice2TextDesktopApi["actOnCaptureRecovery"]>[0],
+    ) {
+      const payload = captureRecoveryActionRequestSchema.parse(options);
+      const response = await bridge.invoke(
+        ipcChannels.captureRecoveryAction,
+        payload,
+      );
+      return response === null ? null : captureSnapshotSchema.parse(response);
     },
     onOperationEvent(listener: (event: OperationEvent) => void) {
       let subscribed = true;

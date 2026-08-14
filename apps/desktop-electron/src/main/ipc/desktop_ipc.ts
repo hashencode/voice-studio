@@ -31,6 +31,13 @@ import {
   assignMeetingSpeakerRequestSchema,
   controlMeetingPlaybackRequestSchema,
   exportMeetingRequestSchema,
+  capturePreflightRequestSchema,
+  captureStartRequestSchema,
+  captureControlRequestSchema,
+  captureRecoveryListRequestSchema,
+  captureRecoveryActionRequestSchema,
+  type CapturePreflight,
+  type CaptureSnapshot,
   type ExportMeetingResponse,
   type MeetingExportFormat,
   type MeetingPlaybackSnapshot,
@@ -68,6 +75,27 @@ export interface DesktopIpcServices {
   ): Promise<RetryProcessingResponse>;
   listProcessingTasks(): Promise<ProcessingTask[]>;
   importMeeting(): Promise<ImportMeetingResponse>;
+  preflightCapture(options: {
+    requestPermissions: boolean;
+    captionEnabled: boolean;
+  }): Promise<CapturePreflight>;
+  startCapture(options: {
+    title: string;
+    microphoneDeviceId?: string;
+    captionEnabled: boolean;
+    idempotencyKey: string;
+  }): Promise<CaptureSnapshot>;
+  controlCapture(options: {
+    action: "pause" | "resume" | "stop";
+    sessionId: string;
+    idempotencyKey: string;
+  }): Promise<CaptureSnapshot>;
+  listCaptureRecoveries(): Promise<CaptureSnapshot[]>;
+  actOnCaptureRecovery(options: {
+    action: "keep" | "discard";
+    sessionId: string;
+    idempotencyKey: string;
+  }): Promise<CaptureSnapshot | null>;
   onOperationEvent?(listener: (event: OperationEvent) => void): () => void;
   listMeetings(options: {
     query: string;
@@ -248,6 +276,57 @@ export function createDesktopIpcHandlers(options: {
         schema: importMeetingRequestSchema,
         invoke: async () => await options.services.importMeeting(),
       },
+    ],
+    [
+      ipcChannels.capturePreflight,
+      {
+        schema: capturePreflightRequestSchema,
+        invoke: async (payload: {
+          requestPermissions: boolean;
+          captionEnabled: boolean;
+        }) => await options.services.preflightCapture(payload),
+      } as RegisteredHandler,
+    ],
+    [
+      ipcChannels.captureStart,
+      {
+        schema: captureStartRequestSchema,
+        invoke: async (payload: {
+          title: string;
+          microphoneDeviceId?: string;
+          captionEnabled: boolean;
+          idempotencyKey: string;
+        }) => await options.services.startCapture(payload),
+      } as RegisteredHandler,
+    ],
+    [
+      ipcChannels.captureControl,
+      {
+        schema: captureControlRequestSchema,
+        invoke: async (payload: {
+          action: "pause" | "resume" | "stop";
+          sessionId: string;
+          idempotencyKey: string;
+        }) => await options.services.controlCapture(payload),
+      } as RegisteredHandler,
+    ],
+    [
+      ipcChannels.captureRecoveryList,
+      {
+        schema: captureRecoveryListRequestSchema,
+        invoke: async () => await options.services.listCaptureRecoveries(),
+      },
+    ],
+    [
+      ipcChannels.captureRecoveryAction,
+      {
+        schema: captureRecoveryActionRequestSchema,
+        invoke: async (payload: {
+          action: "keep" | "discard";
+          sessionId: string;
+          idempotencyKey: string;
+        }) => await options.services.actOnCaptureRecovery(payload),
+      } as RegisteredHandler,
     ],
     [
       ipcChannels.meetingList,

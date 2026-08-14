@@ -52,6 +52,11 @@ function handlers() {
           protocolVersion: 1 as const,
           state: "canceled" as const,
         })),
+        preflightCapture: vi.fn(),
+        startCapture: vi.fn(),
+        controlCapture: vi.fn(),
+        listCaptureRecoveries: vi.fn(async () => []),
+        actOnCaptureRecovery: vi.fn(),
         listMeetings: vi.fn(async () => []),
         openMeeting: vi.fn(async () => null),
         searchTranscript: vi.fn(async () => []),
@@ -71,6 +76,18 @@ function handlers() {
 }
 
 describe("Main IPC validation", () => {
+  it("rejects raw capture paths before they reach Main services", async () => {
+    const fixture = handlers();
+    await expect(
+      fixture.handlers.invoke(ipcChannels.captureStart, trustedEvent, {
+        title: "会议",
+        captionEnabled: false,
+        idempotencyKey: "capture-start-123456",
+        sessionRoot: "/tmp/renderer-controlled",
+      }),
+    ).rejects.toMatchObject({ code: "INVALID_PAYLOAD" });
+  });
+
   it("rejects unknown channels, sender/frame/origin failures, and invalid payloads before services", async () => {
     const fixture = handlers();
     expect(fixture.handlers.has("desktop.raw.process.spawn")).toBe(false);
@@ -212,6 +229,11 @@ describe("Main IPC validation", () => {
           protocolVersion: 1 as const,
           state: "canceled" as const,
         })),
+        preflightCapture: vi.fn(),
+        startCapture: vi.fn(),
+        controlCapture: vi.fn(),
+        listCaptureRecoveries: vi.fn(async () => []),
+        actOnCaptureRecovery: vi.fn(),
         listMeetings: vi.fn(async () => []),
         openMeeting: vi.fn(async () => null),
         searchTranscript: vi.fn(async () => []),

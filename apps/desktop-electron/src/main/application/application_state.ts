@@ -2,6 +2,7 @@ import {
   applicationSnapshotSchema,
   desktopProtocolVersion,
   type ApplicationSnapshot,
+  type CaptureSnapshot,
   type ShellSection,
 } from "../../shared/contracts";
 import type { ElectronProfileInitializationResult } from "../profile/electron_profile";
@@ -91,6 +92,31 @@ export class DesktopApplicationState {
     });
   }
 
+  setCapture(
+    capture: CaptureSnapshot | null,
+    title = "会议录制",
+  ): ApplicationSnapshot {
+    if (!capture) return this.update({ capture: { phase: "idle" } });
+    const phase = capture.state === "recoverable" ? "recovery" : capture.state;
+    return this.update({
+      capture: {
+        phase,
+        sessionId: capture.sessionId,
+        title,
+        elapsedMs: capture.captureTimelineMs,
+        captureMode: capture.captureMode,
+        systemAudioHealthy: capture.systemAudioHealthy,
+        microphoneHealthy: capture.microphoneHealthy,
+        partialCapture: capture.partialCapture,
+        gapCount: capture.gapCount,
+        interruptionReason: capture.interruptionReason,
+        message: capture.interruptionReason
+          ? captureMessage(capture.interruptionReason)
+          : undefined,
+      },
+    });
+  }
+
   private update(
     patch: Partial<Omit<ApplicationSnapshot, "protocolVersion" | "revision">>,
   ): ApplicationSnapshot {
@@ -103,4 +129,12 @@ export class DesktopApplicationState {
     for (const listener of this.listeners) listener(snapshot);
     return snapshot;
   }
+}
+
+function captureMessage(reason: string): string {
+  if (reason === "system_sleep") return "电脑已进入睡眠，录制已安全暂停。";
+  if (reason === "system_wake_requires_resume")
+    return "电脑已唤醒，请确认后手动继续录制。";
+  if (reason === "disk_space_low") return "磁盘空间不足，已保存当前可用录音。";
+  return "录制状态发生变化，请检查轨道状态。";
 }

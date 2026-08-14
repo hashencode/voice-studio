@@ -63,16 +63,27 @@ const captureStateSchema = z.discriminatedUnion("phase", [
     .object({
       phase: z.enum([
         "preflight",
+        "preparing",
         "recording",
         "paused",
         "finalizing",
+        "completed",
         "recovery",
+        "partial_capture",
         "failed",
       ]),
       sessionId: z.string().min(1).max(128),
       title: z.string().min(1).max(256),
       elapsedMs: z.number().int().nonnegative(),
       message: z.string().min(1).max(512).optional(),
+      captureMode: z
+        .enum(["dual_track", "microphone_only", "system_audio_only"])
+        .optional(),
+      systemAudioHealthy: z.boolean().optional(),
+      microphoneHealthy: z.boolean().optional(),
+      partialCapture: z.boolean().optional(),
+      gapCount: z.number().int().nonnegative().max(100_000).optional(),
+      interruptionReason: z.string().min(1).max(240).nullable().optional(),
     })
     .strict(),
 ]);

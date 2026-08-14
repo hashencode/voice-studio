@@ -6,6 +6,7 @@ let package = Package(
   platforms: [.macOS(.v13)],
   products: [
     .library(name: "SecureImport", targets: ["SecureImport"]),
+    .library(name: "CaptureCore", targets: ["CaptureCore"]),
     .executable(
       name: "desktop_macos_native_helper",
       targets: ["DesktopMacOSNativeHelper"]
@@ -13,10 +14,12 @@ let package = Package(
   ],
   targets: [
     .target(name: "SecureImport"),
+    .target(name: "CaptureCore"),
     .executableTarget(
       name: "DesktopMacOSNativeHelper",
-      dependencies: ["SecureImport"]
+      dependencies: ["SecureImport", "CaptureCore"]
     ),
     .testTarget(name: "SecureImportTests", dependencies: ["SecureImport"]),
+    .testTarget(name: "CaptureCoreTests", dependencies: ["CaptureCore"]),
   ]
 )
