@@ -15,11 +15,15 @@ const referenceBindings = {
   fixtureSha256: "b".repeat(64),
 };
 
-function evidence(elapsedMilliseconds: number, text = "hello") {
+function evidence(
+  elapsedMilliseconds: number,
+  text = "hello",
+  manifestSha256 = "c".repeat(64),
+) {
   return buildProcessingSmokeEvidence({
     referenceBindings,
     resource: {
-      manifestSha256: "c".repeat(64),
+      manifestSha256,
       modelSha256: "d".repeat(64),
       runtimeSha256: "e".repeat(64),
     },
@@ -56,6 +60,12 @@ describe("packaged processing smoke evidence", () => {
     expect(evidence(10, "different").projectionSha256).not.toBe(
       first.projectionSha256,
     );
+    expect(evidence(10, "hello", "9".repeat(64)).projectionSha256).toBe(
+      first.projectionSha256,
+    );
+    expect(
+      evidence(10, "hello", "9".repeat(64)).projection.resource.manifestSha256,
+    ).toBe("9".repeat(64));
     expect(JSON.stringify(first)).not.toContain("hello");
   });
 

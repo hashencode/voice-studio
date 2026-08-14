@@ -115,10 +115,19 @@ export function buildProcessingSmokeEvidence(input: {
     transcriptNonEmpty,
     segmentCount: segments.length,
   };
+  // The manifest records the exact package, but its AOT worker bytes are not
+  // reproducible across builds and therefore are not Dart-behavior evidence.
+  const semanticProjection = {
+    ...projection,
+    resource: {
+      modelSha256: projection.resource.modelSha256,
+      runtimeSha256: projection.resource.runtimeSha256,
+    },
+  };
   return {
     schemaVersion: 1,
     projection,
-    projectionSha256: sha256Canonical(projection),
+    projectionSha256: sha256Canonical(semanticProjection),
     transcriptNonEmpty,
     segmentCount: segments.length,
   };

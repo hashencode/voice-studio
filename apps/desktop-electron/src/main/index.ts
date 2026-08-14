@@ -672,6 +672,9 @@ async function runProcessingSmokeIfRequested(): Promise<void> {
     throw new Error("packaged processing smoke result payload is invalid");
   }
   const pipeline = requireProcessingPipelineIdentities(resourceCatalog);
+  if (String(job.resource_identity) !== resourceCatalog.identity) {
+    throw new Error("packaged processing smoke resource identity changed");
+  }
   const normalizedSha256 = await sha256File(String(meeting.normalized_path));
   if (normalizedSha256 !== String(meeting.content_sha256)) {
     throw new Error("packaged processing smoke normalized media changed");
@@ -696,7 +699,6 @@ async function runProcessingSmokeIfRequested(): Promise<void> {
       },
       job: {
         operationId: String(job.operation_id),
-        resourceIdentity: String(job.resource_identity),
         state: String(job.state),
         attempt: Number(job.attempt),
         errorCode: job.error_code === null ? null : String(job.error_code),
