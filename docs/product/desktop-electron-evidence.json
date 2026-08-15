@@ -5,11 +5,11 @@
   "status": "BLOCKED",
   "disposition": "MACOS_ELECTRON_CLOSURE_BLOCKED",
   "developmentPosture": "DEVELOPMENT_ONLY",
-  "capturedAt": "2026-08-15T06:46:25+08:00",
+  "capturedAt": "2026-08-15T08:02:02+08:00",
   "source": {
-    "revision": "a732eec91b4afe0c098cf7ae42341566bbcc4092",
-    "tree": "7d05dc8373b981cad95c0be68287381ceb86d3a4",
-    "relevantSourceSha256": "57a9ca4b3b541b2c8505a833bf180b6aabf0d6e7c78d6e0c3dd0d9258f6a3dff",
+    "revision": "ded2f8d6cbdc0116887762ccac893e3575d39b8d",
+    "tree": "c0842e3b0b306a58cec996ff30958618fb959558",
+    "relevantSourceSha256": "d64903d999fb46f1ce9cb76ddbdf4269617a84ff63307c5da7c9d30c06288970",
     "packageManifest": {
       "path": "apps/desktop-electron/package.json",
       "sha256": "d74c0e299a2807b8883521828e2be34d2d1d95f2549aa22ac8e8916cdbc1d13d"
@@ -35,28 +35,28 @@
     "bundle": {
       "path": "apps/desktop-electron/out/Voice2Text-darwin-arm64/Voice2Text.app",
       "hashScheme": "sorted-bundle-manifest-v1",
-      "manifestSha256": "f98259bc45075e578fa014ca703d5540731e80374903057678c4e28720e9724c"
+      "manifestSha256": "7f9c11f2fd6d3a83a38050897b6f3605a57234f671c49fff1e584dbaff64a124"
     },
     "bindings": [
       {
         "id": "app-executable",
         "kind": "application",
         "path": "apps/desktop-electron/out/Voice2Text-darwin-arm64/Voice2Text.app/Contents/MacOS/Voice2Text",
-        "sha256": "7de0d22b3f7fa0d187731288f6a8e762e6f3834bcbcf1aa2cce8348c7a16dcf5",
+        "sha256": "91564a3eca4d7175b980c0fd3b2f9e7856f6c0549b285db00a29b0981dcb2b5e",
         "outsideAsar": false
       },
       {
         "id": "app-asar",
         "kind": "renderer",
         "path": "apps/desktop-electron/out/Voice2Text-darwin-arm64/Voice2Text.app/Contents/Resources/app.asar",
-        "sha256": "2cf1ae6fde4c7370891e0ac3d8cfbad1048cc7c2774d123c7d8cb91fdef9163c",
+        "sha256": "f966db795a6ba6735300ef1a79d60809314f228fd6b6147f77f3491cf7522320",
         "outsideAsar": false
       },
       {
         "id": "info-plist",
         "kind": "application",
         "path": "apps/desktop-electron/out/Voice2Text-darwin-arm64/Voice2Text.app/Contents/Info.plist",
-        "sha256": "04fb79ca818b3ce51a20b4bfa132f602a9a909cabe026f7f7dbaf18114f302b2",
+        "sha256": "acdcb4c38a6f8b0e5e9691a1d10007110f8c22ddd9386939aa865170776f2d35",
         "outsideAsar": false
       },
       {
@@ -70,14 +70,14 @@
         "id": "asr-worker",
         "kind": "worker",
         "path": "apps/desktop-electron/out/Voice2Text-darwin-arm64/Voice2Text.app/Contents/Resources/worker/bin/desktop_sherpa_worker",
-        "sha256": "6c68ff0f1d33241a84d412585ec66db0064482d539d021a297ca103a9cfa0ab1",
+        "sha256": "73ea850d63dd14292262307f8974e8970a0a1dc8262fadb2cf0473b8e154a542",
         "outsideAsar": true
       },
       {
         "id": "caption-worker",
         "kind": "worker",
         "path": "apps/desktop-electron/out/Voice2Text-darwin-arm64/Voice2Text.app/Contents/Resources/worker/bin/desktop_sensevoice_caption_worker",
-        "sha256": "b1bda750f5f2626976fe45e50b42b13ed15e00dd1b95d6e9ce70eff040251401",
+        "sha256": "d53c02b611bfff1b3c4a533d050ee169bd9009582da016e823d4598f8fa18320",
         "outsideAsar": true
       },
       {
@@ -112,7 +112,7 @@
         "id": "worker-manifest",
         "kind": "manifest",
         "path": "apps/desktop-electron/out/Voice2Text-darwin-arm64/Voice2Text.app/Contents/Resources/worker/manifest.json",
-        "sha256": "76a6a7aec2dd29274ab4d7ee10affb963d3519606f23d5ce8818a8176d093f7d",
+        "sha256": "c587533adfa029ecf879775378f3f638996a7fa6d197b3d2f4884f047f2ab647",
         "outsideAsar": true
       },
       {
@@ -174,212 +174,212 @@
     {
       "id": "gate-shell.navigation",
       "mode": "automated",
-      "status": "DEFINED_NOT_CAPTURED",
+      "status": "PASS",
       "procedureId": null,
       "maximumMinutes": null,
-      "elapsedMilliseconds": 0,
+      "elapsedMilliseconds": 338696,
       "targetFingerprintSha256": "c426e6d59fa483026cdd66c49e9edf33c96a4ce55e5f90ff2a61ef9d52da92d3",
-      "packageManifestSha256": "f98259bc45075e578fa014ca703d5540731e80374903057678c4e28720e9724c",
+      "packageManifestSha256": "7f9c11f2fd6d3a83a38050897b6f3605a57234f671c49fff1e584dbaff64a124",
       "definitionPath": "apps/desktop-electron/tests/packaged/macos_local_workstation_dogfood_test.ts",
       "definitionSha256": "04d2f36ca84264b8843cc540fe9207172e3ff2aec1fccfc4405f37166a9251ba",
-      "receiptPath": null,
-      "receiptSha256": null
+      "receiptPath": "docs/product/electron-closure-receipts/gate-shell.navigation.json",
+      "receiptSha256": "d635cc2c15c411b6f22481742dcd03d4fba9159286feb392d908ac6f9833a8c6"
     },
     {
       "id": "gate-library.meetings",
       "mode": "automated",
-      "status": "DEFINED_NOT_CAPTURED",
+      "status": "PASS",
       "procedureId": null,
       "maximumMinutes": null,
-      "elapsedMilliseconds": 0,
+      "elapsedMilliseconds": 338696,
       "targetFingerprintSha256": "c426e6d59fa483026cdd66c49e9edf33c96a4ce55e5f90ff2a61ef9d52da92d3",
-      "packageManifestSha256": "f98259bc45075e578fa014ca703d5540731e80374903057678c4e28720e9724c",
+      "packageManifestSha256": "7f9c11f2fd6d3a83a38050897b6f3605a57234f671c49fff1e584dbaff64a124",
       "definitionPath": "apps/desktop-electron/tests/packaged/macos_local_workstation_dogfood_test.ts",
       "definitionSha256": "04d2f36ca84264b8843cc540fe9207172e3ff2aec1fccfc4405f37166a9251ba",
-      "receiptPath": null,
-      "receiptSha256": null
+      "receiptPath": "docs/product/electron-closure-receipts/gate-library.meetings.json",
+      "receiptSha256": "59d9edaf9f153e8d89a56ebfd8393447d419ef4ac1f8bf100b251b448c9a51b3"
     },
     {
       "id": "gate-library.import",
       "mode": "automated",
-      "status": "DEFINED_NOT_CAPTURED",
+      "status": "PASS",
       "procedureId": null,
       "maximumMinutes": null,
-      "elapsedMilliseconds": 0,
+      "elapsedMilliseconds": 341586,
       "targetFingerprintSha256": "c426e6d59fa483026cdd66c49e9edf33c96a4ce55e5f90ff2a61ef9d52da92d3",
-      "packageManifestSha256": "f98259bc45075e578fa014ca703d5540731e80374903057678c4e28720e9724c",
+      "packageManifestSha256": "7f9c11f2fd6d3a83a38050897b6f3605a57234f671c49fff1e584dbaff64a124",
       "definitionPath": "apps/desktop-electron/tests/packaged/macos_processing_smoke_test.ts",
       "definitionSha256": "1da21dd37ee2713888aa61fb25485cb1ad442e4f29c4678716a3ee4eea859c2a",
-      "receiptPath": null,
-      "receiptSha256": null
+      "receiptPath": "docs/product/electron-closure-receipts/gate-library.import.json",
+      "receiptSha256": "88770a2cb5b193dd20c7eaa8396f17d871e3c7fcbb69dfe55807186478c7e769"
     },
     {
       "id": "gate-processing.tasks",
       "mode": "automated",
-      "status": "DEFINED_NOT_CAPTURED",
+      "status": "PASS",
       "procedureId": null,
       "maximumMinutes": null,
-      "elapsedMilliseconds": 0,
+      "elapsedMilliseconds": 341586,
       "targetFingerprintSha256": "c426e6d59fa483026cdd66c49e9edf33c96a4ce55e5f90ff2a61ef9d52da92d3",
-      "packageManifestSha256": "f98259bc45075e578fa014ca703d5540731e80374903057678c4e28720e9724c",
+      "packageManifestSha256": "7f9c11f2fd6d3a83a38050897b6f3605a57234f671c49fff1e584dbaff64a124",
       "definitionPath": "apps/desktop-electron/tests/packaged/macos_processing_smoke_test.ts",
       "definitionSha256": "1da21dd37ee2713888aa61fb25485cb1ad442e4f29c4678716a3ee4eea859c2a",
-      "receiptPath": null,
-      "receiptSha256": null
+      "receiptPath": "docs/product/electron-closure-receipts/gate-processing.tasks.json",
+      "receiptSha256": "44e6d7a569ffbcb0eaafff803215df95fc84f5344bf130c2f2c0b21ec078a54e"
     },
     {
       "id": "gate-meeting.review",
       "mode": "automated",
-      "status": "DEFINED_NOT_CAPTURED",
+      "status": "PASS",
       "procedureId": null,
       "maximumMinutes": null,
-      "elapsedMilliseconds": 0,
+      "elapsedMilliseconds": 338696,
       "targetFingerprintSha256": "c426e6d59fa483026cdd66c49e9edf33c96a4ce55e5f90ff2a61ef9d52da92d3",
-      "packageManifestSha256": "f98259bc45075e578fa014ca703d5540731e80374903057678c4e28720e9724c",
+      "packageManifestSha256": "7f9c11f2fd6d3a83a38050897b6f3605a57234f671c49fff1e584dbaff64a124",
       "definitionPath": "apps/desktop-electron/tests/packaged/macos_local_workstation_dogfood_test.ts",
       "definitionSha256": "04d2f36ca84264b8843cc540fe9207172e3ff2aec1fccfc4405f37166a9251ba",
-      "receiptPath": null,
-      "receiptSha256": null
+      "receiptPath": "docs/product/electron-closure-receipts/gate-meeting.review.json",
+      "receiptSha256": "0b6ae1fc28ddbe94e081baf7bcf70c21dc4ac6230bfa346d3dc78f806ae4777f"
     },
     {
       "id": "gate-capture.workspace",
       "mode": "automated",
-      "status": "DEFINED_NOT_CAPTURED",
+      "status": "PASS",
       "procedureId": null,
       "maximumMinutes": null,
-      "elapsedMilliseconds": 0,
+      "elapsedMilliseconds": 12460,
       "targetFingerprintSha256": "c426e6d59fa483026cdd66c49e9edf33c96a4ce55e5f90ff2a61ef9d52da92d3",
-      "packageManifestSha256": "f98259bc45075e578fa014ca703d5540731e80374903057678c4e28720e9724c",
+      "packageManifestSha256": "7f9c11f2fd6d3a83a38050897b6f3605a57234f671c49fff1e584dbaff64a124",
       "definitionPath": "apps/desktop-electron/tests/packaged/macos_capture_recovery_smoke_test.ts",
-      "definitionSha256": "152bd76c66e378a25bb598cd1752361be9c3662085cfe683e519d3c59dcaec49",
-      "receiptPath": null,
-      "receiptSha256": null
+      "definitionSha256": "df05920643d8f34ee2aede7271c8690e180f6821bc2ce1e681f816603ca1523c",
+      "receiptPath": "docs/product/electron-closure-receipts/gate-capture.workspace.json",
+      "receiptSha256": "9c11ea58f4ab4e11392b17a5cfa99b42c1c71032c8ddd73fdf75a308eaafb685"
     },
     {
       "id": "gate-capture.recovery",
       "mode": "automated",
-      "status": "DEFINED_NOT_CAPTURED",
+      "status": "PASS",
       "procedureId": null,
       "maximumMinutes": null,
-      "elapsedMilliseconds": 0,
+      "elapsedMilliseconds": 12460,
       "targetFingerprintSha256": "c426e6d59fa483026cdd66c49e9edf33c96a4ce55e5f90ff2a61ef9d52da92d3",
-      "packageManifestSha256": "f98259bc45075e578fa014ca703d5540731e80374903057678c4e28720e9724c",
+      "packageManifestSha256": "7f9c11f2fd6d3a83a38050897b6f3605a57234f671c49fff1e584dbaff64a124",
       "definitionPath": "apps/desktop-electron/tests/packaged/macos_capture_recovery_smoke_test.ts",
-      "definitionSha256": "152bd76c66e378a25bb598cd1752361be9c3662085cfe683e519d3c59dcaec49",
-      "receiptPath": null,
-      "receiptSha256": null
+      "definitionSha256": "df05920643d8f34ee2aede7271c8690e180f6821bc2ce1e681f816603ca1523c",
+      "receiptPath": "docs/product/electron-closure-receipts/gate-capture.recovery.json",
+      "receiptSha256": "acca09d344c11ba75d27f118096d87006ed84082843dbb4d386e121be654fc7a"
     },
     {
       "id": "gate-captions.live",
       "mode": "automated",
-      "status": "DEFINED_NOT_CAPTURED",
+      "status": "PASS",
       "procedureId": null,
       "maximumMinutes": null,
-      "elapsedMilliseconds": 0,
+      "elapsedMilliseconds": 195795,
       "targetFingerprintSha256": "c426e6d59fa483026cdd66c49e9edf33c96a4ce55e5f90ff2a61ef9d52da92d3",
-      "packageManifestSha256": "f98259bc45075e578fa014ca703d5540731e80374903057678c4e28720e9724c",
+      "packageManifestSha256": "7f9c11f2fd6d3a83a38050897b6f3605a57234f671c49fff1e584dbaff64a124",
       "definitionPath": "apps/desktop-electron/tests/packaged/macos_caption_formal_smoke_test.ts",
       "definitionSha256": "3d920f2c042e3576fb05b7b5452904d00c89af8eb2af51ee8c0e49a863c4166a",
-      "receiptPath": null,
-      "receiptSha256": null
+      "receiptPath": "docs/product/electron-closure-receipts/gate-captions.live.json",
+      "receiptSha256": "d9c39efe7347f0b3923c9e584fba9a6793fba39f060517d0c91dbb64283b7f82"
     },
     {
       "id": "gate-settings.runtime",
       "mode": "automated",
-      "status": "DEFINED_NOT_CAPTURED",
+      "status": "PASS",
       "procedureId": null,
       "maximumMinutes": null,
-      "elapsedMilliseconds": 0,
+      "elapsedMilliseconds": 3834,
       "targetFingerprintSha256": "c426e6d59fa483026cdd66c49e9edf33c96a4ce55e5f90ff2a61ef9d52da92d3",
-      "packageManifestSha256": "f98259bc45075e578fa014ca703d5540731e80374903057678c4e28720e9724c",
+      "packageManifestSha256": "7f9c11f2fd6d3a83a38050897b6f3605a57234f671c49fff1e584dbaff64a124",
       "definitionPath": "apps/desktop-electron/tests/packaged/macos_live_caption_worker_smoke_test.ts",
       "definitionSha256": "a39e1a89a065cb008a082946eb307a45412969b5fbde3740cebab011042f8452",
-      "receiptPath": null,
-      "receiptSha256": null
+      "receiptPath": "docs/product/electron-closure-receipts/gate-settings.runtime.json",
+      "receiptSha256": "8aeec7d59aab491fe1cbb3e1136f2f5c237f9344e5f16fc6ccd70281fece4a90"
     },
     {
       "id": "gate-settings.ai",
       "mode": "automated",
-      "status": "DEFINED_NOT_CAPTURED",
+      "status": "PASS",
       "procedureId": null,
       "maximumMinutes": null,
-      "elapsedMilliseconds": 0,
+      "elapsedMilliseconds": 4490,
       "targetFingerprintSha256": "c426e6d59fa483026cdd66c49e9edf33c96a4ce55e5f90ff2a61ef9d52da92d3",
-      "packageManifestSha256": "f98259bc45075e578fa014ca703d5540731e80374903057678c4e28720e9724c",
+      "packageManifestSha256": "7f9c11f2fd6d3a83a38050897b6f3605a57234f671c49fff1e584dbaff64a124",
       "definitionPath": "apps/desktop-electron/tests/packaged/macos_ai_boundary_smoke_test.ts",
       "definitionSha256": "3e0a9e55bafaa4505b792bad756360973c8a430d7ccdbb05d9269e317ca2ddc0",
-      "receiptPath": null,
-      "receiptSha256": null
+      "receiptPath": "docs/product/electron-closure-receipts/gate-settings.ai.json",
+      "receiptSha256": "1e8639594d6067ad9d85dabfebcee8c33fca410e76f15a0afe1450324a93d614"
     },
     {
       "id": "gate-settings.security",
       "mode": "automated",
-      "status": "DEFINED_NOT_CAPTURED",
+      "status": "PASS",
       "procedureId": null,
       "maximumMinutes": null,
-      "elapsedMilliseconds": 0,
+      "elapsedMilliseconds": 1585,
       "targetFingerprintSha256": "c426e6d59fa483026cdd66c49e9edf33c96a4ce55e5f90ff2a61ef9d52da92d3",
-      "packageManifestSha256": "f98259bc45075e578fa014ca703d5540731e80374903057678c4e28720e9724c",
+      "packageManifestSha256": "7f9c11f2fd6d3a83a38050897b6f3605a57234f671c49fff1e584dbaff64a124",
       "definitionPath": "apps/desktop-electron/tests/packaged/macos_native_security_helper_smoke_test.ts",
       "definitionSha256": "921c17b1103a061d20a11a4f3c9fb0731c7792bb35be5cfb5b98e690eeaf9a69",
-      "receiptPath": null,
-      "receiptSha256": null
+      "receiptPath": "docs/product/electron-closure-receipts/gate-settings.security.json",
+      "receiptSha256": "2d32f218f1ab197d58ee9978e94f284ea484f1cd1601ef71fd42cb8653b96841"
     },
     {
       "id": "gate-companion.pairing",
       "mode": "automated",
-      "status": "DEFINED_NOT_CAPTURED",
+      "status": "PASS",
       "procedureId": null,
       "maximumMinutes": null,
-      "elapsedMilliseconds": 0,
+      "elapsedMilliseconds": 16894,
       "targetFingerprintSha256": "c426e6d59fa483026cdd66c49e9edf33c96a4ce55e5f90ff2a61ef9d52da92d3",
-      "packageManifestSha256": "f98259bc45075e578fa014ca703d5540731e80374903057678c4e28720e9724c",
+      "packageManifestSha256": "7f9c11f2fd6d3a83a38050897b6f3605a57234f671c49fff1e584dbaff64a124",
       "definitionPath": "apps/desktop-electron/tests/packaged/macos_companion_smoke_test.ts",
       "definitionSha256": "91ad3fb694c047cbd71eff5d72a3b7895dfbdb1169f83512ad87876beeaa3825",
-      "receiptPath": null,
-      "receiptSha256": null
+      "receiptPath": "docs/product/electron-closure-receipts/gate-companion.pairing.json",
+      "receiptSha256": "b1f32053ec75d4e2279102e47650722d1f3b4080874c313f11d6659e4114885a"
     },
     {
       "id": "gate-companion.transfer",
       "mode": "automated",
-      "status": "DEFINED_NOT_CAPTURED",
+      "status": "PASS",
       "procedureId": null,
       "maximumMinutes": null,
-      "elapsedMilliseconds": 0,
+      "elapsedMilliseconds": 16894,
       "targetFingerprintSha256": "c426e6d59fa483026cdd66c49e9edf33c96a4ce55e5f90ff2a61ef9d52da92d3",
-      "packageManifestSha256": "f98259bc45075e578fa014ca703d5540731e80374903057678c4e28720e9724c",
+      "packageManifestSha256": "7f9c11f2fd6d3a83a38050897b6f3605a57234f671c49fff1e584dbaff64a124",
       "definitionPath": "apps/desktop-electron/tests/packaged/macos_companion_smoke_test.ts",
       "definitionSha256": "91ad3fb694c047cbd71eff5d72a3b7895dfbdb1169f83512ad87876beeaa3825",
-      "receiptPath": null,
-      "receiptSha256": null
+      "receiptPath": "docs/product/electron-closure-receipts/gate-companion.transfer.json",
+      "receiptSha256": "66715d3e5d5d46e30324c7367d6baec713c97766de0599df45b53ba41ba03083"
     },
     {
       "id": "gate-lifecycle.application",
       "mode": "automated",
-      "status": "DEFINED_NOT_CAPTURED",
+      "status": "PASS",
       "procedureId": null,
       "maximumMinutes": null,
-      "elapsedMilliseconds": 0,
+      "elapsedMilliseconds": 4609,
       "targetFingerprintSha256": "c426e6d59fa483026cdd66c49e9edf33c96a4ce55e5f90ff2a61ef9d52da92d3",
-      "packageManifestSha256": "f98259bc45075e578fa014ca703d5540731e80374903057678c4e28720e9724c",
+      "packageManifestSha256": "7f9c11f2fd6d3a83a38050897b6f3605a57234f671c49fff1e584dbaff64a124",
       "definitionPath": "apps/desktop-electron/tests/packaged/macos_bootstrap_smoke_test.ts",
       "definitionSha256": "892c954edc71a9d22622be06a9cde54eb71da3b10fd8edfb7638957d1998cab0",
-      "receiptPath": null,
-      "receiptSha256": null
+      "receiptPath": "docs/product/electron-closure-receipts/gate-lifecycle.application.json",
+      "receiptSha256": "7566ee414bd4c0d28a1ad8c1030c7fb44386ee783f8410d5a7596e04cab8b78b"
     },
     {
       "id": "gate-accessibility.desktop",
       "mode": "automated",
-      "status": "DEFINED_NOT_CAPTURED",
+      "status": "PASS",
       "procedureId": null,
       "maximumMinutes": null,
-      "elapsedMilliseconds": 0,
+      "elapsedMilliseconds": 338696,
       "targetFingerprintSha256": "c426e6d59fa483026cdd66c49e9edf33c96a4ce55e5f90ff2a61ef9d52da92d3",
-      "packageManifestSha256": "f98259bc45075e578fa014ca703d5540731e80374903057678c4e28720e9724c",
+      "packageManifestSha256": "7f9c11f2fd6d3a83a38050897b6f3605a57234f671c49fff1e584dbaff64a124",
       "definitionPath": "apps/desktop-electron/tests/packaged/macos_local_workstation_dogfood_test.ts",
       "definitionSha256": "04d2f36ca84264b8843cc540fe9207172e3ff2aec1fccfc4405f37166a9251ba",
-      "receiptPath": null,
-      "receiptSha256": null
+      "receiptPath": "docs/product/electron-closure-receipts/gate-accessibility.desktop.json",
+      "receiptSha256": "a34c4efb1d85e61455d3001cf9ae3c42c98b8e149fa12f5b45f41ad77bccdf78"
     },
     {
       "id": "manual-voiceover",
@@ -389,9 +389,9 @@
       "maximumMinutes": 10,
       "elapsedMilliseconds": 0,
       "targetFingerprintSha256": "c426e6d59fa483026cdd66c49e9edf33c96a4ce55e5f90ff2a61ef9d52da92d3",
-      "packageManifestSha256": "f98259bc45075e578fa014ca703d5540731e80374903057678c4e28720e9724c",
+      "packageManifestSha256": "7f9c11f2fd6d3a83a38050897b6f3605a57234f671c49fff1e584dbaff64a124",
       "definitionPath": "docs/product/desktop-electron-status.md",
-      "definitionSha256": "2616fcbb409c1e3ddb8b2dbf490a1226d5cb1aab3763c1806a96a53265315c93",
+      "definitionSha256": "3ad7b0bada964e63836fa6302f7fe5e295d4f050da3d81b6724d5f4d392f36ed",
       "receiptPath": null,
       "receiptSha256": null
     }
@@ -399,98 +399,98 @@
   "capabilityEvidence": [
     {
       "id": "shell.navigation",
-      "status": "BLOCKED",
+      "status": "PASS",
       "evidenceBindingIds": [
         "gate-shell.navigation"
       ]
     },
     {
       "id": "library.meetings",
-      "status": "BLOCKED",
+      "status": "PASS",
       "evidenceBindingIds": [
         "gate-library.meetings"
       ]
     },
     {
       "id": "library.import",
-      "status": "BLOCKED",
+      "status": "PASS",
       "evidenceBindingIds": [
         "gate-library.import"
       ]
     },
     {
       "id": "processing.tasks",
-      "status": "BLOCKED",
+      "status": "PASS",
       "evidenceBindingIds": [
         "gate-processing.tasks"
       ]
     },
     {
       "id": "meeting.review",
-      "status": "BLOCKED",
+      "status": "PASS",
       "evidenceBindingIds": [
         "gate-meeting.review"
       ]
     },
     {
       "id": "capture.workspace",
-      "status": "BLOCKED",
+      "status": "PASS",
       "evidenceBindingIds": [
         "gate-capture.workspace"
       ]
     },
     {
       "id": "capture.recovery",
-      "status": "BLOCKED",
+      "status": "PASS",
       "evidenceBindingIds": [
         "gate-capture.recovery"
       ]
     },
     {
       "id": "captions.live",
-      "status": "BLOCKED",
+      "status": "PASS",
       "evidenceBindingIds": [
         "gate-captions.live"
       ]
     },
     {
       "id": "settings.runtime",
-      "status": "BLOCKED",
+      "status": "PASS",
       "evidenceBindingIds": [
         "gate-settings.runtime"
       ]
     },
     {
       "id": "settings.ai",
-      "status": "BLOCKED",
+      "status": "PASS",
       "evidenceBindingIds": [
         "gate-settings.ai"
       ]
     },
     {
       "id": "settings.security",
-      "status": "BLOCKED",
+      "status": "PASS",
       "evidenceBindingIds": [
         "gate-settings.security"
       ]
     },
     {
       "id": "companion.pairing",
-      "status": "BLOCKED",
+      "status": "PASS",
       "evidenceBindingIds": [
         "gate-companion.pairing"
       ]
     },
     {
       "id": "companion.transfer",
-      "status": "BLOCKED",
+      "status": "PASS",
       "evidenceBindingIds": [
         "gate-companion.transfer"
       ]
     },
     {
       "id": "lifecycle.application",
-      "status": "BLOCKED",
+      "status": "PASS",
       "evidenceBindingIds": [
         "gate-lifecycle.application"
       ]
@@ -505,18 +505,18 @@
     }
   ],
   "accessibility": {
-    "status": "NOT_RUN",
+    "status": "BLOCKED",
     "checks": [
       {
         "id": "keyboard",
-        "status": "NOT_RUN",
+        "status": "PASS",
         "evidenceBindingIds": [
           "gate-accessibility.desktop"
         ]
       },
       {
         "id": "focus",
-        "status": "NOT_RUN",
+        "status": "PASS",
         "evidenceBindingIds": [
           "gate-accessibility.desktop"
         ]
@@ -530,28 +530,28 @@
       },
       {
         "id": "minimum-window",
-        "status": "NOT_RUN",
+        "status": "PASS",
         "evidenceBindingIds": [
           "gate-accessibility.desktop"
         ]
       },
       {
         "id": "text-scaling-200-percent",
-        "status": "NOT_RUN",
+        "status": "PASS",
         "evidenceBindingIds": [
           "gate-accessibility.desktop"
         ]
       },
       {
         "id": "reduced-motion",
-        "status": "NOT_RUN",
+        "status": "PASS",
         "evidenceBindingIds": [
           "gate-accessibility.desktop"
         ]
       },
       {
         "id": "non-drag-alternatives",
-        "status": "NOT_RUN",
+        "status": "PASS",
         "evidenceBindingIds": [
           "gate-accessibility.desktop"
         ]
@@ -567,30 +567,38 @@
     "rawAudioOrTranscriptDetected": false,
     "reusableTokenDetected": false,
     "secretCanaryDetected": false,
-    "scannedEvidenceBindingIds": []
+    "scannedEvidenceBindingIds": [
+      "gate-accessibility.desktop",
+      "gate-captions.live",
+      "gate-capture.recovery",
+      "gate-capture.workspace",
+      "gate-companion.pairing",
+      "gate-companion.transfer",
+      "gate-library.import",
+      "gate-library.meetings",
+      "gate-lifecycle.application",
+      "gate-meeting.review",
+      "gate-processing.tasks",
+      "gate-settings.ai",
+      "gate-settings.runtime",
+      "gate-settings.security",
+      "gate-shell.navigation"
+    ]
   },
   "validationSessions": [
     {
-      "id": "root-dev-check",
+      "id": "macos-packaged-closure",
       "status": "PASS",
-      "startedAt": "2026-08-15T05:46:00+08:00",
-      "finishedAt": "2026-08-15T05:49:00+08:00",
-      "elapsedMilliseconds": 180000,
-      "maximumMilliseconds": 1800000
-    },
-    {
-      "id": "u11-packaged-companion",
-      "status": "PASS",
-      "startedAt": "2026-08-15T05:32:00+08:00",
-      "finishedAt": "2026-08-15T05:32:25+08:00",
-      "elapsedMilliseconds": 24620,
+      "startedAt": "2026-08-14T23:42:02.120+00:00",
+      "finishedAt": "2026-08-14T23:57:22.661+00:00",
+      "elapsedMilliseconds": 920541,
       "maximumMilliseconds": 1800000
     }
   ],
   "verification": {
     "electronStaticAndUnit": "PASS",
     "packagedMacos": "PASS",
-    "packagedProductFlows": "BLOCKED_CURRENT_PACKAGE_EVIDENCE_NOT_CAPTURED",
+    "packagedProductFlows": "PASS",
     "artifactInspection": "PASS",
     "privacy": "PASS",
     "accessibility": "NOT_RUN_LOCKED_GUI",
@@ -598,7 +606,6 @@
     "uiWatcher": "PASS"
   },
   "blockers": [
-    "CURRENT_PACKAGE_FULL_PRODUCT_FLOW_EVIDENCE_NOT_CAPTURED",
     "ACCESSIBILITY_MANUAL_NOT_RUN_LOCKED_GUI"
   ]
 }

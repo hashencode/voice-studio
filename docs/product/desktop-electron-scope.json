@@ -28,7 +28,7 @@
       "closureDisposition": "MACOS_ELECTRON_CLOSURE_BLOCKED",
       "evidence": {
         "path": "docs/product/desktop-electron-evidence.json",
-        "sha256": "c4a755626178017e42164e6e03a7d81cb93e8982077beecb33600e7a435ca785"
+        "sha256": "7e0afa2e59bc1b60a0ab4d36662c522ffd13440761e0d7d7a0b34fe2cb6b24ba"
       }
     },
     "windows": {
@@ -38,21 +38,112 @@
     }
   },
   "capabilities": [
-    {"id": "shell.navigation", "status": "BLOCKED", "evidenceBindingIds": ["gate-shell.navigation"]},
-    {"id": "library.meetings", "status": "BLOCKED", "evidenceBindingIds": ["gate-library.meetings"]},
-    {"id": "library.import", "status": "BLOCKED", "evidenceBindingIds": ["gate-library.import"]},
-    {"id": "processing.tasks", "status": "BLOCKED", "evidenceBindingIds": ["gate-processing.tasks"]},
-    {"id": "meeting.review", "status": "BLOCKED", "evidenceBindingIds": ["gate-meeting.review"]},
-    {"id": "capture.workspace", "status": "BLOCKED", "evidenceBindingIds": ["gate-capture.workspace"]},
-    {"id": "capture.recovery", "status": "BLOCKED", "evidenceBindingIds": ["gate-capture.recovery"]},
-    {"id": "captions.live", "status": "BLOCKED", "evidenceBindingIds": ["gate-captions.live"]},
-    {"id": "settings.runtime", "status": "BLOCKED", "evidenceBindingIds": ["gate-settings.runtime"]},
-    {"id": "settings.ai", "status": "BLOCKED", "evidenceBindingIds": ["gate-settings.ai"]},
-    {"id": "settings.security", "status": "BLOCKED", "evidenceBindingIds": ["gate-settings.security"]},
-    {"id": "companion.pairing", "status": "BLOCKED", "evidenceBindingIds": ["gate-companion.pairing"]},
-    {"id": "companion.transfer", "status": "BLOCKED", "evidenceBindingIds": ["gate-companion.transfer"]},
-    {"id": "lifecycle.application", "status": "BLOCKED", "evidenceBindingIds": ["gate-lifecycle.application"]},
-    {"id": "accessibility.desktop", "status": "BLOCKED", "evidenceBindingIds": ["gate-accessibility.desktop", "manual-voiceover"]}
+    {
+      "id": "shell.navigation",
+      "status": "PASS",
+      "evidenceBindingIds": [
+        "gate-shell.navigation"
+      ]
+    },
+    {
+      "id": "library.meetings",
+      "status": "PASS",
+      "evidenceBindingIds": [
+        "gate-library.meetings"
+      ]
+    },
+    {
+      "id": "library.import",
+      "status": "PASS",
+      "evidenceBindingIds": [
+        "gate-library.import"
+      ]
+    },
+    {
+      "id": "processing.tasks",
+      "status": "PASS",
+      "evidenceBindingIds": [
+        "gate-processing.tasks"
+      ]
+    },
+    {
+      "id": "meeting.review",
+      "status": "PASS",
+      "evidenceBindingIds": [
+        "gate-meeting.review"
+      ]
+    },
+    {
+      "id": "capture.workspace",
+      "status": "PASS",
+      "evidenceBindingIds": [
+        "gate-capture.workspace"
+      ]
+    },
+    {
+      "id": "capture.recovery",
+      "status": "PASS",
+      "evidenceBindingIds": [
+        "gate-capture.recovery"
+      ]
+    },
+    {
+      "id": "captions.live",
+      "status": "PASS",
+      "evidenceBindingIds": [
+        "gate-captions.live"
+      ]
+    },
+    {
+      "id": "settings.runtime",
+      "status": "PASS",
+      "evidenceBindingIds": [
+        "gate-settings.runtime"
+      ]
+    },
+    {
+      "id": "settings.ai",
+      "status": "PASS",
+      "evidenceBindingIds": [
+        "gate-settings.ai"
+      ]
+    },
+    {
+      "id": "settings.security",
+      "status": "PASS",
+      "evidenceBindingIds": [
+        "gate-settings.security"
+      ]
+    },
+    {
+      "id": "companion.pairing",
+      "status": "PASS",
+      "evidenceBindingIds": [
+        "gate-companion.pairing"
+      ]
+    },
+    {
+      "id": "companion.transfer",
+      "status": "PASS",
+      "evidenceBindingIds": [
+        "gate-companion.transfer"
+      ]
+    },
+    {
+      "id": "lifecycle.application",
+      "status": "PASS",
+      "evidenceBindingIds": [
+        "gate-lifecycle.application"
+      ]
+    },
+    {
+      "id": "accessibility.desktop",
+      "status": "BLOCKED",
+      "evidenceBindingIds": [
+        "gate-accessibility.desktop",
+        "manual-voiceover"
+      ]
+    }
   ],
   "releaseExclusions": {
     "maximumValidationSessionMinutes": 30,

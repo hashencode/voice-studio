@@ -10,24 +10,24 @@ The packaged macOS application, native helper, workers, runtimes, models,
 resource manifest, dependency lock, source revision, target fingerprint,
 signatures, and frozen Flutter reference fixtures are hash-bound in
 `desktop-electron-evidence.json`. The root `./tool/dev_check.sh`, Electron static
-checks, current package creation, package smoke, and U11 companion restart/resume
-gate passed on the declared Apple M2 target.
+checks, fresh package creation, package smoke, and every automated U6-U11
+product-flow gate passed against one package manifest on the declared Apple M2
+target. Each automated result has a privacy-safe, source/package/target-bound
+execution receipt under `docs/product/electron-closure-receipts/`.
 
-Closure is not declared because the complete U6-U11 product-flow set has not
-been recaptured against the single current package manifest, and the locked GUI
-prevented the bounded VoiceOver/minimum-window/200%-scaling/reduced-motion
-accessibility procedure from being executed. Test definitions are present and
-hash-bound, but definitions are not execution evidence.
+Closure is not declared only because the locked GUI prevented the bounded
+VoiceOver/minimum-window/200%-scaling/reduced-motion accessibility procedure
+from being executed. Automated keyboard, focus, minimum-window, scaling,
+reduced-motion, and non-drag checks passed; VoiceOver remains `NOT_RUN` and is
+not inferred from DOM or packaged automation.
 
 ## Required to unblock macOS
 
-1. Run `tool/check_electron_desktop.sh` from the bound source revision and retain
-   privacy-safe execution receipts for every packaged flow.
-2. On the same target and package manifest, execute the bounded accessibility
+1. On the same target and package manifest, execute the bounded accessibility
    procedure `macos-voiceover-navigation-v1` within ten minutes and record PASS
    for keyboard, focus, VoiceOver, minimum window size, 200% text scaling,
    reduced motion, and non-drag alternatives.
-3. Regenerate the evidence bindings and change macOS to `PASS` only after
+2. Regenerate the evidence bindings and change macOS to `PASS` only after
    `tool/validate_electron_desktop_scope.py` accepts the complete record.
 
 ## Bounded accessibility procedure
