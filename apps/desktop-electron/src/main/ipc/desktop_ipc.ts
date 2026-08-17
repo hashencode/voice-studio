@@ -725,9 +725,14 @@ function isTrustedLocation(value: string, trust: IpcTrustPolicy): boolean {
 }
 
 function trustedRendererHash(hash: string): boolean {
-  return ["", "#/library", "#/tasks", "#/companion", "#/settings"].includes(
-    hash,
-  );
+  return [
+    "",
+    "#/audio",
+    "#/library",
+    "#/tasks",
+    "#/companion",
+    "#/settings",
+  ].includes(hash);
 }
 
 function assertPayloadEnvelope(payload: unknown, maximumBytes: number): void {

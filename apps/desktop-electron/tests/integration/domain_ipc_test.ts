@@ -320,6 +320,17 @@ describe("Main IPC validation", () => {
         {
           senderId: 1,
           frameId: 2,
+          origin: "file:///Voice2Text/renderer/index.html#/audio",
+        },
+        payload,
+      ),
+    ).resolves.toEqual(expect.objectContaining({ protocolVersion: 2 }));
+    await expect(
+      packaged.invoke(
+        ipcChannels.workerHealth,
+        {
+          senderId: 1,
+          frameId: 2,
           origin: "file:///%56oice2Text/renderer/index.html",
         },
         payload,
@@ -358,7 +369,7 @@ describe("Main IPC validation", () => {
         payload,
       ),
     ).rejects.toBeInstanceOf(IpcContractError);
-    expect(workerHealth).toHaveBeenCalledTimes(3);
+    expect(workerHealth).toHaveBeenCalledTimes(4);
   });
 });
 
