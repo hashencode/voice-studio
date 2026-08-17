@@ -65,11 +65,30 @@ export function initializeAudioProfile(
     legacyMeetingDatabasePathForApplicationData(applicationDataRoot);
   let archivedLegacyDatabasePath: string | null = null;
 
-  if (existsSync(legacyPath)) {
+  let legacyDatabaseExists: boolean;
+  try {
+    legacyDatabaseExists = lstatSync(legacyPath).isFile();
+    if (!legacyDatabaseExists) {
+      throw new Error("Meeting-era database is not a regular file");
+    }
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code === "ENOENT") {
+      legacyDatabaseExists = false;
+    } else {
+      return {
+        status: "blocked",
+        code: "legacy_archive_failed",
+        message:
+          error instanceof Error
+            ? `Meeting-era database archive failed: ${error.message}`
+            : "Meeting-era database archive failed",
+        repairable: true,
+      };
+    }
+  }
+
+  if (legacyDatabaseExists) {
     try {
-      if (!lstatSync(legacyPath).isFile()) {
-        throw new Error("Meeting-era database is not a regular file");
-      }
       const container = join(
         resolve(applicationDataRoot),
         "voice2text-electron",

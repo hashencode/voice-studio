@@ -1,4 +1,4 @@
-import { existsSync, mkdirSync, statSync } from "node:fs";
+import { mkdirSync, statSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { DatabaseSync } from "node:sqlite";
 
@@ -36,9 +36,7 @@ export function openAudioDatabase(databasePath: string): DatabaseSync {
   const resolvedPath =
     databasePath === ":memory:" ? databasePath : resolve(databasePath);
   const existing =
-    resolvedPath !== ":memory:" &&
-    existsSync(resolvedPath) &&
-    statSync(resolvedPath).size > 0;
+    resolvedPath !== ":memory:" && hasNonEmptyDatabase(resolvedPath);
   if (existing) inspectExistingDatabase(resolvedPath);
   if (resolvedPath !== ":memory:") {
     mkdirSync(dirname(resolvedPath), { recursive: true, mode: 0o700 });
@@ -60,7 +58,7 @@ export function openAudioDatabase(databasePath: string): DatabaseSync {
         throw error;
       }
     }
-    validateAudioSchema(database);
+    if (!existing) validateAudioSchema(database);
     return database;
   } catch (error) {
     try {
@@ -80,7 +78,6 @@ function inspectExistingDatabase(path: string): void {
   let database: DatabaseSync | undefined;
   try {
     database = new DatabaseSync(path, { readOnly: true });
-    assertIntegrity(database);
     const applicationId = pragmaNumber(database, "application_id");
     const version = pragmaNumber(database, "user_version");
     if (
@@ -100,6 +97,15 @@ function inspectExistingDatabase(path: string): void {
     );
   } finally {
     database?.close();
+  }
+}
+
+function hasNonEmptyDatabase(path: string): boolean {
+  try {
+    return statSync(path).size > 0;
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code === "ENOENT") return false;
+    throw error;
   }
 }
 

@@ -318,6 +318,15 @@ class AppDatabase {
         merged_text TEXT NOT NULL,
         has_user_edits INTEGER NOT NULL DEFAULT 0,
         has_evidence_links INTEGER NOT NULL DEFAULT 0,
+        generation_kind TEXT NOT NULL DEFAULT 'formal'
+          CHECK (generation_kind IN ('draft', 'formal')),
+        supersedes_generation_id INTEGER,
+        reconciliation_state TEXT NOT NULL DEFAULT 'not_required'
+          CHECK (
+            reconciliation_state IN (
+              'not_required', 'pending', 'kept_draft', 'accepted_formal'
+            )
+          ),
         created_at_ms INTEGER NOT NULL,
         activated_at_ms INTEGER,
         updated_at_ms INTEGER NOT NULL,
@@ -342,6 +351,12 @@ class AppDatabase {
         is_final INTEGER NOT NULL DEFAULT 1,
         source TEXT NOT NULL,
         confidence REAL,
+        language TEXT,
+        model_sha256 TEXT
+          CHECK (model_sha256 IS NULL OR length(model_sha256) = 64),
+        caption_session_id TEXT,
+        worker_offset_bytes INTEGER
+          CHECK (worker_offset_bytes IS NULL OR worker_offset_bytes >= 0),
         review_state TEXT NOT NULL DEFAULT 'unreviewed'
           CHECK (review_state IN ('unreviewed', 'needs_review', 'reviewed')),
         reviewed_at_ms INTEGER,
@@ -881,56 +896,6 @@ class AppDatabase {
   }
 
   static Future<void> _createDesktopLiveCaptionSchema(Database db) async {
-    await _addColumnIfMissing(
-      db,
-      table: 'transcript_generations',
-      column: 'generation_kind',
-      definition:
-          "TEXT NOT NULL DEFAULT 'formal' "
-          "CHECK (generation_kind IN ('draft', 'formal'))",
-    );
-    await _addColumnIfMissing(
-      db,
-      table: 'transcript_generations',
-      column: 'supersedes_generation_id',
-      definition: 'INTEGER',
-    );
-    await _addColumnIfMissing(
-      db,
-      table: 'transcript_generations',
-      column: 'reconciliation_state',
-      definition:
-          "TEXT NOT NULL DEFAULT 'not_required' "
-          "CHECK (reconciliation_state IN "
-          "('not_required', 'pending', 'kept_draft', 'accepted_formal'))",
-    );
-    await _addColumnIfMissing(
-      db,
-      table: 'transcript_segments',
-      column: 'language',
-      definition: 'TEXT',
-    );
-    await _addColumnIfMissing(
-      db,
-      table: 'transcript_segments',
-      column: 'model_sha256',
-      definition:
-          'TEXT CHECK (model_sha256 IS NULL OR length(model_sha256) = 64)',
-    );
-    await _addColumnIfMissing(
-      db,
-      table: 'transcript_segments',
-      column: 'caption_session_id',
-      definition: 'TEXT',
-    );
-    await _addColumnIfMissing(
-      db,
-      table: 'transcript_segments',
-      column: 'worker_offset_bytes',
-      definition:
-          'INTEGER CHECK (worker_offset_bytes IS NULL OR '
-          'worker_offset_bytes >= 0)',
-    );
     await db.execute('''
       CREATE TABLE IF NOT EXISTS desktop_live_caption_sessions (
         session_id TEXT PRIMARY KEY,
@@ -987,17 +952,5 @@ class AppDatabase {
       'caption_session_id, generation_id, sequence_id, worker_offset_bytes'
       ')',
     );
-  }
-
-  static Future<void> _addColumnIfMissing(
-    Database db, {
-    required String table,
-    required String column,
-    required String definition,
-  }) async {
-    final columns = await db.rawQuery('PRAGMA table_info($table)');
-    if (!columns.any((row) => row['name'] == column)) {
-      await db.execute('ALTER TABLE $table ADD COLUMN $column $definition');
-    }
   }
 }
