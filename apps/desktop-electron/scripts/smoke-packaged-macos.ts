@@ -1,5 +1,5 @@
 import { createHash, randomUUID } from "node:crypto";
-import { readFile, rm } from "node:fs/promises";
+import { mkdir, mkdtemp, readFile, realpath, rm } from "node:fs/promises";
 import { spawn } from "node:child_process";
 import path from "node:path";
 import os from "node:os";
@@ -26,18 +26,25 @@ export interface PackagedSmokeReceipt {
 export async function runPackagedMacosSmoke(): Promise<PackagedSmokeReceipt> {
   const appRoot = path.resolve("out/Voice2Text-darwin-arm64/Voice2Text.app");
   const executable = path.join(appRoot, "Contents/MacOS/Voice2Text");
+  const temporaryRoot = await mkdtemp(
+    path.join(await realpath(os.homedir()), ".voice2text-app-bootstrap-"),
+  );
+  const processTemporaryPath = path.join(temporaryRoot, "tmp");
+  const appDataPath = path.join(processTemporaryPath, "app-data");
   const receiptPath = path.join(
-    os.tmpdir(),
+    processTemporaryPath,
     `voice2text-bootstrap-${randomUUID()}.json`,
   );
+  await mkdir(appDataPath, { recursive: true, mode: 0o700 });
   try {
     const child = spawn(executable, [], {
       cwd: os.tmpdir(),
       env: {
-        HOME: process.env.HOME,
+        HOME: temporaryRoot,
         LANG: "en_US.UTF-8",
         PATH: "/usr/bin:/bin:/usr/sbin:/sbin",
-        TMPDIR: process.env.TMPDIR,
+        TMPDIR: processTemporaryPath,
+        VOICE2TEXT_BOOTSTRAP_SMOKE_APP_DATA: appDataPath,
         VOICE2TEXT_BOOTSTRAP_SMOKE_OUTPUT: receiptPath,
       },
       stdio: ["ignore", "pipe", "pipe"],
@@ -54,7 +61,9 @@ export async function runPackagedMacosSmoke(): Promise<PackagedSmokeReceipt> {
         resolve(code ?? -1);
       });
     });
-    if (exitCode !== 0) throw new Error(`packaged app exited with ${exitCode}`);
+    if (exitCode !== 0) {
+      throw new Error(`packaged app exited with ${exitCode}`);
+    }
 
     const receipt = JSON.parse(await readFile(receiptPath, "utf8")) as Omit<
       PackagedSmokeReceipt,
@@ -71,7 +80,7 @@ export async function runPackagedMacosSmoke(): Promise<PackagedSmokeReceipt> {
       .digest("hex");
     return { ...receipt, appSha256 };
   } finally {
-    await rm(receiptPath, { force: true });
+    await rm(temporaryRoot, { force: true, recursive: true });
   }
 }
 

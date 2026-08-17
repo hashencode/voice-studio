@@ -116,12 +116,14 @@ import { MacOSCompanionNativeAdapter } from "./features/companion/macos_companio
 import { TransferRepository } from "./storage/repositories/transfer_repository";
 import { WorkerHealthSupervisor } from "./worker_health";
 
+let bootstrapSmokeRequest: BootstrapSmokeRequest | null = null;
 let processingSmokeRequest: ProcessingSmokeRequest | null = null;
 let captureSmokeRequest: CaptureSmokeRequest | null = null;
 let captionFormalSmokeRequest: CaptionFormalSmokeRequest | null = null;
 let aiBoundarySmokeRequest: AiBoundarySmokeRequest | null = null;
 let companionSmokeRequest: CompanionSmokeRequest | null = null;
 try {
+  bootstrapSmokeRequest = readBootstrapSmokeRequest();
   processingSmokeRequest = readProcessingSmokeRequest();
   captureSmokeRequest = readCaptureSmokeRequest();
   captionFormalSmokeRequest = readCaptionFormalSmokeRequest();
@@ -133,6 +135,7 @@ try {
 }
 if (
   [
+    bootstrapSmokeRequest,
     processingSmokeRequest,
     captureSmokeRequest,
     captionFormalSmokeRequest,
@@ -143,6 +146,7 @@ if (
   throw new Error("packaged smoke modes are mutually exclusive");
 }
 const smokeAppDataPath =
+  bootstrapSmokeRequest?.appDataPath ??
   processingSmokeRequest?.appDataPath ??
   captureSmokeRequest?.appDataPath ??
   captionFormalSmokeRequest?.appDataPath ??
@@ -155,6 +159,11 @@ if (smokeAppDataPath) {
   app.setPath("userData", smokeUserData);
 }
 const isPrimaryInstance = runPrimaryInstance(app, () => app.enableSandbox());
+
+interface BootstrapSmokeRequest {
+  appDataPath: string;
+  outputPath: string;
+}
 
 interface ProcessingSmokeRequest {
   appDataPath: string;
@@ -306,8 +315,11 @@ function configureSessionSecurity(): void {
 }
 
 async function runBootstrapSmokeIfRequested(): Promise<void> {
-  const outputPath = process.env.VOICE2TEXT_BOOTSTRAP_SMOKE_OUTPUT;
-  if (!outputPath || !workerSupervisor) return;
+  const request = bootstrapSmokeRequest;
+  if (!request) return;
+  if (!workerSupervisor) {
+    throw new Error("packaged bootstrap smoke worker is unavailable");
+  }
   const worker = await workerSupervisor.check();
   const receipt = {
     schemaVersion: 1,
@@ -318,12 +330,38 @@ async function runBootstrapSmokeIfRequested(): Promise<void> {
     node: process.versions.node,
     worker,
   };
-  const temporaryPath = `${outputPath}.tmp-${process.pid}`;
+  const temporaryPath = `${request.outputPath}.tmp-${process.pid}`;
   await writeFile(temporaryPath, `${JSON.stringify(receipt, null, 2)}\n`, {
     mode: 0o600,
   });
-  await rename(temporaryPath, outputPath);
+  await rename(temporaryPath, request.outputPath);
   app.quit();
+}
+
+function readBootstrapSmokeRequest(): BootstrapSmokeRequest | null {
+  const values = [
+    process.env.VOICE2TEXT_BOOTSTRAP_SMOKE_APP_DATA,
+    process.env.VOICE2TEXT_BOOTSTRAP_SMOKE_OUTPUT,
+  ];
+  if (values.every((value) => value === undefined)) return null;
+  if (!app.isPackaged || values.some((value) => !value)) {
+    throw new Error(
+      "packaged bootstrap smoke requires a complete packaged-only request",
+    );
+  }
+  const [appDataRaw, outputRaw] = values as [string, string];
+  const temporaryRoot = realpathSync(tmpdir());
+  const appDataPath = realpathSync(path.resolve(appDataRaw));
+  const outputPath = path.resolve(outputRaw);
+  const outputParent = realpathSync(path.dirname(outputPath));
+  if (
+    lstatSync(appDataPath).isSymbolicLink() ||
+    !isPathInside(temporaryRoot, appDataPath) ||
+    !isPathInside(temporaryRoot, outputParent)
+  ) {
+    throw new Error("packaged bootstrap smoke paths are not private");
+  }
+  return { appDataPath, outputPath };
 }
 
 function readProcessingSmokeRequest(): ProcessingSmokeRequest | null {
@@ -2162,6 +2200,7 @@ async function initializeApplication(): Promise<void> {
       }),
     );
     if (
+      bootstrapSmokeRequest ||
       processingSmokeRequest ||
       captureSmokeRequest ||
       captionFormalSmokeRequest ||
@@ -2414,6 +2453,7 @@ async function initializeApplication(): Promise<void> {
       error instanceof Error ? error.message : "本地处理运行时不可用",
     );
     if (
+      bootstrapSmokeRequest ||
       processingSmokeRequest ||
       captionFormalSmokeRequest ||
       companionSmokeRequest
