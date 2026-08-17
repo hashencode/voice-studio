@@ -12,7 +12,7 @@ import { join } from "node:path";
 import { afterEach, expect, it } from "vitest";
 
 import { writeExportAtomically } from "../../../src/main/domain/workspace/atomic_export_writer";
-import { exportMeetingResponseSchema } from "../../../src/shared/contracts";
+import { exportAudioResponseSchema } from "../../../src/shared/contracts";
 
 const roots: string[] = [];
 
@@ -24,7 +24,7 @@ afterEach(() => {
 it("publishes through a same-directory 0600 temp file and preserves an existing export on failure", async () => {
   const root = mkdtempSync(join(tmpdir(), "voice2text-export-"));
   roots.push(root);
-  const destination = join(root, "meeting.txt");
+  const destination = join(root, "audio.txt");
   writeFileSync(destination, "old", { mode: 0o600 });
   chmodSync(destination, 0o600);
 
@@ -45,7 +45,7 @@ it("publishes through a same-directory 0600 temp file and preserves an existing 
 
 it("exposes export failures as a bounded typed response without a destination path", () => {
   expect(
-    exportMeetingResponseSchema.parse({
+    exportAudioResponseSchema.parse({
       state: "failed",
       code: "export-write-failed",
       message: "会议导出失败，请重试。",
@@ -56,7 +56,7 @@ it("exposes export failures as a bounded typed response without a destination pa
     message: "会议导出失败，请重试。",
   });
   expect(() =>
-    exportMeetingResponseSchema.parse({
+    exportAudioResponseSchema.parse({
       state: "failed",
       code: "export-write-failed",
       message: "failed",

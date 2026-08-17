@@ -30,7 +30,7 @@ it("shows semantic task states, throttled progress, and keyboard cancel", async 
       tasks={[
         {
           id: 7,
-          meetingId: 3,
+          audioId: 3,
           displayName: "项目周会.wav",
           state: "running",
           phase: "asr",
@@ -40,7 +40,7 @@ it("shows semantic task states, throttled progress, and keyboard cancel", async 
         },
         {
           id: 8,
-          meetingId: 4,
+          audioId: 4,
           displayName: "取消任务.wav",
           state: "canceled",
           phase: "asr",
@@ -76,7 +76,7 @@ it.each([
   async (state, label) => {
     const running = {
       id: 7,
-      meetingId: 3,
+      audioId: 3,
       displayName: "项目周会.wav",
       state: "running" as const,
       phase: "asr" as const,
@@ -120,7 +120,7 @@ it.each([
 it("announces the task that just became terminal when an older terminal task is listed first", async () => {
   const olderCompleted = {
     id: 6,
-    meetingId: 2,
+    audioId: 2,
     displayName: "旧会议.wav",
     state: "completed" as const,
     phase: "diarization" as const,
@@ -130,7 +130,7 @@ it("announces the task that just became terminal when an older terminal task is 
   };
   const running = {
     id: 7,
-    meetingId: 3,
+    audioId: 3,
     displayName: "本次会议.wav",
     state: "running" as const,
     phase: "asr" as const,

@@ -182,7 +182,7 @@ function fixtureManifest(bytes: Buffer) {
     schema: "companion-audio-transfer/v2" as const,
     transferId: "transfer-1",
     sourceAssetId: "asset-1",
-    displayName: "meeting.wav",
+    displayName: "audio.wav",
     sizeBytes: bytes.length,
     wholeFileSha256: sha256(bytes),
     chunkBytes: 4_096,

@@ -12,7 +12,7 @@ import { mkdtempSync } from "node:fs";
 import { afterEach, describe, expect, it } from "vitest";
 
 import { DesktopDomainService } from "../../src/main/domain/desktop_domain_service";
-import { initializeElectronProfile } from "../../src/main/profile/electron_profile";
+import { initializeAudioProfile } from "../../src/main/profile/audio_profile";
 import { DesktopRepository } from "../../src/main/storage/desktop_repository";
 
 const temporaryRoots: string[] = [];
@@ -29,7 +29,7 @@ function temporaryRoot(): string {
   return root;
 }
 
-function requireReady(result: ReturnType<typeof initializeElectronProfile>) {
+function requireReady(result: ReturnType<typeof initializeAudioProfile>) {
   expect(result.status).toBe("ready");
   if (result.status !== "ready") throw new Error(result.message);
   return result;
@@ -38,20 +38,18 @@ function requireReady(result: ReturnType<typeof initializeElectronProfile>) {
 describe("Electron profile startup reconciliation", () => {
   it("makes every interrupted checkpoint explicit without success or retry", () => {
     const applicationDataRoot = temporaryRoot();
-    const initial = requireReady(
-      initializeElectronProfile(applicationDataRoot),
-    );
+    const initial = requireReady(initializeAudioProfile(applicationDataRoot));
     const repository = new DesktopRepository(initial.database, initial.profile);
     const service = new DesktopDomainService(repository, () => 1_000);
-    const meeting = service.createMeeting({
-      idempotencyKey: "meeting-1",
+    const audio = service.createAudio({
+      idempotencyKey: "audio-1",
       sourceIdentity: "electron-import:1",
-      displayName: "Meeting.wav",
-      mediaPath: join(initial.profile.mediaDirectory, "meeting.wav"),
+      displayName: "Audio.wav",
+      mediaPath: join(initial.profile.mediaDirectory, "audio.wav"),
       durationMs: 1,
     });
     const job = service.enqueueProcessingJob({
-      meetingId: meeting.value.id,
+      audioId: audio.value.id,
       idempotencyKey: "job-1",
       operationId: "operation-1",
       resourceIdentity: "resource-1",
@@ -80,7 +78,7 @@ describe("Electron profile startup reconciliation", () => {
     initial.database.close();
 
     const restarted = requireReady(
-      initializeElectronProfile(applicationDataRoot, { now: () => 2_000 }),
+      initializeAudioProfile(applicationDataRoot, { now: () => 2_000 }),
     );
     try {
       const states = restarted.reconciliation.items.map((item) => [
@@ -132,9 +130,7 @@ describe("Electron profile startup reconciliation", () => {
 
   it("keeps repairable checkpoints visible on later starts", () => {
     const applicationDataRoot = temporaryRoot();
-    const initial = requireReady(
-      initializeElectronProfile(applicationDataRoot),
-    );
+    const initial = requireReady(initializeAudioProfile(applicationDataRoot));
     writeFileSync(
       join(initial.profile.stagingDirectory, "retry-me.partial"),
       "x",
@@ -142,7 +138,7 @@ describe("Electron profile startup reconciliation", () => {
     initial.database.close();
 
     const firstRestart = requireReady(
-      initializeElectronProfile(applicationDataRoot),
+      initializeAudioProfile(applicationDataRoot),
     );
     expect(firstRestart.reconciliation.items).toEqual([
       expect.objectContaining({ kind: "staging", state: "repairable" }),
@@ -150,7 +146,7 @@ describe("Electron profile startup reconciliation", () => {
     firstRestart.database.close();
 
     const secondRestart = requireReady(
-      initializeElectronProfile(applicationDataRoot),
+      initializeAudioProfile(applicationDataRoot),
     );
     expect(secondRestart.reconciliation.items).toEqual([
       expect.objectContaining({ kind: "staging", state: "repairable" }),

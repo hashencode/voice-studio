@@ -3,7 +3,7 @@ import type {
   CaptionSnapshot,
 } from "../../../shared/contracts";
 import type { TranscriptRepository } from "../../storage/repositories/transcript_repository";
-import type { ElectronProfilePaths } from "../../profile/profile_paths";
+import type { AudioProfilePaths } from "../../profile/profile_paths";
 import { validateFormalMediaAuthority } from "./formal_capture_media";
 
 export interface FormalCaptureMedia {
@@ -27,7 +27,7 @@ export class FormalTranscriptHandoffService {
   constructor(
     private readonly options: {
       repository: TranscriptRepository;
-      profile: ElectronProfilePaths;
+      profile: AudioProfilePaths;
       flushDraft(sessionId: string): Promise<unknown>;
       prepareMedia(sessionId: string): Promise<FormalCaptureMedia>;
       scheduleProcessing(jobId: number): void;

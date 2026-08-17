@@ -16,7 +16,7 @@ import path from "node:path";
 import { describe, expect, it } from "vitest";
 
 import { MacOSNativeHelperClient } from "../../src/main/features/importing/macos_native_helper_client";
-import { ELECTRON_SCHEMA_VERSION } from "../../src/main/storage/database";
+import { AUDIO_SCHEMA_VERSION } from "../../src/main/storage/audio_database";
 
 const packagedIt =
   process.env.RUN_PACKAGED_CAPTURE_SMOKE === "1" ? it : it.skip;
@@ -86,7 +86,7 @@ describe("packaged macOS capture recovery", () => {
         expect(JSON.parse(readFileSync(initializeReceipt, "utf8"))).toEqual(
           expect.objectContaining({
             phase: "profile-initialized",
-            databaseUserVersion: ELECTRON_SCHEMA_VERSION,
+            databaseUserVersion: AUDIO_SCHEMA_VERSION,
             transport: "inherited-stdio",
           }),
         );
@@ -240,7 +240,7 @@ describe("packaged macOS capture recovery", () => {
             trackCount: 2,
             chunkCount: 1,
             receiptCount: 2,
-            databaseUserVersion: ELECTRON_SCHEMA_VERSION,
+            databaseUserVersion: AUDIO_SCHEMA_VERSION,
             recordingSha256: expect.stringMatching(/^[a-f0-9]{64}$/),
             journalSha256: expect.stringMatching(/^[a-f0-9]{64}$/),
             sessionIdentitySha256: expect.stringMatching(/^[a-f0-9]{64}$/),
@@ -267,7 +267,7 @@ describe("packaged macOS capture recovery", () => {
               readFileSync(
                 path.join(
                   appData,
-                  "voice2text-electron/v1/database/meetings.sqlite3",
+                  "voice2text-electron/v1/database/audios.sqlite3",
                 ),
               ),
             )

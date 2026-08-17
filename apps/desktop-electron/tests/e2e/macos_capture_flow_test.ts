@@ -5,7 +5,7 @@ import { describe, expect, it, vi } from "vitest";
 
 import { DesktopCaptureService } from "../../src/main/domain/capture/desktop_capture_service";
 import type { CaptureNativePort } from "../../src/main/domain/capture/capture_native_port";
-import { openElectronDatabase } from "../../src/main/storage/database";
+import { openAudioDatabase } from "../../src/main/storage/audio_database";
 import { CaptureRepository } from "../../src/main/storage/repositories/capture_repository";
 import {
   captureSnapshotSchema,
@@ -27,7 +27,7 @@ const parity = desktopCaptureParitySchema.parse(
 
 describe("macOS capture parity flow", () => {
   it("persists idempotent controls and commits only after native finalization", async () => {
-    const database = openElectronDatabase(":memory:");
+    const database = openAudioDatabase(":memory:");
     const native = nativeFixture();
     const service = new DesktopCaptureService(
       new CaptureRepository(database),
@@ -141,7 +141,7 @@ describe("macOS capture parity flow", () => {
   });
 
   it("preserves one healthy track, visible gaps, and recoverable authority", async () => {
-    const database = openElectronDatabase(":memory:");
+    const database = openAudioDatabase(":memory:");
     const native = nativeFixture();
     native.start.mockResolvedValueOnce(
       snapshot({
@@ -206,7 +206,7 @@ describe("macOS capture parity flow", () => {
   });
 
   it("keeps validated recovery once and fences the same durable receipt", async () => {
-    const database = openElectronDatabase(":memory:");
+    const database = openAudioDatabase(":memory:");
     const native = nativeFixture();
     native.recover.mockResolvedValueOnce([
       snapshot({
@@ -248,7 +248,7 @@ describe("macOS capture parity flow", () => {
   });
 
   it("durably reconciles an all-track native start failure", async () => {
-    const database = openElectronDatabase(":memory:");
+    const database = openAudioDatabase(":memory:");
     const native = nativeFixture();
     native.start.mockRejectedValueOnce(new Error("both tracks failed"));
     native.snapshot.mockRejectedValueOnce(new Error("no native session"));
@@ -282,7 +282,7 @@ describe("macOS capture parity flow", () => {
   });
 
   it("reconciles a start response loss without hiding a live native capture", async () => {
-    const database = openElectronDatabase(":memory:");
+    const database = openAudioDatabase(":memory:");
     const native = nativeFixture();
     native.start.mockRejectedValueOnce(new Error("response lost"));
     native.snapshot.mockResolvedValueOnce(
@@ -313,7 +313,7 @@ describe("macOS capture parity flow", () => {
   });
 
   it("commits a completed native journal that crashed before the Main stop receipt", async () => {
-    const database = openElectronDatabase(":memory:");
+    const database = openAudioDatabase(":memory:");
     const native = nativeFixture();
     native.recover.mockResolvedValue([
       snapshot({

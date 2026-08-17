@@ -27,11 +27,11 @@ import {
 import {
   desktopProtocolVersion,
   type BootstrapAction,
-  type ImportMeetingResponse,
+  type ImportAudioResponse,
   type OperationEvent,
   type CaptureSnapshot,
   type CaptionSnapshot,
-  type MeetingAiSnapshot,
+  type AudioAiSnapshot,
   type CompanionSnapshot,
 } from "../shared/contracts";
 import { DesktopApplicationState } from "./application/application_state";
@@ -68,10 +68,10 @@ import {
 } from "./domain/capture/capture_capability";
 import { listAvailableCaptureRecoveries } from "./domain/capture/capture_availability";
 import { BrowserWindowPlaybackPort } from "./features/playback/browser_window_playback_port";
-import { MeetingPlaybackService } from "./features/playback/meeting_playback_service";
-import { MeetingExportService } from "./domain/workspace/meeting_export_service";
+import { AudioPlaybackService } from "./features/playback/audio_playback_service";
+import { AudioExportService } from "./domain/workspace/audio_export_service";
 import { writeExportAtomically } from "./domain/workspace/atomic_export_writer";
-import { MeetingWorkspaceService } from "./domain/workspace/meeting_workspace_service";
+import { AudioWorkspaceService } from "./domain/workspace/audio_workspace_service";
 import {
   DurableProcessCoordinator,
   ProcessCanceledError,
@@ -86,8 +86,8 @@ import {
   WorkerReportedError,
 } from "./processes/owned_process_supervisor";
 import { prepareProcessingAttempt } from "./processes/processing_attempt";
-import { initializeElectronProfile } from "./profile/electron_profile";
-import type { ElectronProfilePaths } from "./profile/electron_profile";
+import { initializeAudioProfile } from "./profile/audio_profile";
+import type { AudioProfilePaths } from "./profile/audio_profile";
 import {
   ResourceCatalog,
   requireProcessingPipelineIdentities,
@@ -96,7 +96,7 @@ import {
 import { secureWebPreferences } from "./security";
 import { sha256File } from "./security/sha256_file";
 import { DesktopRepository } from "./storage/desktop_repository";
-import { MeetingWorkspaceRepository } from "./storage/repositories/meeting_workspace_repository";
+import { AudioWorkspaceRepository } from "./storage/repositories/audio_workspace_repository";
 import { CaptureRepository } from "./storage/repositories/capture_repository";
 import { TranscriptRepository } from "./storage/repositories/transcript_repository";
 import { LiveCaptionService } from "./domain/captions/live_caption_service";
@@ -104,7 +104,7 @@ import { CaptionWorkerSupervisor } from "./processes/caption_worker_supervisor";
 import { FormalTranscriptHandoffService } from "./domain/captions/formal_transcript_handoff_service";
 import { prepareFormalCaptureMedia } from "./domain/captions/formal_capture_media";
 import { finalizeCommittedCaptureTranscript } from "./domain/captions/capture_formal_completion";
-import { MeetingAiService } from "./domain/meeting-intelligence/meeting_ai_service";
+import { AudioAiService } from "./domain/audio-intelligence/audio_ai_service";
 import { AiJobRepository } from "./storage/repositories/ai_job_repository";
 import { MacOSHelperSecretStore } from "./features/secrets/macos_helper_secret_store";
 import { UnavailableDesktopSecretStore } from "./features/secrets/secret_store_port";
@@ -204,16 +204,16 @@ let unregisterIpc: (() => void) | null = null;
 let workerSupervisor: WorkerHealthSupervisor | null = null;
 let processCoordinator: DurableProcessCoordinator | null = null;
 let profileDatabase: DatabaseSync | null = null;
-let profilePaths: ElectronProfilePaths | null = null;
+let profilePaths: AudioProfilePaths | null = null;
 let domainService: DesktopDomainService | null = null;
 let desktopRepository: DesktopRepository | null = null;
 let transcriptRepository: TranscriptRepository | null = null;
 let liveCaptionService: LiveCaptionService | null = null;
 let formalTranscriptHandoff: FormalTranscriptHandoffService | null = null;
-let meetingWorkspaceService: MeetingWorkspaceService | null = null;
-let meetingExportService: MeetingExportService | null = null;
-let meetingPlaybackService: MeetingPlaybackService | null = null;
-let meetingAiService: MeetingAiService | null = null;
+let audioWorkspaceService: AudioWorkspaceService | null = null;
+let audioExportService: AudioExportService | null = null;
+let audioPlaybackService: AudioPlaybackService | null = null;
+let audioAiService: AudioAiService | null = null;
 let companionService: CompanionService | null = null;
 let companionNativeAdapter: MacOSCompanionNativeAdapter | null = null;
 let unsubscribeCompanion: (() => void) | null = null;
@@ -221,7 +221,7 @@ let resourceCatalog: ResourceCatalog | null = null;
 let captureService: DesktopCaptureService | null = null;
 let captureNativeSession: MacOSNativeHelperSession | null = null;
 let captureTray: Tray | null = null;
-let activeCaptureTitle = "会议录制";
+let activeCaptureTitle = "音频录制";
 let captureLifecycleBound = false;
 let capturePollTimer: ReturnType<typeof setInterval> | null = null;
 let capturePollInFlight = false;
@@ -238,7 +238,7 @@ let processingLoop: Promise<void> | null = null;
 const applicationState = new DesktopApplicationState();
 const operationListeners = new Set<(event: OperationEvent) => void>();
 const captionListeners = new Set<(snapshot: CaptionSnapshot) => void>();
-const meetingAiListeners = new Set<(snapshot: MeetingAiSnapshot) => void>();
+const audioAiListeners = new Set<(snapshot: AudioAiSnapshot) => void>();
 const companionListeners = new Set<(snapshot: CompanionSnapshot) => void>();
 
 function createMainWindow(): BrowserWindow {
@@ -613,9 +613,9 @@ async function runProcessingSmokeIfRequested(): Promise<void> {
     throw new Error("packaged processing smoke fixture hash mismatch");
   }
   if (request.workstationOutputPath) await preparePackagedRendererTelemetry();
-  const imported = await importMeetingFromSource(request.sourcePath, {
+  const imported = await importAudioFromSource(request.sourcePath, {
     minimumFreeBytes: 0,
-    destinationId: "meeting-packaged-smoke",
+    destinationId: "audio-packaged-smoke",
   });
   const workstationProgress = request.workstationOutputPath
     ? observePackagedRendererProgress()
@@ -639,16 +639,16 @@ async function runProcessingSmokeIfRequested(): Promise<void> {
       `packaged processing smoke did not complete: ${task?.state ?? "missing"}`,
     );
   }
-  const meeting = profileDatabase
+  const audio = profileDatabase
     .prepare(
-      `SELECT meetings.display_name, meetings.duration_ms,
+      `SELECT audio_items.display_name, audio_items.duration_ms,
         media_authorities.normalized_path, media_authorities.source_sha256,
         media_authorities.content_sha256, media_authorities.size_bytes
-      FROM meetings
-      JOIN media_authorities ON media_authorities.id = meetings.media_authority_id
-      WHERE meetings.id = ?`,
+      FROM audio_items
+      JOIN media_authorities ON media_authorities.id = audio_items.media_authority_id
+      WHERE audio_items.id = ?`,
     )
-    .get(imported.meetingId);
+    .get(imported.audioId);
   const job = profileDatabase
     .prepare(
       `SELECT operation_id, resource_identity, state, attempt, error_code,
@@ -664,7 +664,7 @@ async function runProcessingSmokeIfRequested(): Promise<void> {
       FROM result_publications WHERE job_id = ?`,
     )
     .get(imported.jobId);
-  if (!meeting || !job || !publication) {
+  if (!audio || !job || !publication) {
     throw new Error("packaged processing smoke durable projection is missing");
   }
   const resultPayload = JSON.parse(String(publication.payload_json)) as unknown;
@@ -675,8 +675,8 @@ async function runProcessingSmokeIfRequested(): Promise<void> {
   if (String(job.resource_identity) !== resourceCatalog.identity) {
     throw new Error("packaged processing smoke resource identity changed");
   }
-  const normalizedSha256 = await sha256File(String(meeting.normalized_path));
-  if (normalizedSha256 !== String(meeting.content_sha256)) {
+  const normalizedSha256 = await sha256File(String(audio.normalized_path));
+  if (normalizedSha256 !== String(audio.content_sha256)) {
     throw new Error("packaged processing smoke normalized media changed");
   }
   const evidence = buildProcessingSmokeEvidence({
@@ -687,15 +687,15 @@ async function runProcessingSmokeIfRequested(): Promise<void> {
       runtimeSha256: pipeline.diarization.runtimeSha256,
     },
     media: {
-      sourceSha256: String(meeting.source_sha256),
+      sourceSha256: String(audio.source_sha256),
       normalizedSha256,
-      normalizedSizeBytes: Number(meeting.size_bytes),
-      durationMs: Number(meeting.duration_ms),
+      normalizedSizeBytes: Number(audio.size_bytes),
+      durationMs: Number(audio.duration_ms),
     },
     databaseProjection: {
-      meeting: {
-        displayName: String(meeting.display_name),
-        durationMs: Number(meeting.duration_ms),
+      audio: {
+        displayName: String(audio.display_name),
+        durationMs: Number(audio.duration_ms),
       },
       job: {
         operationId: String(job.operation_id),
@@ -734,7 +734,7 @@ async function runProcessingSmokeIfRequested(): Promise<void> {
   await rename(temporaryPath, request.outputPath);
   if (request.workstationOutputPath) {
     await runPackagedWorkstationSmoke({
-      meetingId: imported.meetingId,
+      audioId: imported.audioId,
       outputPath: request.workstationOutputPath,
       pipeline,
       sourceSha256: String(job.source_sha256),
@@ -879,7 +879,7 @@ async function runCaptionFormalSmokeIfRequested(): Promise<void> {
   const snapshot = transcriptRepository.getSnapshot(sessionId);
   const handoff = profileDatabase
     .prepare(
-      `SELECT meeting_id, processing_job_id, normalized_sha256,
+      `SELECT audio_id, processing_job_id, normalized_sha256,
         normalized_size_bytes FROM caption_formal_handoffs WHERE session_id = ?`,
     )
     .get(sessionId);
@@ -920,17 +920,17 @@ async function runCaptionFormalSmokeIfRequested(): Promise<void> {
       })}`,
     );
   }
-  if (!handoff?.processing_job_id || !handoff.meeting_id) {
+  if (!handoff?.processing_job_id || !handoff.audio_id) {
     throw new Error("packaged caption formal durable handoff is missing");
   }
   const counts = profileDatabase
     .prepare(
       `SELECT
-        (SELECT COUNT(*) FROM processing_jobs WHERE meeting_id = ?) AS jobs,
+        (SELECT COUNT(*) FROM processing_jobs WHERE audio_id = ?) AS jobs,
         (SELECT COUNT(*) FROM result_publications WHERE job_id = ?) AS publications,
         (SELECT COUNT(*) FROM caption_formal_attempts WHERE session_id = ?) AS attempts`,
     )
-    .get(handoff.meeting_id, handoff.processing_job_id, sessionId);
+    .get(handoff.audio_id, handoff.processing_job_id, sessionId);
   const job = profileDatabase
     .prepare("SELECT attempt, state FROM processing_jobs WHERE id = ?")
     .get(handoff.processing_job_id);
@@ -1053,25 +1053,25 @@ async function writeCaptionFormalSmokeReceipt(
 }
 
 async function runPackagedWorkstationSmoke(input: {
-  meetingId: number;
+  audioId: number;
   outputPath: string;
   pipeline: ReturnType<typeof requireProcessingPipelineIdentities>;
   sourceSha256: string;
   initialProgressObserved: boolean;
 }): Promise<void> {
   if (
-    !meetingWorkspaceService ||
-    !meetingPlaybackService ||
+    !audioWorkspaceService ||
+    !audioPlaybackService ||
     !domainService ||
     !desktopRepository ||
     !profilePaths
   ) {
     throw new Error("packaged workstation smoke authority is unavailable");
   }
-  const rendererReview = await runPackagedRendererReview(input.meetingId);
+  const rendererReview = await runPackagedRendererReview(input.audioId);
   const retryJob = domainService.enqueueProcessingJob({
-    meetingId: input.meetingId,
-    idempotencyKey: `packaged-workstation-retry:${input.meetingId}`,
+    audioId: input.audioId,
+    idempotencyKey: `packaged-workstation-retry:${input.audioId}`,
     operationId: "asr",
     resourceIdentity: input.pipeline.asr.resourceIdentity,
     phase: "asr",
@@ -1108,13 +1108,13 @@ async function runPackagedWorkstationSmoke(input: {
     .find((task) => task.id === retryJob.value.id);
   if (retryTask?.state !== "completed" || retryTask.attempt < 2)
     throw new Error("packaged workstation production retry did not complete");
-  const workspace = meetingWorkspaceService.openMeeting(input.meetingId);
+  const workspace = audioWorkspaceService.openAudio(input.audioId);
   if (workspace?.segments[0]?.text !== rendererReview.reviewedText) {
     throw new Error("packaged workstation retry overwrote manual authority");
   }
   const cancelJob = domainService.enqueueProcessingJob({
-    meetingId: input.meetingId,
-    idempotencyKey: `packaged-workstation-cancel:${input.meetingId}`,
+    audioId: input.audioId,
+    idempotencyKey: `packaged-workstation-cancel:${input.audioId}`,
     operationId: "asr",
     resourceIdentity: input.pipeline.asr.resourceIdentity,
     phase: "asr",
@@ -1151,12 +1151,12 @@ async function runPackagedWorkstationSmoke(input: {
     .find((task) => task.id === cancelJob.value.id);
   if (canceledTask?.state !== "canceled")
     throw new Error("packaged workstation cancel was not durable");
-  const rendererEvidence = await runPackagedRendererAssertions(input.meetingId);
+  const rendererEvidence = await runPackagedRendererAssertions(input.audioId);
   const evidence = {
     schemaVersion: 1,
     protocol: "voice2text-u7-packaged-workstation/v1",
     packaged: app.isPackaged,
-    meetingId: input.meetingId,
+    audioId: input.audioId,
     generationId: workspace.summary.generationId,
     segmentCount: workspace.segments.length,
     manualRevisionSurvivedRetry: true,
@@ -1187,7 +1187,7 @@ async function runPackagedWorkstationSmoke(input: {
   await rename(temporaryPath, input.outputPath);
 }
 
-async function runPackagedRendererReview(meetingId: number): Promise<{
+async function runPackagedRendererReview(audioId: number): Promise<{
   reviewedText: string;
   domReady: boolean;
 }> {
@@ -1206,11 +1206,11 @@ async function runPackagedRendererReview(meetingId: number): Promise<{
       const buttonWithText = (text) => [...document.querySelectorAll("button")]
         .find((button) => button.textContent?.trim().includes(text));
       buttonWithText("会议库")?.click();
-      const meeting = await waitFor(
-        () => document.querySelector('[data-meeting-id="${meetingId}"]'),
-        "meeting card"
+      const audio = await waitFor(
+        () => document.querySelector('[data-audio-id="${audioId}"]'),
+        "audio card"
       );
-      meeting.click();
+      audio.click();
       const edit = await waitFor(() => buttonWithText("编辑片段 1"), "edit segment");
       edit.click();
       const textarea = await waitFor(
@@ -1244,7 +1244,7 @@ async function runPackagedRendererReview(meetingId: number): Promise<{
   )) as { reviewedText: string; domReady: boolean };
 }
 
-async function runPackagedRendererAssertions(meetingId: number): Promise<{
+async function runPackagedRendererAssertions(audioId: number): Promise<{
   searchResultCount: number;
   playback: {
     initialized: boolean;
@@ -1272,11 +1272,11 @@ async function runPackagedRendererAssertions(meetingId: number): Promise<{
       const buttonWithText = (text) => [...document.querySelectorAll("button")]
         .find((button) => button.textContent?.trim().includes(text));
       buttonWithText("会议库")?.click();
-      const meeting = await waitFor(
-        () => document.querySelector('[data-meeting-id="${meetingId}"]'),
-        "meeting card after retry"
+      const audio = await waitFor(
+        () => document.querySelector('[data-audio-id="${audioId}"]'),
+        "audio card after retry"
       );
-      meeting.click();
+      audio.click();
       const searchInput = await waitFor(
         () => document.querySelector('[aria-label="搜索会议转写"]'),
         "transcript search"
@@ -1308,11 +1308,11 @@ async function runPackagedRendererAssertions(meetingId: number): Promise<{
         () => document.body.textContent?.includes("已导出 renderer-"),
         "DOM export status"
       );
-      const playback = await api.controlMeetingPlayback(${meetingId}, { action: "seek", positionMs: 500 });
-      const sped = await api.controlMeetingPlayback(${meetingId}, { action: "speed", speed: 1.5 });
+      const playback = await api.controlAudioPlayback(${audioId}, { action: "seek", positionMs: 500 });
+      const sped = await api.controlAudioPlayback(${audioId}, { action: "speed", speed: 1.5 });
       const exported = [{ format: "txt", fileName: "renderer-dom.txt", bytes: 1 }];
       for (const format of ["md", "vtt", "srt", "json"]) {
-        const result = await api.exportMeeting(${meetingId}, format);
+        const result = await api.exportAudio(${audioId}, format);
         if (result.state !== "saved") throw new Error("Renderer export failed");
         exported.push({ format, fileName: result.fileName, bytes: 1 });
       }
@@ -1552,7 +1552,7 @@ function setupCaptureLifecycle(): void {
     const image = nativeImage.createFromNamedImage("NSStatusAvailable");
     image.setTemplateImage(true);
     captureTray = new Tray(image);
-    captureTray.setToolTip("Voice2Text 会议录制");
+    captureTray.setToolTip("Voice2Text 音频录制");
     updateCaptureTray(captureService?.snapshot() ?? null);
   }
   powerMonitor.on("suspend", () => {
@@ -1772,45 +1772,43 @@ function bindDesktopIpc(window: BrowserWindow): void {
       return () => companionListeners.delete(listener);
     },
     getAiSettings: async () => {
-      if (!meetingAiService)
-        throw new Error("meeting AI settings are unavailable");
-      return await meetingAiService.getSettings();
+      if (!audioAiService) throw new Error("audio AI settings are unavailable");
+      return await audioAiService.getSettings();
     },
     saveAiSettings: async (options) => {
-      if (!meetingAiService)
-        throw new Error("meeting AI settings are unavailable");
-      return await meetingAiService.saveSettings(options);
+      if (!audioAiService) throw new Error("audio AI settings are unavailable");
+      return await audioAiService.saveSettings(options);
     },
     replaceAiProviderSecret: async (options) => {
-      if (!meetingAiService)
+      if (!audioAiService)
         throw new Error("secure secret storage is unavailable");
-      return await meetingAiService.replaceSecret(
+      return await audioAiService.replaceSecret(
         options.providerId,
         options.secret,
       );
     },
     deleteAiProviderSecret: async (options) => {
-      if (!meetingAiService)
+      if (!audioAiService)
         throw new Error("secure secret storage is unavailable");
-      return await meetingAiService.deleteSecret(options.providerId);
+      return await audioAiService.deleteSecret(options.providerId);
     },
-    prepareMeetingAi: async (options) => {
-      if (!meetingAiService) throw new Error("meeting AI is unavailable");
-      return meetingAiService.prepare(options);
+    prepareAudioAi: async (options) => {
+      if (!audioAiService) throw new Error("audio AI is unavailable");
+      return audioAiService.prepare(options);
     },
-    getMeetingAiSnapshot: async ({ meetingId }) =>
-      meetingAiService?.snapshot(meetingId) ?? null,
-    generateMeetingAi: async (options) => {
-      if (!meetingAiService) throw new Error("meeting AI is unavailable");
-      return await meetingAiService.generate(options);
+    getAudioAiSnapshot: async ({ audioId }) =>
+      audioAiService?.snapshot(audioId) ?? null,
+    generateAudioAi: async (options) => {
+      if (!audioAiService) throw new Error("audio AI is unavailable");
+      return await audioAiService.generate(options);
     },
-    retryMeetingAi: async (options) => {
-      if (!meetingAiService) throw new Error("meeting AI is unavailable");
-      return await meetingAiService.retry(options);
+    retryAudioAi: async (options) => {
+      if (!audioAiService) throw new Error("audio AI is unavailable");
+      return await audioAiService.retry(options);
     },
-    onMeetingAiSnapshot: (listener) => {
-      meetingAiListeners.add(listener);
-      return () => meetingAiListeners.delete(listener);
+    onAudioAiSnapshot: (listener) => {
+      audioAiListeners.add(listener);
+      return () => audioAiListeners.delete(listener);
     },
     applicationSnapshot: () => applicationState.snapshot(),
     navigate: (section) => applicationState.navigate(section),
@@ -1868,7 +1866,7 @@ function bindDesktopIpc(window: BrowserWindow): void {
       return queuedResponse(jobId);
     },
     listProcessingTasks: async () => domainService?.listProcessingTasks() ?? [],
-    importMeeting: async () => await chooseAndImportMeeting(),
+    importAudio: async () => await chooseAndImportAudio(),
     preflightCapture: async (options) => await preflightCapture(options),
     startCapture: async (options) => await startCapture(options),
     controlCapture: async (options) => await controlCapture(options),
@@ -1913,68 +1911,67 @@ function bindDesktopIpc(window: BrowserWindow): void {
       publishCaption(snapshot);
       return snapshot;
     },
-    listMeetings: async (options) => {
-      if (!meetingWorkspaceService)
-        throw new Error("meeting workspace is unavailable");
-      return meetingWorkspaceService.listMeetings(options);
+    listAudios: async (options) => {
+      if (!audioWorkspaceService)
+        throw new Error("audio workspace is unavailable");
+      return audioWorkspaceService.listAudios(options);
     },
-    openMeeting: async (meetingId) => {
-      if (!meetingWorkspaceService)
-        throw new Error("meeting workspace is unavailable");
-      return meetingWorkspaceService.openMeeting(meetingId);
+    openAudio: async (audioId) => {
+      if (!audioWorkspaceService)
+        throw new Error("audio workspace is unavailable");
+      return audioWorkspaceService.openAudio(audioId);
     },
     searchTranscript: async (options) => {
-      if (!meetingWorkspaceService)
-        throw new Error("meeting workspace is unavailable");
-      return meetingWorkspaceService.searchTranscript(options);
+      if (!audioWorkspaceService)
+        throw new Error("audio workspace is unavailable");
+      return audioWorkspaceService.searchTranscript(options);
     },
-    editMeetingSegment: async (command) => {
-      if (!meetingWorkspaceService)
-        throw new Error("meeting workspace is unavailable");
-      return meetingWorkspaceService.editSegment(command);
+    editAudioSegment: async (command) => {
+      if (!audioWorkspaceService)
+        throw new Error("audio workspace is unavailable");
+      return audioWorkspaceService.editSegment(command);
     },
-    undoMeetingEdit: async (meetingId, generationId, expectedRevision) => {
-      if (!meetingWorkspaceService)
-        throw new Error("meeting workspace is unavailable");
-      return meetingWorkspaceService.undo(
-        meetingId,
+    undoAudioEdit: async (audioId, generationId, expectedRevision) => {
+      if (!audioWorkspaceService)
+        throw new Error("audio workspace is unavailable");
+      return audioWorkspaceService.undo(
+        audioId,
         generationId,
         expectedRevision,
       );
     },
-    redoMeetingEdit: async (meetingId, generationId, expectedRevision) => {
-      if (!meetingWorkspaceService)
-        throw new Error("meeting workspace is unavailable");
-      return meetingWorkspaceService.redo(
-        meetingId,
+    redoAudioEdit: async (audioId, generationId, expectedRevision) => {
+      if (!audioWorkspaceService)
+        throw new Error("audio workspace is unavailable");
+      return audioWorkspaceService.redo(
+        audioId,
         generationId,
         expectedRevision,
       );
     },
-    renameMeetingSpeaker: async (command) => {
-      if (!meetingWorkspaceService)
-        throw new Error("meeting workspace is unavailable");
-      return meetingWorkspaceService.renameSpeaker(command);
+    renameAudioSpeaker: async (command) => {
+      if (!audioWorkspaceService)
+        throw new Error("audio workspace is unavailable");
+      return audioWorkspaceService.renameSpeaker(command);
     },
-    mergeMeetingSpeakers: async (command) => {
-      if (!meetingWorkspaceService)
-        throw new Error("meeting workspace is unavailable");
-      return meetingWorkspaceService.mergeSpeakers(command);
+    mergeAudioSpeakers: async (command) => {
+      if (!audioWorkspaceService)
+        throw new Error("audio workspace is unavailable");
+      return audioWorkspaceService.mergeSpeakers(command);
     },
-    assignMeetingSpeaker: async (command) => {
-      if (!meetingWorkspaceService)
-        throw new Error("meeting workspace is unavailable");
-      return meetingWorkspaceService.assignSpeaker(command);
+    assignAudioSpeaker: async (command) => {
+      if (!audioWorkspaceService)
+        throw new Error("audio workspace is unavailable");
+      return audioWorkspaceService.assignSpeaker(command);
     },
-    controlMeetingPlayback: async (meetingId, command) => {
-      if (!meetingPlaybackService)
-        throw new Error("meeting playback is unavailable");
-      return await meetingPlaybackService.command({ meetingId, ...command });
+    controlAudioPlayback: async (audioId, command) => {
+      if (!audioPlaybackService)
+        throw new Error("audio playback is unavailable");
+      return await audioPlaybackService.command({ audioId, ...command });
     },
-    exportMeeting: async (meetingId, format) => {
-      if (!meetingExportService)
-        throw new Error("meeting export is unavailable");
-      return await meetingExportService.exportMeeting(meetingId, format);
+    exportAudio: async (audioId, format) => {
+      if (!audioExportService) throw new Error("audio export is unavailable");
+      return await audioExportService.exportAudio(audioId, format);
     },
   });
 }
@@ -1986,16 +1983,16 @@ function requireCompanionService(): CompanionService {
   return companionService;
 }
 
-async function chooseAndImportMeeting(): Promise<ImportMeetingResponse> {
+async function chooseAndImportAudio(): Promise<ImportAudioResponse> {
   if (!mainWindow || !profilePaths || !domainService || !desktopRepository) {
     throw new Error("Electron profile is not ready for import");
   }
   const selection = await dialog.showOpenDialog(mainWindow, {
-    title: "安全导入会议",
+    title: "安全导入音频",
     properties: ["openFile"],
     filters: [
       {
-        name: "可归一化的会议音视频",
+        name: "可归一化的音频与视频",
         extensions: [
           "wav",
           "aiff",
@@ -2013,13 +2010,13 @@ async function chooseAndImportMeeting(): Promise<ImportMeetingResponse> {
   if (selection.canceled || selection.filePaths.length !== 1) {
     return { protocolVersion: desktopProtocolVersion, state: "canceled" };
   }
-  const result = await importMeetingFromSource(selection.filePaths[0]!, {
+  const result = await importAudioFromSource(selection.filePaths[0]!, {
     minimumFreeBytes: 2 * 1024 * 1024 * 1024,
   });
   return {
     protocolVersion: desktopProtocolVersion,
     state: result.state,
-    meetingId: result.meetingId,
+    audioId: result.audioId,
     jobId: result.jobId,
     mediaSha256: result.mediaSha256,
     inserted: result.inserted,
@@ -2027,7 +2024,7 @@ async function chooseAndImportMeeting(): Promise<ImportMeetingResponse> {
   };
 }
 
-async function importMeetingFromSource(
+async function importAudioFromSource(
   sourcePath: string,
   options: {
     minimumFreeBytes: number;
@@ -2046,7 +2043,7 @@ async function importMeetingFromSource(
     );
     if (existing) {
       const result = {
-        meetingId: existing.meeting.id,
+        audioId: existing.audio.id,
         jobId: existing.job.id,
         recordingId: existing.mediaAuthorityId,
         mediaSha256: existing.contentSha256,
@@ -2056,7 +2053,7 @@ async function importMeetingFromSource(
         progressFraction: existing.job.progressFraction,
         sourceSha256: options.expectedSourceSha256,
       };
-      applicationState.setLibraryCount(desktopRepository.countMeetings());
+      applicationState.setLibraryCount(desktopRepository.countAudios());
       emitOperation({
         jobId: result.jobId,
         state: result.state,
@@ -2079,7 +2076,7 @@ async function importMeetingFromSource(
   }
   const destinationId =
     options.destinationId ??
-    `meeting-${Date.now()}-${randomBytes(12).toString("hex")}`;
+    `audio-${Date.now()}-${randomBytes(12).toString("hex")}`;
   const helper = new MacOSNativeHelperClient(helperPath);
   const nativeSession = await helper.openSession({
     exactSourcePaths: [sourcePath],
@@ -2116,7 +2113,7 @@ async function importMeetingFromSource(
       receipt,
       processing: { operationId: "asr", ...pipeline.asr },
     });
-    applicationState.setLibraryCount(desktopRepository.countMeetings());
+    applicationState.setLibraryCount(desktopRepository.countAudios());
     emitOperation({
       jobId: result.jobId,
       state: result.state,
@@ -2151,7 +2148,7 @@ async function bootstrapApplication(): Promise<void> {
 async function initializeApplication(): Promise<void> {
   traceCaptureSmoke("initialize-start");
   applicationState.beginBootstrap();
-  const profile = initializeElectronProfile(
+  const profile = initializeAudioProfile(
     smokeAppDataPath ?? app.getPath("appData"),
   );
   if (profile.status === "blocked") {
@@ -2208,19 +2205,19 @@ async function initializeApplication(): Promise<void> {
   const secretStore = captureNativeSession
     ? new MacOSHelperSecretStore(captureNativeSession)
     : new UnavailableDesktopSecretStore();
-  meetingAiService = new MeetingAiService(
+  audioAiService = new AudioAiService(
     new AiJobRepository(profile.database),
     secretStore,
   );
-  meetingAiService.reconcileInterrupted();
-  meetingAiService.subscribe(publishMeetingAi);
+  audioAiService.reconcileInterrupted();
+  audioAiService.subscribe(publishAudioAi);
   setupCaptureLifecycle();
-  const workspaceRepository = new MeetingWorkspaceRepository(
+  const workspaceRepository = new AudioWorkspaceRepository(
     profile.database,
     profile.profile,
   );
-  meetingWorkspaceService = new MeetingWorkspaceService(workspaceRepository);
-  meetingPlaybackService = new MeetingPlaybackService(
+  audioWorkspaceService = new AudioWorkspaceService(workspaceRepository);
+  audioPlaybackService = new AudioPlaybackService(
     workspaceRepository,
     new BrowserWindowPlaybackPort(
       app.isPackaged
@@ -2228,8 +2225,8 @@ async function initializeApplication(): Promise<void> {
         : path.resolve("resources/playback/player.html"),
     ),
   );
-  meetingExportService = new MeetingExportService(
-    meetingWorkspaceService,
+  audioExportService = new AudioExportService(
+    audioWorkspaceService,
     async (request) => {
       try {
         if (processingSmokeRequest?.workstationOutputPath) {
@@ -2243,10 +2240,9 @@ async function initializeApplication(): Promise<void> {
             fileName: path.basename(destination),
           } as const;
         }
-        if (!mainWindow)
-          throw new Error("meeting export window is unavailable");
+        if (!mainWindow) throw new Error("audio export window is unavailable");
         const selection = await dialog.showSaveDialog(mainWindow, {
-          title: "导出会议",
+          title: "导出音频",
           defaultPath: request.suggestedName,
           filters: [
             {
@@ -2266,13 +2262,13 @@ async function initializeApplication(): Promise<void> {
         return {
           state: "failed",
           code: "export-write-failed",
-          message: "会议导出失败，请重试。",
+          message: "音频导出失败，请重试。",
         } as const;
       }
     },
   );
   applicationState.completeBootstrap(profile);
-  applicationState.setLibraryCount(desktopRepository.countMeetings());
+  applicationState.setLibraryCount(desktopRepository.countAudios());
   const attemptsRoot = path.join(
     profile.profile.workspaceDirectory,
     "attempts",
@@ -2446,7 +2442,7 @@ async function initializeApplication(): Promise<void> {
 async function runAiBoundarySmokeIfRequested(): Promise<void> {
   const request = aiBoundarySmokeRequest;
   if (!request) return;
-  if (!meetingAiService || !profileDatabase || !captureNativeSession) {
+  if (!audioAiService || !profileDatabase || !captureNativeSession) {
     throw new Error("packaged AI boundary smoke services are unavailable");
   }
   const before = profileDatabase
@@ -2466,9 +2462,9 @@ async function runAiBoundarySmokeIfRequested(): Promise<void> {
   let settings;
   let invalidEndpointRejected = false;
   try {
-    settings = await meetingAiService.getSettings();
+    settings = await audioAiService.getSettings();
     try {
-      await meetingAiService.saveSettings({
+      await audioAiService.saveSettings({
         providerId: "openai-compatible",
         modelId: "invalid-smoke-model",
         endpoint: "http://untrusted.example.com",
@@ -2587,12 +2583,12 @@ async function runCompanionSmokeIfRequested(): Promise<void> {
   }
   const durable = profileDatabase
     .prepare(
-      `SELECT t.state, t.revision, t.meeting_id, t.processing_job_id,
+      `SELECT t.state, t.revision, t.audio_id, t.processing_job_id,
         t.recording_id, t.receipt_json, t.sender_delete_allowed,
         a.normalized_path, a.source_sha256, a.content_sha256, a.size_bytes
        FROM companion_transfers t
-       JOIN meetings m ON m.id = t.meeting_id
-       JOIN processing_jobs j ON j.id = t.processing_job_id AND j.meeting_id = m.id
+       JOIN audio_items m ON m.id = t.audio_id
+       JOIN processing_jobs j ON j.id = t.processing_job_id AND j.audio_id = m.id
        JOIN media_authorities a ON a.id = t.recording_id AND a.id = m.media_authority_id
        WHERE t.transfer_id = ?`,
     )
@@ -2626,7 +2622,7 @@ async function runCompanionSmokeIfRequested(): Promise<void> {
     receiptSignatureSha256: createHash("sha256")
       .update(transfer.receipt.signature)
       .digest("hex"),
-    meetingId: Number(durable.meeting_id),
+    audioId: Number(durable.audio_id),
     processingJobId: Number(durable.processing_job_id),
     recordingId: Number(durable.recording_id),
     transferRevision: Number(durable.revision),
@@ -2690,7 +2686,7 @@ async function writeCompanionSmokeJson(
 
 async function initializeCapture(
   database: DatabaseSync,
-  profile: ElectronProfilePaths,
+  profile: AudioProfilePaths,
 ): Promise<void> {
   const helperPath = resolveMacOSNativeHelper({
     appRoot: app.getAppPath(),
@@ -2714,13 +2710,13 @@ async function initializeCapture(
     profile.captureDirectory,
   );
   const recoveries = await captureService.recover();
-  activeCaptureTitle = recoveries.length > 0 ? "中断的会议录制" : "会议录制";
+  activeCaptureTitle = recoveries.length > 0 ? "中断的音频录制" : "音频录制";
   publishCapture(recoveries[0] ?? captureService.snapshot());
 }
 
 async function initializeCompanion(
   database: DatabaseSync,
-  profile: ElectronProfilePaths,
+  profile: AudioProfilePaths,
 ): Promise<void> {
   const native = companionSmokeRequest
     ? createCompanionSmokeNativeAdapter(companionSmokeRequest)
@@ -2767,7 +2763,7 @@ async function initializeCompanion(
         desktopRepository?.committedImportForSourceSha256(sourceSha256);
       return committed
         ? {
-            meetingId: committed.meeting.id,
+            audioId: committed.audio.id,
             jobId: committed.job.id,
             recordingId: committed.mediaAuthorityId,
             sourceSha256,
@@ -2788,7 +2784,7 @@ async function initializeCompanion(
       path.join(
         profile.mediaDirectory,
         "complete",
-        `meeting-companion-${destinationIdentity.slice(0, 32)}.wav`,
+        `audio-companion-${destinationIdentity.slice(0, 32)}.wav`,
       ),
     publishedExists: existsSync,
     discardPublished: async (publishedPath) => {
@@ -2806,9 +2802,9 @@ async function initializeCompanion(
       }
     },
     importFresh: async (stagedSourcePath, manifest, destinationIdentity) => {
-      const imported = await importMeetingFromSource(stagedSourcePath, {
+      const imported = await importAudioFromSource(stagedSourcePath, {
         minimumFreeBytes: 2 * 1024 * 1024 * 1024,
-        destinationId: `meeting-companion-${destinationIdentity.slice(0, 32)}`,
+        destinationId: `audio-companion-${destinationIdentity.slice(0, 32)}`,
         expectedSourceSha256: manifest.wholeFileSha256,
         discardExistingPublished: false,
       });
@@ -2819,7 +2815,7 @@ async function initializeCompanion(
         throw new Error("companion secure import authority is unavailable");
       }
       return {
-        meetingId: committed.meeting.id,
+        audioId: committed.audio.id,
         jobId: committed.job.id,
         recordingId: committed.mediaAuthorityId,
         sourceSha256: imported.sourceSha256,
@@ -2938,7 +2934,7 @@ function createCompanionSmokeNativeAdapter(
         companionDiscovery: {
           schemaVersion: 1,
           state: "registered",
-          serviceType: "_voice2text-media._tcp.",
+          serviceType: "_voice2text-audio._tcp.",
           port,
           registeredName: "Voice2Text Packaged Smoke",
           manualFallbackAvailable: false,
@@ -2950,7 +2946,7 @@ function createCompanionSmokeNativeAdapter(
         companionDiscovery: {
           schemaVersion: 1,
           state: "stopped",
-          serviceType: "_voice2text-media._tcp.",
+          serviceType: "_voice2text-audio._tcp.",
           port: null,
           registeredName: null,
           manualFallbackAvailable: true,
@@ -3311,12 +3307,12 @@ async function teardownOwnedResources(): Promise<void> {
   processCoordinator = null;
   await workerSupervisor?.shutdown();
   workerSupervisor = null;
-  await meetingPlaybackService?.close();
-  meetingPlaybackService = null;
-  meetingExportService = null;
-  meetingWorkspaceService = null;
-  await meetingAiService?.shutdown();
-  meetingAiService = null;
+  await audioPlaybackService?.close();
+  audioPlaybackService = null;
+  audioExportService = null;
+  audioWorkspaceService = null;
+  await audioAiService?.shutdown();
+  audioAiService = null;
   unsubscribeCompanion?.();
   unsubscribeCompanion = null;
   await companionService?.close();
@@ -3343,8 +3339,8 @@ async function teardownOwnedResources(): Promise<void> {
   resourceCatalog = null;
 }
 
-function publishMeetingAi(snapshot: MeetingAiSnapshot): void {
-  for (const listener of meetingAiListeners) listener(snapshot);
+function publishAudioAi(snapshot: AudioAiSnapshot): void {
+  for (const listener of audioAiListeners) listener(snapshot);
 }
 
 function publishCompanion(snapshot: CompanionSnapshot): void {
@@ -3529,7 +3525,7 @@ async function drainProcessingQueue(): Promise<void> {
 }
 
 async function cleanupNativeImportArtifacts(
-  profile: ElectronProfilePaths,
+  profile: AudioProfilePaths,
   repository: DesktopRepository,
 ): Promise<void> {
   if (process.platform !== "darwin") return;

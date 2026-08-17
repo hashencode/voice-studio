@@ -35,8 +35,8 @@ function api(overrides: Record<string, unknown> = {}) {
       ...configured,
       secretState: "missing",
     })),
-    generateMeetingAi: vi.fn(),
-    retryMeetingAi: vi.fn(),
+    generateAudioAi: vi.fn(),
+    retryAudioAi: vi.fn(),
     ...overrides,
   } as unknown as Voice2TextDesktopApi;
 }
@@ -80,8 +80,8 @@ describe("AI settings security boundary", () => {
         endpoint: "https://ai.example.com",
       }),
     );
-    expect(desktop.generateMeetingAi).not.toHaveBeenCalled();
-    expect(desktop.retryMeetingAi).not.toHaveBeenCalled();
+    expect(desktop.generateAudioAi).not.toHaveBeenCalled();
+    expect(desktop.retryAudioAi).not.toHaveBeenCalled();
   });
 
   it.each([

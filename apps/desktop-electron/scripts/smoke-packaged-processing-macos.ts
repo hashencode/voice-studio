@@ -22,7 +22,7 @@ export interface PackagedWorkstationEvidence {
   schemaVersion: 1;
   protocol: "voice2text-u7-packaged-workstation/v1";
   packaged: boolean;
-  meetingId: number;
+  audioId: number;
   generationId: number;
   segmentCount: number;
   manualRevisionSurvivedRetry: boolean;

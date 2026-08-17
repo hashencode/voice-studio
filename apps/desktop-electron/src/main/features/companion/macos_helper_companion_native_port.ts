@@ -19,7 +19,7 @@ const credentialReceiptSchema = z.discriminatedUnion("state", [
 ]);
 const discoveryBaseReceipt = {
   schemaVersion: z.literal(1),
-  serviceType: z.literal("_voice2text-media._tcp."),
+  serviceType: z.literal("_voice2text-audio._tcp."),
 };
 const discoveryReceiptSchema = z.discriminatedUnion("state", [
   z

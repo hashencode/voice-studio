@@ -5,10 +5,10 @@ import {
   captionUtteranceSchema,
   type CaptionSnapshot,
 } from "../../../shared/contracts";
-import { withTransaction } from "../database";
+import { withTransaction } from "../audio_database";
 import {
   assertProfileOwnedPath,
-  type ElectronProfilePaths,
+  type AudioProfilePaths,
 } from "../../profile/profile_paths";
 
 const SHA256 = /^[a-f0-9]{64}$/;
@@ -53,7 +53,7 @@ interface FormalHandoffRow {
   runtime_sha256: string;
   current_attempt: number;
   state: string;
-  meeting_id: number | null;
+  audio_id: number | null;
   processing_job_id: number | null;
   revision: number;
 }
@@ -102,7 +102,7 @@ export interface PendingFormalFinalization {
 export class TranscriptRepository {
   constructor(
     private readonly database: DatabaseSync,
-    private readonly profile?: ElectronProfilePaths,
+    private readonly profile?: AudioProfilePaths,
   ) {}
 
   createOrResumeDraft(identity: DraftExecutionIdentity & { nowMs: number }): {
@@ -768,9 +768,9 @@ export class TranscriptRepository {
         JOIN processing_jobs AS jobs ON jobs.id = attempts.processing_job_id
         LEFT JOIN result_publications AS publications
           ON publications.job_id = jobs.id AND publications.attempt = jobs.attempt
-        LEFT JOIN meeting_generations AS generations
+        LEFT JOIN audio_generations AS generations
           ON generations.publication_id = publications.id
-          AND generations.meeting_id = attempts.meeting_id
+          AND generations.audio_id = attempts.audio_id
         WHERE attempts.processing_job_id = ?`,
       )
       .get(processingJobId);
@@ -922,7 +922,7 @@ export class TranscriptRepository {
       this.database
         .prepare(
           `UPDATE caption_formal_handoffs SET current_attempt = ?,
-            state = 'failed', meeting_id = NULL, processing_job_id = NULL,
+            state = 'failed', audio_id = NULL, processing_job_id = NULL,
             error_code = 'FORMAL_ENQUEUE_FAILED', updated_at_ms = ?
           WHERE session_id = ? AND current_attempt = ?`,
         )
@@ -954,20 +954,19 @@ export class TranscriptRepository {
         throw new Error("formal attempt is not retryable");
       }
       const attempt = checkedIncrement(expectedAttempt, "formal attempt");
-      let meetingId =
-        handoff.meeting_id == null ? null : Number(handoff.meeting_id);
+      let audioId = handoff.audio_id == null ? null : Number(handoff.audio_id);
       const existingMedia = this.database
         .prepare("SELECT id FROM media_authorities WHERE content_sha256 = ?")
         .get(String(handoff.normalized_sha256));
-      if (meetingId == null && existingMedia) {
-        const existingMeeting = this.database
-          .prepare("SELECT id FROM meetings WHERE media_authority_id = ?")
+      if (audioId == null && existingMedia) {
+        const existingAudio = this.database
+          .prepare("SELECT id FROM audio_items WHERE media_authority_id = ?")
           .get(Number(existingMedia.id));
-        if (!existingMeeting)
-          throw new Error("caption formal media lacks its meeting");
-        meetingId = Number(existingMeeting.id);
+        if (!existingAudio)
+          throw new Error("caption formal media lacks its audio");
+        audioId = Number(existingAudio.id);
       }
-      if (meetingId == null) {
+      if (audioId == null) {
         const media = this.database
           .prepare(
             `INSERT INTO media_authorities (
@@ -984,9 +983,9 @@ export class TranscriptRepository {
             handoff.receipt_json,
             nowMs,
           );
-        const meeting = this.database
+        const audio = this.database
           .prepare(
-            `INSERT INTO meetings (
+            `INSERT INTO audio_items (
               idempotency_key, source_identity, display_name, media_path,
               duration_ms, media_authority_id, created_at_ms, updated_at_ms
             ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
@@ -1001,18 +1000,18 @@ export class TranscriptRepository {
             nowMs,
             nowMs,
           );
-        meetingId = Number(meeting.lastInsertRowid);
+        audioId = Number(audio.lastInsertRowid);
       }
       const job = this.database
         .prepare(
           `INSERT INTO processing_jobs (
-            meeting_id, idempotency_key, operation_id, resource_identity,
+            audio_id, idempotency_key, operation_id, resource_identity,
             state, attempt, phase, protocol_identity, source_sha256,
             model_sha256, runtime_sha256, created_at_ms, updated_at_ms
           ) VALUES (?, ?, 'asr', ?, 'queued', 0, 'asr', ?, ?, ?, ?, ?, ?)`,
         )
         .run(
-          meetingId,
+          audioId,
           `caption-formal:${sessionId}:${attempt}`,
           handoff.resource_identity,
           handoff.protocol_identity,
@@ -1032,21 +1031,21 @@ export class TranscriptRepository {
       this.database
         .prepare(
           `INSERT INTO caption_formal_attempts (
-            session_id, attempt, meeting_id, processing_job_id, state,
+            session_id, attempt, audio_id, processing_job_id, state,
             created_at_ms, updated_at_ms
           ) VALUES (?, ?, ?, ?, ?, ?, ?)`,
         )
-        .run(sessionId, attempt, meetingId, jobId, state, nowMs, nowMs);
+        .run(sessionId, attempt, audioId, jobId, state, nowMs, nowMs);
       const updated = this.database
         .prepare(
           `UPDATE caption_formal_handoffs SET current_attempt = ?, state = ?,
-            meeting_id = ?, processing_job_id = ?, error_code = NULL,
+            audio_id = ?, processing_job_id = ?, error_code = NULL,
             updated_at_ms = ? WHERE session_id = ? AND current_attempt = ?`,
         )
         .run(
           attempt,
           state,
-          meetingId,
+          audioId,
           jobId,
           nowMs,
           sessionId,

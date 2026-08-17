@@ -1,11 +1,11 @@
 import type { DatabaseSync, StatementResultingChanges } from "node:sqlite";
 
-import type { MeetingAiOutput } from "../../domain/meeting-intelligence/provider_output";
+import type { AudioAiOutput } from "../../domain/audio-intelligence/provider_output";
 import {
   AiProviderFailure,
   parseRemoteAiEndpoint,
-} from "../../domain/meeting-intelligence/provider_security";
-import { withTransaction } from "../database";
+} from "../../domain/audio-intelligence/provider_security";
+import { withTransaction } from "../audio_database";
 
 export interface AiProviderSettingsRecord {
   providerId: "deepseek" | "openai-compatible";
@@ -23,7 +23,7 @@ export interface AiConsentIdentity {
 
 export interface AiJobRecord {
   id: number;
-  meetingId: number;
+  audioId: number;
   generationId: number;
   providerId: string;
   modelId: string;
@@ -40,14 +40,14 @@ export interface AiJobRecord {
 
 export interface AiNoteRecord {
   id: number;
-  output: MeetingAiOutput;
+  output: AudioAiOutput;
 }
 
 export interface AiNoteSnapshotRecord {
   noteId: number;
-  schemaVersion: "meeting_intelligence_output/v1";
+  schemaVersion: "audio_intelligence_output/v1";
   suggestedTitle: string | null;
-  meetingType: string | null;
+  audioType: string | null;
   items: Array<{
     insightId: number;
     kind: string;
@@ -59,7 +59,7 @@ export interface AiNoteSnapshotRecord {
 }
 
 export interface AiTranscriptScopeSource {
-  meetingTitle: string;
+  audioTitle: string;
   segments: Array<{
     id: number;
     startMs: number;
@@ -117,7 +117,7 @@ export class AiJobRepository {
 
   enqueue(
     command: {
-      meetingId: number;
+      audioId: number;
       generationId: number;
       providerId: string;
       modelId: string;
@@ -153,26 +153,26 @@ export class AiJobRepository {
       if (
         !this.database
           .prepare(
-            "SELECT id FROM meeting_generations WHERE id = ? AND meeting_id = ?",
+            "SELECT id FROM audio_generations WHERE id = ? AND audio_id = ?",
           )
-          .get(command.generationId, command.meetingId)
+          .get(command.generationId, command.audioId)
       ) {
         throw new AiProviderFailure(
           "AI_INVALID_OUTPUT",
-          "meeting transcript is unavailable",
+          "audio transcript is unavailable",
         );
       }
       this.database
         .prepare(
           `INSERT INTO ai_consents (
-            meeting_id, generation_id, provider_id, endpoint, endpoint_origin, endpoint_identity_sha256,
+            audio_id, generation_id, provider_id, endpoint, endpoint_origin, endpoint_identity_sha256,
             transcript_scope_sha256, consent_version, granted_at_ms
           ) VALUES (?, ?, ?, ?, ?, ?, ?, 1, ?)
-          ON CONFLICT(meeting_id, generation_id, provider_id, endpoint_identity_sha256,
+          ON CONFLICT(audio_id, generation_id, provider_id, endpoint_identity_sha256,
             transcript_scope_sha256, consent_version) DO NOTHING`,
         )
         .run(
-          command.meetingId,
+          command.audioId,
           command.generationId,
           command.providerId,
           command.endpoint,
@@ -183,12 +183,12 @@ export class AiJobRepository {
         );
       const consentRow = this.database
         .prepare(
-          `SELECT id FROM ai_consents WHERE meeting_id = ? AND generation_id = ?
+          `SELECT id FROM ai_consents WHERE audio_id = ? AND generation_id = ?
            AND provider_id = ? AND endpoint_identity_sha256 = ? AND transcript_scope_sha256 = ?
            AND consent_version = 1`,
         )
         .get(
-          command.meetingId,
+          command.audioId,
           command.generationId,
           command.providerId,
           command.endpointIdentitySha256,
@@ -197,13 +197,13 @@ export class AiJobRepository {
       const inserted = this.database
         .prepare(
           `INSERT INTO ai_jobs (
-            meeting_id, generation_id, consent_id, idempotency_key, provider_id,
+            audio_id, generation_id, consent_id, idempotency_key, provider_id,
             model_id, endpoint, endpoint_origin, endpoint_identity_sha256, transcript_scope_sha256, template_id,
             state, attempt, revision, created_at_ms, updated_at_ms
           ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'queued', 0, 0, ?, ?)`,
         )
         .run(
-          command.meetingId,
+          command.audioId,
           command.generationId,
           Number(consentRow!.id),
           command.idempotencyKey,
@@ -255,7 +255,7 @@ export class AiJobRepository {
   publish(
     jobId: number,
     attempt: number,
-    output: MeetingAiOutput,
+    output: AudioAiOutput,
     nowMs: number,
   ): AiNoteRecord {
     return withTransaction(this.database, () => {
@@ -279,17 +279,17 @@ export class AiJobRepository {
       const inserted = this.database
         .prepare(
           `INSERT INTO ai_notes (
-            job_id, meeting_id, generation_id, output_schema_version,
-            suggested_title, meeting_type, output_json, created_at_ms
+            job_id, audio_id, generation_id, output_schema_version,
+            suggested_title, audio_type, output_json, created_at_ms
           ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
         )
         .run(
           jobId,
-          current.meetingId,
+          current.audioId,
           current.generationId,
           output.schemaVersion,
           output.suggestedTitle,
-          output.meetingType,
+          output.audioType,
           JSON.stringify(output),
           nowMs,
         );
@@ -438,12 +438,12 @@ export class AiJobRepository {
     return null;
   }
 
-  latestForMeeting(meetingId: number): AiJobRecord | null {
+  latestForAudio(audioId: number): AiJobRecord | null {
     const row = this.database
       .prepare(
-        "SELECT * FROM ai_jobs WHERE meeting_id = ? ORDER BY updated_at_ms DESC, id DESC LIMIT 1",
+        "SELECT * FROM ai_jobs WHERE audio_id = ? ORDER BY updated_at_ms DESC, id DESC LIMIT 1",
       )
-      .get(meetingId);
+      .get(audioId);
     return row ? mapJob(row) : null;
   }
 
@@ -468,7 +468,7 @@ export class AiJobRepository {
   noteSnapshot(jobId: number): AiNoteSnapshotRecord | null {
     const note = this.database
       .prepare(
-        `SELECT id, output_schema_version, suggested_title, meeting_type
+        `SELECT id, output_schema_version, suggested_title, audio_type
          FROM ai_notes WHERE job_id = ?`,
       )
       .get(jobId);
@@ -514,35 +514,35 @@ export class AiJobRepository {
       noteId: Number(note.id),
       schemaVersion: String(
         note.output_schema_version,
-      ) as "meeting_intelligence_output/v1",
+      ) as "audio_intelligence_output/v1",
       suggestedTitle:
         note.suggested_title == null ? null : String(note.suggested_title),
-      meetingType: note.meeting_type == null ? null : String(note.meeting_type),
+      audioType: note.audio_type == null ? null : String(note.audio_type),
       items,
     };
   }
 
   transcriptScopeSource(
-    meetingId: number,
+    audioId: number,
     generationId: number,
     limit: number,
   ): AiTranscriptScopeSource | null {
-    const meeting = this.database
+    const audio = this.database
       .prepare(
-        `SELECT display_name FROM meetings
+        `SELECT display_name FROM audio_items
          WHERE id = ? AND active_generation_id = ?`,
       )
-      .get(meetingId, generationId);
-    if (!meeting) return null;
+      .get(audioId, generationId);
+    if (!audio) return null;
     return {
-      meetingTitle: String(meeting.display_name),
+      audioTitle: String(audio.display_name),
       segments: this.database
         .prepare(
           `SELECT id, start_ms, end_ms, text, speaker_state
-           FROM transcript_segments WHERE meeting_id = ? AND generation_id = ?
+           FROM transcript_segments WHERE audio_id = ? AND generation_id = ?
            ORDER BY sequence_id, start_ms, id LIMIT ?`,
         )
-        .all(meetingId, generationId, limit)
+        .all(audioId, generationId, limit)
         .map((row) => ({
           id: Number(row.id),
           startMs: Number(row.start_ms),
@@ -560,7 +560,7 @@ export class AiJobRepository {
     return row
       ? {
           id: Number(row.id),
-          output: JSON.parse(String(row.output_json)) as MeetingAiOutput,
+          output: JSON.parse(String(row.output_json)) as AudioAiOutput,
         }
       : null;
   }
@@ -592,7 +592,7 @@ export class AiJobRepository {
     >,
   ): void {
     if (
-      existing.meetingId !== command.meetingId ||
+      existing.audioId !== command.audioId ||
       existing.generationId !== command.generationId ||
       existing.providerId !== command.providerId ||
       existing.modelId !== command.modelId ||
@@ -618,7 +618,7 @@ export class AiJobRepository {
 function mapJob(row: Record<string, unknown>): AiJobRecord {
   return {
     id: Number(row.id),
-    meetingId: Number(row.meeting_id),
+    audioId: Number(row.audio_id),
     generationId: Number(row.generation_id),
     providerId: String(row.provider_id),
     modelId: String(row.model_id),

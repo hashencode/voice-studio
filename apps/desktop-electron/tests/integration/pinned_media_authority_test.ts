@@ -74,7 +74,7 @@ describe("U11 reused normalized media authority", () => {
     const fixture = mediaFixture();
     const replacement = path.join(fixture.root, "replacement");
     mkdirSync(replacement, { mode: 0o700 });
-    const replacementFile = path.join(replacement, "meeting.wav");
+    const replacementFile = path.join(replacement, "audio.wav");
     writeFileSync(replacementFile, fixture.bytes, { mode: 0o600 });
     rmSync(fixture.authority.authorityPath);
     rmSync(fixture.authority.authorityDirectory, { recursive: true });
@@ -92,8 +92,8 @@ describe("U11 reused normalized media authority", () => {
     chmodSync(root, 0o700);
     const directory = path.join(root, "complete");
     mkdirSync(directory, { mode: 0o700 });
-    const authorityPath = path.join(directory, "meeting.wav");
-    const bytes = Buffer.from("bounded normalized meeting authority", "utf8");
+    const authorityPath = path.join(directory, "audio.wav");
+    const bytes = Buffer.from("bounded normalized audio authority", "utf8");
     writeFileSync(authorityPath, bytes, { mode: 0o600 });
     return {
       root,

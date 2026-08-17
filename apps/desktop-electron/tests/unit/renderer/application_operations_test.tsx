@@ -14,7 +14,7 @@ import type {
 import { companionRendererStubs } from "../../fixtures/companion";
 
 const tasksSnapshot: ApplicationSnapshot = {
-  protocolVersion: 1,
+  protocolVersion: 2,
   revision: 1,
   navigation: { section: "tasks" },
   profile: { phase: "ready" },
@@ -32,7 +32,7 @@ const librarySnapshot: ApplicationSnapshot = {
 
 const runningTask: ProcessingTask = {
   id: 7,
-  meetingId: 3,
+  audioId: 3,
   displayName: "项目周会.wav",
   state: "running",
   phase: "asr",
@@ -65,27 +65,27 @@ function installOperationsApi(overrides: Partial<Voice2TextDesktopApi> = {}) {
     saveAiSettings: vi.fn(async () => testAiSettings()),
     replaceAiProviderSecret: vi.fn(async () => testAiSettings()),
     deleteAiProviderSecret: vi.fn(async () => testAiSettings()),
-    prepareMeetingAi: vi.fn(),
-    getMeetingAiSnapshot: vi.fn(async () => null),
-    generateMeetingAi: vi.fn(),
-    retryMeetingAi: vi.fn(),
-    onMeetingAiSnapshot: vi.fn(() => () => undefined),
+    prepareAudioAi: vi.fn(),
+    getAudioAiSnapshot: vi.fn(async () => null),
+    generateAudioAi: vi.fn(),
+    retryAudioAi: vi.fn(),
+    onAudioAiSnapshot: vi.fn(() => () => undefined),
     workerHealth: vi.fn(),
     cancelProcessing: vi.fn(),
     retryProcessing: vi.fn(),
     listProcessingTasks: vi.fn(async () => [runningTask]),
-    importMeeting: vi.fn(),
-    listMeetings: vi.fn(async () => []),
-    openMeeting: vi.fn(async () => null),
+    importAudio: vi.fn(),
+    listAudios: vi.fn(async () => []),
+    openAudio: vi.fn(async () => null),
     searchTranscript: vi.fn(async () => []),
-    editMeetingSegment: vi.fn(),
-    undoMeetingEdit: vi.fn(),
-    redoMeetingEdit: vi.fn(),
-    renameMeetingSpeaker: vi.fn(),
-    mergeMeetingSpeakers: vi.fn(),
-    assignMeetingSpeaker: vi.fn(),
-    controlMeetingPlayback: vi.fn(),
-    exportMeeting: vi.fn(),
+    editAudioSegment: vi.fn(),
+    undoAudioEdit: vi.fn(),
+    redoAudioEdit: vi.fn(),
+    renameAudioSpeaker: vi.fn(),
+    mergeAudioSpeakers: vi.fn(),
+    assignAudioSpeaker: vi.fn(),
+    controlAudioPlayback: vi.fn(),
+    exportAudio: vi.fn(),
     preflightCapture: vi.fn(),
     startCapture: vi.fn(),
     controlCapture: vi.fn(),
@@ -145,9 +145,9 @@ function testAiSettings() {
 describe("renderer processing operation races", () => {
   it("guards a double-clicked import and clears pending in finally", async () => {
     const request = deferred<never>();
-    const importMeeting = vi.fn(() => request.promise);
+    const importAudio = vi.fn(() => request.promise);
     installOperationsApi({
-      importMeeting,
+      importAudio,
       getApplicationSnapshot: vi.fn(async () => librarySnapshot),
     });
     const user = userEvent.setup();
@@ -155,7 +155,7 @@ describe("renderer processing operation races", () => {
 
     const action = await screen.findByRole("button", { name: "导入会议" });
     await user.dblClick(action);
-    expect(importMeeting).toHaveBeenCalledTimes(1);
+    expect(importAudio).toHaveBeenCalledTimes(1);
     expect(screen.getByRole("button", { name: "正在导入会议" })).toBeDisabled();
     expect(
       screen.getByRole("button", { name: "正在导入会议" }),
@@ -214,7 +214,7 @@ describe("renderer processing operation races", () => {
     ).toHaveValue(0.1);
 
     const progress: OperationEvent = {
-      protocolVersion: 1,
+      protocolVersion: 2,
       jobId: 7,
       attempt: 2,
       state: "running",
@@ -251,7 +251,7 @@ describe("renderer processing operation races", () => {
     await waitFor(() => expect(api.listProcessingTasks).toHaveBeenCalledOnce());
 
     emit({
-      protocolVersion: 1,
+      protocolVersion: 2,
       jobId: 7,
       attempt: 2,
       state: "running",
@@ -259,7 +259,7 @@ describe("renderer processing operation races", () => {
       progressFraction: 0.7,
     });
     emit({
-      protocolVersion: 1,
+      protocolVersion: 2,
       jobId: 7,
       attempt: 2,
       state: "completed",
@@ -275,7 +275,7 @@ describe("renderer processing operation races", () => {
       expect(api.listProcessingTasks).toHaveBeenCalledTimes(2),
     );
     emit({
-      protocolVersion: 1,
+      protocolVersion: 2,
       jobId: 7,
       attempt: 2,
       state: "running",
@@ -283,7 +283,7 @@ describe("renderer processing operation races", () => {
       progressFraction: 0.2,
     });
     const unknown: OperationEvent = {
-      protocolVersion: 1,
+      protocolVersion: 2,
       jobId: 8,
       attempt: 1,
       state: "queued",
@@ -319,7 +319,7 @@ describe("renderer processing operation races", () => {
     await waitFor(() => expect(api.listProcessingTasks).toHaveBeenCalledOnce());
     view.unmount();
     emit({
-      protocolVersion: 1,
+      protocolVersion: 2,
       jobId: 7,
       attempt: 2,
       state: "running",
@@ -347,7 +347,7 @@ describe("renderer processing operation races", () => {
       .mockResolvedValueOnce([queuedNext])
       .mockResolvedValue([queuedNext]);
     const retryProcessing = vi.fn(async () => ({
-      protocolVersion: 1 as const,
+      protocolVersion: 2 as const,
       jobId: 7,
       state: "queued" as const,
     }));
@@ -365,7 +365,7 @@ describe("renderer processing operation races", () => {
     expect(screen.getByText("等待处理", { selector: "span" })).toBeVisible();
 
     emit({
-      protocolVersion: 1,
+      protocolVersion: 2,
       jobId: 7,
       attempt: 2,
       state: "interrupted",
@@ -375,7 +375,7 @@ describe("renderer processing operation races", () => {
     expect(screen.getByText("等待处理", { selector: "span" })).toBeVisible();
 
     emit({
-      protocolVersion: 1,
+      protocolVersion: 2,
       jobId: 7,
       attempt: 3,
       state: "running",

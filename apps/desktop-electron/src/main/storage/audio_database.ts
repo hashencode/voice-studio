@@ -3,6 +3,11 @@ import { dirname, resolve } from "node:path";
 import { DatabaseSync } from "node:sqlite";
 
 import {
+  assertAudioProfilePaths,
+  type AudioProfilePaths,
+} from "../profile/profile_paths";
+
+import {
   AUDIO_APPLICATION_ID,
   AUDIO_SCHEMA_VERSION,
   createAudioSchemaV1,
@@ -30,6 +35,13 @@ export class AudioStorageCorruptionError extends AudioStorageError {
     super(message, options);
     this.name = "AudioStorageCorruptionError";
   }
+}
+
+export function openAudioProfileDatabase(
+  profile: AudioProfilePaths,
+): DatabaseSync {
+  assertAudioProfilePaths(profile);
+  return openAudioDatabase(profile.databasePath);
 }
 
 export function openAudioDatabase(databasePath: string): DatabaseSync {
@@ -71,6 +83,22 @@ export function openAudioDatabase(databasePath: string): DatabaseSync {
       "Audio database could not be created or validated",
       { cause: error },
     );
+  }
+}
+
+export function withTransaction<T>(database: DatabaseSync, action: () => T): T {
+  database.exec("BEGIN IMMEDIATE");
+  try {
+    const result = action();
+    database.exec("COMMIT");
+    return result;
+  } catch (error) {
+    try {
+      database.exec("ROLLBACK");
+    } catch {
+      // Preserve the original transaction failure.
+    }
+    throw error;
   }
 }
 

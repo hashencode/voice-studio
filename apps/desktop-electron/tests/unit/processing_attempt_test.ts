@@ -8,7 +8,7 @@ import type { ExecutionIntent } from "../../src/main/domain/models";
 
 const intent: ExecutionIntent = {
   jobId: 7,
-  meetingId: 3,
+  audioId: 3,
   operationId: "asr",
   attempt: 1,
   sourceIdentity: "worker-test",

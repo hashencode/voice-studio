@@ -37,27 +37,27 @@ function applicationApi(
     saveAiSettings: vi.fn(async () => testAiSettings()),
     replaceAiProviderSecret: vi.fn(async () => testAiSettings()),
     deleteAiProviderSecret: vi.fn(async () => testAiSettings()),
-    prepareMeetingAi: vi.fn(),
-    getMeetingAiSnapshot: vi.fn(async () => null),
-    generateMeetingAi: vi.fn(),
-    retryMeetingAi: vi.fn(),
-    onMeetingAiSnapshot: vi.fn(() => () => undefined),
+    prepareAudioAi: vi.fn(),
+    getAudioAiSnapshot: vi.fn(async () => null),
+    generateAudioAi: vi.fn(),
+    retryAudioAi: vi.fn(),
+    onAudioAiSnapshot: vi.fn(() => () => undefined),
     workerHealth: vi.fn(),
     cancelProcessing: vi.fn(),
     retryProcessing: vi.fn(),
     listProcessingTasks: vi.fn(async () => []),
-    importMeeting: vi.fn(),
-    listMeetings: vi.fn(async () => []),
-    openMeeting: vi.fn(async () => null),
+    importAudio: vi.fn(),
+    listAudios: vi.fn(async () => []),
+    openAudio: vi.fn(async () => null),
     searchTranscript: vi.fn(async () => []),
-    editMeetingSegment: vi.fn(),
-    undoMeetingEdit: vi.fn(),
-    redoMeetingEdit: vi.fn(),
-    renameMeetingSpeaker: vi.fn(),
-    mergeMeetingSpeakers: vi.fn(),
-    assignMeetingSpeaker: vi.fn(),
-    controlMeetingPlayback: vi.fn(),
-    exportMeeting: vi.fn(),
+    editAudioSegment: vi.fn(),
+    undoAudioEdit: vi.fn(),
+    redoAudioEdit: vi.fn(),
+    renameAudioSpeaker: vi.fn(),
+    mergeAudioSpeakers: vi.fn(),
+    assignAudioSpeaker: vi.fn(),
+    controlAudioPlayback: vi.fn(),
+    exportAudio: vi.fn(),
     preflightCapture: vi.fn(),
     startCapture: vi.fn(),
     controlCapture: vi.fn(),
@@ -102,7 +102,7 @@ function testAiSettings() {
 }
 
 const restored: ApplicationSnapshot = {
-  protocolVersion: 1,
+  protocolVersion: 2,
   revision: 8,
   navigation: { section: "companion" },
   profile: { phase: "ready" },
@@ -172,11 +172,11 @@ describe("sidebar navigation e2e", () => {
     ).toHaveTextContent("访谈");
   });
 
-  it("closes meeting playback once when sidebar navigation unmounts the workspace", async () => {
-    const meeting = {
+  it("closes audio playback once when sidebar navigation unmounts the workspace", async () => {
+    const audio = {
       revision: 3,
       summary: {
-        meetingId: 4,
+        audioId: 4,
         displayName: "项目周会.wav",
         durationMs: 6_000,
         createdAtMs: 1,
@@ -193,11 +193,11 @@ describe("sidebar navigation e2e", () => {
     const initial: ApplicationSnapshot = {
       ...restored,
       navigation: { section: "library" },
-      library: { phase: "ready", meetingCount: 1 },
+      library: { phase: "ready", audioCount: 1 },
       capture: { phase: "idle" },
     };
-    const controlMeetingPlayback = vi.fn(async () => ({
-      meetingId: 4,
+    const controlAudioPlayback = vi.fn(async () => ({
+      audioId: 4,
       initialized: false,
       playing: false,
       positionMs: 0,
@@ -206,9 +206,9 @@ describe("sidebar navigation e2e", () => {
       error: null,
     }));
     applicationApi(initial, {
-      listMeetings: vi.fn(async () => [meeting.summary]),
-      openMeeting: vi.fn(async () => meeting),
-      controlMeetingPlayback,
+      listAudios: vi.fn(async () => [audio.summary]),
+      openAudio: vi.fn(async () => audio),
+      controlAudioPlayback,
     });
     const user = userEvent.setup();
     render(createElement(App));
@@ -224,10 +224,10 @@ describe("sidebar navigation e2e", () => {
       await screen.findByRole("heading", { name: "Companion" }),
     ).toBeVisible();
     await waitFor(() =>
-      expect(controlMeetingPlayback).toHaveBeenCalledWith(4, {
+      expect(controlAudioPlayback).toHaveBeenCalledWith(4, {
         action: "close",
       }),
     );
-    expect(controlMeetingPlayback).toHaveBeenCalledTimes(1);
+    expect(controlAudioPlayback).toHaveBeenCalledTimes(1);
   });
 });

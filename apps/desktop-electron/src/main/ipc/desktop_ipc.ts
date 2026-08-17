@@ -6,7 +6,7 @@ import {
   cancelProcessingRequestSchema,
   retryProcessingRequestSchema,
   processingTasksRequestSchema,
-  importMeetingRequestSchema,
+  importAudioRequestSchema,
   desktopProtocolVersion,
   getApplicationSnapshotRequestSchema,
   ipcChannels,
@@ -16,21 +16,21 @@ import {
   type BootstrapAction,
   type CancelProcessingResponse,
   type RetryProcessingResponse,
-  type ImportMeetingResponse,
+  type ImportAudioResponse,
   type ProcessingTask,
   type OperationEvent,
   type ShellSection,
   type WorkerHealthResponse,
-  listMeetingsRequestSchema,
-  openMeetingRequestSchema,
+  listAudiosRequestSchema,
+  openAudioRequestSchema,
   searchTranscriptRequestSchema,
-  editMeetingSegmentRequestSchema,
-  meetingHistoryRequestSchema,
-  renameMeetingSpeakerRequestSchema,
-  mergeMeetingSpeakersRequestSchema,
-  assignMeetingSpeakerRequestSchema,
-  controlMeetingPlaybackRequestSchema,
-  exportMeetingRequestSchema,
+  editAudioSegmentRequestSchema,
+  audioHistoryRequestSchema,
+  renameAudioSpeakerRequestSchema,
+  mergeAudioSpeakersRequestSchema,
+  assignAudioSpeakerRequestSchema,
+  controlAudioPlaybackRequestSchema,
+  exportAudioRequestSchema,
   capturePreflightRequestSchema,
   captureStartRequestSchema,
   captureControlRequestSchema,
@@ -43,26 +43,26 @@ import {
   type CaptionFormalRetryRequest,
   type CaptionSnapshot,
   type CaptionSnapshotRequest,
-  type ExportMeetingResponse,
-  type MeetingExportFormat,
-  type MeetingPlaybackSnapshot,
-  type MeetingSegment,
-  type MeetingSummary,
-  type MeetingWorkspaceSnapshot,
+  type ExportAudioResponse,
+  type AudioExportFormat,
+  type AudioPlaybackSnapshot,
+  type AudioSegment,
+  type AudioSummary,
+  type AudioWorkspaceSnapshot,
   type PlaybackAction,
   getAiSettingsRequestSchema,
   saveAiSettingsRequestSchema,
   replaceAiProviderSecretRequestSchema,
   deleteAiProviderSecretRequestSchema,
-  prepareMeetingAiRequestSchema,
-  getMeetingAiSnapshotRequestSchema,
-  generateMeetingAiRequestSchema,
-  retryMeetingAiRequestSchema,
+  prepareAudioAiRequestSchema,
+  getAudioAiSnapshotRequestSchema,
+  generateAudioAiRequestSchema,
+  retryAudioAiRequestSchema,
   type AiSettingsSnapshot,
-  type GenerateMeetingAiRequest,
-  type MeetingAiConsentPreview,
-  type MeetingAiSnapshot,
-  type RetryMeetingAiRequest,
+  type GenerateAudioAiRequest,
+  type AudioAiConsentPreview,
+  type AudioAiSnapshot,
+  type RetryAudioAiRequest,
   companionSnapshotRequestSchema,
   companionOptInRequestSchema,
   companionPairingInviteRequestSchema,
@@ -121,21 +121,17 @@ export interface DesktopIpcServices {
   deleteAiProviderSecret(options: {
     providerId: "deepseek" | "openai-compatible";
   }): Promise<AiSettingsSnapshot>;
-  prepareMeetingAi(options: {
-    meetingId: number;
+  prepareAudioAi(options: {
+    audioId: number;
     generationId: number;
     templateId: string;
-  }): Promise<MeetingAiConsentPreview>;
-  getMeetingAiSnapshot(options: {
-    meetingId: number;
-  }): Promise<MeetingAiSnapshot | null>;
-  generateMeetingAi(
-    options: GenerateMeetingAiRequest,
-  ): Promise<MeetingAiSnapshot>;
-  retryMeetingAi(options: RetryMeetingAiRequest): Promise<MeetingAiSnapshot>;
-  onMeetingAiSnapshot?(
-    listener: (snapshot: MeetingAiSnapshot) => void,
-  ): () => void;
+  }): Promise<AudioAiConsentPreview>;
+  getAudioAiSnapshot(options: {
+    audioId: number;
+  }): Promise<AudioAiSnapshot | null>;
+  generateAudioAi(options: GenerateAudioAiRequest): Promise<AudioAiSnapshot>;
+  retryAudioAi(options: RetryAudioAiRequest): Promise<AudioAiSnapshot>;
+  onAudioAiSnapshot?(listener: (snapshot: AudioAiSnapshot) => void): () => void;
   applicationSnapshot(): ApplicationSnapshot;
   navigate(section: ShellSection): ApplicationSnapshot;
   requestBootstrapAction(action: BootstrapAction): Promise<ApplicationSnapshot>;
@@ -149,7 +145,7 @@ export interface DesktopIpcServices {
     expectedAttempt: number,
   ): Promise<RetryProcessingResponse>;
   listProcessingTasks(): Promise<ProcessingTask[]>;
-  importMeeting(): Promise<ImportMeetingResponse>;
+  importAudio(): Promise<ImportAudioResponse>;
   preflightCapture(options: {
     requestPermissions: boolean;
     captionEnabled: boolean;
@@ -179,55 +175,55 @@ export interface DesktopIpcServices {
   ): Promise<CaptionSnapshot>;
   onCaptionSnapshot?(listener: (snapshot: CaptionSnapshot) => void): () => void;
   onOperationEvent?(listener: (event: OperationEvent) => void): () => void;
-  listMeetings(options: {
+  listAudios(options: {
     query: string;
     limit: number;
     offset: number;
-  }): Promise<MeetingSummary[]>;
-  openMeeting(meetingId: number): Promise<MeetingWorkspaceSnapshot | null>;
+  }): Promise<AudioSummary[]>;
+  openAudio(audioId: number): Promise<AudioWorkspaceSnapshot | null>;
   searchTranscript(options: {
-    meetingId: number;
+    audioId: number;
     query: string;
     limit: number;
-  }): Promise<MeetingSegment[]>;
-  editMeetingSegment(
+  }): Promise<AudioSegment[]>;
+  editAudioSegment(
     command: Parameters<
-      import("../domain/workspace/meeting_workspace_service").MeetingWorkspaceService["editSegment"]
+      import("../domain/workspace/audio_workspace_service").AudioWorkspaceService["editSegment"]
     >[0],
-  ): Promise<MeetingWorkspaceSnapshot>;
-  undoMeetingEdit(
-    meetingId: number,
+  ): Promise<AudioWorkspaceSnapshot>;
+  undoAudioEdit(
+    audioId: number,
     generationId: number,
     expectedRevision: number,
-  ): Promise<MeetingWorkspaceSnapshot>;
-  redoMeetingEdit(
-    meetingId: number,
+  ): Promise<AudioWorkspaceSnapshot>;
+  redoAudioEdit(
+    audioId: number,
     generationId: number,
     expectedRevision: number,
-  ): Promise<MeetingWorkspaceSnapshot>;
-  renameMeetingSpeaker(
+  ): Promise<AudioWorkspaceSnapshot>;
+  renameAudioSpeaker(
     command: Parameters<
-      import("../domain/workspace/meeting_workspace_service").MeetingWorkspaceService["renameSpeaker"]
+      import("../domain/workspace/audio_workspace_service").AudioWorkspaceService["renameSpeaker"]
     >[0],
-  ): Promise<MeetingWorkspaceSnapshot>;
-  mergeMeetingSpeakers(
+  ): Promise<AudioWorkspaceSnapshot>;
+  mergeAudioSpeakers(
     command: Parameters<
-      import("../domain/workspace/meeting_workspace_service").MeetingWorkspaceService["mergeSpeakers"]
+      import("../domain/workspace/audio_workspace_service").AudioWorkspaceService["mergeSpeakers"]
     >[0],
-  ): Promise<MeetingWorkspaceSnapshot>;
-  assignMeetingSpeaker(
+  ): Promise<AudioWorkspaceSnapshot>;
+  assignAudioSpeaker(
     command: Parameters<
-      import("../domain/workspace/meeting_workspace_service").MeetingWorkspaceService["assignSpeaker"]
+      import("../domain/workspace/audio_workspace_service").AudioWorkspaceService["assignSpeaker"]
     >[0],
-  ): Promise<MeetingWorkspaceSnapshot>;
-  controlMeetingPlayback(
-    meetingId: number,
+  ): Promise<AudioWorkspaceSnapshot>;
+  controlAudioPlayback(
+    audioId: number,
     command: PlaybackAction,
-  ): Promise<MeetingPlaybackSnapshot>;
-  exportMeeting(
-    meetingId: number,
-    format: MeetingExportFormat,
-  ): Promise<ExportMeetingResponse>;
+  ): Promise<AudioPlaybackSnapshot>;
+  exportAudio(
+    audioId: number,
+    format: AudioExportFormat,
+  ): Promise<ExportAudioResponse>;
 }
 
 export class IpcContractError extends Error {
@@ -375,37 +371,37 @@ export function createDesktopIpcHandlers(options: {
       } as RegisteredHandler,
     ],
     [
-      ipcChannels.meetingAiPrepare,
+      ipcChannels.audioAiPrepare,
       {
-        schema: prepareMeetingAiRequestSchema,
+        schema: prepareAudioAiRequestSchema,
         invoke: async (
-          payload: Parameters<DesktopIpcServices["prepareMeetingAi"]>[0],
-        ) => options.services.prepareMeetingAi(payload),
+          payload: Parameters<DesktopIpcServices["prepareAudioAi"]>[0],
+        ) => options.services.prepareAudioAi(payload),
       } as RegisteredHandler,
     ],
     [
-      ipcChannels.meetingAiSnapshotGet,
+      ipcChannels.audioAiSnapshotGet,
       {
-        schema: getMeetingAiSnapshotRequestSchema,
+        schema: getAudioAiSnapshotRequestSchema,
         invoke: async (
-          payload: Parameters<DesktopIpcServices["getMeetingAiSnapshot"]>[0],
-        ) => options.services.getMeetingAiSnapshot(payload),
+          payload: Parameters<DesktopIpcServices["getAudioAiSnapshot"]>[0],
+        ) => options.services.getAudioAiSnapshot(payload),
       } as RegisteredHandler,
     ],
     [
-      ipcChannels.meetingAiGenerate,
+      ipcChannels.audioAiGenerate,
       {
-        schema: generateMeetingAiRequestSchema,
-        invoke: async (payload: GenerateMeetingAiRequest) =>
-          options.services.generateMeetingAi(payload),
+        schema: generateAudioAiRequestSchema,
+        invoke: async (payload: GenerateAudioAiRequest) =>
+          options.services.generateAudioAi(payload),
       } as RegisteredHandler,
     ],
     [
-      ipcChannels.meetingAiRetry,
+      ipcChannels.audioAiRetry,
       {
-        schema: retryMeetingAiRequestSchema,
-        invoke: async (payload: RetryMeetingAiRequest) =>
-          options.services.retryMeetingAi(payload),
+        schema: retryAudioAiRequestSchema,
+        invoke: async (payload: RetryAudioAiRequest) =>
+          options.services.retryAudioAi(payload),
       } as RegisteredHandler,
     ],
     [
@@ -468,10 +464,10 @@ export function createDesktopIpcHandlers(options: {
       },
     ],
     [
-      ipcChannels.importMeeting,
+      ipcChannels.importAudio,
       {
-        schema: importMeetingRequestSchema,
-        invoke: async () => await options.services.importMeeting(),
+        schema: importAudioRequestSchema,
+        invoke: async () => await options.services.importAudio(),
       },
     ],
     [
@@ -542,32 +538,32 @@ export function createDesktopIpcHandlers(options: {
       } as RegisteredHandler,
     ],
     [
-      ipcChannels.meetingList,
+      ipcChannels.audioList,
       {
-        schema: listMeetingsRequestSchema,
+        schema: listAudiosRequestSchema,
         invoke: async (payload: {
           query: string;
           limit: number;
           offset: number;
         }) => ({
-          meetings: await options.services.listMeetings(payload),
+          audios: await options.services.listAudios(payload),
         }),
       } as RegisteredHandler,
     ],
     [
-      ipcChannels.meetingOpen,
+      ipcChannels.audioOpen,
       {
-        schema: openMeetingRequestSchema,
-        invoke: async (payload: { meetingId: number }) =>
-          await options.services.openMeeting(payload.meetingId),
+        schema: openAudioRequestSchema,
+        invoke: async (payload: { audioId: number }) =>
+          await options.services.openAudio(payload.audioId),
       } as RegisteredHandler,
     ],
     [
-      ipcChannels.meetingSearch,
+      ipcChannels.audioSearch,
       {
         schema: searchTranscriptRequestSchema,
         invoke: async (payload: {
-          meetingId: number;
+          audioId: number;
           query: string;
           limit: number;
         }) => ({
@@ -576,95 +572,89 @@ export function createDesktopIpcHandlers(options: {
       } as RegisteredHandler,
     ],
     [
-      ipcChannels.meetingEditSegment,
+      ipcChannels.audioEditSegment,
       {
-        schema: editMeetingSegmentRequestSchema,
+        schema: editAudioSegmentRequestSchema,
         invoke: async (payload: never) =>
-          await options.services.editMeetingSegment(payload),
+          await options.services.editAudioSegment(payload),
       },
     ],
     [
-      ipcChannels.meetingUndo,
+      ipcChannels.audioUndo,
       {
-        schema: meetingHistoryRequestSchema,
+        schema: audioHistoryRequestSchema,
         invoke: async (payload: {
-          meetingId: number;
+          audioId: number;
           generationId: number;
           expectedRevision: number;
         }) =>
-          await options.services.undoMeetingEdit(
-            payload.meetingId,
+          await options.services.undoAudioEdit(
+            payload.audioId,
             payload.generationId,
             payload.expectedRevision,
           ),
       } as RegisteredHandler,
     ],
     [
-      ipcChannels.meetingRedo,
+      ipcChannels.audioRedo,
       {
-        schema: meetingHistoryRequestSchema,
+        schema: audioHistoryRequestSchema,
         invoke: async (payload: {
-          meetingId: number;
+          audioId: number;
           generationId: number;
           expectedRevision: number;
         }) =>
-          await options.services.redoMeetingEdit(
-            payload.meetingId,
+          await options.services.redoAudioEdit(
+            payload.audioId,
             payload.generationId,
             payload.expectedRevision,
           ),
       } as RegisteredHandler,
     ],
     [
-      ipcChannels.meetingRenameSpeaker,
+      ipcChannels.audioRenameSpeaker,
       {
-        schema: renameMeetingSpeakerRequestSchema,
+        schema: renameAudioSpeakerRequestSchema,
         invoke: async (payload: never) =>
-          await options.services.renameMeetingSpeaker(payload),
+          await options.services.renameAudioSpeaker(payload),
       },
     ],
     [
-      ipcChannels.meetingMergeSpeakers,
+      ipcChannels.audioMergeSpeakers,
       {
-        schema: mergeMeetingSpeakersRequestSchema,
+        schema: mergeAudioSpeakersRequestSchema,
         invoke: async (payload: never) =>
-          await options.services.mergeMeetingSpeakers(payload),
+          await options.services.mergeAudioSpeakers(payload),
       },
     ],
     [
-      ipcChannels.meetingAssignSpeaker,
+      ipcChannels.audioAssignSpeaker,
       {
-        schema: assignMeetingSpeakerRequestSchema,
+        schema: assignAudioSpeakerRequestSchema,
         invoke: async (payload: never) =>
-          await options.services.assignMeetingSpeaker(payload),
+          await options.services.assignAudioSpeaker(payload),
       },
     ],
     [
-      ipcChannels.meetingPlayback,
+      ipcChannels.audioPlayback,
       {
-        schema: controlMeetingPlaybackRequestSchema,
-        invoke: async (payload: {
-          meetingId: number;
-          command: PlaybackAction;
-        }) =>
-          await options.services.controlMeetingPlayback(
-            payload.meetingId,
+        schema: controlAudioPlaybackRequestSchema,
+        invoke: async (payload: { audioId: number; command: PlaybackAction }) =>
+          await options.services.controlAudioPlayback(
+            payload.audioId,
             payload.command,
           ),
       } as RegisteredHandler,
     ],
     [
-      ipcChannels.meetingExport,
+      ipcChannels.audioExport,
       {
-        schema: exportMeetingRequestSchema,
+        schema: exportAudioRequestSchema,
         invoke: async (payload: {
-          meetingId: number;
-          format: MeetingExportFormat;
+          audioId: number;
+          format: AudioExportFormat;
         }) =>
-          await options.services.exportMeeting(
-            payload.meetingId,
-            payload.format,
-          ),
+          await options.services.exportAudio(payload.audioId, payload.format),
       } as RegisteredHandler,
     ],
   ]);

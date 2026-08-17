@@ -4,17 +4,20 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 
-import { openElectronDatabase } from "../../src/main/storage/database";
+import {
+  AUDIO_SCHEMA_VERSION,
+  openAudioDatabase,
+} from "../../src/main/storage/audio_database";
 import { TransferRepository } from "../../src/main/storage/repositories/transfer_repository";
 
 describe("U11 companion transfer authority", () => {
   let database: DatabaseSync | undefined;
   afterEach(() => database?.close());
 
-  it("migrates to v10 and never stores credential bytes", () => {
-    database = openElectronDatabase(":memory:");
+  it("creates fresh Audio companion tables and never stores credential bytes", () => {
+    database = openAudioDatabase(":memory:");
     expect(database.prepare("PRAGMA user_version").get()).toEqual({
-      user_version: 10,
+      user_version: AUDIO_SCHEMA_VERSION,
     });
     const repository = new TransferRepository(database);
     repository.pairPeer({
@@ -29,11 +32,11 @@ describe("U11 companion transfer authority", () => {
     ).not.toContain("sharedCredential");
   });
 
-  it("upgrades an intact v9 profile to v10 atomically", () => {
+  it("rejects a downgraded profile instead of compatibility-reading it", () => {
     const temporary = mkdtempSync(join(tmpdir(), "voice2text-companion-v10-"));
     try {
-      const databasePath = join(temporary, "meetings.sqlite3");
-      database = openElectronDatabase(databasePath);
+      const databasePath = join(temporary, "audios.sqlite3");
+      database = openAudioDatabase(databasePath);
       database.exec(`
         DROP TABLE companion_command_receipts;
         DROP TABLE companion_transfer_chunks;
@@ -44,17 +47,9 @@ describe("U11 companion transfer authority", () => {
       `);
       database.close();
       database = undefined;
-      database = openElectronDatabase(databasePath);
-      expect(database.prepare("PRAGMA user_version").get()).toEqual({
-        user_version: 10,
-      });
-      expect(
-        database
-          .prepare(
-            "SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'companion_transfers'",
-          )
-          .get(),
-      ).toEqual({ name: "companion_transfers" });
+      expect(() => openAudioDatabase(databasePath)).toThrow(
+        "Existing database is not the fresh Audio v1 store",
+      );
     } finally {
       database?.close();
       database = undefined;
@@ -63,7 +58,7 @@ describe("U11 companion transfer authority", () => {
   });
 
   it("resumes verified missing chunks and rejects stale checkpoints", () => {
-    database = openElectronDatabase(":memory:");
+    database = openAudioDatabase(":memory:");
     const repository = new TransferRepository(database);
     repository.pairPeer({
       deviceId: "mobile-1",
@@ -76,7 +71,7 @@ describe("U11 companion transfer authority", () => {
       schema: "companion-audio-transfer/v2" as const,
       transferId: "transfer-1",
       sourceAssetId: "mobile-recording-1",
-      displayName: "meeting.wav",
+      displayName: "audio.wav",
       sizeBytes: 8_000,
       wholeFileSha256: "a".repeat(64),
       chunkBytes: 4_096,
@@ -100,8 +95,8 @@ describe("U11 companion transfer authority", () => {
   });
 
   it("protects committed receipts from expiry and gates sender deletion", () => {
-    database = openElectronDatabase(":memory:");
-    seedMeeting(database);
+    database = openAudioDatabase(":memory:");
+    seedAudio(database);
     const repository = new TransferRepository(database);
     repository.pairPeer({
       deviceId: "mobile-1",
@@ -114,7 +109,7 @@ describe("U11 companion transfer authority", () => {
       schema: "companion-audio-transfer/v2" as const,
       transferId: "transfer-1",
       sourceAssetId: "mobile-recording-1",
-      displayName: "meeting.wav",
+      displayName: "audio.wav",
       sizeBytes: 8,
       wholeFileSha256: "a".repeat(64),
       chunkBytes: 4_096,
@@ -141,7 +136,7 @@ describe("U11 companion transfer authority", () => {
           signature: "c2lnbmF0dXJl",
         },
         {
-          meetingId: 1,
+          audioId: 1,
           processingJobId: 5,
           recordingId: 99,
           sourceSha256: manifest.wholeFileSha256,
@@ -182,7 +177,7 @@ describe("U11 companion transfer authority", () => {
         signature: "c2lnbmF0dXJl",
       },
       {
-        meetingId: 1,
+        audioId: 1,
         processingJobId: 5,
         recordingId: 99,
         sourceSha256: manifest.wholeFileSha256,
@@ -216,7 +211,7 @@ describe("U11 companion transfer authority", () => {
   });
 
   it("uses revision-fenced verification/import states and durable cleanup tombstones", () => {
-    database = openElectronDatabase(":memory:");
+    database = openAudioDatabase(":memory:");
     const repository = new TransferRepository(database);
     repository.pairPeer({
       deviceId: "mobile-1",
@@ -229,7 +224,7 @@ describe("U11 companion transfer authority", () => {
       schema: "companion-audio-transfer/v2" as const,
       transferId: "transfer-cas-1",
       sourceAssetId: "asset-cas-1",
-      displayName: "meeting.wav",
+      displayName: "audio.wav",
       sizeBytes: 8,
       wholeFileSha256: "e".repeat(64),
       chunkBytes: 4_096,
@@ -295,18 +290,18 @@ describe("U11 companion transfer authority", () => {
   });
 });
 
-function seedMeeting(database: DatabaseSync): void {
+function seedAudio(database: DatabaseSync): void {
   database.exec(`
     INSERT INTO media_authorities (
       id, content_sha256, normalized_path, source_sha256, size_bytes,
       duration_ms, receipt_json, created_at_ms
     ) VALUES (99, '${"d".repeat(64)}', '/private/tmp/media.wav', '${"a".repeat(64)}', 48, 1000, '{}', 1);
-    INSERT INTO meetings (
+    INSERT INTO audio_items (
       id, idempotency_key, source_identity, display_name, media_path,
       duration_ms, media_authority_id, created_at_ms, updated_at_ms
-    ) VALUES (1, 'meeting-1', 'source-1', 'Meeting', '/private/tmp/media.wav', 1000, 99, 1, 1);
+    ) VALUES (1, 'audio-1', 'source-1', 'Audio', '/private/tmp/media.wav', 1000, 99, 1, 1);
     INSERT INTO processing_jobs (
-      id, meeting_id, idempotency_key, operation_id, resource_identity,
+      id, audio_id, idempotency_key, operation_id, resource_identity,
       state, attempt, created_at_ms, updated_at_ms
     ) VALUES (5, 1, 'processing-1', 'asr', 'resource-1', 'queued', 0, 1, 1);
   `);

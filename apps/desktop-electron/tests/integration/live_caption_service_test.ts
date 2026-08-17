@@ -4,7 +4,7 @@ import {
   LiveCaptionService,
   type LiveCaptionWorkerLauncher,
 } from "../../src/main/domain/captions/live_caption_service";
-import { openElectronDatabase } from "../../src/main/storage/database";
+import { openAudioDatabase } from "../../src/main/storage/audio_database";
 import { TranscriptRepository } from "../../src/main/storage/repositories/transcript_repository";
 
 const sessionId = "session-caption-service-123456";
@@ -18,7 +18,7 @@ const identity = {
 };
 
 describe("live caption service", () => {
-  const database = openElectronDatabase(":memory:");
+  const database = openAudioDatabase(":memory:");
 
   beforeEach(() => {
     database.exec("DELETE FROM capture_sessions");

@@ -22,7 +22,7 @@ import {
   finalizeExistingSherpaResult,
 } from "../../src/main/processes/existing_asr_worker_adapter";
 import { OwnedProcessSupervisor } from "../../src/main/processes/owned_process_supervisor";
-import { initializeElectronProfile } from "../../src/main/profile/electron_profile";
+import { initializeAudioProfile } from "../../src/main/profile/audio_profile";
 import { ResourceCatalog } from "../../src/main/resources/resource_catalog";
 import { sha256File } from "../../src/main/security/sha256_file";
 import { DesktopRepository } from "../../src/main/storage/desktop_repository";
@@ -67,7 +67,7 @@ describe.skipIf(process.platform !== "darwin")(
           session.secureImport({
             sourcePath: "/etc/passwd",
             destinationRoot: join(root, "profile-media"),
-            destinationId: "meeting-123456789abc",
+            destinationId: "audio-123456789abc",
             maxSourceBytes: 1024,
             minimumFreeBytes: 0,
             temporaryStorageMultiplier: 2,
@@ -97,7 +97,7 @@ describe.skipIf(process.platform !== "darwin")(
           const receipt = await session.secureImport({
             sourcePath: source,
             destinationRoot,
-            destinationId: "meeting-abcdef123456",
+            destinationId: "audio-abcdef123456",
             maxSourceBytes: 1024 * 1024,
             minimumFreeBytes: 0,
             temporaryStorageMultiplier: 2,
@@ -111,7 +111,7 @@ describe.skipIf(process.platform !== "darwin")(
             }),
           );
           expect(receipt.normalizedPath).toMatch(
-            /\/complete\/meeting-abcdef123456\.wav$/,
+            /\/complete\/audio-abcdef123456\.wav$/,
           );
           expect(receipt.normalizedSha256).toMatch(/^[a-f0-9]{64}$/);
         } finally {
@@ -149,7 +149,7 @@ describe.skipIf(process.platform !== "darwin")(
         );
         roots.push(root);
         const source = resolve("../../benchmark/audio/en.wav");
-        const initialized = initializeElectronProfile(join(root, "app-data"));
+        const initialized = initializeAudioProfile(join(root, "app-data"));
         if (initialized.status !== "ready") {
           throw new Error(initialized.message);
         }
@@ -171,7 +171,7 @@ describe.skipIf(process.platform !== "darwin")(
           const receipt = await session.secureImport({
             sourcePath: source,
             destinationRoot: profile.mediaDirectory,
-            destinationId: "meeting-packaged-representative",
+            destinationId: "audio-packaged-representative",
             maxSourceBytes: 64 * 1024 * 1024,
             minimumFreeBytes: 0,
             temporaryStorageMultiplier: 2,
@@ -278,11 +278,11 @@ describe.skipIf(process.platform !== "darwin")(
               "SELECT state, progress_fraction FROM processing_jobs WHERE id = ?",
             )
             .get(committed.jobId);
-          const durableMeeting = database
+          const durableAudio = database
             .prepare(
-              "SELECT media_path, active_publication_id FROM meetings WHERE id = ?",
+              "SELECT media_path, active_publication_id FROM audio_items WHERE id = ?",
             )
-            .get(committed.meetingId);
+            .get(committed.audioId);
           expect(payload.diarizationSucceeded).toBe(true);
           expect(payload.segments).toEqual(
             expect.arrayContaining([
@@ -295,12 +295,10 @@ describe.skipIf(process.platform !== "darwin")(
               progress_fraction: 1,
             }),
           );
-          expect(Number(durableMeeting?.active_publication_id)).toBeGreaterThan(
+          expect(Number(durableAudio?.active_publication_id)).toBeGreaterThan(
             0,
           );
-          expect(String(durableMeeting?.media_path)).toBe(
-            receipt.normalizedPath,
-          );
+          expect(String(durableAudio?.media_path)).toBe(receipt.normalizedPath);
           expect(String(publication?.source_sha256)).toBe(
             receipt.normalizedSha256,
           );
@@ -334,7 +332,7 @@ describe.skipIf(process.platform !== "darwin")(
             resourceManifestSha256: catalog.identity,
             modelSha256: processing.modelSha256,
             runtimeSha256: diarizationIdentity.runtimeSha256,
-            meetingId: committed.meetingId,
+            audioId: committed.audioId,
             jobId: committed.jobId,
             attempt: intent.attempt,
             state: String(durableJob?.state),

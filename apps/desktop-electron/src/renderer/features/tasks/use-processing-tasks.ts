@@ -182,13 +182,13 @@ export function useProcessingTasks(
     if (mountedRef.current) setPendingJobActions(new Map(pendingRef.current));
   }, []);
 
-  const importMeeting = React.useCallback(async () => {
+  const importAudio = React.useCallback(async () => {
     if (importPendingRef.current) return;
     importPendingRef.current = true;
     if (mountedRef.current) setImportPending(true);
     setOperationError(null);
     try {
-      const result = await window.voice2text.importMeeting();
+      const result = await window.voice2text.importAudio();
       if (result.state === "queued") {
         acceptSnapshot(await window.voice2text.getApplicationSnapshot());
         await requestReconcile({ queueIfBusy: false });
@@ -247,7 +247,7 @@ export function useProcessingTasks(
     operationError,
     importPending,
     pendingJobActions,
-    importMeeting,
+    importAudio,
     cancelProcessing,
     retryProcessing,
   };

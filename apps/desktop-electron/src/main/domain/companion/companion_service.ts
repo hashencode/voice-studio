@@ -93,7 +93,7 @@ export interface CompanionImportCommitPort {
     stagedSourcePath: string,
     manifest: CompanionTransferManifest,
   ): Promise<{
-    meetingId: number;
+    audioId: number;
     jobId: number;
     recordingId: number;
     sourceSha256: string;
@@ -749,7 +749,7 @@ export class CompanionService {
       signature: await this.identityPort.signReceipt(unsigned),
     });
     this.repository.recordCommittedReceipt(manifest, receipt, {
-      meetingId: committed.meetingId,
+      audioId: committed.audioId,
       processingJobId: committed.jobId,
       recordingId: committed.recordingId,
       sourceSha256: committed.sourceSha256,

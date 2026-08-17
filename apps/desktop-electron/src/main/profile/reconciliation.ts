@@ -7,7 +7,7 @@ import { DesktopRepository } from "../storage/desktop_repository";
 import { writeJsonAtomically } from "./atomic_json";
 import {
   assertProfileOwnedPath,
-  type ElectronProfilePaths,
+  type AudioProfilePaths,
 } from "./profile_paths";
 
 export type ReconciliationKind =
@@ -27,9 +27,9 @@ export interface StartupReconciliationReport {
   items: ReconciliationItem[];
 }
 
-export function reconcileElectronProfile(
+export function reconcileAudioProfile(
   database: DatabaseSync,
-  profile: ElectronProfilePaths,
+  profile: AudioProfilePaths,
   nowMs: number,
 ): StartupReconciliationReport {
   const items: ReconciliationItem[] = [];
@@ -84,7 +84,7 @@ export function reconcileElectronProfile(
 }
 
 function scanCheckpoints(
-  profile: ElectronProfilePaths,
+  profile: AudioProfilePaths,
   observedAtMs: number,
   root: string,
   kind: ReconciliationKind,
@@ -120,7 +120,7 @@ function scanCheckpoints(
 }
 
 function persistReceipt(
-  profile: ElectronProfilePaths,
+  profile: AudioProfilePaths,
   observedAtMs: number,
   item: {
     kind: ReconciliationKind;

@@ -2,7 +2,7 @@ import type { CompanionTransferManifest } from "../../../shared/contracts";
 import type { TransferRepository } from "../../storage/repositories/transfer_repository";
 
 export interface CompanionCommittedImportAuthority {
-  meetingId: number;
+  audioId: number;
   jobId: number;
   recordingId: number;
   sourceSha256: string;
@@ -84,8 +84,8 @@ function assertCommittedAuthority(
   manifest: CompanionTransferManifest,
 ): void {
   if (
-    !Number.isSafeInteger(authority.meetingId) ||
-    authority.meetingId < 1 ||
+    !Number.isSafeInteger(authority.audioId) ||
+    authority.audioId < 1 ||
     !Number.isSafeInteger(authority.jobId) ||
     authority.jobId < 1 ||
     !Number.isSafeInteger(authority.recordingId) ||

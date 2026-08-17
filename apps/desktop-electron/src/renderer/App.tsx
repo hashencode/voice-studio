@@ -19,7 +19,7 @@ import {
 } from "@/features/shell/shell-surfaces";
 import { useApplicationShell } from "@/features/shell/use-application-shell";
 import { LibraryFeature } from "@/features/library/library-feature";
-import { MeetingWorkspaceFeature } from "@/features/meetings/meeting-workspace-feature";
+import { AudioWorkspaceFeature } from "@/features/audios/audio-workspace-feature";
 import { AiSettingsFeature } from "@/features/settings/ai-settings-feature";
 import { TasksFeature } from "@/features/tasks/tasks-feature";
 import type { ApplicationSnapshot } from "@shared/contracts";
@@ -36,7 +36,7 @@ export default function App() {
     pendingJobActions,
     navigate,
     requestBootstrapAction,
-    importMeeting,
+    importAudio,
     cancelProcessing,
     retryProcessing,
   } = useApplicationShell();
@@ -73,11 +73,11 @@ export default function App() {
             snapshot={snapshot}
             onNavigate={navigate}
             onBootstrapAction={requestBootstrapAction}
-            tasks={tasks}
-            pendingJobActions={pendingJobActions}
             operationError={operationError}
             importPending={importPending}
-            onImport={importMeeting}
+            tasks={tasks}
+            pendingJobActions={pendingJobActions}
+            onImport={importAudio}
             onCancel={cancelProcessing}
             onRetry={retryProcessing}
           />
@@ -95,10 +95,10 @@ function ShellContent({
   snapshot,
   onNavigate,
   onBootstrapAction,
-  tasks,
-  pendingJobActions,
   operationError,
   importPending,
+  tasks,
+  pendingJobActions,
   onImport,
   onCancel,
   onRetry,
@@ -106,10 +106,10 @@ function ShellContent({
   snapshot: ApplicationSnapshot;
   onNavigate: (section: ApplicationSnapshot["navigation"]["section"]) => void;
   onBootstrapAction: Parameters<typeof ProfileBlocker>[0]["onAction"];
-  tasks: Parameters<typeof TasksFeature>[0]["tasks"];
-  pendingJobActions: Parameters<typeof TasksFeature>[0]["pendingJobActions"];
   operationError: string | null;
   importPending: boolean;
+  tasks: Parameters<typeof TasksFeature>[0]["tasks"];
+  pendingJobActions: Parameters<typeof TasksFeature>[0]["pendingJobActions"];
   onImport: () => void;
   onCancel: Parameters<typeof TasksFeature>[0]["onCancel"];
   onRetry: Parameters<typeof TasksFeature>[0]["onRetry"];
@@ -175,7 +175,7 @@ function ShellContent({
             importPending={importPending}
             onImport={onImport}
           />
-          <MeetingWorkspaceFeature />
+          <AudioWorkspaceFeature />
         </div>
       );
       break;

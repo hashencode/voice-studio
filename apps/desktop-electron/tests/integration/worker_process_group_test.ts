@@ -20,7 +20,7 @@ import {
   ProcessCanceledError,
 } from "../../src/main/processes/durable_process_coordinator";
 import { OwnedProcessSupervisor } from "../../src/main/processes/owned_process_supervisor";
-import { initializeElectronProfile } from "../../src/main/profile/electron_profile";
+import { initializeAudioProfile } from "../../src/main/profile/audio_profile";
 import {
   ResourceCatalog,
   requireProcessingPipelineIdentities,
@@ -172,7 +172,7 @@ function processExists(pid: number): boolean {
 function intent(resourceIdentity: string, jobId = 1): ExecutionIntent {
   return {
     jobId,
-    meetingId: 1,
+    audioId: 1,
     operationId: "fixture-operation",
     attempt: 1,
     sourceIdentity: "fixture-source",
@@ -258,24 +258,22 @@ describe.skipIf(process.platform !== "darwin")(
           resourcesPath: paths.packagedResourcesRoot,
         }),
       );
-      const initialized = initializeElectronProfile(
-        join(paths.root, "app-data"),
-      );
+      const initialized = initializeAudioProfile(join(paths.root, "app-data"));
       if (initialized.status !== "ready") throw new Error(initialized.message);
       const repository = new DesktopRepository(
         initialized.database,
         initialized.profile,
       );
       const service = new DesktopDomainService(repository);
-      const meeting = service.createMeeting({
-        idempotencyKey: "fixture-meeting",
+      const audio = service.createAudio({
+        idempotencyKey: "fixture-audio",
         sourceIdentity: "fixture-source-media",
         displayName: "Fixture",
         mediaPath: join(initialized.profile.mediaDirectory, "fixture.wav"),
         durationMs: 1000,
       });
       const job = service.enqueueProcessingJob({
-        meetingId: meeting.value.id,
+        audioId: audio.value.id,
         idempotencyKey: "fixture-job",
         operationId: "fixture-operation",
         resourceIdentity: catalog.identity,

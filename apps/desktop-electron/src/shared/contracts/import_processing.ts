@@ -29,7 +29,7 @@ export const secureImportRequestSchema = z
   .object({
     sourcePath: z.string().min(1).max(secureImportLimits.maximumPathBytes),
     destinationRoot: z.string().min(1).max(secureImportLimits.maximumPathBytes),
-    destinationId: z.string().regex(/^meeting-[a-zA-Z0-9-]{12,120}$/),
+    destinationId: z.string().regex(/^audio-[a-zA-Z0-9-]{12,120}$/),
     expectedSourceSha256: sha256Schema.optional(),
     maxSourceBytes: z
       .number()
@@ -65,7 +65,7 @@ export const processingTaskPhaseSchema = z.enum(["asr", "diarization"]);
 export const processingTaskSchema = z
   .object({
     id: z.number().int().positive(),
-    meetingId: z.number().int().positive(),
+    audioId: z.number().int().positive(),
     displayName: z.string().min(1).max(256),
     state: processingTaskStateSchema,
     phase: processingTaskPhaseSchema,

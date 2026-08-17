@@ -182,7 +182,7 @@ export function LibrarySurface({
       ) : (
         <StateCard
           icon={FolderOpen}
-          title={`${state.meetingCount} 个本机会议`}
+          title={`${state.audioCount} 个本机会议`}
           description="会议详情将在后续迁移单元接入。"
         />
       )}

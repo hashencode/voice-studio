@@ -1,49 +1,60 @@
 import type { DatabaseSync } from "node:sqlite";
 
+import { createAudioCoreSchema } from "./audio_schema_fragments/v1";
+import { addAudioWorkspaceSchema } from "./audio_schema_fragments/v5";
+import { addAudioWorkspaceIntegritySchema } from "./audio_schema_fragments/v6";
+import { addCaptureSchema } from "./audio_schema_fragments/v7";
+import { addCaptionSchema } from "./audio_schema_fragments/v8";
+import { addAudioAiSchema } from "./audio_schema_fragments/v9";
+import { addCompanionSchema } from "./audio_schema_fragments/v10";
+
 export const AUDIO_SCHEMA_VERSION = 1;
 export const AUDIO_APPLICATION_ID = 0x56324155;
 
 export const REQUIRED_AUDIO_SCHEMA_TABLES = [
   "audio_items",
-  "audio_processing_jobs",
-  "audio_transcript_segments",
+  "processing_jobs",
+  "audio_notes",
+  "durable_receipts",
+  "result_publications",
+  "media_authorities",
+  "audio_generations",
+  "audio_speakers",
+  "transcript_segments",
+  "workspace_heads",
+  "transcript_revisions",
+  "capture_sessions",
+  "capture_command_receipts",
+  "capture_tracks",
+  "capture_chunks",
+  "capture_events",
+  "caption_sessions",
+  "caption_utterances",
+  "caption_formal_handoffs",
+  "caption_formal_preparations",
+  "caption_formal_attempts",
+  "caption_command_receipts",
+  "ai_provider_settings",
+  "ai_consents",
+  "ai_jobs",
+  "ai_notes",
+  "ai_insights",
+  "ai_evidence_links",
+  "ai_command_receipts",
+  "companion_settings",
+  "companion_peers",
+  "companion_transfers",
+  "companion_transfer_chunks",
+  "companion_command_receipts",
 ] as const;
 
+/** Builds the only supported fresh Audio schema. No historical rows are read. */
 export function createAudioSchemaV1(database: DatabaseSync): void {
-  database.exec(`
-    CREATE TABLE audio_items (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      source_identity TEXT NOT NULL UNIQUE,
-      display_name TEXT NOT NULL,
-      media_path TEXT NOT NULL,
-      duration_ms INTEGER NOT NULL CHECK (duration_ms >= 0),
-      created_at_ms INTEGER NOT NULL CHECK (created_at_ms >= 0),
-      updated_at_ms INTEGER NOT NULL CHECK (updated_at_ms >= created_at_ms)
-    );
-
-    CREATE TABLE audio_processing_jobs (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      audio_id INTEGER NOT NULL REFERENCES audio_items(id) ON DELETE CASCADE,
-      operation_id TEXT NOT NULL,
-      state TEXT NOT NULL CHECK (state IN ('queued', 'running', 'completed', 'failed', 'canceled')),
-      created_at_ms INTEGER NOT NULL CHECK (created_at_ms >= 0),
-      updated_at_ms INTEGER NOT NULL CHECK (updated_at_ms >= created_at_ms),
-      UNIQUE(audio_id, operation_id)
-    );
-
-    CREATE TABLE audio_transcript_segments (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      audio_id INTEGER NOT NULL REFERENCES audio_items(id) ON DELETE CASCADE,
-      sequence_id INTEGER NOT NULL CHECK (sequence_id >= 0),
-      text TEXT NOT NULL,
-      start_ms INTEGER NOT NULL CHECK (start_ms >= 0),
-      end_ms INTEGER NOT NULL CHECK (end_ms >= start_ms),
-      UNIQUE(audio_id, sequence_id)
-    );
-
-    CREATE INDEX audio_processing_jobs_state_order
-      ON audio_processing_jobs(state, created_at_ms, id);
-    CREATE INDEX audio_transcript_segments_audio_order
-      ON audio_transcript_segments(audio_id, sequence_id);
-  `);
+  createAudioCoreSchema(database);
+  addAudioWorkspaceSchema(database);
+  addAudioWorkspaceIntegritySchema(database);
+  addCaptureSchema(database);
+  addCaptionSchema(database);
+  addAudioAiSchema(database);
+  addCompanionSchema(database);
 }

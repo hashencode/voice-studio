@@ -7,7 +7,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { FormalTranscriptHandoffService } from "../../src/main/domain/captions/formal_transcript_handoff_service";
 import { DesktopDomainService } from "../../src/main/domain/desktop_domain_service";
-import { openElectronDatabase } from "../../src/main/storage/database";
+import { openAudioDatabase } from "../../src/main/storage/audio_database";
 import { DesktopRepository } from "../../src/main/storage/desktop_repository";
 import { TranscriptRepository } from "../../src/main/storage/repositories/transcript_repository";
 import { profilePathsForRoot } from "../../src/main/profile/profile_paths";
@@ -16,13 +16,13 @@ const sessionId = "session-formal-handoff-123456";
 const roots: string[] = [];
 
 describe("capture to formal transcript handoff", () => {
-  const database = openElectronDatabase(":memory:");
+  const database = openAudioDatabase(":memory:");
   let fixture: Awaited<ReturnType<typeof createFixture>>;
 
   beforeEach(async () => {
     database.exec("DROP TRIGGER IF EXISTS fail_formal_enqueue");
     database.exec("DELETE FROM capture_sessions");
-    database.exec("DELETE FROM meetings");
+    database.exec("DELETE FROM audio_items");
     database.exec("DELETE FROM media_authorities");
     fixture = await createFixture(database);
   });
@@ -166,7 +166,7 @@ describe("capture to formal transcript handoff", () => {
     ).toBe("completed");
     const completed = fixture.transcripts.getSnapshot(sessionId)!;
     const activeGenerationId = Number(
-      database.prepare("SELECT active_generation_id FROM meetings").get()
+      database.prepare("SELECT active_generation_id FROM audio_items").get()
         ?.active_generation_id,
     );
     expect(completed.formal).toEqual(
@@ -176,12 +176,12 @@ describe("capture to formal transcript handoff", () => {
       }),
     );
     const unrelated = domain.enqueueProcessingJob({
-      meetingId: Number(
+      audioId: Number(
         database
           .prepare(
-            "SELECT meeting_id FROM caption_formal_handoffs WHERE session_id = ?",
+            "SELECT audio_id FROM caption_formal_handoffs WHERE session_id = ?",
           )
-          .get(sessionId)?.meeting_id,
+          .get(sessionId)?.audio_id,
       ),
       idempotencyKey: "later-same-media-job-123456",
       operationId: "asr",
@@ -218,7 +218,7 @@ describe("capture to formal transcript handoff", () => {
     });
     expect(
       Number(
-        database.prepare("SELECT active_generation_id FROM meetings").get()
+        database.prepare("SELECT active_generation_id FROM audio_items").get()
           ?.active_generation_id,
       ),
     ).not.toBe(activeGenerationId);
@@ -227,7 +227,7 @@ describe("capture to formal transcript handoff", () => {
     ).toBe(activeGenerationId);
   });
 
-  it("never adopts an unrelated existing meeting job for the same media", async () => {
+  it("never adopts an unrelated existing audio job for the same media", async () => {
     const media = database
       .prepare(
         `INSERT INTO media_authorities (
@@ -244,15 +244,15 @@ describe("capture to formal transcript handoff", () => {
         JSON.stringify(fixture.media.receipt),
         900,
       );
-    const meeting = database
+    const audio = database
       .prepare(
-        `INSERT INTO meetings (
+        `INSERT INTO audio_items (
           idempotency_key, source_identity, display_name, media_path,
           duration_ms, media_authority_id, created_at_ms, updated_at_ms
         ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
       )
       .run(
-        "unrelated-meeting",
+        "unrelated-audio",
         "unrelated-source",
         "Unrelated import",
         fixture.media.normalizedPath,
@@ -263,7 +263,7 @@ describe("capture to formal transcript handoff", () => {
       );
     const unrelated = fixture.desktop.enqueueProcessingJob(
       {
-        meetingId: Number(meeting.lastInsertRowid),
+        audioId: Number(audio.lastInsertRowid),
         idempotencyKey: "unrelated-job",
         operationId: "asr",
         resourceIdentity: "9".repeat(64),
@@ -510,9 +510,7 @@ describe("capture to formal transcript handoff", () => {
   });
 });
 
-async function createFixture(
-  database: ReturnType<typeof openElectronDatabase>,
-) {
+async function createFixture(database: ReturnType<typeof openAudioDatabase>) {
   const root = await mkdtemp(path.join(tmpdir(), "formal-handoff-"));
   roots.push(root);
   const profile = profilePathsForRoot(path.join(root, "profile"));

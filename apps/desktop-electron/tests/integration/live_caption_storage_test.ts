@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
-import { openElectronDatabase } from "../../src/main/storage/database";
+import { openAudioDatabase } from "../../src/main/storage/audio_database";
 import { TranscriptRepository } from "../../src/main/storage/repositories/transcript_repository";
 
 const sessionId = "session-caption-storage-123456";
@@ -9,7 +9,7 @@ const resourceIdentity = "b".repeat(64);
 const runtimeSha256 = "c".repeat(64);
 
 describe("live caption storage", () => {
-  const database = openElectronDatabase(":memory:");
+  const database = openAudioDatabase(":memory:");
 
   beforeEach(() => {
     database.exec("DELETE FROM capture_sessions");

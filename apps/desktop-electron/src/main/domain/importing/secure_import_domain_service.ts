@@ -31,7 +31,7 @@ export class SecureImportDomainService {
     receipt: SecureImportReceipt;
     processing: ProcessingResourceIdentity;
   }): Promise<{
-    meetingId: number;
+    audioId: number;
     jobId: number;
     recordingId: number;
     mediaSha256: string;
@@ -75,14 +75,11 @@ export class SecureImportDomainService {
       if (discardPath) await bestEffortDiscard(this.discardPort, discardPath);
       throw error;
     }
-    if (
-      !commit.inserted &&
-      commit.meeting.mediaPath !== receipt.normalizedPath
-    ) {
+    if (!commit.inserted && commit.audio.mediaPath !== receipt.normalizedPath) {
       await this.discardPort.discard(receipt.normalizedPath);
     }
     return {
-      meetingId: commit.meeting.id,
+      audioId: commit.audio.id,
       jobId: commit.job.id,
       recordingId: commit.mediaAuthorityId,
       mediaSha256: receipt.normalizedSha256,
@@ -122,5 +119,5 @@ function boundDisplayName(raw: string): string {
     .filter((character) => character.charCodeAt(0) >= 32)
     .join("")
     .trim();
-  return [...(basename || "未命名会议")].slice(0, 160).join("");
+  return [...(basename || "未命名音频")].slice(0, 160).join("");
 }

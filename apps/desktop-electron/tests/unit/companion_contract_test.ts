@@ -34,7 +34,7 @@ describe("U11 companion contracts", () => {
       schema: "companion-audio-transfer/v2",
       transferId: "transfer-1",
       sourceAssetId: "mobile-recording-1",
-      displayName: "meeting.wav",
+      displayName: "audio.wav",
       sizeBytes: 4_097,
       wholeFileSha256: "a".repeat(64),
       chunkBytes: 4_096,

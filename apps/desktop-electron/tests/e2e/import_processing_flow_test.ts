@@ -9,7 +9,7 @@ import { SecureImportDomainService } from "../../src/main/domain/importing/secur
 import { DesktopDomainService } from "../../src/main/domain/desktop_domain_service";
 import type { ExecutionIntent } from "../../src/main/domain/models";
 import { finalizeExistingSherpaResult } from "../../src/main/processes/existing_asr_worker_adapter";
-import { initializeElectronProfile } from "../../src/main/profile/electron_profile";
+import { initializeAudioProfile } from "../../src/main/profile/audio_profile";
 import { DesktopRepository } from "../../src/main/storage/desktop_repository";
 
 const roots: string[] = [];
@@ -23,7 +23,7 @@ describe("secure import to durable processing", () => {
   it("processes two distinct media authorities through ASR and diarization", () => {
     const root = mkdtempSync(join(tmpdir(), "voice2text-distinct-imports-"));
     roots.push(root);
-    const initialized = initializeElectronProfile(root, {
+    const initialized = initializeAudioProfile(root, {
       minimumFreeBytes: 0n,
     });
     if (initialized.status !== "ready") throw new Error(initialized.message);
@@ -97,7 +97,7 @@ describe("secure import to durable processing", () => {
   it("deduplicates normalized content and fences publication by every processing identity", async () => {
     const root = mkdtempSync(join(tmpdir(), "voice2text-import-flow-"));
     roots.push(root);
-    const initialized = initializeElectronProfile(root, {
+    const initialized = initializeAudioProfile(root, {
       minimumFreeBytes: 0n,
     });
     if (initialized.status !== "ready") throw new Error(initialized.message);
@@ -315,7 +315,7 @@ describe("secure import to durable processing", () => {
   it("best-effort discards private output for validation and commit failures without replacing the original error", async () => {
     const root = mkdtempSync(join(tmpdir(), "voice2text-import-errors-"));
     roots.push(root);
-    const initialized = initializeElectronProfile(root, {
+    const initialized = initializeAudioProfile(root, {
       minimumFreeBytes: 0n,
     });
     if (initialized.status !== "ready") throw new Error(initialized.message);

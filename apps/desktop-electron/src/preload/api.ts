@@ -4,7 +4,7 @@ import {
   cancelProcessingResponseSchema,
   retryProcessingResponseSchema,
   processingTasksResponseSchema,
-  importMeetingResponseSchema,
+  importAudioResponseSchema,
   desktopProtocolVersion,
   shellSectionSchema,
   ipcChannels,
@@ -15,23 +15,23 @@ import {
   type OperationEvent,
   type ShellSection,
   type Voice2TextDesktopApi,
-  listMeetingsRequestSchema,
-  listMeetingsResponseSchema,
-  openMeetingRequestSchema,
-  openMeetingResponseSchema,
+  listAudiosRequestSchema,
+  listAudiosResponseSchema,
+  openAudioRequestSchema,
+  openAudioResponseSchema,
   searchTranscriptRequestSchema,
   searchTranscriptResponseSchema,
-  editMeetingSegmentRequestSchema,
-  meetingHistoryRequestSchema,
-  renameMeetingSpeakerRequestSchema,
-  mergeMeetingSpeakersRequestSchema,
-  assignMeetingSpeakerRequestSchema,
-  controlMeetingPlaybackRequestSchema,
-  meetingPlaybackSnapshotSchema,
-  exportMeetingRequestSchema,
-  exportMeetingResponseSchema,
-  meetingWorkspaceSnapshotSchema,
-  type MeetingExportFormat,
+  editAudioSegmentRequestSchema,
+  audioHistoryRequestSchema,
+  renameAudioSpeakerRequestSchema,
+  mergeAudioSpeakersRequestSchema,
+  assignAudioSpeakerRequestSchema,
+  controlAudioPlaybackRequestSchema,
+  audioPlaybackSnapshotSchema,
+  exportAudioRequestSchema,
+  exportAudioResponseSchema,
+  audioWorkspaceSnapshotSchema,
+  type AudioExportFormat,
   type PlaybackAction,
   capturePreflightRequestSchema,
   captureStartRequestSchema,
@@ -47,14 +47,14 @@ import {
   saveAiSettingsRequestSchema,
   replaceAiProviderSecretRequestSchema,
   deleteAiProviderSecretRequestSchema,
-  prepareMeetingAiRequestSchema,
-  getMeetingAiSnapshotRequestSchema,
-  generateMeetingAiRequestSchema,
-  retryMeetingAiRequestSchema,
+  prepareAudioAiRequestSchema,
+  getAudioAiSnapshotRequestSchema,
+  generateAudioAiRequestSchema,
+  retryAudioAiRequestSchema,
   aiSettingsSnapshotSchema,
-  meetingAiConsentPreviewSchema,
-  meetingAiSnapshotSchema,
-  type MeetingAiSnapshot,
+  audioAiConsentPreviewSchema,
+  audioAiSnapshotSchema,
+  type AudioAiSnapshot,
   companionSnapshotRequestSchema,
   companionOptInRequestSchema,
   companionPairingInviteRequestSchema,
@@ -177,50 +177,50 @@ export function createDesktopApi(
         await bridge.invoke(ipcChannels.aiSecretDelete, payload),
       );
     },
-    async prepareMeetingAi(
-      options: Parameters<Voice2TextDesktopApi["prepareMeetingAi"]>[0],
+    async prepareAudioAi(
+      options: Parameters<Voice2TextDesktopApi["prepareAudioAi"]>[0],
     ) {
-      const payload = prepareMeetingAiRequestSchema.parse(options);
-      return meetingAiConsentPreviewSchema.parse(
-        await bridge.invoke(ipcChannels.meetingAiPrepare, payload),
+      const payload = prepareAudioAiRequestSchema.parse(options);
+      return audioAiConsentPreviewSchema.parse(
+        await bridge.invoke(ipcChannels.audioAiPrepare, payload),
       );
     },
-    async getMeetingAiSnapshot(
-      options: Parameters<Voice2TextDesktopApi["getMeetingAiSnapshot"]>[0],
+    async getAudioAiSnapshot(
+      options: Parameters<Voice2TextDesktopApi["getAudioAiSnapshot"]>[0],
     ) {
-      const payload = getMeetingAiSnapshotRequestSchema.parse(options);
+      const payload = getAudioAiSnapshotRequestSchema.parse(options);
       const response = await bridge.invoke(
-        ipcChannels.meetingAiSnapshotGet,
+        ipcChannels.audioAiSnapshotGet,
         payload,
       );
-      return response === null ? null : meetingAiSnapshotSchema.parse(response);
+      return response === null ? null : audioAiSnapshotSchema.parse(response);
     },
-    async generateMeetingAi(
-      options: Parameters<Voice2TextDesktopApi["generateMeetingAi"]>[0],
+    async generateAudioAi(
+      options: Parameters<Voice2TextDesktopApi["generateAudioAi"]>[0],
     ) {
-      const payload = generateMeetingAiRequestSchema.parse(options);
-      return meetingAiSnapshotSchema.parse(
-        await bridge.invoke(ipcChannels.meetingAiGenerate, payload),
+      const payload = generateAudioAiRequestSchema.parse(options);
+      return audioAiSnapshotSchema.parse(
+        await bridge.invoke(ipcChannels.audioAiGenerate, payload),
       );
     },
-    async retryMeetingAi(
-      options: Parameters<Voice2TextDesktopApi["retryMeetingAi"]>[0],
+    async retryAudioAi(
+      options: Parameters<Voice2TextDesktopApi["retryAudioAi"]>[0],
     ) {
-      const payload = retryMeetingAiRequestSchema.parse(options);
-      return meetingAiSnapshotSchema.parse(
-        await bridge.invoke(ipcChannels.meetingAiRetry, payload),
+      const payload = retryAudioAiRequestSchema.parse(options);
+      return audioAiSnapshotSchema.parse(
+        await bridge.invoke(ipcChannels.audioAiRetry, payload),
       );
     },
-    onMeetingAiSnapshot(listener: (snapshot: MeetingAiSnapshot) => void) {
+    onAudioAiSnapshot(listener: (snapshot: AudioAiSnapshot) => void) {
       let subscribed = true;
       const validatedListener = (payload: unknown) => {
-        listener(meetingAiSnapshotSchema.parse(payload));
+        listener(audioAiSnapshotSchema.parse(payload));
       };
-      bridge.on(ipcChannels.meetingAiSnapshotEvent, validatedListener);
+      bridge.on(ipcChannels.audioAiSnapshotEvent, validatedListener);
       return () => {
         if (!subscribed) return;
         subscribed = false;
-        bridge.off(ipcChannels.meetingAiSnapshotEvent, validatedListener);
+        bridge.off(ipcChannels.audioAiSnapshotEvent, validatedListener);
       };
     },
     async getApplicationSnapshot() {
@@ -279,9 +279,9 @@ export function createDesktopApi(
       });
       return processingTasksResponseSchema.parse(response).tasks;
     },
-    async importMeeting() {
-      const response = await bridge.invoke(ipcChannels.importMeeting, {});
-      return importMeetingResponseSchema.parse(response);
+    async importAudio() {
+      const response = await bridge.invoke(ipcChannels.importAudio, {});
+      return importAudioResponseSchema.parse(response);
     },
     async preflightCapture(
       options: Parameters<Voice2TextDesktopApi["preflightCapture"]>[0],
@@ -365,99 +365,99 @@ export function createDesktopApi(
         bridge.off(ipcChannels.operationEvent, validatedListener);
       };
     },
-    async listMeetings(query = "", limit = 200, offset = 0) {
-      const payload = listMeetingsRequestSchema.parse({ query, limit, offset });
-      const response = await bridge.invoke(ipcChannels.meetingList, payload);
-      return listMeetingsResponseSchema.parse(response).meetings;
+    async listAudios(query = "", limit = 200, offset = 0) {
+      const payload = listAudiosRequestSchema.parse({ query, limit, offset });
+      const response = await bridge.invoke(ipcChannels.audioList, payload);
+      return listAudiosResponseSchema.parse(response).audios;
     },
-    async openMeeting(meetingId: number) {
-      const payload = openMeetingRequestSchema.parse({ meetingId });
-      return openMeetingResponseSchema.parse(
-        await bridge.invoke(ipcChannels.meetingOpen, payload),
+    async openAudio(audioId: number) {
+      const payload = openAudioRequestSchema.parse({ audioId });
+      return openAudioResponseSchema.parse(
+        await bridge.invoke(ipcChannels.audioOpen, payload),
       );
     },
-    async searchTranscript(meetingId: number, query: string, limit = 200) {
+    async searchTranscript(audioId: number, query: string, limit = 200) {
       const payload = searchTranscriptRequestSchema.parse({
-        meetingId,
+        audioId,
         query,
         limit,
       });
-      const response = await bridge.invoke(ipcChannels.meetingSearch, payload);
+      const response = await bridge.invoke(ipcChannels.audioSearch, payload);
       return searchTranscriptResponseSchema.parse(response).segments;
     },
-    async editMeetingSegment(
-      command: Parameters<Voice2TextDesktopApi["editMeetingSegment"]>[0],
+    async editAudioSegment(
+      command: Parameters<Voice2TextDesktopApi["editAudioSegment"]>[0],
     ) {
-      const payload = editMeetingSegmentRequestSchema.parse(command);
-      return meetingWorkspaceSnapshotSchema.parse(
-        await bridge.invoke(ipcChannels.meetingEditSegment, payload),
+      const payload = editAudioSegmentRequestSchema.parse(command);
+      return audioWorkspaceSnapshotSchema.parse(
+        await bridge.invoke(ipcChannels.audioEditSegment, payload),
       );
     },
-    async undoMeetingEdit(
-      meetingId: number,
+    async undoAudioEdit(
+      audioId: number,
       generationId: number,
       expectedRevision: number,
     ) {
-      const payload = meetingHistoryRequestSchema.parse({
-        meetingId,
+      const payload = audioHistoryRequestSchema.parse({
+        audioId,
         generationId,
         expectedRevision,
       });
-      return meetingWorkspaceSnapshotSchema.parse(
-        await bridge.invoke(ipcChannels.meetingUndo, payload),
+      return audioWorkspaceSnapshotSchema.parse(
+        await bridge.invoke(ipcChannels.audioUndo, payload),
       );
     },
-    async redoMeetingEdit(
-      meetingId: number,
+    async redoAudioEdit(
+      audioId: number,
       generationId: number,
       expectedRevision: number,
     ) {
-      const payload = meetingHistoryRequestSchema.parse({
-        meetingId,
+      const payload = audioHistoryRequestSchema.parse({
+        audioId,
         generationId,
         expectedRevision,
       });
-      return meetingWorkspaceSnapshotSchema.parse(
-        await bridge.invoke(ipcChannels.meetingRedo, payload),
+      return audioWorkspaceSnapshotSchema.parse(
+        await bridge.invoke(ipcChannels.audioRedo, payload),
       );
     },
-    async renameMeetingSpeaker(
-      command: Parameters<Voice2TextDesktopApi["renameMeetingSpeaker"]>[0],
+    async renameAudioSpeaker(
+      command: Parameters<Voice2TextDesktopApi["renameAudioSpeaker"]>[0],
     ) {
-      const payload = renameMeetingSpeakerRequestSchema.parse(command);
-      return meetingWorkspaceSnapshotSchema.parse(
-        await bridge.invoke(ipcChannels.meetingRenameSpeaker, payload),
+      const payload = renameAudioSpeakerRequestSchema.parse(command);
+      return audioWorkspaceSnapshotSchema.parse(
+        await bridge.invoke(ipcChannels.audioRenameSpeaker, payload),
       );
     },
-    async mergeMeetingSpeakers(
-      command: Parameters<Voice2TextDesktopApi["mergeMeetingSpeakers"]>[0],
+    async mergeAudioSpeakers(
+      command: Parameters<Voice2TextDesktopApi["mergeAudioSpeakers"]>[0],
     ) {
-      const payload = mergeMeetingSpeakersRequestSchema.parse(command);
-      return meetingWorkspaceSnapshotSchema.parse(
-        await bridge.invoke(ipcChannels.meetingMergeSpeakers, payload),
+      const payload = mergeAudioSpeakersRequestSchema.parse(command);
+      return audioWorkspaceSnapshotSchema.parse(
+        await bridge.invoke(ipcChannels.audioMergeSpeakers, payload),
       );
     },
-    async assignMeetingSpeaker(
-      command: Parameters<Voice2TextDesktopApi["assignMeetingSpeaker"]>[0],
+    async assignAudioSpeaker(
+      command: Parameters<Voice2TextDesktopApi["assignAudioSpeaker"]>[0],
     ) {
-      const payload = assignMeetingSpeakerRequestSchema.parse(command);
-      return meetingWorkspaceSnapshotSchema.parse(
-        await bridge.invoke(ipcChannels.meetingAssignSpeaker, payload),
+      const payload = assignAudioSpeakerRequestSchema.parse(command);
+      return audioWorkspaceSnapshotSchema.parse(
+        await bridge.invoke(ipcChannels.audioAssignSpeaker, payload),
       );
     },
-    async controlMeetingPlayback(meetingId: number, command: PlaybackAction) {
-      const payload = controlMeetingPlaybackRequestSchema.parse({
-        meetingId,
+    async controlAudioPlayback(audioId: number, command: PlaybackAction) {
+      const payload = controlAudioPlaybackRequestSchema.parse({
+        audioId,
         command,
       });
-      return meetingPlaybackSnapshotSchema.parse(
-        await bridge.invoke(ipcChannels.meetingPlayback, payload),
+      return audioPlaybackSnapshotSchema.parse(
+        await bridge.invoke(ipcChannels.audioPlayback, payload),
       );
     },
-    async exportMeeting(meetingId: number, format: MeetingExportFormat) {
-      const payload = exportMeetingRequestSchema.parse({ meetingId, format });
-      return exportMeetingResponseSchema.parse(
-        await bridge.invoke(ipcChannels.meetingExport, payload),
+    async exportAudio(audioId: number, format: AudioExportFormat) {
+      const payload = exportAudioRequestSchema.parse({ audioId, format });
+      return exportAudioResponseSchema.parse(
+        await bridge.invoke(ipcChannels.audioExport, payload),
       );
     },
   });

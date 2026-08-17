@@ -145,7 +145,7 @@ public enum ProviderSecretMutationState: String, Codable, Equatable, Sendable {
 }
 
 public final class ProviderSecretStore: @unchecked Sendable {
-  public static let service = "com.voice2text.desktop.meeting-ai"
+  public static let service = "com.voice2text.desktop.audio-ai"
   private let backend: KeychainBackend
 
   public init(backend: KeychainBackend = SystemKeychainBackend()) {

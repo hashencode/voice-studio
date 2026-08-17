@@ -11,15 +11,15 @@ import {
   DesktopDomainService,
   PartialPublicationError,
 } from "../../../src/main/domain/desktop_domain_service";
-import { initializeElectronProfile } from "../../../src/main/profile/electron_profile";
-import { openElectronDatabase } from "../../../src/main/storage/database";
+import { initializeAudioProfile } from "../../../src/main/profile/audio_profile";
+import { openAudioDatabase } from "../../../src/main/storage/audio_database";
 import {
   DesktopRepository,
   IdempotencyConflictError,
 } from "../../../src/main/storage/desktop_repository";
 
 interface CharacterizationFixture {
-  meeting: {
+  audio: {
     idempotencyKey: string;
     sourceIdentity: string;
     displayName: string;
@@ -42,7 +42,7 @@ interface CharacterizationFixture {
 
 const fixturePath = join(
   dirname(fileURLToPath(import.meta.url)),
-  "../../fixtures/flutter-reference/desktop_domain_v1.json",
+  "../../fixtures/audio_domain_v1.json",
 );
 const fixture = JSON.parse(
   readFileSync(fixturePath, "utf8"),
@@ -58,86 +58,86 @@ afterEach(() => {
 function openService(nowMs = 1000) {
   const root = mkdtempSync(join(tmpdir(), "voice2text-electron-domain-"));
   temporaryRoots.push(root);
-  const initialized = initializeElectronProfile(root);
+  const initialized = initializeAudioProfile(root);
   if (initialized.status !== "ready") throw new Error(initialized.message);
   const { database, profile } = initialized;
   const repository = new DesktopRepository(database, profile);
   const service = new DesktopDomainService(repository, () => nowMs);
-  const meetingCommand = {
-    ...fixture.meeting,
-    mediaPath: join(profile.mediaDirectory, "meeting-001.wav"),
+  const audioCommand = {
+    ...fixture.audio,
+    mediaPath: join(profile.mediaDirectory, "audio-001.wav"),
   };
-  return { database, meetingCommand, profile, repository, service };
+  return { database, audioCommand, profile, repository, service };
 }
 
-function seedMeetingAndJob(
+function seedAudioAndJob(
   service: DesktopDomainService,
-  meetingCommand: CharacterizationFixture["meeting"],
+  audioCommand: CharacterizationFixture["audio"],
 ) {
-  const meeting = service.createMeeting(meetingCommand);
+  const audio = service.createAudio(audioCommand);
   const job = service.enqueueProcessingJob({
     ...fixture.job,
-    meetingId: meeting.value.id,
+    audioId: audio.value.id,
   });
-  return { meeting, job };
+  return { audio, job };
 }
 
 describe("DesktopDomainService idempotency", () => {
   it("rejects durable media paths outside the Electron profile", () => {
-    const { database, meetingCommand, service } = openService();
+    const { database, audioCommand, service } = openService();
     try {
       expect(() =>
-        service.createMeeting({
-          ...meetingCommand,
+        service.createAudio({
+          ...audioCommand,
           mediaPath: join(
-            dirname(meetingCommand.mediaPath),
+            dirname(audioCommand.mediaPath),
             "..",
             "..",
             "outside.wav",
           ),
         }),
       ).toThrow("outside the Electron profile");
-      expect(rowCount(database, "meetings")).toBe(0);
+      expect(rowCount(database, "audio_items")).toBe(0);
     } finally {
       database.close();
     }
   });
 
-  it("does not duplicate a meeting, job, note, or receipt", () => {
-    const { database, meetingCommand, service } = openService();
+  it("does not duplicate a audio, job, note, or receipt", () => {
+    const { database, audioCommand, service } = openService();
     try {
-      const first = seedMeetingAndJob(service, meetingCommand);
-      const secondMeeting = service.createMeeting(meetingCommand);
+      const first = seedAudioAndJob(service, audioCommand);
+      const secondAudio = service.createAudio(audioCommand);
       const secondJob = service.enqueueProcessingJob({
         ...fixture.job,
-        meetingId: first.meeting.value.id,
+        audioId: first.audio.value.id,
       });
-      const firstNote = service.saveMeetingNote({
+      const firstNote = service.saveAudioNote({
         ...fixture.note,
-        meetingId: first.meeting.value.id,
+        audioId: first.audio.value.id,
       });
-      const secondNote = service.saveMeetingNote({
+      const secondNote = service.saveAudioNote({
         ...fixture.note,
-        meetingId: first.meeting.value.id,
+        audioId: first.audio.value.id,
       });
       const firstReceipt = service.recordReceipt({
         ...fixture.receipt,
-        meetingId: first.meeting.value.id,
+        audioId: first.audio.value.id,
       });
       const secondReceipt = service.recordReceipt({
         ...fixture.receipt,
-        meetingId: first.meeting.value.id,
+        audioId: first.audio.value.id,
       });
 
-      expect(first.meeting.inserted).toBe(true);
+      expect(first.audio.inserted).toBe(true);
       expect(first.job.inserted).toBe(true);
-      expect(secondMeeting).toEqual({ ...first.meeting, inserted: false });
+      expect(secondAudio).toEqual({ ...first.audio, inserted: false });
       expect(secondJob).toEqual({ ...first.job, inserted: false });
       expect(secondNote).toEqual({ ...firstNote, inserted: false });
       expect(secondReceipt).toEqual({ ...firstReceipt, inserted: false });
-      expect(rowCount(database, "meetings")).toBe(1);
+      expect(rowCount(database, "audio_items")).toBe(1);
       expect(rowCount(database, "processing_jobs")).toBe(1);
-      expect(rowCount(database, "meeting_notes")).toBe(1);
+      expect(rowCount(database, "audio_notes")).toBe(1);
       expect(rowCount(database, "durable_receipts")).toBe(1);
     } finally {
       database.close();
@@ -145,16 +145,16 @@ describe("DesktopDomainService idempotency", () => {
   });
 
   it("rejects reuse of an idempotency key with different content", () => {
-    const { database, meetingCommand, service } = openService();
+    const { database, audioCommand, service } = openService();
     try {
-      service.createMeeting(meetingCommand);
+      service.createAudio(audioCommand);
       expect(() =>
-        service.createMeeting({
-          ...meetingCommand,
-          displayName: "Different meeting.wav",
+        service.createAudio({
+          ...audioCommand,
+          displayName: "Different audio.wav",
         }),
       ).toThrow(IdempotencyConflictError);
-      expect(rowCount(database, "meetings")).toBe(1);
+      expect(rowCount(database, "audio_items")).toBe(1);
     } finally {
       database.close();
     }
@@ -163,9 +163,9 @@ describe("DesktopDomainService idempotency", () => {
 
 describe("attempt and source fenced publication", () => {
   it("records cancellation durably before completion and rejects late output", () => {
-    const { database, meetingCommand, repository, service } = openService();
+    const { database, audioCommand, repository, service } = openService();
     try {
-      const { job } = seedMeetingAndJob(service, meetingCommand);
+      const { job } = seedAudioAndJob(service, audioCommand);
       const intent = service.claimNextProcessingJob({
         sourceIdentity: "worker:cancel",
         deadlineAtMs: 5000,
@@ -191,12 +191,12 @@ describe("attempt and source fenced publication", () => {
   });
 
   it("rejects partial, wrong-source, and late results before atomic publication", () => {
-    const { database, meetingCommand, repository, service } = openService();
+    const { database, audioCommand, repository, service } = openService();
     try {
-      const meeting = service.createMeeting(meetingCommand);
+      const audio = service.createAudio(audioCommand);
       const job = service.enqueueProcessingJob({
         ...fixture.job,
-        meetingId: meeting.value.id,
+        audioId: audio.value.id,
         operationId: "asr",
       });
       const firstIntent = service.claimNextProcessingJob({
@@ -304,9 +304,9 @@ describe("attempt and source fenced publication", () => {
   });
 
   it("rolls publication back if the job cannot complete", () => {
-    const { database, meetingCommand, repository, service } = openService();
+    const { database, audioCommand, repository, service } = openService();
     try {
-      seedMeetingAndJob(service, meetingCommand);
+      seedAudioAndJob(service, audioCommand);
       const intent = service.claimNextProcessingJob({
         sourceIdentity: "worker:atomic",
         deadlineAtMs: 5000,
@@ -336,11 +336,11 @@ describe("attempt and source fenced publication", () => {
 });
 
 function rowCount(
-  database: ReturnType<typeof openElectronDatabase>,
+  database: ReturnType<typeof openAudioDatabase>,
   table:
-    | "meetings"
+    | "audio_items"
     | "processing_jobs"
-    | "meeting_notes"
+    | "audio_notes"
     | "durable_receipts"
     | "result_publications",
 ): number {
@@ -351,9 +351,9 @@ function rowCount(
 
 describe("startup reconciliation", () => {
   it("marks running work interrupted and never automatically retries it", () => {
-    const { database, meetingCommand, repository, service } = openService();
+    const { database, audioCommand, repository, service } = openService();
     try {
-      const { job } = seedMeetingAndJob(service, meetingCommand);
+      const { job } = seedAudioAndJob(service, audioCommand);
       service.claimNextProcessingJob({
         sourceIdentity: "worker:orphaned",
         deadlineAtMs: 5000,

@@ -15,7 +15,7 @@ struct SecureImporterTests {
       SecureImportRequest(
         sourcePath: source.path,
         destinationRoot: fixture.destination.path,
-        destinationId: "meeting-123456789abc",
+        destinationId: "audio-123456789abc",
         maxSourceBytes: 8 * 1024 * 1024,
         minimumFreeBytes: 0,
         temporaryStorageMultiplier: 2,
@@ -218,7 +218,7 @@ struct SecureImporterTests {
     #expect(failureCode { try importer.importMedia(fixture.request(source: source)) } == "IMPORT_RECEIPT_TOO_LARGE")
     #expect(
       !FileManager.default.fileExists(
-        atPath: fixture.destination.appending(path: "complete/meeting-123456789abc.wav").path
+        atPath: fixture.destination.appending(path: "complete/audio-123456789abc.wav").path
       )
     )
   }
@@ -244,7 +244,7 @@ struct SecureImporterTests {
       withIntermediateDirectories: true
     )
     let protected = attackerDestination.appending(
-      path: "complete/meeting-123456789abc.wav"
+      path: "complete/audio-123456789abc.wav"
     )
     try Data("attacker-owned".utf8).write(to: protected)
     let importer = SecureImporter(
@@ -324,7 +324,7 @@ struct SecureImporterTests {
     let attackerComplete = fixture.root.appending(path: "attacker-complete")
     try FileManager.default.createDirectory(at: attackerStaging, withIntermediateDirectories: true)
     try FileManager.default.createDirectory(at: attackerComplete, withIntermediateDirectories: true)
-    let protected = attackerComplete.appending(path: "meeting-123456789abc.wav")
+    let protected = attackerComplete.appending(path: "audio-123456789abc.wav")
     try Data("attacker-owned".utf8).write(to: protected)
     let importer = SecureImporter(
       availableCapacity: { _ in Int64.max },
@@ -406,7 +406,7 @@ struct SecureImporterTests {
     try writePCMFixture(to: source, sampleRate: 16_000, channels: 1)
     let complete = fixture.destination.appending(path: "complete")
     try FileManager.default.createDirectory(at: complete, withIntermediateDirectories: true)
-    let existing = complete.appending(path: "meeting-123456789abc.wav")
+    let existing = complete.appending(path: "audio-123456789abc.wav")
     let protected = Data("existing-authority".utf8)
     try protected.write(to: existing)
 
@@ -445,7 +445,7 @@ private struct Fixture {
     SecureImportRequest(
       sourcePath: source.path,
       destinationRoot: destination.path,
-      destinationId: "meeting-123456789abc",
+      destinationId: "audio-123456789abc",
       maxSourceBytes: 8 * 1024 * 1024,
       minimumFreeBytes: 512,
       temporaryStorageMultiplier: 2,

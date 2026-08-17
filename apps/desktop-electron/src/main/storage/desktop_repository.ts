@@ -4,7 +4,7 @@ import type {
   ExecutionIntent,
   IdempotentResult,
   MediaAuthorityRecord,
-  MeetingRecord,
+  AudioRecord,
   ProcessingPhase,
   ProcessingJobRecord,
   PublicationRecord,
@@ -12,10 +12,10 @@ import type {
 import type { ProcessingTask } from "../../shared/contracts";
 import {
   assertProfileOwnedPath,
-  type ElectronProfilePaths,
+  type AudioProfilePaths,
 } from "../profile/profile_paths";
-import { withTransaction } from "./database";
-import { MeetingWorkspaceRepository } from "./repositories/meeting_workspace_repository";
+import { withTransaction } from "./audio_database";
+import { AudioWorkspaceRepository } from "./repositories/audio_workspace_repository";
 
 export class IdempotencyConflictError extends Error {
   constructor(entity: string) {
@@ -34,19 +34,16 @@ export class AttemptFenceError extends Error {
 }
 
 export class DesktopRepository {
-  private readonly workspaceRepository: MeetingWorkspaceRepository;
+  private readonly workspaceRepository: AudioWorkspaceRepository;
 
   constructor(
     private readonly database: DatabaseSync,
-    private readonly profile: ElectronProfilePaths,
+    private readonly profile: AudioProfilePaths,
   ) {
-    this.workspaceRepository = new MeetingWorkspaceRepository(
-      database,
-      profile,
-    );
+    this.workspaceRepository = new AudioWorkspaceRepository(database, profile);
   }
 
-  createMeeting(
+  createAudio(
     command: {
       idempotencyKey: string;
       sourceIdentity: string;
@@ -55,13 +52,13 @@ export class DesktopRepository {
       durationMs: number;
     },
     nowMs: number,
-  ): IdempotentResult<MeetingRecord> {
+  ): IdempotentResult<AudioRecord> {
     assertProfileOwnedPath(this.profile, command.mediaPath);
     return withTransaction(this.database, () => {
-      const existing = this.findMeetingByIdempotencyKey(command.idempotencyKey);
+      const existing = this.findAudioByIdempotencyKey(command.idempotencyKey);
       if (existing) {
         assertSame(
-          "meeting",
+          "audio",
           [
             existing.sourceIdentity,
             existing.displayName,
@@ -79,7 +76,7 @@ export class DesktopRepository {
       }
       const result = this.database
         .prepare(
-          "INSERT INTO meetings (idempotency_key, source_identity, display_name, media_path, duration_ms, created_at_ms, updated_at_ms) VALUES (?, ?, ?, ?, ?, ?, ?)",
+          "INSERT INTO audio_items (idempotency_key, source_identity, display_name, media_path, duration_ms, created_at_ms, updated_at_ms) VALUES (?, ?, ?, ?, ?, ?, ?)",
         )
         .run(
           command.idempotencyKey,
@@ -91,7 +88,7 @@ export class DesktopRepository {
           nowMs,
         );
       return {
-        value: this.requireMeeting(Number(result.lastInsertRowid)),
+        value: this.requireAudio(Number(result.lastInsertRowid)),
         inserted: true,
       };
     });
@@ -99,7 +96,7 @@ export class DesktopRepository {
 
   enqueueProcessingJob(
     command: {
-      meetingId: number;
+      audioId: number;
       idempotencyKey: string;
       operationId: string;
       resourceIdentity: string;
@@ -117,7 +114,7 @@ export class DesktopRepository {
         assertSame(
           "processing job",
           [
-            existing.meetingId,
+            existing.audioId,
             existing.operationId,
             existing.resourceIdentity,
             existing.phase,
@@ -127,7 +124,7 @@ export class DesktopRepository {
             existing.runtimeSha256,
           ],
           [
-            command.meetingId,
+            command.audioId,
             command.operationId,
             command.resourceIdentity,
             command.phase ?? "asr",
@@ -141,10 +138,10 @@ export class DesktopRepository {
       }
       const result = this.database
         .prepare(
-          "INSERT INTO processing_jobs (meeting_id, idempotency_key, operation_id, resource_identity, state, attempt, phase, protocol_identity, source_sha256, model_sha256, runtime_sha256, created_at_ms, updated_at_ms) VALUES (?, ?, ?, ?, 'queued', 0, ?, ?, ?, ?, ?, ?, ?)",
+          "INSERT INTO processing_jobs (audio_id, idempotency_key, operation_id, resource_identity, state, attempt, phase, protocol_identity, source_sha256, model_sha256, runtime_sha256, created_at_ms, updated_at_ms) VALUES (?, ?, ?, ?, 'queued', 0, ?, ?, ?, ?, ?, ?, ?)",
         )
         .run(
-          command.meetingId,
+          command.audioId,
           command.idempotencyKey,
           command.operationId,
           command.resourceIdentity,
@@ -163,35 +160,35 @@ export class DesktopRepository {
     });
   }
 
-  saveMeetingNote(
-    command: { meetingId: number; idempotencyKey: string; body: string },
+  saveAudioNote(
+    command: { audioId: number; idempotencyKey: string; body: string },
     nowMs: number,
-  ): IdempotentResult<{ id: number; meetingId: number; body: string }> {
+  ): IdempotentResult<{ id: number; audioId: number; body: string }> {
     return withTransaction(this.database, () => {
       const row = this.database
         .prepare(
-          "SELECT id, meeting_id, body FROM meeting_notes WHERE idempotency_key = ?",
+          "SELECT id, audio_id, body FROM audio_notes WHERE idempotency_key = ?",
         )
         .get(command.idempotencyKey);
       if (row) {
         const existing = {
           id: Number(row.id),
-          meetingId: Number(row.meeting_id),
+          audioId: Number(row.audio_id),
           body: String(row.body),
         };
         assertSame(
-          "meeting note",
-          [existing.meetingId, existing.body],
-          [command.meetingId, command.body],
+          "audio note",
+          [existing.audioId, existing.body],
+          [command.audioId, command.body],
         );
         return { value: existing, inserted: false };
       }
       const result = this.database
         .prepare(
-          "INSERT INTO meeting_notes (meeting_id, idempotency_key, body, created_at_ms, updated_at_ms) VALUES (?, ?, ?, ?, ?)",
+          "INSERT INTO audio_notes (audio_id, idempotency_key, body, created_at_ms, updated_at_ms) VALUES (?, ?, ?, ?, ?)",
         )
         .run(
-          command.meetingId,
+          command.audioId,
           command.idempotencyKey,
           command.body,
           nowMs,
@@ -200,7 +197,7 @@ export class DesktopRepository {
       return {
         value: {
           id: Number(result.lastInsertRowid),
-          meetingId: command.meetingId,
+          audioId: command.audioId,
           body: command.body,
         },
         inserted: true,
@@ -210,7 +207,7 @@ export class DesktopRepository {
 
   recordReceipt(
     command: {
-      meetingId: number;
+      audioId: number;
       idempotencyKey: string;
       kind: string;
       payload: Record<string, unknown>;
@@ -218,7 +215,7 @@ export class DesktopRepository {
     nowMs: number,
   ): IdempotentResult<{
     id: number;
-    meetingId: number;
+    audioId: number;
     kind: string;
     payload: Record<string, unknown>;
   }> {
@@ -226,19 +223,19 @@ export class DesktopRepository {
     return withTransaction(this.database, () => {
       const row = this.database
         .prepare(
-          "SELECT id, meeting_id, kind, payload_json FROM durable_receipts WHERE idempotency_key = ?",
+          "SELECT id, audio_id, kind, payload_json FROM durable_receipts WHERE idempotency_key = ?",
         )
         .get(command.idempotencyKey);
       if (row) {
         assertSame(
           "durable receipt",
-          [Number(row.meeting_id), String(row.kind), String(row.payload_json)],
-          [command.meetingId, command.kind, payloadJson],
+          [Number(row.audio_id), String(row.kind), String(row.payload_json)],
+          [command.audioId, command.kind, payloadJson],
         );
         return {
           value: {
             id: Number(row.id),
-            meetingId: Number(row.meeting_id),
+            audioId: Number(row.audio_id),
             kind: String(row.kind),
             payload: JSON.parse(String(row.payload_json)) as Record<
               string,
@@ -250,10 +247,10 @@ export class DesktopRepository {
       }
       const result = this.database
         .prepare(
-          "INSERT INTO durable_receipts (meeting_id, idempotency_key, kind, payload_json, created_at_ms) VALUES (?, ?, ?, ?, ?)",
+          "INSERT INTO durable_receipts (audio_id, idempotency_key, kind, payload_json, created_at_ms) VALUES (?, ?, ?, ?, ?)",
         )
         .run(
-          command.meetingId,
+          command.audioId,
           command.idempotencyKey,
           command.kind,
           payloadJson,
@@ -262,7 +259,7 @@ export class DesktopRepository {
       return {
         value: {
           id: Number(result.lastInsertRowid),
-          meetingId: command.meetingId,
+          audioId: command.audioId,
           kind: command.kind,
           payload: command.payload,
         },
@@ -293,7 +290,7 @@ export class DesktopRepository {
       const job = this.requireJob(jobId);
       return {
         jobId: job.id,
-        meetingId: job.meetingId,
+        audioId: job.audioId,
         operationId: job.operationId,
         attempt: job.attempt,
         sourceIdentity,
@@ -315,13 +312,13 @@ export class DesktopRepository {
   ): boolean {
     const updated = this.database
       .prepare(
-        "UPDATE processing_jobs SET progress_fraction = ?, updated_at_ms = ? WHERE id = ? AND state = 'running' AND meeting_id = ? AND operation_id = ? AND resource_identity = ? AND attempt = ? AND source_identity = ? AND deadline_at_ms = ? AND phase = ? AND protocol_identity = ? AND source_sha256 = ? AND model_sha256 = ? AND runtime_sha256 = ? AND cancel_requested_at_ms IS NULL AND progress_fraction <= ?",
+        "UPDATE processing_jobs SET progress_fraction = ?, updated_at_ms = ? WHERE id = ? AND state = 'running' AND audio_id = ? AND operation_id = ? AND resource_identity = ? AND attempt = ? AND source_identity = ? AND deadline_at_ms = ? AND phase = ? AND protocol_identity = ? AND source_sha256 = ? AND model_sha256 = ? AND runtime_sha256 = ? AND cancel_requested_at_ms IS NULL AND progress_fraction <= ?",
       )
       .run(
         fraction,
         nowMs,
         intent.jobId,
-        intent.meetingId,
+        intent.audioId,
         intent.operationId,
         intent.resourceIdentity,
         intent.attempt,
@@ -353,7 +350,7 @@ export class DesktopRepository {
   ): ExecutionIntent {
     const updated = this.database
       .prepare(
-        "UPDATE processing_jobs SET operation_id = ?, resource_identity = ?, phase = ?, protocol_identity = ?, model_sha256 = ?, runtime_sha256 = ?, updated_at_ms = ? WHERE id = ? AND state = 'running' AND meeting_id = ? AND operation_id = ? AND resource_identity = ? AND attempt = ? AND source_identity = ? AND deadline_at_ms = ? AND phase = ? AND protocol_identity = ? AND source_sha256 = ? AND model_sha256 = ? AND runtime_sha256 = ? AND cancel_requested_at_ms IS NULL",
+        "UPDATE processing_jobs SET operation_id = ?, resource_identity = ?, phase = ?, protocol_identity = ?, model_sha256 = ?, runtime_sha256 = ?, updated_at_ms = ? WHERE id = ? AND state = 'running' AND audio_id = ? AND operation_id = ? AND resource_identity = ? AND attempt = ? AND source_identity = ? AND deadline_at_ms = ? AND phase = ? AND protocol_identity = ? AND source_sha256 = ? AND model_sha256 = ? AND runtime_sha256 = ? AND cancel_requested_at_ms IS NULL",
       )
       .run(
         next.operationId,
@@ -364,7 +361,7 @@ export class DesktopRepository {
         next.runtimeSha256,
         nowMs,
         intent.jobId,
-        intent.meetingId,
+        intent.audioId,
         intent.operationId,
         intent.resourceIdentity,
         intent.attempt,
@@ -393,7 +390,7 @@ export class DesktopRepository {
         intent.operationId !== "diarization" ||
         intent.phase !== "diarization" ||
         job.state !== "running" ||
-        job.meetingId !== intent.meetingId ||
+        job.audioId !== intent.audioId ||
         job.operationId !== intent.operationId ||
         job.resourceIdentity !== intent.resourceIdentity ||
         job.attempt !== intent.attempt ||
@@ -409,10 +406,10 @@ export class DesktopRepository {
       }
       const inserted = this.database
         .prepare(
-          "INSERT INTO result_publications (meeting_id, job_id, operation_id, attempt, source_identity, payload_json, created_at_ms, phase, protocol_identity, source_sha256, model_sha256, runtime_sha256) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+          "INSERT INTO result_publications (audio_id, job_id, operation_id, attempt, source_identity, payload_json, created_at_ms, phase, protocol_identity, source_sha256, model_sha256, runtime_sha256) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
         )
         .run(
-          job.meetingId,
+          job.audioId,
           job.id,
           job.operationId,
           job.attempt,
@@ -427,7 +424,7 @@ export class DesktopRepository {
         );
       const publicationId = Number(inserted.lastInsertRowid);
       this.workspaceRepository.materializePublishedResult({
-        meetingId: job.meetingId,
+        audioId: job.audioId,
         publicationId,
         attempt: job.attempt,
         payload,
@@ -441,12 +438,12 @@ export class DesktopRepository {
       if (completed.changes !== 1) throw new AttemptFenceError();
       this.database
         .prepare(
-          "UPDATE meetings SET active_publication_id = ?, updated_at_ms = ? WHERE id = ?",
+          "UPDATE audio_items SET active_publication_id = ?, updated_at_ms = ? WHERE id = ?",
         )
-        .run(publicationId, nowMs, job.meetingId);
+        .run(publicationId, nowMs, job.audioId);
       return {
         id: publicationId,
-        meetingId: job.meetingId,
+        audioId: job.audioId,
         jobId: job.id,
         operationId: job.operationId,
         attempt: job.attempt,
@@ -491,12 +488,12 @@ export class DesktopRepository {
     return (
       this.database
         .prepare(
-          "UPDATE processing_jobs SET state = 'canceled', error_code = 'CANCELED', updated_at_ms = ? WHERE id = ? AND state = 'running' AND cancel_requested_at_ms IS NOT NULL AND meeting_id = ? AND operation_id = ? AND resource_identity = ? AND attempt = ? AND source_identity = ? AND deadline_at_ms = ? AND phase = ? AND protocol_identity = ? AND source_sha256 = ? AND model_sha256 = ? AND runtime_sha256 = ?",
+          "UPDATE processing_jobs SET state = 'canceled', error_code = 'CANCELED', updated_at_ms = ? WHERE id = ? AND state = 'running' AND cancel_requested_at_ms IS NOT NULL AND audio_id = ? AND operation_id = ? AND resource_identity = ? AND attempt = ? AND source_identity = ? AND deadline_at_ms = ? AND phase = ? AND protocol_identity = ? AND source_sha256 = ? AND model_sha256 = ? AND runtime_sha256 = ?",
         )
         .run(
           nowMs,
           intent.jobId,
-          intent.meetingId,
+          intent.audioId,
           intent.operationId,
           intent.resourceIdentity,
           intent.attempt,
@@ -572,13 +569,13 @@ export class DesktopRepository {
     return (
       this.database
         .prepare(
-          "UPDATE processing_jobs SET state = 'interrupted', error_code = ?, updated_at_ms = ? WHERE id = ? AND state = 'running' AND cancel_requested_at_ms IS NULL AND meeting_id = ? AND operation_id = ? AND resource_identity = ? AND attempt = ? AND source_identity = ? AND deadline_at_ms = ? AND phase = ? AND protocol_identity = ? AND source_sha256 = ? AND model_sha256 = ? AND runtime_sha256 = ?",
+          "UPDATE processing_jobs SET state = 'interrupted', error_code = ?, updated_at_ms = ? WHERE id = ? AND state = 'running' AND cancel_requested_at_ms IS NULL AND audio_id = ? AND operation_id = ? AND resource_identity = ? AND attempt = ? AND source_identity = ? AND deadline_at_ms = ? AND phase = ? AND protocol_identity = ? AND source_sha256 = ? AND model_sha256 = ? AND runtime_sha256 = ?",
         )
         .run(
           errorCode,
           nowMs,
           intent.jobId,
-          intent.meetingId,
+          intent.audioId,
           intent.operationId,
           intent.resourceIdentity,
           intent.attempt,
@@ -596,7 +593,7 @@ export class DesktopRepository {
   sourcePathForJob(jobId: number): string | null {
     const row = this.database
       .prepare(
-        "SELECT meetings.media_path FROM processing_jobs JOIN meetings ON meetings.id = processing_jobs.meeting_id WHERE processing_jobs.id = ?",
+        "SELECT audio_items.media_path FROM processing_jobs JOIN audio_items ON audio_items.id = processing_jobs.audio_id WHERE processing_jobs.id = ?",
       )
       .get(jobId);
     return row ? String(row.media_path) : null;
@@ -619,14 +616,14 @@ export class DesktopRepository {
   listProcessingTasks(): ProcessingTask[] {
     return this.database
       .prepare(
-        "SELECT processing_jobs.*, meetings.display_name FROM processing_jobs JOIN meetings ON meetings.id = processing_jobs.meeting_id ORDER BY processing_jobs.updated_at_ms DESC, processing_jobs.id DESC",
+        "SELECT processing_jobs.*, audio_items.display_name FROM processing_jobs JOIN audio_items ON audio_items.id = processing_jobs.audio_id ORDER BY processing_jobs.updated_at_ms DESC, processing_jobs.id DESC",
       )
       .all()
       .map((row) => {
         const job = mapJob(row);
         return {
           id: job.id,
-          meetingId: job.meetingId,
+          audioId: job.audioId,
           displayName: String(row.display_name),
           state: job.state,
           phase: job.phase,
@@ -637,9 +634,9 @@ export class DesktopRepository {
       });
   }
 
-  countMeetings(): number {
+  countAudios(): number {
     return Number(
-      this.database.prepare("SELECT COUNT(*) AS count FROM meetings").get()
+      this.database.prepare("SELECT COUNT(*) AS count FROM audio_items").get()
         ?.count ?? 0,
     );
   }
@@ -652,7 +649,7 @@ export class DesktopRepository {
   }
 
   committedImportForSourceSha256(sourceSha256: string): {
-    meeting: MeetingRecord;
+    audio: AudioRecord;
     job: ProcessingJobRecord;
     mediaAuthorityId: number;
     contentSha256: string;
@@ -666,10 +663,10 @@ export class DesktopRepository {
       .prepare(
         `SELECT a.id AS media_authority_id, a.content_sha256,
           a.normalized_path, a.size_bytes,
-          m.id AS meeting_id, j.id AS job_id
+          m.id AS audio_id, j.id AS job_id
          FROM media_authorities a
-         JOIN meetings m ON m.media_authority_id = a.id
-         JOIN processing_jobs j ON j.meeting_id = m.id
+         JOIN audio_items m ON m.media_authority_id = a.id
+         JOIN processing_jobs j ON j.audio_id = m.id
            AND j.idempotency_key = 'processing:' || a.content_sha256
          WHERE a.source_sha256 = ?
          ORDER BY a.id, m.id, j.id LIMIT 2`,
@@ -681,7 +678,7 @@ export class DesktopRepository {
     }
     const row = rows[0]!;
     return {
-      meeting: this.requireMeeting(Number(row.meeting_id)),
+      audio: this.requireAudio(Number(row.audio_id)),
       job: this.requireJob(Number(row.job_id)),
       mediaAuthorityId: Number(row.media_authority_id),
       contentSha256: String(row.content_sha256),
@@ -707,7 +704,7 @@ export class DesktopRepository {
     },
     nowMs: number,
   ): {
-    meeting: MeetingRecord;
+    audio: AudioRecord;
     job: ProcessingJobRecord;
     mediaAuthorityId: number;
     inserted: boolean;
@@ -718,20 +715,19 @@ export class DesktopRepository {
         .prepare("SELECT * FROM media_authorities WHERE content_sha256 = ?")
         .get(command.normalizedSha256);
       if (existingAsset) {
-        const meetingRow = this.database
-          .prepare("SELECT * FROM meetings WHERE media_authority_id = ?")
+        const audioRow = this.database
+          .prepare("SELECT * FROM audio_items WHERE media_authority_id = ?")
           .get(Number(existingAsset.id));
-        if (!meetingRow)
-          throw new Error("media authority is missing its meeting");
+        if (!audioRow) throw new Error("media authority is missing its audio");
         const jobRow = this.database
           .prepare(
-            "SELECT * FROM processing_jobs WHERE meeting_id = ? ORDER BY id LIMIT 1",
+            "SELECT * FROM processing_jobs WHERE audio_id = ? ORDER BY id LIMIT 1",
           )
-          .get(Number(meetingRow.id));
+          .get(Number(audioRow.id));
         if (!jobRow)
           throw new Error("media authority is missing its processing job");
         return {
-          meeting: mapMeeting(meetingRow),
+          audio: mapAudio(audioRow),
           job: mapJob(jobRow),
           mediaAuthorityId: Number(existingAsset.id),
           inserted: false,
@@ -755,9 +751,9 @@ export class DesktopRepository {
           nowMs,
         );
       const mediaId = Number(media.lastInsertRowid);
-      const meeting = this.database
+      const audio = this.database
         .prepare(
-          "INSERT INTO meetings (idempotency_key, source_identity, display_name, media_path, duration_ms, media_authority_id, created_at_ms, updated_at_ms) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+          "INSERT INTO audio_items (idempotency_key, source_identity, display_name, media_path, duration_ms, media_authority_id, created_at_ms, updated_at_ms) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
         )
         .run(
           `media:${command.normalizedSha256}`,
@@ -769,14 +765,14 @@ export class DesktopRepository {
           nowMs,
           nowMs,
         );
-      const meetingId = Number(meeting.lastInsertRowid);
+      const audioId = Number(audio.lastInsertRowid);
       const operationId = command.phase;
       const job = this.database
         .prepare(
-          "INSERT INTO processing_jobs (meeting_id, idempotency_key, operation_id, resource_identity, state, attempt, phase, protocol_identity, source_sha256, model_sha256, runtime_sha256, created_at_ms, updated_at_ms) VALUES (?, ?, ?, ?, 'queued', 0, ?, ?, ?, ?, ?, ?, ?)",
+          "INSERT INTO processing_jobs (audio_id, idempotency_key, operation_id, resource_identity, state, attempt, phase, protocol_identity, source_sha256, model_sha256, runtime_sha256, created_at_ms, updated_at_ms) VALUES (?, ?, ?, ?, 'queued', 0, ?, ?, ?, ?, ?, ?, ?)",
         )
         .run(
-          meetingId,
+          audioId,
           `processing:${command.normalizedSha256}`,
           operationId,
           command.resourceIdentity,
@@ -789,7 +785,7 @@ export class DesktopRepository {
           nowMs,
         );
       return {
-        meeting: this.requireMeeting(meetingId),
+        audio: this.requireAudio(audioId),
         job: this.requireJob(Number(job.lastInsertRowid)),
         mediaAuthorityId: mediaId,
         inserted: true,
@@ -797,19 +793,19 @@ export class DesktopRepository {
     });
   }
 
-  private findMeetingByIdempotencyKey(key: string): MeetingRecord | null {
+  private findAudioByIdempotencyKey(key: string): AudioRecord | null {
     const row = this.database
-      .prepare("SELECT * FROM meetings WHERE idempotency_key = ?")
+      .prepare("SELECT * FROM audio_items WHERE idempotency_key = ?")
       .get(key);
-    return row ? mapMeeting(row) : null;
+    return row ? mapAudio(row) : null;
   }
 
-  private requireMeeting(id: number): MeetingRecord {
+  private requireAudio(id: number): AudioRecord {
     const row = this.database
-      .prepare("SELECT * FROM meetings WHERE id = ?")
+      .prepare("SELECT * FROM audio_items WHERE id = ?")
       .get(id);
-    if (!row) throw new Error("Inserted meeting is missing");
-    return mapMeeting(row);
+    if (!row) throw new Error("Inserted audio is missing");
+    return mapAudio(row);
   }
 
   private findJobByIdempotencyKey(key: string): ProcessingJobRecord | null {
@@ -832,7 +828,7 @@ function executionIntentForJob(job: ProcessingJobRecord): ExecutionIntent {
   }
   return {
     jobId: job.id,
-    meetingId: job.meetingId,
+    audioId: job.audioId,
     operationId: job.operationId,
     attempt: job.attempt,
     sourceIdentity: job.sourceIdentity,
@@ -846,7 +842,7 @@ function executionIntentForJob(job: ProcessingJobRecord): ExecutionIntent {
   };
 }
 
-function mapMeeting(row: Record<string, unknown>): MeetingRecord {
+function mapAudio(row: Record<string, unknown>): AudioRecord {
   return {
     id: Number(row.id),
     idempotencyKey: String(row.idempotency_key),
@@ -869,7 +865,7 @@ function mapJob(row: Record<string, unknown>): ProcessingJobRecord {
       : Number(row.cancel_requested_at_ms);
   return {
     id: Number(row.id),
-    meetingId: Number(row.meeting_id),
+    audioId: Number(row.audio_id),
     idempotencyKey: String(row.idempotency_key),
     operationId: String(row.operation_id),
     resourceIdentity: String(row.resource_identity),

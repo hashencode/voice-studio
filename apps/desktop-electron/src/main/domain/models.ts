@@ -17,7 +17,7 @@ export interface ProcessingFence {
   runtimeSha256: string;
 }
 
-export interface MeetingRecord {
+export interface AudioRecord {
   id: number;
   idempotencyKey: string;
   sourceIdentity: string;
@@ -29,7 +29,7 @@ export interface MeetingRecord {
 
 export interface ProcessingJobRecord extends ProcessingFence {
   id: number;
-  meetingId: number;
+  audioId: number;
   idempotencyKey: string;
   operationId: string;
   resourceIdentity: string;
@@ -44,7 +44,7 @@ export interface ProcessingJobRecord extends ProcessingFence {
 
 export interface ExecutionIntent extends ProcessingFence {
   jobId: number;
-  meetingId: number;
+  audioId: number;
   operationId: string;
   attempt: number;
   sourceIdentity: string;
@@ -64,7 +64,7 @@ export interface MediaAuthorityRecord {
 
 export interface PublicationRecord {
   id: number;
-  meetingId: number;
+  audioId: number;
   jobId: number;
   operationId: string;
   attempt: number;

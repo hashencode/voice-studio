@@ -81,7 +81,7 @@ describe("U11 private companion native adapter", () => {
         companionDiscovery: {
           schemaVersion: 1,
           state: "permission-pending",
-          serviceType: "_voice2text-media._tcp.",
+          serviceType: "_voice2text-audio._tcp.",
           port: 4242,
           registeredName: null,
           manualFallbackAvailable: true,
@@ -91,7 +91,7 @@ describe("U11 private companion native adapter", () => {
         companionDiscovery: {
           schemaVersion: 1,
           state: "registered",
-          serviceType: "_voice2text-media._tcp.",
+          serviceType: "_voice2text-audio._tcp.",
           port: 4242,
           registeredName: "Voice2Text Mac (2)",
           manualFallbackAvailable: false,
@@ -101,7 +101,7 @@ describe("U11 private companion native adapter", () => {
         companionDiscovery: {
           schemaVersion: 1,
           state: "stopped",
-          serviceType: "_voice2text-media._tcp.",
+          serviceType: "_voice2text-audio._tcp.",
           port: null,
           registeredName: null,
           manualFallbackAvailable: true,
@@ -166,7 +166,7 @@ describe("U11 private companion native adapter", () => {
         companionDiscovery: {
           schemaVersion: 1,
           state: "registered",
-          serviceType: "_voice2text-media._tcp.",
+          serviceType: "_voice2text-audio._tcp.",
           port: null,
           registeredName: null,
           manualFallbackAvailable: true,
@@ -203,7 +203,7 @@ describe("U11 private companion native adapter", () => {
           companionDiscovery: {
             schemaVersion: 1,
             state: "stopped",
-            serviceType: "_voice2text-media._tcp.",
+            serviceType: "_voice2text-audio._tcp.",
             port: null,
             registeredName: null,
             manualFallbackAvailable: true,

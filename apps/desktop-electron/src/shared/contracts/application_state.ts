@@ -20,6 +20,7 @@ const profileStateSchema = z.discriminatedUnion("phase", [
       phase: z.literal("blocked"),
       code: z.enum([
         "filesystem_unavailable",
+        "legacy_archive_failed",
         "insufficient_space",
         "path_escape",
         "schema_invalid",
@@ -36,7 +37,7 @@ const libraryStateSchema = z.discriminatedUnion("phase", [
   z
     .object({
       phase: z.literal("ready"),
-      meetingCount: z.number().int().nonnegative(),
+      audioCount: z.number().int().nonnegative(),
     })
     .strict(),
   z

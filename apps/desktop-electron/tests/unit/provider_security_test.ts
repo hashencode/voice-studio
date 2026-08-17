@@ -4,12 +4,12 @@ import {
   AiProviderFailure,
   BoundedOpenAiClient,
   parseRemoteAiEndpoint,
-} from "../../src/main/domain/meeting-intelligence/provider_security";
+} from "../../src/main/domain/audio-intelligence/provider_security";
 import {
-  decodeMeetingAiOutput,
-  type MeetingAiInputSegment,
-} from "../../src/main/domain/meeting-intelligence/provider_output";
-import { AiProviderRegistry } from "../../src/main/domain/meeting-intelligence/provider_registry";
+  decodeAudioAiOutput,
+  type AudioAiInputSegment,
+} from "../../src/main/domain/audio-intelligence/provider_output";
+import { AiProviderRegistry } from "../../src/main/domain/audio-intelligence/provider_registry";
 
 describe("U10 provider security", () => {
   it.each([
@@ -111,15 +111,15 @@ describe("U10 provider security", () => {
   });
 
   it("validates the strict schema and every evidence reference", () => {
-    const segments: MeetingAiInputSegment[] = [
+    const segments: AudioAiInputSegment[] = [
       { id: 41, startMs: 1_000, endMs: 2_500, text: "下周一发布。" },
     ];
     expect(
-      decodeMeetingAiOutput(
+      decodeAudioAiOutput(
         JSON.stringify({
-          schema_version: "meeting_intelligence_output/v1",
+          schema_version: "audio_intelligence_output/v1",
           suggested_title: null,
-          meeting_type: null,
+          audio_type: null,
           items: [
             {
               kind: "decision",
@@ -135,11 +135,11 @@ describe("U10 provider security", () => {
     ).toHaveLength(1);
 
     expect(() =>
-      decodeMeetingAiOutput(
+      decodeAudioAiOutput(
         JSON.stringify({
-          schema_version: "meeting_intelligence_output/v1",
+          schema_version: "audio_intelligence_output/v1",
           suggested_title: null,
-          meeting_type: null,
+          audio_type: null,
           items: [
             {
               kind: "decision",
@@ -155,11 +155,11 @@ describe("U10 provider security", () => {
     ).toThrowError(expect.objectContaining({ code: "AI_EVIDENCE_INVALID" }));
 
     expect(() =>
-      decodeMeetingAiOutput(
+      decodeAudioAiOutput(
         JSON.stringify({
-          schema_version: "meeting_intelligence_output/v1",
+          schema_version: "audio_intelligence_output/v1",
           suggested_title: null,
-          meeting_type: null,
+          audio_type: null,
           items: [
             {
               kind: "decision",
@@ -180,9 +180,9 @@ describe("U10 provider security", () => {
       throw new AiProviderFailure("AI_PROVIDER_FAILED", "failed");
     });
     const fallback = vi.fn(async () => ({
-      schemaVersion: "meeting_intelligence_output/v1" as const,
+      schemaVersion: "audio_intelligence_output/v1" as const,
       suggestedTitle: null,
-      meetingType: null,
+      audioType: null,
       items: [],
     }));
     const registry = new AiProviderRegistry([

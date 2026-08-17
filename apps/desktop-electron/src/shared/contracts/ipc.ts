@@ -7,14 +7,14 @@ import {
   sha256Schema,
 } from "./import_processing";
 import type {
-  ExportMeetingResponse,
-  MeetingExportFormat,
-  MeetingPlaybackSnapshot,
-  MeetingSegment,
-  MeetingSummary,
-  MeetingWorkspaceSnapshot,
+  ExportAudioResponse,
+  AudioExportFormat,
+  AudioPlaybackSnapshot,
+  AudioSegment,
+  AudioSummary,
+  AudioWorkspaceSnapshot,
   PlaybackAction,
-} from "./meeting_workspace";
+} from "./audio_workspace";
 import type { CapturePreflight, CaptureSnapshot } from "./capture";
 import type {
   CaptionFormalRetryRequest,
@@ -23,11 +23,11 @@ import type {
 } from "./captions";
 import type {
   AiSettingsSnapshot,
-  GenerateMeetingAiRequest,
-  MeetingAiConsentPreview,
-  MeetingAiSnapshot,
-  RetryMeetingAiRequest,
-} from "./meeting_ai";
+  GenerateAudioAiRequest,
+  AudioAiConsentPreview,
+  AudioAiSnapshot,
+  RetryAudioAiRequest,
+} from "./audio_ai";
 import type {
   CompanionOptInRequest,
   CompanionPairingInviteRequest,
@@ -37,7 +37,7 @@ import type {
   CompanionTransferRetryRequest,
 } from "./companion";
 
-export const desktopProtocolVersion = 1 as const;
+export const desktopProtocolVersion = 2 as const;
 export const desktopWorkerHealthProtocol =
   "desktop-sherpa-worker-health/v1" as const;
 
@@ -50,19 +50,19 @@ export const ipcChannels = {
   cancelProcessing: "desktop.processing.cancel.v1",
   retryProcessing: "desktop.processing.retry.v1",
   processingTasks: "desktop.processing.tasks.v1",
-  importMeeting: "desktop.importing.choose-and-import.v1",
+  importAudio: "desktop.importing.choose-and-import-audio.v2",
   operationEvent: "desktop.processing.event.v1",
-  meetingList: "desktop.meetings.list.v1",
-  meetingOpen: "desktop.meetings.open.v1",
-  meetingSearch: "desktop.meetings.search.v1",
-  meetingEditSegment: "desktop.meetings.edit-segment.v1",
-  meetingUndo: "desktop.meetings.undo.v1",
-  meetingRedo: "desktop.meetings.redo.v1",
-  meetingRenameSpeaker: "desktop.meetings.rename-speaker.v1",
-  meetingMergeSpeakers: "desktop.meetings.merge-speakers.v1",
-  meetingAssignSpeaker: "desktop.meetings.assign-speaker.v1",
-  meetingPlayback: "desktop.meetings.playback.v1",
-  meetingExport: "desktop.meetings.export.v1",
+  audioList: "desktop.audio.list.v2",
+  audioOpen: "desktop.audio.open.v2",
+  audioSearch: "desktop.audio.search.v2",
+  audioEditSegment: "desktop.audio.edit-segment.v2",
+  audioUndo: "desktop.audio.undo.v2",
+  audioRedo: "desktop.audio.redo.v2",
+  audioRenameSpeaker: "desktop.audio.rename-speaker.v2",
+  audioMergeSpeakers: "desktop.audio.merge-speakers.v2",
+  audioAssignSpeaker: "desktop.audio.assign-speaker.v2",
+  audioPlayback: "desktop.audio.playback.v2",
+  audioExport: "desktop.audio.export.v2",
   capturePreflight: "desktop.capture.preflight.v1",
   captureStart: "desktop.capture.start.v1",
   captureControl: "desktop.capture.control.v1",
@@ -75,11 +75,11 @@ export const ipcChannels = {
   aiSettingsSave: "desktop.ai.settings.save.v1",
   aiSecretReplace: "desktop.ai.secret.replace.v1",
   aiSecretDelete: "desktop.ai.secret.delete.v1",
-  meetingAiPrepare: "desktop.ai.meeting.prepare.v1",
-  meetingAiSnapshotGet: "desktop.ai.meeting.snapshot.get.v1",
-  meetingAiGenerate: "desktop.ai.meeting.generate.v1",
-  meetingAiRetry: "desktop.ai.meeting.retry.v1",
-  meetingAiSnapshotEvent: "desktop.ai.meeting.snapshot.v1",
+  audioAiPrepare: "desktop.ai.audio.prepare.v2",
+  audioAiSnapshotGet: "desktop.ai.audio.snapshot.get.v2",
+  audioAiGenerate: "desktop.ai.audio.generate.v2",
+  audioAiRetry: "desktop.ai.audio.retry.v2",
+  audioAiSnapshotEvent: "desktop.ai.audio.snapshot.v2",
   companionSnapshotGet: "desktop.companion.snapshot.get.v1",
   companionOptInSet: "desktop.companion.opt-in.set.v1",
   companionPairingInviteCreate: "desktop.companion.pairing-invite.create.v1",
@@ -142,9 +142,9 @@ export const processingTasksResponseSchema = z
   })
   .strict();
 
-export const importMeetingRequestSchema = z.object({}).strict();
+export const importAudioRequestSchema = z.object({}).strict();
 
-export const importMeetingResponseSchema = z.union([
+export const importAudioResponseSchema = z.union([
   z
     .object({
       protocolVersion: z.literal(desktopProtocolVersion),
@@ -163,7 +163,7 @@ export const importMeetingResponseSchema = z.union([
         "completed",
         "failed",
       ]),
-      meetingId: z.number().int().positive(),
+      audioId: z.number().int().positive(),
       jobId: z.number().int().positive(),
       mediaSha256: sha256Schema,
       inserted: z.boolean(),
@@ -214,7 +214,7 @@ export type ProcessingTaskDelta = z.infer<typeof processingTaskDeltaSchema>;
 export type RetryProcessingResponse = z.infer<
   typeof retryProcessingResponseSchema
 >;
-export type ImportMeetingResponse = z.infer<typeof importMeetingResponseSchema>;
+export type ImportAudioResponse = z.infer<typeof importAudioResponseSchema>;
 export type DesktopError = z.infer<typeof desktopErrorSchema>;
 
 export interface Voice2TextDesktopApi {
@@ -248,21 +248,17 @@ export interface Voice2TextDesktopApi {
   deleteAiProviderSecret(options: {
     providerId: "deepseek" | "openai-compatible";
   }): Promise<AiSettingsSnapshot>;
-  prepareMeetingAi(options: {
-    meetingId: number;
+  prepareAudioAi(options: {
+    audioId: number;
     generationId: number;
     templateId: string;
-  }): Promise<MeetingAiConsentPreview>;
-  getMeetingAiSnapshot(options: {
-    meetingId: number;
-  }): Promise<MeetingAiSnapshot | null>;
-  generateMeetingAi(
-    options: GenerateMeetingAiRequest,
-  ): Promise<MeetingAiSnapshot>;
-  retryMeetingAi(options: RetryMeetingAiRequest): Promise<MeetingAiSnapshot>;
-  onMeetingAiSnapshot(
-    listener: (snapshot: MeetingAiSnapshot) => void,
-  ): () => void;
+  }): Promise<AudioAiConsentPreview>;
+  getAudioAiSnapshot(options: {
+    audioId: number;
+  }): Promise<AudioAiSnapshot | null>;
+  generateAudioAi(options: GenerateAudioAiRequest): Promise<AudioAiSnapshot>;
+  retryAudioAi(options: RetryAudioAiRequest): Promise<AudioAiSnapshot>;
+  onAudioAiSnapshot(listener: (snapshot: AudioAiSnapshot) => void): () => void;
   getApplicationSnapshot(): Promise<
     import("./application_state").ApplicationSnapshot
   >;
@@ -286,66 +282,66 @@ export interface Voice2TextDesktopApi {
   listProcessingTasks(): Promise<
     import("./import_processing").ProcessingTask[]
   >;
-  importMeeting(): Promise<ImportMeetingResponse>;
+  importAudio(): Promise<ImportAudioResponse>;
   onOperationEvent(listener: (event: OperationEvent) => void): () => void;
-  listMeetings(
+  listAudios(
     query?: string,
     limit?: number,
     offset?: number,
-  ): Promise<MeetingSummary[]>;
-  openMeeting(meetingId: number): Promise<MeetingWorkspaceSnapshot | null>;
+  ): Promise<AudioSummary[]>;
+  openAudio(audioId: number): Promise<AudioWorkspaceSnapshot | null>;
   searchTranscript(
-    meetingId: number,
+    audioId: number,
     query: string,
     limit?: number,
-  ): Promise<MeetingSegment[]>;
-  editMeetingSegment(command: {
-    meetingId: number;
+  ): Promise<AudioSegment[]>;
+  editAudioSegment(command: {
+    audioId: number;
     generationId: number;
     segmentId: number;
     text: string;
     expectedRevision: number;
-  }): Promise<MeetingWorkspaceSnapshot>;
-  undoMeetingEdit(
-    meetingId: number,
+  }): Promise<AudioWorkspaceSnapshot>;
+  undoAudioEdit(
+    audioId: number,
     generationId: number,
     expectedRevision: number,
-  ): Promise<MeetingWorkspaceSnapshot>;
-  redoMeetingEdit(
-    meetingId: number,
+  ): Promise<AudioWorkspaceSnapshot>;
+  redoAudioEdit(
+    audioId: number,
     generationId: number,
     expectedRevision: number,
-  ): Promise<MeetingWorkspaceSnapshot>;
-  renameMeetingSpeaker(command: {
-    meetingId: number;
+  ): Promise<AudioWorkspaceSnapshot>;
+  renameAudioSpeaker(command: {
+    audioId: number;
     generationId: number;
     speakerId: number;
     name: string;
     expectedRevision: number;
-  }): Promise<MeetingWorkspaceSnapshot>;
-  mergeMeetingSpeakers(command: {
-    meetingId: number;
+  }): Promise<AudioWorkspaceSnapshot>;
+  mergeAudioSpeakers(command: {
+    audioId: number;
     generationId: number;
     targetSpeakerId: number;
     sourceSpeakerIds: number[];
     expectedRevision: number;
-  }): Promise<MeetingWorkspaceSnapshot>;
-  assignMeetingSpeaker(command: {
-    meetingId: number;
+  }): Promise<AudioWorkspaceSnapshot>;
+  assignAudioSpeaker(command: {
+    audioId: number;
     generationId: number;
     segmentId: number;
     state: "assigned" | "overlap" | "unknown";
     speakerId: number | null;
     expectedRevision: number;
-  }): Promise<MeetingWorkspaceSnapshot>;
-  controlMeetingPlayback(
-    meetingId: number,
+  }): Promise<AudioWorkspaceSnapshot>;
+  controlAudioPlayback(
+    audioId: number,
     command: PlaybackAction,
-  ): Promise<MeetingPlaybackSnapshot>;
-  exportMeeting(
-    meetingId: number,
-    format: MeetingExportFormat,
-  ): Promise<ExportMeetingResponse>;
+  ): Promise<AudioPlaybackSnapshot>;
+  exportAudio(
+    audioId: number,
+    format: AudioExportFormat,
+  ): Promise<ExportAudioResponse>;
   preflightCapture(options: {
     requestPermissions: boolean;
     captionEnabled: boolean;

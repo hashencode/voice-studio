@@ -193,6 +193,6 @@ class CompanionPlatformPlugin(
 
     companion object {
         const val CHANNEL = "voice2text/companion"
-        private const val SERVICE_TYPE = "_voice2text-media._tcp."
+        private const val SERVICE_TYPE = "_voice2text-audio._tcp."
     }
 }

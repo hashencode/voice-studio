@@ -8,7 +8,7 @@ import {
 
 const intent: ExecutionIntent = {
   jobId: 1,
-  meetingId: 2,
+  audioId: 2,
   operationId: "asr",
   attempt: 3,
   sourceIdentity: "worker-process-9",

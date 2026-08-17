@@ -8,7 +8,7 @@ import { readFileSync } from "node:fs";
 
 import { CompanionReceiver } from "../../src/main/domain/companion/companion_receiver";
 import { companionFingerprint } from "../../src/main/domain/companion/companion_crypto";
-import { openElectronDatabase } from "../../src/main/storage/database";
+import { openAudioDatabase } from "../../src/main/storage/audio_database";
 import { TransferRepository } from "../../src/main/storage/repositories/transfer_repository";
 
 const [transferRoot] = process.argv.slice(2);
@@ -30,7 +30,7 @@ const identityPublicKey = Buffer.from(
 );
 const identityFingerprint = companionFingerprint(identityPublicKey);
 
-const database = openElectronDatabase(":memory:");
+const database = openAudioDatabase(":memory:");
 const repository = new TransferRepository(database);
 repository.pairPeer({
   deviceId: "mobile-interop-1",
@@ -106,7 +106,7 @@ const receiver = new CompanionReceiver({
         identityPrivateKey,
       ).toString("base64");
       repository.recordCommittedReceipt(manifest, receipt, {
-        meetingId: 1,
+        audioId: 1,
         processingJobId: 5,
         recordingId: 99,
         sourceSha256: manifest.wholeFileSha256,
@@ -125,12 +125,12 @@ function seedImport(sourceSha256: string, sizeBytes: number): void {
       id, content_sha256, normalized_path, source_sha256, size_bytes,
       duration_ms, receipt_json, created_at_ms
     ) VALUES (99, '${"d".repeat(64)}', '/private/tmp/interop.wav', '${sourceSha256}', ${sizeBytes}, 1000, '{}', 1);
-    INSERT INTO meetings (
+    INSERT INTO audio_items (
       id, idempotency_key, source_identity, display_name, media_path,
       duration_ms, media_authority_id, created_at_ms, updated_at_ms
-    ) VALUES (1, 'interop-meeting', 'interop-source', 'Interop', '/private/tmp/interop.wav', 1000, 99, 1, 1);
+    ) VALUES (1, 'interop-audio', 'interop-source', 'Interop', '/private/tmp/interop.wav', 1000, 99, 1, 1);
     INSERT INTO processing_jobs (
-      id, meeting_id, idempotency_key, operation_id, resource_identity,
+      id, audio_id, idempotency_key, operation_id, resource_identity,
       state, attempt, created_at_ms, updated_at_ms
     ) VALUES (5, 1, 'interop-processing', 'asr', 'interop-resource', 'queued', 0, 1, 1);
   `);

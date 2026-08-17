@@ -1,7 +1,7 @@
 import { lstatSync, realpathSync } from "node:fs";
 import { dirname, isAbsolute, join, relative, resolve } from "node:path";
 
-export interface ElectronProfilePaths {
+export interface AudioProfilePaths {
   root: string;
   databaseDirectory: string;
   databasePath: string;
@@ -16,33 +16,31 @@ export interface ElectronProfilePaths {
   requiredDirectories: readonly string[];
 }
 
-export class ElectronProfileError extends Error {
+export class AudioProfileError extends Error {
   constructor(message: string) {
     super(message);
-    this.name = "ElectronProfileError";
+    this.name = "AudioProfileError";
   }
 }
 
 export function profilePathsForApplicationData(
   applicationDataRoot: string,
-): ElectronProfilePaths {
+): AudioProfilePaths {
   if (applicationDataRoot.trim().length === 0) {
-    throw new ElectronProfileError("Electron application-data root is empty");
+    throw new AudioProfileError("Electron application-data root is empty");
   }
   return profilePathsForRoot(
-    join(resolve(applicationDataRoot), "voice2text-electron", "v1"),
+    join(resolve(applicationDataRoot), "voice2text-electron", "v2"),
   );
 }
 
-export function profilePathsForRoot(rootPath: string): ElectronProfilePaths {
+export function profilePathsForRoot(rootPath: string): AudioProfilePaths {
   const profile = profilePathsWithoutValidation(rootPath);
-  assertElectronProfilePaths(profile);
+  assertAudioProfilePaths(profile);
   return profile;
 }
 
-export function assertElectronProfilePaths(
-  profile: ElectronProfilePaths,
-): void {
+export function assertAudioProfilePaths(profile: AudioProfilePaths): void {
   const expected = profilePathsWithoutValidation(profile.root);
   for (const [label, actual, expectedPath] of [
     [
@@ -80,7 +78,7 @@ export function assertElectronProfilePaths(
       resolve(actual) !== expectedPath ||
       !isLexicallyInside(profile.root, actual)
     ) {
-      throw new ElectronProfileError(
+      throw new AudioProfileError(
         `Electron ${label} is outside the versioned profile`,
       );
     }
@@ -89,19 +87,19 @@ export function assertElectronProfilePaths(
 
 export function assertProfileTreeContained(
   applicationDataRoot: string,
-  profile: ElectronProfilePaths,
+  profile: AudioProfilePaths,
 ): void {
   const canonicalApplicationData = realpathSync(resolve(applicationDataRoot));
   for (const path of [profile.root, ...profile.requiredDirectories]) {
     if (!pathEntryExists(path)) continue;
     if (lstatSync(path).isSymbolicLink()) {
-      throw new ElectronProfileError(
+      throw new AudioProfileError(
         "Electron profile contains a symbolic-link path",
       );
     }
     const canonical = realpathSync(path);
     if (!isLexicallyInside(canonicalApplicationData, canonical)) {
-      throw new ElectronProfileError(
+      throw new AudioProfileError(
         "Electron profile escapes the application-data root",
       );
     }
@@ -109,18 +107,18 @@ export function assertProfileTreeContained(
 }
 
 export function assertProfileOwnedPath(
-  profile: ElectronProfilePaths,
+  profile: AudioProfilePaths,
   candidate: string,
 ): void {
   if (!isLexicallyInside(profile.root, candidate)) {
-    throw new ElectronProfileError("Path is outside the Electron profile");
+    throw new AudioProfileError("Path is outside the Electron profile");
   }
   let existing = resolve(candidate);
   while (!pathEntryExists(existing) && existing !== dirname(existing)) {
     existing = dirname(existing);
   }
   if (lstatSync(existing).isSymbolicLink()) {
-    throw new ElectronProfileError("Electron profile path is a symbolic link");
+    throw new AudioProfileError("Electron profile path is a symbolic link");
   }
   const canonicalRoot = realpathSync(profile.root);
   const canonicalExisting = realpathSync(existing);
@@ -128,7 +126,7 @@ export function assertProfileOwnedPath(
     canonicalExisting !== canonicalRoot &&
     !isLexicallyInside(canonicalRoot, canonicalExisting)
   ) {
-    throw new ElectronProfileError("Path escapes the Electron profile");
+    throw new AudioProfileError("Path escapes the Electron profile");
   }
 }
 
@@ -142,7 +140,7 @@ export function pathEntryExists(path: string): boolean {
   }
 }
 
-function profilePathsWithoutValidation(rootPath: string): ElectronProfilePaths {
+function profilePathsWithoutValidation(rootPath: string): AudioProfilePaths {
   const root = resolve(rootPath);
   const databaseDirectory = join(root, "database");
   const mediaDirectory = join(root, "media");
@@ -156,7 +154,7 @@ function profilePathsWithoutValidation(rootPath: string): ElectronProfilePaths {
   return {
     root,
     databaseDirectory,
-    databasePath: join(databaseDirectory, "meetings.sqlite3"),
+    databasePath: join(databaseDirectory, "audio.sqlite3"),
     mediaDirectory,
     workspaceDirectory,
     captureDirectory,
@@ -164,7 +162,7 @@ function profilePathsWithoutValidation(rootPath: string): ElectronProfilePaths {
     aiWorkspaceDirectory,
     transferDirectory,
     reconciliationDirectory,
-    readyMarkerPath: join(root, ".profile-ready.json"),
+    readyMarkerPath: join(root, ".audio-profile-ready.json"),
     requiredDirectories: [
       databaseDirectory,
       mediaDirectory,

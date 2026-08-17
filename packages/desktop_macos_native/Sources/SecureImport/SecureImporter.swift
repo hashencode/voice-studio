@@ -200,7 +200,7 @@ public final class SecureImporter: @unchecked Sendable {
       throw SecureImportFailure("IMPORT_MEDIA_CORRUPT", "媒体没有可处理的音频内容")
     }
     guard wave.durationMs <= request.maxDurationMs else {
-      throw SecureImportFailure("IMPORT_SOURCE_DURATION_INVALID", "会议时长超过本地处理上限")
+      throw SecureImportFailure("IMPORT_SOURCE_DURATION_INVALID", "音频时长超过本地处理上限")
     }
     let normalized = try hashFileStreaming(
       descriptor: pcmStagingFD,
@@ -424,7 +424,7 @@ public func discardSecureImportedFile(path: String, destinationRoot: String) thr
 }
 
 private func validate(_ request: SecureImportRequest) throws {
-  let idPattern = try! NSRegularExpression(pattern: #"^meeting-[a-zA-Z0-9-]{12,120}$"#)
+  let idPattern = try! NSRegularExpression(pattern: #"^audio-[a-zA-Z0-9-]{12,120}$"#)
   let idRange = NSRange(request.destinationId.startIndex..., in: request.destinationId)
   guard !request.sourcePath.isEmpty, !request.destinationRoot.isEmpty,
     request.sourcePath.utf8.count <= SecureImportLimits.maximumPathBytes,

@@ -13,10 +13,10 @@ import {
   generateCompanionX25519KeyPair,
 } from "../../src/main/domain/companion/companion_crypto";
 import { CompanionReceiver } from "../../src/main/domain/companion/companion_receiver";
-import { openElectronDatabase } from "../../src/main/storage/database";
+import { openAudioDatabase } from "../../src/main/storage/audio_database";
 import { TransferRepository } from "../../src/main/storage/repositories/transfer_repository";
 
-const database = openElectronDatabase(":memory:");
+const database = openAudioDatabase(":memory:");
 const repository = new TransferRepository(database);
 const identitySeed = Buffer.alloc(32, 0x6d);
 const identityPrivateKey = createPrivateKey({

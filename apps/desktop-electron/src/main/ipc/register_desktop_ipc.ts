@@ -42,10 +42,10 @@ export function registerDesktopIpc(
     ipcChannels.aiSettingsSave,
     ipcChannels.aiSecretReplace,
     ipcChannels.aiSecretDelete,
-    ipcChannels.meetingAiPrepare,
-    ipcChannels.meetingAiSnapshotGet,
-    ipcChannels.meetingAiGenerate,
-    ipcChannels.meetingAiRetry,
+    ipcChannels.audioAiPrepare,
+    ipcChannels.audioAiSnapshotGet,
+    ipcChannels.audioAiGenerate,
+    ipcChannels.audioAiRetry,
     ipcChannels.applicationSnapshot,
     ipcChannels.applicationNavigate,
     ipcChannels.applicationBootstrapAction,
@@ -53,7 +53,7 @@ export function registerDesktopIpc(
     ipcChannels.cancelProcessing,
     ipcChannels.retryProcessing,
     ipcChannels.processingTasks,
-    ipcChannels.importMeeting,
+    ipcChannels.importAudio,
     ipcChannels.capturePreflight,
     ipcChannels.captureStart,
     ipcChannels.captureControl,
@@ -61,17 +61,17 @@ export function registerDesktopIpc(
     ipcChannels.captureRecoveryAction,
     ipcChannels.captionSnapshotGet,
     ipcChannels.captionFormalRetry,
-    ipcChannels.meetingList,
-    ipcChannels.meetingOpen,
-    ipcChannels.meetingSearch,
-    ipcChannels.meetingEditSegment,
-    ipcChannels.meetingUndo,
-    ipcChannels.meetingRedo,
-    ipcChannels.meetingRenameSpeaker,
-    ipcChannels.meetingMergeSpeakers,
-    ipcChannels.meetingAssignSpeaker,
-    ipcChannels.meetingPlayback,
-    ipcChannels.meetingExport,
+    ipcChannels.audioList,
+    ipcChannels.audioOpen,
+    ipcChannels.audioSearch,
+    ipcChannels.audioEditSegment,
+    ipcChannels.audioUndo,
+    ipcChannels.audioRedo,
+    ipcChannels.audioRenameSpeaker,
+    ipcChannels.audioMergeSpeakers,
+    ipcChannels.audioAssignSpeaker,
+    ipcChannels.audioPlayback,
+    ipcChannels.audioExport,
   ] as const;
   for (const channel of channels) {
     ipcMain.handle(channel, async (event, payload: unknown) => {
@@ -97,9 +97,9 @@ export function registerDesktopIpc(
       window.webContents.send(ipcChannels.captionSnapshotEvent, snapshot);
     }
   });
-  const unsubscribeMeetingAi = services.onMeetingAiSnapshot?.((snapshot) => {
+  const unsubscribeAudioAi = services.onAudioAiSnapshot?.((snapshot) => {
     if (!window.isDestroyed()) {
-      window.webContents.send(ipcChannels.meetingAiSnapshotEvent, snapshot);
+      window.webContents.send(ipcChannels.audioAiSnapshotEvent, snapshot);
     }
   });
   const unsubscribeCompanion = services.onCompanionSnapshot?.((snapshot) => {
@@ -111,7 +111,7 @@ export function registerDesktopIpc(
     unsubscribeSnapshot?.();
     unsubscribeOperation?.();
     unsubscribeCaption?.();
-    unsubscribeMeetingAi?.();
+    unsubscribeAudioAi?.();
     unsubscribeCompanion?.();
     for (const channel of channels) ipcMain.removeHandler(channel);
   };

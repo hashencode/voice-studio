@@ -8,7 +8,7 @@ import {
   cancelProcessingRequestSchema,
   desktopErrorSchema,
   desktopProtocolVersion,
-  importMeetingResponseSchema,
+  importAudioResponseSchema,
   ipcChannels,
   operationEventSchema,
   workerHealthRequestSchema,
@@ -21,7 +21,7 @@ describe("shared IPC contracts", () => {
       workerHealthRequestSchema.parse({
         expectedProtocolVersion: desktopProtocolVersion,
       }),
-    ).toEqual({ expectedProtocolVersion: 1 });
+    ).toEqual({ expectedProtocolVersion: 2 });
     expect(() =>
       cancelProcessingRequestSchema.parse({
         jobId: 7,
@@ -29,10 +29,10 @@ describe("shared IPC contracts", () => {
       }),
     ).toThrow();
     expect(
-      importMeetingResponseSchema.parse({
-        protocolVersion: 1,
+      importAudioResponseSchema.parse({
+        protocolVersion: 2,
         state: "failed",
-        meetingId: 3,
+        audioId: 3,
         jobId: 7,
         mediaSha256: "a".repeat(64),
         inserted: false,
@@ -40,10 +40,10 @@ describe("shared IPC contracts", () => {
       }),
     ).toEqual(expect.objectContaining({ state: "failed", inserted: false }));
     expect(() =>
-      importMeetingResponseSchema.parse({
-        protocolVersion: 1,
+      importAudioResponseSchema.parse({
+        protocolVersion: 2,
         state: "queued",
-        meetingId: 3,
+        audioId: 3,
         jobId: 7,
         mediaSha256: "a".repeat(64),
         inserted: true,
@@ -53,7 +53,7 @@ describe("shared IPC contracts", () => {
     ).toThrow();
     expect(
       desktopErrorSchema.parse({
-        protocolVersion: 1,
+        protocolVersion: 2,
         code: "INVALID_PAYLOAD",
         message: "request rejected",
         retryable: false,
@@ -64,14 +64,14 @@ describe("shared IPC contracts", () => {
     ).toThrow();
     expect(() =>
       operationEventSchema.parse({
-        protocolVersion: 1,
+        protocolVersion: 2,
         jobId: 7,
         state: "running",
       }),
     ).toThrow();
     expect(
       operationEventSchema.parse({
-        protocolVersion: 1,
+        protocolVersion: 2,
         jobId: 7,
         attempt: 0,
         state: "running",
@@ -81,7 +81,7 @@ describe("shared IPC contracts", () => {
     );
     expect(() =>
       operationEventSchema.parse({
-        protocolVersion: 1,
+        protocolVersion: 2,
         jobId: 7,
         attempt: 2,
         state: "running",
@@ -100,12 +100,19 @@ describe("shared IPC contracts", () => {
   });
 
   it("maps fixed business methods and returns an unsubscribe per event listener", async () => {
+    expect(desktopProtocolVersion).toBe(2);
+    expect(Object.keys(ipcChannels).some((key) => /meeting/i.test(key))).toBe(
+      false,
+    );
+    expect(
+      Object.values(ipcChannels).some((channel) => /meeting/i.test(channel)),
+    ).toBe(false);
     const listeners = new Map<string, Set<(payload: unknown) => void>>();
     const bridge = {
       invoke: async (channel: string) => {
         expect(Object.values(ipcChannels)).toContain(channel);
         return {
-          protocolVersion: 1,
+          protocolVersion: 2,
           protocol: "desktop-sherpa-worker-health/v1",
           runtime: "sherpa-onnx",
           workerSha256: "a".repeat(64),
@@ -133,7 +140,7 @@ describe("shared IPC contracts", () => {
     expect(listeners.get(ipcChannels.operationEvent)?.size).toBe(2);
     for (const listener of listeners.get(ipcChannels.operationEvent) ?? []) {
       listener({
-        protocolVersion: 1,
+        protocolVersion: 2,
         jobId: 11,
         attempt: 1,
         state: "running",
@@ -147,7 +154,7 @@ describe("shared IPC contracts", () => {
     unsubscribeSecond();
     expect(listeners.get(ipcChannels.operationEvent)?.size).toBe(0);
     await expect(firstApi.workerHealth()).resolves.toEqual(
-      expect.objectContaining({ protocolVersion: 1 }),
+      expect.objectContaining({ protocolVersion: 2 }),
     );
   });
 });

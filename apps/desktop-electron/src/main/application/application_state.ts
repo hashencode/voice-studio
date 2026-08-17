@@ -5,7 +5,7 @@ import {
   type CaptureSnapshot,
   type ShellSection,
 } from "../../shared/contracts";
-import type { ElectronProfileInitializationResult } from "../profile/electron_profile";
+import type { AudioProfileInitializationResult } from "../profile/audio_profile";
 
 type SnapshotListener = (snapshot: ApplicationSnapshot) => void;
 
@@ -40,7 +40,7 @@ export class DesktopApplicationState {
   }
 
   completeBootstrap(
-    result: ElectronProfileInitializationResult,
+    result: AudioProfileInitializationResult,
   ): ApplicationSnapshot {
     if (result.status === "blocked") {
       return this.update({
@@ -83,18 +83,16 @@ export class DesktopApplicationState {
     });
   }
 
-  setLibraryCount(meetingCount: number): ApplicationSnapshot {
+  setLibraryCount(audioCount: number): ApplicationSnapshot {
     return this.update({
       library:
-        meetingCount === 0
-          ? { phase: "empty" }
-          : { phase: "ready", meetingCount },
+        audioCount === 0 ? { phase: "empty" } : { phase: "ready", audioCount },
     });
   }
 
   setCapture(
     capture: CaptureSnapshot | null,
-    title = "会议录制",
+    title = "音频录制",
   ): ApplicationSnapshot {
     if (!capture) return this.update({ capture: { phase: "idle" } });
     const phase = capture.state === "recoverable" ? "recovery" : capture.state;

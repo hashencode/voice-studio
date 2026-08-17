@@ -11,7 +11,7 @@ struct NativeSecurityTests {
     let store = ProviderSecretStore(backend: backend)
 
     #expect(try store.read(providerId: "deepseek") == .available("  secret-value  "))
-    #expect(backend.lastService == "com.voice2text.desktop.meeting-ai")
+    #expect(backend.lastService == "com.voice2text.desktop.audio-ai")
     #expect(backend.lastAccount == "provider.deepseek.api-key")
   }
 
@@ -144,12 +144,12 @@ struct NativeSecurityTests {
     #expect(receipt.state == .registered)
     #expect(receipt.manualFallbackAvailable == false)
     #expect(backend.lastAdvertisement?.domain == "local.")
-    #expect(backend.lastAdvertisement?.serviceType == "_voice2text-media._tcp.")
+    #expect(backend.lastAdvertisement?.serviceType == "_voice2text-audio._tcp.")
     #expect(backend.lastAdvertisement?.port == 4242)
     #expect(
       backend.lastAdvertisement?.txtRecord == [
-        "schema": "companion-media-transfer/v1",
-        "capability": "media-transfer/v1",
+        "schema": "companion-audio-transfer/v2",
+        "capability": "audio-transfer/v2",
         "deviceId": "desktop-01",
         "fingerprint": "ABCDEFGHIJKLMNOPQRSTUVWXYZ234567",
       ])

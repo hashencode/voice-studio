@@ -8,14 +8,14 @@ import {
   openDirectory,
   validateCaptureAuthority,
 } from "../capture/capture_authority";
-import type { ElectronProfilePaths } from "../../profile/profile_paths";
+import type { AudioProfilePaths } from "../../profile/profile_paths";
 import type { FormalCaptureMedia } from "./formal_transcript_handoff_service";
 
 const MAXIMUM_SPOOL_BYTES = 4 * 60 * 60 * 16_000 * 2;
 const PCM_FRAME_BYTES = 3_200;
 
 export async function prepareFormalCaptureMedia(options: {
-  profile: ElectronProfilePaths;
+  profile: AudioProfilePaths;
   sessionId: string;
   recordingSha256: string;
   journalSha256: string;
@@ -267,7 +267,7 @@ export async function prepareFormalCaptureMedia(options: {
 }
 
 export async function validateFormalMediaAuthority(
-  profile: ElectronProfilePaths,
+  profile: AudioProfilePaths,
   media: FormalCaptureMedia,
 ): Promise<void> {
   const root = await realpath(profile.mediaDirectory);

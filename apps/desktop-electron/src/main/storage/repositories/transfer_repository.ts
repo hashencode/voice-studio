@@ -8,7 +8,7 @@ import {
   type CompanionTransferManifest,
   type CompanionTransferReceipt,
 } from "../../../shared/contracts";
-import { withTransaction } from "../database";
+import { withTransaction } from "../audio_database";
 
 export class CompanionTransferFailure extends Error {
   constructor(
@@ -725,7 +725,7 @@ export class TransferRepository {
     input: CompanionTransferManifest,
     rawReceipt: CompanionTransferReceipt,
     authority: {
-      meetingId: number;
+      audioId: number;
       processingJobId: number;
       recordingId: number;
       sourceSha256: string;
@@ -769,15 +769,15 @@ export class TransferRepository {
       }
       const committedImport = this.database
         .prepare(
-          `SELECT m.id AS meeting_id, m.media_authority_id, j.id AS processing_job_id,
+          `SELECT m.id AS audio_id, m.media_authority_id, j.id AS processing_job_id,
              a.source_sha256
-           FROM meetings m
-           JOIN processing_jobs j ON j.meeting_id = m.id
+           FROM audio_items m
+           JOIN processing_jobs j ON j.audio_id = m.id
            JOIN media_authorities a ON a.id = m.media_authority_id
            WHERE m.id = ? AND j.id = ? AND a.id = ?`,
         )
         .get(
-          authority.meetingId,
+          authority.audioId,
           authority.processingJobId,
           authority.recordingId,
         );
@@ -792,7 +792,7 @@ export class TransferRepository {
       }
       this.database
         .prepare(
-          `UPDATE companion_transfers SET state = 'committed', recording_id = ?, meeting_id = ?,
+          `UPDATE companion_transfers SET state = 'committed', recording_id = ?, audio_id = ?,
            processing_job_id = ?,
            receipt_json = ?, sender_delete_allowed = 1, revision = revision + 1,
            staging_cleanup_state = 'pending', error_code = NULL,
@@ -801,7 +801,7 @@ export class TransferRepository {
         )
         .run(
           authority.recordingId,
-          authority.meetingId,
+          authority.audioId,
           authority.processingJobId,
           JSON.stringify(receipt),
           receipt.committedAtMs,

@@ -14,10 +14,10 @@ import { mkdtempSync } from "node:fs";
 import { afterEach, describe, expect, it } from "vitest";
 
 import {
-  initializeElectronProfile,
+  initializeAudioProfile,
   profilePathsForApplicationData,
-} from "../../src/main/profile/electron_profile";
-import { ELECTRON_SCHEMA_VERSION } from "../../src/main/storage/database";
+} from "../../src/main/profile/audio_profile";
+import { AUDIO_SCHEMA_VERSION } from "../../src/main/storage/audio_database";
 
 const temporaryRoots: string[] = [];
 
@@ -33,20 +33,20 @@ function temporaryRoot(): string {
   return root;
 }
 
-function requireReady(result: ReturnType<typeof initializeElectronProfile>) {
+function requireReady(result: ReturnType<typeof initializeAudioProfile>) {
   expect(result.status).toBe("ready");
   if (result.status !== "ready") throw new Error(result.message);
   return result;
 }
 
 describe("Electron-only profile initialization", () => {
-  it("atomically publishes ready only after every required v1 asset exists", () => {
+  it("atomically publishes ready only after every required v2 asset exists", () => {
     const applicationDataRoot = temporaryRoot();
-    const result = requireReady(initializeElectronProfile(applicationDataRoot));
+    const result = requireReady(initializeAudioProfile(applicationDataRoot));
 
     try {
       expect(result.profile.root).toBe(
-        join(applicationDataRoot, "voice2text-electron", "v1"),
+        join(applicationDataRoot, "voice2text-electron", "v2"),
       );
       for (const directory of result.profile.requiredDirectories) {
         expect(existsSync(directory)).toBe(true);
@@ -58,7 +58,7 @@ describe("Electron-only profile initialization", () => {
       ).toEqual(
         expect.objectContaining({
           schema: "voice2text-electron-profile-ready/v1",
-          databaseSchemaVersion: ELECTRON_SCHEMA_VERSION,
+          databaseSchemaVersion: AUDIO_SCHEMA_VERSION,
           status: "ready",
         }),
       );
@@ -74,7 +74,7 @@ describe("Electron-only profile initialization", () => {
     const preserved = join(profile.mediaDirectory, "preserved.wav");
     writeFileSync(preserved, "electron-owned-media");
 
-    const result = requireReady(initializeElectronProfile(applicationDataRoot));
+    const result = requireReady(initializeAudioProfile(applicationDataRoot));
     try {
       expect(readFileSync(preserved, "utf8")).toBe("electron-owned-media");
       expect(existsSync(result.profile.readyMarkerPath)).toBe(true);
@@ -85,7 +85,7 @@ describe("Electron-only profile initialization", () => {
 
   it("keeps disk-full and path-permission failures blocked and retryable", () => {
     const diskRoot = temporaryRoot();
-    const blocked = initializeElectronProfile(diskRoot, {
+    const blocked = initializeAudioProfile(diskRoot, {
       minimumFreeBytes: 1024n,
       freeSpaceProbe: () => 1023n,
     });
@@ -101,7 +101,7 @@ describe("Electron-only profile initialization", () => {
     ).toBe(false);
 
     const retried = requireReady(
-      initializeElectronProfile(diskRoot, {
+      initializeAudioProfile(diskRoot, {
         minimumFreeBytes: 1024n,
         freeSpaceProbe: () => 2048n,
       }),
@@ -113,7 +113,7 @@ describe("Electron-only profile initialization", () => {
       join(collisionRoot, "voice2text-electron"),
       "not-a-directory",
     );
-    const collision = initializeElectronProfile(collisionRoot);
+    const collision = initializeAudioProfile(collisionRoot);
     expect(collision).toEqual(
       expect.objectContaining({
         status: "blocked",
@@ -128,10 +128,10 @@ describe("Electron-only profile initialization", () => {
     const migrationProfile = profilePathsForApplicationData(migrationRoot);
     mkdirSync(migrationProfile.databaseDirectory, { recursive: true });
     const incomplete = new DatabaseSync(migrationProfile.databasePath);
-    incomplete.exec("CREATE TABLE meetings (id INTEGER PRIMARY KEY)");
+    incomplete.exec("CREATE TABLE audio_items (id INTEGER PRIMARY KEY)");
     incomplete.close();
 
-    const interrupted = initializeElectronProfile(migrationRoot);
+    const interrupted = initializeAudioProfile(migrationRoot);
     expect(interrupted).toEqual(
       expect.objectContaining({
         status: "blocked",
@@ -145,7 +145,7 @@ describe("Electron-only profile initialization", () => {
     const corruptProfile = profilePathsForApplicationData(corruptRoot);
     mkdirSync(corruptProfile.databaseDirectory, { recursive: true });
     writeFileSync(corruptProfile.databasePath, "not sqlite");
-    const corrupt = initializeElectronProfile(corruptRoot);
+    const corrupt = initializeAudioProfile(corruptRoot);
     expect(corrupt).toEqual(
       expect.objectContaining({
         status: "blocked",
@@ -161,16 +161,16 @@ describe("Electron-only profile initialization", () => {
     const external = temporaryRoot();
     const container = join(applicationDataRoot, "voice2text-electron");
     mkdirSync(container);
-    symlinkSync(external, join(container, "v1"), "dir");
+    symlinkSync(external, join(container, "v2"), "dir");
 
-    expect(initializeElectronProfile(applicationDataRoot)).toEqual(
+    expect(initializeAudioProfile(applicationDataRoot)).toEqual(
       expect.objectContaining({
         status: "blocked",
         code: "path_escape",
         repairable: true,
       }),
     );
-    expect(existsSync(join(external, ".profile-ready.json"))).toBe(false);
+    expect(existsSync(join(external, ".audio-profile-ready.json"))).toBe(false);
   });
 
   it("rejects a database symlink before it can mutate an external target", () => {
@@ -181,7 +181,7 @@ describe("Electron-only profile initialization", () => {
     const externalDatabase = join(external, "outside.sqlite3");
     symlinkSync(externalDatabase, profile.databasePath, "file");
 
-    expect(initializeElectronProfile(applicationDataRoot)).toEqual(
+    expect(initializeAudioProfile(applicationDataRoot)).toEqual(
       expect.objectContaining({
         status: "blocked",
         code: "path_escape",
@@ -198,7 +198,7 @@ describe("Electron-only profile initialization", () => {
     const poison = join(flutterRoot, "profile.lock");
     writeFileSync(poison, "flutter-profile-must-stay-untouched");
 
-    const result = requireReady(initializeElectronProfile(applicationDataRoot));
+    const result = requireReady(initializeAudioProfile(applicationDataRoot));
     result.database.close();
 
     expect(readFileSync(poison, "utf8")).toBe(

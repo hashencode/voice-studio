@@ -11,5 +11,7 @@ void main() {
 
     expect(source, contains('capability != "audio-transfer/v2"'));
     expect(source, isNot(contains('capability != "media-transfer/v1"')));
+    expect(source, contains('SERVICE_TYPE = "_voice2text-audio._tcp."'));
+    expect(source, isNot(contains('_voice2text-media._tcp.')));
   });
 }

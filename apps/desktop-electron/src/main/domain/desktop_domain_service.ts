@@ -1,7 +1,7 @@
 import type {
   ExecutionIntent,
   IdempotentResult,
-  MeetingRecord,
+  AudioRecord,
   ProcessingPhase,
   ProcessingJobRecord,
   PublicationRecord,
@@ -39,25 +39,25 @@ export class DesktopDomainService {
     private readonly now: () => number = Date.now,
   ) {}
 
-  createMeeting(command: {
+  createAudio(command: {
     idempotencyKey: string;
     sourceIdentity: string;
     displayName: string;
     mediaPath: string;
     durationMs: number;
-  }): IdempotentResult<MeetingRecord> {
-    requireText(command.idempotencyKey, "meeting idempotency key");
-    requireText(command.sourceIdentity, "meeting source identity");
-    requireText(command.displayName, "meeting display name");
-    requireText(command.mediaPath, "meeting media path");
+  }): IdempotentResult<AudioRecord> {
+    requireText(command.idempotencyKey, "audio idempotency key");
+    requireText(command.sourceIdentity, "audio source identity");
+    requireText(command.displayName, "audio display name");
+    requireText(command.mediaPath, "audio media path");
     if (!Number.isSafeInteger(command.durationMs) || command.durationMs < 0) {
-      throw new DomainValidationError("Meeting duration is invalid");
+      throw new DomainValidationError("Audio duration is invalid");
     }
-    return this.repository.createMeeting(command, this.now());
+    return this.repository.createAudio(command, this.now());
   }
 
   enqueueProcessingJob(command: {
-    meetingId: number;
+    audioId: number;
     idempotencyKey: string;
     operationId: string;
     resourceIdentity: string;
@@ -67,7 +67,7 @@ export class DesktopDomainService {
     modelSha256?: string;
     runtimeSha256?: string;
   }): IdempotentResult<ProcessingJobRecord> {
-    requirePositiveInteger(command.meetingId, "meeting id");
+    requirePositiveInteger(command.audioId, "audio id");
     requireText(command.idempotencyKey, "job idempotency key");
     requireText(command.operationId, "operation id");
     requireText(command.resourceIdentity, "resource identity");
@@ -96,7 +96,7 @@ export class DesktopDomainService {
     modelSha256: string;
     runtimeSha256: string;
   }) {
-    requireText(command.displayName, "meeting display name");
+    requireText(command.displayName, "audio display name");
     requireText(command.normalizedPath, "normalized media path");
     for (const [value, label] of [
       [command.normalizedSha256, "normalized media hash"],
@@ -175,24 +175,24 @@ export class DesktopDomainService {
     }
   }
 
-  saveMeetingNote(command: {
-    meetingId: number;
+  saveAudioNote(command: {
+    audioId: number;
     idempotencyKey: string;
     body: string;
   }) {
-    requirePositiveInteger(command.meetingId, "meeting id");
+    requirePositiveInteger(command.audioId, "audio id");
     requireText(command.idempotencyKey, "note idempotency key");
     requireText(command.body, "note body");
-    return this.repository.saveMeetingNote(command, this.now());
+    return this.repository.saveAudioNote(command, this.now());
   }
 
   recordReceipt(command: {
-    meetingId: number;
+    audioId: number;
     idempotencyKey: string;
     kind: string;
     payload: Record<string, unknown>;
   }) {
-    requirePositiveInteger(command.meetingId, "meeting id");
+    requirePositiveInteger(command.audioId, "audio id");
     requireText(command.idempotencyKey, "receipt idempotency key");
     requireText(command.kind, "receipt kind");
     return this.repository.recordReceipt(command, this.now());

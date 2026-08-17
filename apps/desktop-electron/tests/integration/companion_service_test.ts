@@ -23,7 +23,7 @@ import {
   generateCompanionX25519KeyPair,
   type CompanionPairingTranscriptValue,
 } from "../../src/main/domain/companion/companion_crypto";
-import { openElectronDatabase } from "../../src/main/storage/database";
+import { openAudioDatabase } from "../../src/main/storage/audio_database";
 import { TransferRepository } from "../../src/main/storage/repositories/transfer_repository";
 
 describe("U11 companion service lifecycle", () => {
@@ -434,7 +434,7 @@ describe("U11 companion service lifecycle", () => {
       schema: "companion-audio-transfer/v2" as const,
       transferId: "transfer-revoke-crash",
       sourceAssetId: "mobile-recording-1",
-      displayName: "meeting.wav",
+      displayName: "audio.wav",
       sizeBytes: 8,
       wholeFileSha256: "a".repeat(64),
       chunkBytes: 4_096,
@@ -495,7 +495,7 @@ describe("U11 companion service lifecycle", () => {
       schema: "companion-audio-transfer/v2" as const,
       transferId: "transfer-media-fence",
       sourceAssetId: "source-media-fence",
-      displayName: "meeting.wav",
+      displayName: "audio.wav",
       sizeBytes: 8,
       wholeFileSha256: "a".repeat(64),
       chunkBytes: 4_096,
@@ -539,7 +539,7 @@ function createFixture(
     commitVerifiedTransfer?: CompanionImportCommitPort["commitVerifiedTransfer"];
   } = {},
 ) {
-  const database = openElectronDatabase(":memory:");
+  const database = openAudioDatabase(":memory:");
   const repository = new TransferRepository(database);
   const storedCredentials: Buffer[] = [];
   const security = {

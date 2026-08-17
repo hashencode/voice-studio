@@ -1,0 +1,31 @@
+{
+  "schemaVersion": 1,
+  "audio": {
+    "idempotencyKey": "import:sha256:fixture-audio",
+    "sourceIdentity": "sha256:fixture-audio",
+    "displayName": "Project weekly sync.wav",
+    "mediaPath": "/electron-profile/media/fixture-audio.wav",
+    "durationMs": 42000
+  },
+  "job": {
+    "idempotencyKey": "transcription:sha256:fixture-audio",
+    "operationId": "transcribe:fixture-audio",
+    "resourceIdentity": "sha256:fixture-audio"
+  },
+  "note": {
+    "idempotencyKey": "note:fixture-audio:summary",
+    "body": "Ship the desktop foundation."
+  },
+  "receipt": {
+    "idempotencyKey": "receipt:fixture-audio:import",
+    "kind": "media_import",
+    "payload": {
+      "sha256": "fixture-audio",
+      "bytes": 4096
+    }
+  },
+  "publication": {
+    "transcript": "Audio transcript fixture",
+    "segments": 7
+  }
+}

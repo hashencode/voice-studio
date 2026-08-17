@@ -216,7 +216,7 @@ describe.skipIf(process.platform !== "darwin")(
           companionDiscovery: {
             schemaVersion: 1,
             state: "stopped",
-            serviceType: "_voice2text-media._tcp.",
+            serviceType: "_voice2text-audio._tcp.",
             port: null,
             registeredName: null,
             manualFallbackAvailable: true,
@@ -255,7 +255,7 @@ it("rejects import limits outside the shared fixed envelope", () => {
   const valid = {
     sourcePath: "/tmp/source.wav",
     destinationRoot: "/tmp/profile-media",
-    destinationId: "meeting-123456789abc",
+    destinationId: "audio-123456789abc",
     maxSourceBytes: secureImportLimits.maximumSourceBytes,
     minimumFreeBytes: secureImportLimits.maximumMinimumFreeBytes,
     temporaryStorageMultiplier: 8,

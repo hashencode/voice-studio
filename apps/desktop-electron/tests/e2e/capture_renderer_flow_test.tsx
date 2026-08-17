@@ -12,7 +12,7 @@ import type {
 } from "../../src/shared/contracts";
 
 const initial: ApplicationSnapshot = {
-  protocolVersion: 1,
+  protocolVersion: 2,
   revision: 10,
   navigation: { section: "library" },
   profile: { phase: "ready" },
@@ -78,8 +78,8 @@ function installApi() {
     ),
     listProcessingTasks: vi.fn(async () => []),
     onOperationEvent: vi.fn(() => () => undefined),
-    listMeetings: vi.fn(async () => []),
-    openMeeting: vi.fn(async () => null),
+    listAudios: vi.fn(async () => []),
+    openAudio: vi.fn(async () => null),
     listCaptureRecoveries: vi.fn(async () => []),
     preflightCapture: vi.fn(),
     startCapture: vi.fn(),

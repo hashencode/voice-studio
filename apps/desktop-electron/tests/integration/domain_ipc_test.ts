@@ -15,16 +15,17 @@ const trustedEvent = {
 
 function handlers() {
   const workerHealth = vi.fn(async () => ({
-    protocolVersion: 1 as const,
+    protocolVersion: 2 as const,
     protocol: "desktop-sherpa-worker-health/v1" as const,
     runtime: "sherpa-onnx" as const,
     workerSha256: "b".repeat(64),
   }));
   const cancelProcessing = vi.fn(async (jobId: number) => ({
-    protocolVersion: 1 as const,
+    protocolVersion: 2 as const,
     jobId,
     state: "canceled" as const,
   }));
+  const openAudio = vi.fn(async () => null);
   return {
     cancelProcessing,
     handlers: createDesktopIpcHandlers({
@@ -44,10 +45,10 @@ function handlers() {
         saveAiSettings: vi.fn(),
         replaceAiProviderSecret: vi.fn(),
         deleteAiProviderSecret: vi.fn(),
-        prepareMeetingAi: vi.fn(),
-        getMeetingAiSnapshot: vi.fn(async () => null),
-        generateMeetingAi: vi.fn(),
-        retryMeetingAi: vi.fn(),
+        prepareAudioAi: vi.fn(),
+        getAudioAiSnapshot: vi.fn(async () => null),
+        generateAudioAi: vi.fn(),
+        retryAudioAi: vi.fn(),
         applicationSnapshot: () => applicationSnapshot(),
         navigate: (section) => ({
           ...applicationSnapshot(),
@@ -57,13 +58,13 @@ function handlers() {
         workerHealth,
         cancelProcessing,
         retryProcessing: vi.fn(async (jobId: number) => ({
-          protocolVersion: 1 as const,
+          protocolVersion: 2 as const,
           jobId,
           state: "queued" as const,
         })),
         listProcessingTasks: vi.fn(async () => []),
-        importMeeting: vi.fn(async () => ({
-          protocolVersion: 1 as const,
+        importAudio: vi.fn(async () => ({
+          protocolVersion: 2 as const,
           state: "canceled" as const,
         })),
         preflightCapture: vi.fn(),
@@ -73,21 +74,22 @@ function handlers() {
         actOnCaptureRecovery: vi.fn(),
         getCaptionSnapshot: vi.fn(async () => null),
         retryFormalTranscript: vi.fn(),
-        listMeetings: vi.fn(async () => []),
-        openMeeting: vi.fn(async () => null),
+        listAudios: vi.fn(async () => []),
+        openAudio,
         searchTranscript: vi.fn(async () => []),
-        editMeetingSegment: vi.fn(),
-        undoMeetingEdit: vi.fn(),
-        redoMeetingEdit: vi.fn(),
-        renameMeetingSpeaker: vi.fn(),
-        mergeMeetingSpeakers: vi.fn(),
-        assignMeetingSpeaker: vi.fn(),
-        controlMeetingPlayback: vi.fn(),
-        exportMeeting: vi.fn(),
+        editAudioSegment: vi.fn(),
+        undoAudioEdit: vi.fn(),
+        redoAudioEdit: vi.fn(),
+        renameAudioSpeaker: vi.fn(),
+        mergeAudioSpeakers: vi.fn(),
+        assignAudioSpeaker: vi.fn(),
+        controlAudioPlayback: vi.fn(),
+        exportAudio: vi.fn(),
       },
       maximumPayloadBytes: 1024,
     }),
     workerHealth,
+    openAudio,
   };
 }
 
@@ -115,7 +117,7 @@ describe("Main IPC validation", () => {
     ]) {
       await expect(
         fixture.handlers.invoke(ipcChannels.workerHealth, event, {
-          expectedProtocolVersion: 1,
+          expectedProtocolVersion: 2,
         }),
       ).rejects.toBeInstanceOf(IpcContractError);
     }
@@ -133,6 +135,16 @@ describe("Main IPC validation", () => {
     ).rejects.toBeInstanceOf(IpcContractError);
     expect(fixture.workerHealth).not.toHaveBeenCalled();
     expect(fixture.cancelProcessing).not.toHaveBeenCalled();
+  });
+
+  it("rejects Meeting-era IPC before any Audio mutation service runs", async () => {
+    const fixture = handlers();
+    await expect(
+      fixture.handlers.invoke("desktop.meetings.open.v1", trustedEvent, {
+        meetingId: 7,
+      }),
+    ).rejects.toMatchObject({ code: "UNKNOWN_CHANNEL" });
+    expect(fixture.openAudio).not.toHaveBeenCalled();
   });
 
   it("rejects oversized and non-serializable payloads before services", async () => {
@@ -161,14 +173,14 @@ describe("Main IPC validation", () => {
       fixture.handlers.invoke(ipcChannels.cancelProcessing, trustedEvent, {
         jobId: 23,
       }),
-    ).resolves.toEqual({ protocolVersion: 1, jobId: 23, state: "canceled" });
+    ).resolves.toEqual({ protocolVersion: 2, jobId: 23, state: "canceled" });
     expect(fixture.cancelProcessing).toHaveBeenCalledOnce();
     expect(fixture.cancelProcessing).toHaveBeenCalledWith(23);
     await expect(
-      fixture.handlers.invoke(ipcChannels.importMeeting, trustedEvent, {}),
-    ).resolves.toEqual({ protocolVersion: 1, state: "canceled" });
+      fixture.handlers.invoke(ipcChannels.importAudio, trustedEvent, {}),
+    ).resolves.toEqual({ protocolVersion: 2, state: "canceled" });
     await expect(
-      fixture.handlers.invoke(ipcChannels.importMeeting, trustedEvent, {
+      fixture.handlers.invoke(ipcChannels.importAudio, trustedEvent, {
         sourcePath: "/etc/passwd",
       }),
     ).rejects.toBeInstanceOf(IpcContractError);
@@ -188,16 +200,16 @@ describe("Main IPC validation", () => {
     ).resolves.toEqual([]);
     await expect(
       fixture.handlers.invoke(ipcChannels.processingTasks, trustedEvent, {
-        expectedProtocolVersion: 1,
+        expectedProtocolVersion: 2,
       }),
-    ).resolves.toEqual({ protocolVersion: 1, tasks: [] });
+    ).resolves.toEqual({ protocolVersion: 2, tasks: [] });
   });
 
   it("exposes only validated application snapshot and navigation commands", async () => {
     const fixture = handlers();
     await expect(
       fixture.handlers.invoke(ipcChannels.applicationSnapshot, trustedEvent, {
-        expectedProtocolVersion: 1,
+        expectedProtocolVersion: 2,
       }),
     ).resolves.toEqual(
       expect.objectContaining({ navigation: { section: "library" } }),
@@ -218,7 +230,7 @@ describe("Main IPC validation", () => {
 
   it("allows only the exact packaged renderer file URL", async () => {
     const workerHealth = vi.fn(async () => ({
-      protocolVersion: 1 as const,
+      protocolVersion: 2 as const,
       protocol: "desktop-sherpa-worker-health/v1" as const,
       runtime: "sherpa-onnx" as const,
       workerSha256: "c".repeat(64),
@@ -241,10 +253,10 @@ describe("Main IPC validation", () => {
         saveAiSettings: vi.fn(),
         replaceAiProviderSecret: vi.fn(),
         deleteAiProviderSecret: vi.fn(),
-        prepareMeetingAi: vi.fn(),
-        getMeetingAiSnapshot: vi.fn(async () => null),
-        generateMeetingAi: vi.fn(),
-        retryMeetingAi: vi.fn(),
+        prepareAudioAi: vi.fn(),
+        getAudioAiSnapshot: vi.fn(async () => null),
+        generateAudioAi: vi.fn(),
+        retryAudioAi: vi.fn(),
         applicationSnapshot: () => applicationSnapshot(),
         navigate: (section) => ({
           ...applicationSnapshot(),
@@ -255,8 +267,8 @@ describe("Main IPC validation", () => {
         cancelProcessing: vi.fn(),
         retryProcessing: vi.fn(),
         listProcessingTasks: vi.fn(async () => []),
-        importMeeting: vi.fn(async () => ({
-          protocolVersion: 1 as const,
+        importAudio: vi.fn(async () => ({
+          protocolVersion: 2 as const,
           state: "canceled" as const,
         })),
         preflightCapture: vi.fn(),
@@ -266,20 +278,20 @@ describe("Main IPC validation", () => {
         actOnCaptureRecovery: vi.fn(),
         getCaptionSnapshot: vi.fn(async () => null),
         retryFormalTranscript: vi.fn(),
-        listMeetings: vi.fn(async () => []),
-        openMeeting: vi.fn(async () => null),
+        listAudios: vi.fn(async () => []),
+        openAudio: vi.fn(async () => null),
         searchTranscript: vi.fn(async () => []),
-        editMeetingSegment: vi.fn(),
-        undoMeetingEdit: vi.fn(),
-        redoMeetingEdit: vi.fn(),
-        renameMeetingSpeaker: vi.fn(),
-        mergeMeetingSpeakers: vi.fn(),
-        assignMeetingSpeaker: vi.fn(),
-        controlMeetingPlayback: vi.fn(),
-        exportMeeting: vi.fn(),
+        editAudioSegment: vi.fn(),
+        undoAudioEdit: vi.fn(),
+        redoAudioEdit: vi.fn(),
+        renameAudioSpeaker: vi.fn(),
+        mergeAudioSpeakers: vi.fn(),
+        assignAudioSpeaker: vi.fn(),
+        controlAudioPlayback: vi.fn(),
+        exportAudio: vi.fn(),
       },
     });
-    const payload = { expectedProtocolVersion: 1 };
+    const payload = { expectedProtocolVersion: 2 };
     await expect(
       packaged.invoke(
         ipcChannels.workerHealth,
@@ -290,7 +302,7 @@ describe("Main IPC validation", () => {
         },
         payload,
       ),
-    ).resolves.toEqual(expect.objectContaining({ protocolVersion: 1 }));
+    ).resolves.toEqual(expect.objectContaining({ protocolVersion: 2 }));
     await expect(
       packaged.invoke(
         ipcChannels.workerHealth,
@@ -301,7 +313,7 @@ describe("Main IPC validation", () => {
         },
         payload,
       ),
-    ).resolves.toEqual(expect.objectContaining({ protocolVersion: 1 }));
+    ).resolves.toEqual(expect.objectContaining({ protocolVersion: 2 }));
     await expect(
       packaged.invoke(
         ipcChannels.workerHealth,
@@ -312,7 +324,7 @@ describe("Main IPC validation", () => {
         },
         payload,
       ),
-    ).resolves.toEqual(expect.objectContaining({ protocolVersion: 1 }));
+    ).resolves.toEqual(expect.objectContaining({ protocolVersion: 2 }));
     await expect(
       packaged.invoke(
         ipcChannels.workerHealth,
@@ -352,7 +364,7 @@ describe("Main IPC validation", () => {
 
 function applicationSnapshot() {
   return {
-    protocolVersion: 1 as const,
+    protocolVersion: 2 as const,
     revision: 1,
     navigation: { section: "library" as const },
     profile: { phase: "ready" as const },

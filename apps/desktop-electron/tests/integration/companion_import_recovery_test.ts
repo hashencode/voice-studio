@@ -2,7 +2,7 @@ import type { DatabaseSync } from "node:sqlite";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { CompanionImportCoordinator } from "../../src/main/domain/companion/companion_import_coordinator";
-import { openElectronDatabase } from "../../src/main/storage/database";
+import { openAudioDatabase } from "../../src/main/storage/audio_database";
 import { TransferRepository } from "../../src/main/storage/repositories/transfer_repository";
 
 describe("U11 companion secure-import crash recovery", () => {
@@ -44,7 +44,7 @@ describe("U11 companion secure-import crash recovery", () => {
     database = fixture.database;
     let published = false;
     let committedAuthority: {
-      meetingId: number;
+      audioId: number;
       jobId: number;
       recordingId: number;
       sourceSha256: string;
@@ -64,7 +64,7 @@ describe("U11 companion secure-import crash recovery", () => {
       .mockImplementationOnce(async () => {
         published = true;
         committedAuthority = {
-          meetingId: 41,
+          audioId: 41,
           jobId: 42,
           recordingId: 43,
           sourceSha256: fixture.manifest.wholeFileSha256,
@@ -116,7 +116,7 @@ describe("U11 companion secure-import crash recovery", () => {
 });
 
 function importingFixture() {
-  const database = openElectronDatabase(":memory:");
+  const database = openAudioDatabase(":memory:");
   const repository = new TransferRepository(database);
   repository.pairPeer({
     deviceId: "mobile-1",
@@ -129,7 +129,7 @@ function importingFixture() {
     schema: "companion-audio-transfer/v2" as const,
     transferId: "transfer-import-crash",
     sourceAssetId: "source-import-crash",
-    displayName: "meeting.wav",
+    displayName: "audio.wav",
     sizeBytes: 8,
     wholeFileSha256: "a".repeat(64),
     chunkBytes: 4_096,

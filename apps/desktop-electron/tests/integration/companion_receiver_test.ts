@@ -11,7 +11,7 @@ import {
   CompanionReceiver,
   encodeMissingChunkBitmap,
 } from "../../src/main/domain/companion/companion_receiver";
-import { openElectronDatabase } from "../../src/main/storage/database";
+import { openAudioDatabase } from "../../src/main/storage/audio_database";
 import { TransferRepository } from "../../src/main/storage/repositories/transfer_repository";
 
 describe("companion-audio-transfer/v2 Node receiver", () => {
@@ -28,7 +28,7 @@ describe("companion-audio-transfer/v2 Node receiver", () => {
   });
 
   it("rejects a v1 peer before repository or handler mutation", async () => {
-    database = openElectronDatabase(":memory:");
+    database = openAudioDatabase(":memory:");
     root = mkdtempSync(join(tmpdir(), "voice2text-companion-receiver-"));
     const repository = new TransferRepository(database);
     const resolveInvite = vi.fn(async () => null);
@@ -98,7 +98,7 @@ describe("companion-audio-transfer/v2 Node receiver", () => {
   });
 
   it("uses the real desktop identity and resumes only the missing verified chunks", async () => {
-    database = openElectronDatabase(":memory:");
+    database = openAudioDatabase(":memory:");
     root = mkdtempSync(join(tmpdir(), "voice2text-companion-receiver-"));
     const repository = new TransferRepository(database);
     const credential = Buffer.alloc(32, 0x4c);
@@ -125,7 +125,7 @@ describe("companion-audio-transfer/v2 Node receiver", () => {
         signature: "c2lnbmF0dXJl",
       };
       repository.recordCommittedReceipt(manifest, receipt, {
-        meetingId: 1,
+        audioId: 1,
         processingJobId: 5,
         recordingId: 99,
         sourceSha256: manifest.wholeFileSha256,
@@ -244,7 +244,7 @@ describe("companion-audio-transfer/v2 Node receiver", () => {
   });
 
   it("fences an externally canceled active transfer before late bytes or commit", async () => {
-    database = openElectronDatabase(":memory:");
+    database = openAudioDatabase(":memory:");
     root = mkdtempSync(join(tmpdir(), "voice2text-companion-receiver-"));
     const repository = new TransferRepository(database);
     const credential = Buffer.alloc(32, 0x4c);
@@ -307,7 +307,7 @@ describe("companion-audio-transfer/v2 Node receiver", () => {
   });
 
   it("retries expired tombstone cleanup and never expires committed authority", async () => {
-    database = openElectronDatabase(":memory:");
+    database = openAudioDatabase(":memory:");
     root = mkdtempSync(join(tmpdir(), "voice2text-companion-receiver-"));
     const repository = new TransferRepository(database);
     const credential = Buffer.alloc(32, 0x4c);
@@ -370,7 +370,7 @@ describe("companion-audio-transfer/v2 Node receiver", () => {
   });
 
   it("accepts one client and releases a stalled handshake after its deadline", async () => {
-    database = openElectronDatabase(":memory:");
+    database = openAudioDatabase(":memory:");
     root = mkdtempSync(join(tmpdir(), "voice2text-companion-receiver-"));
     const repository = new TransferRepository(database);
     const credential = Buffer.alloc(32, 0x4c);
@@ -450,7 +450,7 @@ const manifest = {
   schema: "companion-audio-transfer/v2" as const,
   transferId: "transfer-1",
   sourceAssetId: "asset-1",
-  displayName: "meeting.wav",
+  displayName: "audio.wav",
   sizeBytes: source.length,
   wholeFileSha256: sha256(source),
   chunkBytes: 4_096,
@@ -598,12 +598,12 @@ function seedCommittedImport(database: DatabaseSync) {
       id, content_sha256, normalized_path, source_sha256, size_bytes,
       duration_ms, receipt_json, created_at_ms
     ) VALUES (99, '${"d".repeat(64)}', '/private/tmp/media.wav', '${manifest.wholeFileSha256}', 5000, 1000, '{}', 1);
-    INSERT INTO meetings (
+    INSERT INTO audio_items (
       id, idempotency_key, source_identity, display_name, media_path,
       duration_ms, media_authority_id, created_at_ms, updated_at_ms
-    ) VALUES (1, 'meeting-1', 'source-1', 'Meeting', '/private/tmp/media.wav', 1000, 99, 1, 1);
+    ) VALUES (1, 'audio-1', 'source-1', 'Audio', '/private/tmp/media.wav', 1000, 99, 1, 1);
     INSERT INTO processing_jobs (
-      id, meeting_id, idempotency_key, operation_id, resource_identity,
+      id, audio_id, idempotency_key, operation_id, resource_identity,
       state, attempt, created_at_ms, updated_at_ms
     ) VALUES (5, 1, 'processing-1', 'asr', 'resource-1', 'queued', 0, 1, 1);
   `);

@@ -189,7 +189,7 @@ public enum CompanionDiscoveryState: String, Codable, Equatable, Sendable {
 public struct CompanionDiscoveryReceipt: Encodable, Equatable, Sendable {
   public let schemaVersion = 1
   public let state: CompanionDiscoveryState
-  public let serviceType = "_voice2text-media._tcp."
+  public let serviceType = "_voice2text-audio._tcp."
   public let port: Int?
   public let registeredName: String?
   public let manualFallbackAvailable: Bool
@@ -220,12 +220,12 @@ public final class CompanionDiscoveryRegistrar: @unchecked Sendable {
     }
     let advertisement = CompanionBonjourAdvertisement(
       domain: "local.",
-      serviceType: "_voice2text-media._tcp.",
+      serviceType: "_voice2text-audio._tcp.",
       name: request.deviceName,
       port: request.port,
       txtRecord: [
-        "schema": "companion-media-transfer/v1",
-        "capability": "media-transfer/v1",
+        "schema": "companion-audio-transfer/v2",
+        "capability": "audio-transfer/v2",
         "deviceId": request.deviceId,
         "fingerprint": request.fingerprint,
       ]

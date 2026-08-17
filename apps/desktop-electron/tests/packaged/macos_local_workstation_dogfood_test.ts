@@ -6,7 +6,7 @@ const packagedWorkstationIt =
   process.env.RUN_PACKAGED_WORKSTATION === "1" ? it : it.skip;
 
 describe.skipIf(process.platform !== "darwin")(
-  "packaged macOS local meeting workstation",
+  "packaged macOS local audio workstation",
   () => {
     packagedWorkstationIt(
       "reviews, edits, searches, controls audio and exports through packaged Main authority",

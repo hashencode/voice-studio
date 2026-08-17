@@ -185,7 +185,7 @@ export class DesktopCaptureService {
       if (!this.repository.find(value.sessionId)) {
         this.repository.beginSession({
           sessionId: value.sessionId,
-          title: "中断的会议录音",
+          title: "中断的音频录制",
           workspacePath: path.join(this.captureRoot, value.sessionId),
           nowMs: this.now(),
         });

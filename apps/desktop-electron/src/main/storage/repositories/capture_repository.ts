@@ -5,7 +5,7 @@ import {
   captureSnapshotSchema,
   type CaptureSnapshot,
 } from "../../../shared/contracts";
-import { withTransaction } from "../database";
+import { withTransaction } from "../audio_database";
 import type { CaptureAuthority } from "../../domain/capture/capture_authority";
 
 interface CaptureSessionRow {
