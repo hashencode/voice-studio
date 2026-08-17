@@ -17,6 +17,12 @@ it("routes every packaged smoke through its isolated appData and fails blocked p
   expect(bootstrapSource).toContain(
     "VOICE2TEXT_BOOTSTRAP_SMOKE_APP_DATA: appDataPath",
   );
+  expect(bootstrapSource).toContain(
+    'const evidencePath = path.join(processTemporaryPath, "evidence")',
+  );
+  expect(bootstrapSource).toContain(
+    "await mkdir(evidencePath, { mode: 0o700 })",
+  );
   expect(source).toMatch(
     /if \(\s*bootstrapSmokeRequest \|\|\s*processingSmokeRequest \|\|\s*captureSmokeRequest \|\|\s*captionFormalSmokeRequest \|\|\s*aiBoundarySmokeRequest \|\|\s*companionSmokeRequest\s*\)/,
   );

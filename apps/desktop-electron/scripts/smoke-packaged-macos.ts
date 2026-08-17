@@ -31,11 +31,13 @@ export async function runPackagedMacosSmoke(): Promise<PackagedSmokeReceipt> {
   );
   const processTemporaryPath = path.join(temporaryRoot, "tmp");
   const appDataPath = path.join(processTemporaryPath, "app-data");
+  const evidencePath = path.join(processTemporaryPath, "evidence");
   const receiptPath = path.join(
-    processTemporaryPath,
+    evidencePath,
     `voice2text-bootstrap-${randomUUID()}.json`,
   );
   await mkdir(appDataPath, { recursive: true, mode: 0o700 });
+  await mkdir(evidencePath, { mode: 0o700 });
   try {
     const child = spawn(executable, [], {
       cwd: os.tmpdir(),
