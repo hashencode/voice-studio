@@ -38,6 +38,7 @@ import type {
 } from "./companion";
 
 export const desktopProtocolVersion = 2 as const;
+export const desktopWorkerHealthProtocolVersion = 1 as const;
 export const desktopWorkerHealthProtocol =
   "desktop-sherpa-worker-health/v1" as const;
 

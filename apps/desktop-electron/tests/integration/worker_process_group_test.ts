@@ -27,6 +27,7 @@ import {
   resolveResourceRoot,
 } from "../../src/main/resources/resource_catalog";
 import { DesktopRepository } from "../../src/main/storage/desktop_repository";
+import { WorkerHealthSupervisor } from "../../src/main/worker_health";
 
 const temporaryRoots: string[] = [];
 
@@ -64,6 +65,12 @@ printf '%s\\n' '{"schemaVersion":1,"type":"progress","operationId":"progress-fai
 sleep 1
 printf '%s\\n' '{"schemaVersion":1,"type":"result","operationId":"progress-failure-operation","attempt":1,"sourceIdentity":"fixture-source","phase":"asr","protocolIdentity":"desktop-sherpa-worker/v1","sourceSha256":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","modelSha256":"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb","runtimeSha256":"cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc","payload":{"mustNotPublish":true}}'
 `;
+  const healthScript = `#!/bin/sh
+set -eu
+IFS= read -r request
+test "$request" = '{"schemaVersion":1,"operation":"health","expectedProtocolVersion":1}'
+printf '%s\\n' '{"schemaVersion":1,"type":"result","operation":"health","protocol":"desktop-sherpa-worker-health/v1","runtime":"sherpa-onnx"}'
+`;
   const modelBytes = "fixture-model-v1";
   const runtimeBytes = "fixture-runtime-v1";
   const manifest = {
@@ -80,6 +87,10 @@ printf '%s\\n' '{"schemaVersion":1,"type":"result","operationId":"progress-failu
         sha256: createHash("sha256")
           .update(progressFailureScript)
           .digest("hex"),
+      },
+      {
+        path: "bin/health-fixture",
+        sha256: createHash("sha256").update(healthScript).digest("hex"),
       },
       {
         path: "model.bin",
@@ -128,6 +139,11 @@ printf '%s\\n' '{"schemaVersion":1,"type":"result","operationId":"progress-failu
         executable: "bin/progress-failure-fixture",
         arguments: [],
       },
+      {
+        operation: "worker-health",
+        executable: "bin/health-fixture",
+        arguments: [],
+      },
     ],
   };
   for (const resourceRoot of [developmentRoot, packagedRoot]) {
@@ -138,6 +154,8 @@ printf '%s\\n' '{"schemaVersion":1,"type":"result","operationId":"progress-failu
       progressFailureScript,
     );
     chmodSync(join(resourceRoot, "bin", "progress-failure-fixture"), 0o700);
+    writeFileSync(join(resourceRoot, "bin", "health-fixture"), healthScript);
+    chmodSync(join(resourceRoot, "bin", "health-fixture"), 0o700);
     writeFileSync(join(resourceRoot, "model.bin"), modelBytes);
     writeFileSync(join(resourceRoot, "runtime.bin"), runtimeBytes);
     writeFileSync(
@@ -189,6 +207,26 @@ function intent(resourceIdentity: string, jobId = 1): ExecutionIntent {
 describe.skipIf(process.platform !== "darwin")(
   "owned worker process groups on macOS",
   () => {
+    it("keeps the raw worker health protocol on v1 behind desktop IPC v2", async () => {
+      const paths = fixture();
+      const catalog = await ResourceCatalog.load(
+        resolveResourceRoot({
+          appRoot: paths.developmentAppRoot,
+          packaged: false,
+          resourcesPath: "/not-used",
+        }),
+      );
+      const supervisor = new WorkerHealthSupervisor(
+        catalog.command("worker-health"),
+      );
+
+      await expect(supervisor.check()).resolves.toMatchObject({
+        protocolVersion: 2,
+        protocol: "desktop-sherpa-worker-health/v1",
+        runtime: "sherpa-onnx",
+      });
+    });
+
     it("uses one manifest identity in development and packaged layouts without cwd", async () => {
       const paths = fixture();
       const previousCwd = process.cwd();

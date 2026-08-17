@@ -2,6 +2,7 @@ import { spawn, type ChildProcessWithoutNullStreams } from "node:child_process";
 
 import {
   desktopProtocolVersion,
+  desktopWorkerHealthProtocolVersion,
   workerHealthResponseSchema,
   type WorkerHealthResponse,
 } from "../shared/contracts";
@@ -44,7 +45,7 @@ export class WorkerHealthSupervisor {
     try {
       const frame = await readHealthFrame(child);
       return workerHealthResponseSchema.parse({
-        protocolVersion: frame.schemaVersion,
+        protocolVersion: desktopProtocolVersion,
         protocol: frame.protocol,
         runtime: frame.runtime,
         workerSha256,
@@ -133,7 +134,7 @@ async function readHealthFrame(
       try {
         const decoded = JSON.parse(lines[0]!) as WorkerHealthFrame;
         if (
-          decoded.schemaVersion !== desktopProtocolVersion ||
+          decoded.schemaVersion !== desktopWorkerHealthProtocolVersion ||
           decoded.type !== "result" ||
           decoded.operation !== "health"
         ) {
@@ -151,9 +152,9 @@ async function readHealthFrame(
 
     child.stdin.end(
       `${JSON.stringify({
-        schemaVersion: desktopProtocolVersion,
+        schemaVersion: desktopWorkerHealthProtocolVersion,
         operation: "health",
-        expectedProtocolVersion: desktopProtocolVersion,
+        expectedProtocolVersion: desktopWorkerHealthProtocolVersion,
       })}\n`,
     );
   });
