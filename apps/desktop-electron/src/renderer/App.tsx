@@ -10,11 +10,13 @@ import {
   useAudioRouteController,
 } from "@/features/audios/audio-route-feature";
 import { CaptureWorkspace } from "@/features/capture/capture-workspace";
-import { CompanionFeature } from "@/features/companion/companion-feature";
 import {
-  ContextPanePlaceholder,
-  ContextPaneShell,
-} from "@/features/shell/context-pane-shell";
+  CompanionContextPane,
+  CompanionMainWorkspace,
+  type CompanionRouteController,
+  useCompanionRouteController,
+} from "@/features/companion/companion-feature";
+import { ContextPaneShell } from "@/features/shell/context-pane-shell";
 import type { RendererShellSection } from "@/features/shell/context-pane-contract";
 import { useContextPaneShell } from "@/features/shell/use-context-pane-shell";
 import {
@@ -66,6 +68,10 @@ export default function App() {
     onCancel: cancelProcessing,
     onRetry: retryProcessing,
   });
+  const companion = useCompanionRouteController({
+    api: window.voice2text,
+    enabled: snapshot !== null && current === "companion",
+  });
 
   if (loadError) return <ShellLoadError message={loadError} />;
   if (!snapshot) return <LoadingShell />;
@@ -83,7 +89,7 @@ export default function App() {
           {pane.paneSection === "audio" ? (
             <AudioContextPane controller={audio} />
           ) : (
-            <ContextPanePlaceholder section={pane.paneSection} />
+            <CompanionContextPane controller={companion} />
           )}
         </ContextPaneShell>
       ) : null}
@@ -123,7 +129,9 @@ export default function App() {
             onBootstrapAction={requestBootstrapAction}
             operationError={operationError}
             audio={audio}
+            companion={companion}
             onOpenAudioPane={pane.openPane}
+            onOpenCompanionPane={pane.openPane}
           />
         </main>
       </SidebarInset>
@@ -142,14 +150,18 @@ function ShellContent({
   onBootstrapAction,
   operationError,
   audio,
+  companion,
   onOpenAudioPane,
+  onOpenCompanionPane,
 }: {
   snapshot: ApplicationSnapshot;
   onNavigate: (section: RendererShellSection) => void;
   onBootstrapAction: Parameters<typeof ProfileBlocker>[0]["onAction"];
   operationError: string | null;
   audio: AudioRouteController;
+  companion: CompanionRouteController;
   onOpenAudioPane: () => void;
+  onOpenCompanionPane: () => void;
 }) {
   if (snapshot.profile.phase === "initializing") {
     return (
@@ -214,7 +226,12 @@ function ShellContent({
       );
       break;
     case "companion":
-      section = <CompanionFeature />;
+      section = (
+        <CompanionMainWorkspace
+          controller={companion}
+          onOpenPane={onOpenCompanionPane}
+        />
+      );
       break;
     case "settings":
       section = (

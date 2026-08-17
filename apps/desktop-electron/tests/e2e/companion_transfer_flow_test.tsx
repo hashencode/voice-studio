@@ -150,16 +150,18 @@ describe("companion Renderer flow", () => {
     const user = userEvent.setup();
     render(<App />);
 
+    const pane = await screen.findByRole("complementary", {
+      name: "互联上下文面板",
+    });
+    expect(within(pane).getByText("Offline Phone")).toBeVisible();
+    expect(within(pane).queryByText("Revoked Phone")).not.toBeInTheDocument();
+    await user.click(
+      within(pane).getByRole("button", { name: "添加或配对设备" }),
+    );
     expect(
       await screen.findByRole("alert", { name: "局域网权限被拒绝" }),
     ).toHaveTextContent("仍可使用手动配对");
     expect(screen.getByText("短码不一致")).toBeVisible();
-    expect(screen.getByText("Offline Phone").closest("li")).toHaveTextContent(
-      "离线",
-    );
-    expect(screen.getByText("Revoked Phone").closest("li")).toHaveTextContent(
-      "已撤销",
-    );
 
     await user.click(screen.getByRole("button", { name: "生成手动配对邀请" }));
     await waitFor(() =>
@@ -211,6 +213,7 @@ describe("companion Renderer flow", () => {
       transfers: [
         {
           transferId: "transfer-active",
+          peerDeviceId: "android-history",
           displayName: "访谈.wav",
           wholeFileSha256: "a".repeat(64),
           sizeBytes: 10_000,
@@ -225,6 +228,7 @@ describe("companion Renderer flow", () => {
         },
         {
           transferId: "transfer-committed",
+          peerDeviceId: "android-history",
           displayName: "周会.wav",
           wholeFileSha256: "b".repeat(64),
           sizeBytes: 8_000,
@@ -250,6 +254,7 @@ describe("companion Renderer flow", () => {
         },
         {
           transferId: "transfer-interrupted",
+          peerDeviceId: "android-history",
           displayName: "复盘.wav",
           wholeFileSha256: "c".repeat(64),
           sizeBytes: 12_000,
@@ -270,6 +275,9 @@ describe("companion Renderer flow", () => {
     const user = userEvent.setup();
     render(<App />);
 
+    await user.click(
+      await screen.findByRole("button", { name: "查看传输历史" }),
+    );
     const progress = await screen.findByRole("progressbar", {
       name: "访谈.wav 接收进度：40%，还缺 3 个待验证分块",
     });

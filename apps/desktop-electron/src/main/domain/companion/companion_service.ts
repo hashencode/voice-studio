@@ -762,6 +762,7 @@ export class CompanionService {
     const settings = this.repository.receiverSettings();
     const transfers = this.repository.listTransfers().map((transfer) => ({
       transferId: transfer.transferId,
+      peerDeviceId: transfer.peerDeviceId,
       displayName: transfer.displayName,
       wholeFileSha256: transfer.wholeFileSha256,
       sizeBytes: transfer.sizeBytes,

@@ -319,7 +319,7 @@ describe("sidebar navigation e2e", () => {
 
     await user.click(screen.getByRole("button", { name: "互联" }));
     expect(
-      await screen.findByRole("heading", { name: "Companion" }),
+      await screen.findByRole("heading", { name: "互联", level: 1 }),
     ).toBeVisible();
     await waitFor(() =>
       expect(controlAudioPlayback).toHaveBeenCalledWith(4, {

@@ -194,6 +194,7 @@ export const companionSnapshotSchema = z
         z
           .object({
             transferId: identifierSchema,
+            peerDeviceId: identifierSchema,
             displayName: boundedTextSchema(160),
             wholeFileSha256: sha256Schema,
             sizeBytes: z
