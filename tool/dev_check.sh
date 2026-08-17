@@ -52,7 +52,9 @@ python3 -m unittest tool/test_validate_mobile_flutter_layout.py
 python3 tool/validate_mobile_flutter_layout.py
 
 echo "[10/20] Audio/sidebar workstation contract"
-python3 -m unittest tool/test_validate_audio_sidebar_workstation.py
+python3 -m unittest \
+  tool/test_audio_sidebar_release_candidate.py \
+  tool/test_validate_audio_sidebar_workstation.py
 python3 tool/validate_audio_sidebar_workstation.py
 
 echo "[11/20] Electron Desktop removal truth contract"

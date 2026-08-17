@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import hashlib
 import pathlib
 import sys
 from typing import Any
@@ -147,10 +148,69 @@ def validate(
             "manualReceipt",
         ):
             _require(candidate[field] is None, f"pending candidate must not bind {field}")
-    else:
-        raise AudioSidebarValidationError(
-            "release candidate status is unsupported until the U6 validator is installed"
+    elif candidate["status"] == "PASS":
+        _require(manifest["status"] == "RELEASE_VALIDATED", "validated candidate status drifted")
+        source_revision = candidate["sourceRevision"]
+        package_sha = candidate["packageManifestSha256"]
+        _require(
+            isinstance(source_revision, str)
+            and len(source_revision) == 40
+            and all(character in "0123456789abcdef" for character in source_revision),
+            "validated source revision is invalid",
         )
+        _require(
+            isinstance(package_sha, str)
+            and len(package_sha) == 64
+            and all(character in "0123456789abcdef" for character in package_sha),
+            "validated package hash is invalid",
+        )
+        receipt_values: dict[str, dict[str, Any]] = {}
+        for field in ("automatedReceipt", "manualReceipt"):
+            relative = candidate[field]
+            _require(isinstance(relative, str), f"{field} path is invalid")
+            path = root / relative
+            _require(path.is_file(), f"{field} is missing")
+            value = json.loads(path.read_text(encoding="utf-8"))
+            _require(isinstance(value, dict), f"{field} must be an object")
+            receipt_values[field] = value
+        automated = receipt_values["automatedReceipt"]
+        manual = receipt_values["manualReceipt"]
+        _require(
+            automated.get("status") == "AUTOMATED_PASS_MANUAL_PENDING"
+            and automated.get("sourceRevision") == source_revision
+            and isinstance(automated.get("package"), dict)
+            and automated["package"].get("manifestSha256") == package_sha,
+            "automated receipt identity drifted",
+        )
+        _require(
+            manual.get("status") == "PASS"
+            and manual.get("sourceRevision") == source_revision
+            and manual.get("packageManifestSha256") == package_sha,
+            "manual receipt identity drifted",
+        )
+        final_path = root / "docs/product/audio-sidebar-release/final.json"
+        _require(final_path.is_file(), "final receipt is missing")
+        final = json.loads(final_path.read_text(encoding="utf-8"))
+        _require(
+            isinstance(final, dict)
+            and final.get("status") == "PASS"
+            and final.get("sourceRevision") == source_revision
+            and final.get("packageManifestSha256") == package_sha
+            and final.get("rebuildPerformed") is False,
+            "final receipt identity drifted",
+        )
+        for label, field, relative in (
+            (
+                "candidate",
+                "candidateReceiptSha256",
+                candidate["automatedReceipt"],
+            ),
+            ("manual", "manualReceiptSha256", candidate["manualReceipt"]),
+        ):
+            digest = hashlib.sha256((root / relative).read_bytes()).hexdigest()
+            _require(final.get(field) == digest, f"{label} receipt hash drifted")
+    else:
+        raise AudioSidebarValidationError("release candidate status is invalid")
 
     historical = manifest["historicalArtifacts"]
     _require(isinstance(historical, list) and historical, "historical artifacts are required")

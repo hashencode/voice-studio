@@ -1,0 +1,34 @@
+{
+  "schema": "voice2text-audio-sidebar-manual-checks/v1",
+  "maximumSessionMinutes": 20,
+  "checks": [
+    {
+      "id": "fresh-audio-reset",
+      "requirement": "旧开发数据库归档提示真实，fresh Audio 数据库打开且旧内容未加载"
+    },
+    {
+      "id": "rail-pane-preferences",
+      "requirement": "音频 / 互联 / 设置可由键盘与 VoiceOver 识别，两个 pane 偏好独立且导航/重启恢复"
+    },
+    {
+      "id": "narrow-focus-recovery",
+      "requirement": "880 px 非模态 drawer 保持 rail、capture、recovery、关闭与目标焦点可达"
+    },
+    {
+      "id": "audio-workflow",
+      "requirement": "Audio 录制/导入/列表/详情/处理/播放/搜索/编辑/AI/导出保持可用"
+    },
+    {
+      "id": "companion-workflow",
+      "requirement": "互联设备、配对、凭据恢复、历史、传输与 unknown availability 表述真实"
+    },
+    {
+      "id": "legacy-protocol-rejection",
+      "requirement": "旧 peer 在 Audio 状态变更前被清晰拒绝"
+    },
+    {
+      "id": "text-motion-semantics",
+      "requirement": "200% 文本与 reduced motion 下控件可用，状态不只靠颜色或运动表达"
+    }
+  ]
+}
