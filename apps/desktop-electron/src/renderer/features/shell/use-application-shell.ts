@@ -6,6 +6,7 @@ import type {
   ShellSection,
 } from "@shared/contracts";
 import { useProcessingTasks } from "@/features/tasks/use-processing-tasks";
+import type { RendererShellSection } from "@/features/shell/context-pane-contract";
 
 export function useApplicationShell() {
   const [snapshot, setSnapshot] = React.useState<ApplicationSnapshot | null>(
@@ -35,13 +36,22 @@ export function useApplicationShell() {
         if (!active) return;
         accept(restored);
         const deepLink = parseShellDeepLink(window.location.hash);
+        if (isLegacyAudioDeepLink(window.location.hash)) {
+          window.history.replaceState(null, "", "#/audio");
+        }
+        const restoredSection = normalizeRendererSection(
+          restored.navigation.section,
+        );
         if (
-          deepLink &&
-          deepLink !== restored.navigation.section &&
+          ((deepLink && deepLink !== restoredSection) ||
+            restored.navigation.section === "tasks") &&
           !deepLinkApplied.current
         ) {
           deepLinkApplied.current = true;
-          accept(await window.voice2text.navigate(deepLink));
+          const destination = deepLink ?? restoredSection;
+          accept(
+            await window.voice2text.navigate(toApplicationSection(destination)),
+          );
         }
       })
       .catch((error: unknown) => {
@@ -58,12 +68,18 @@ export function useApplicationShell() {
   }, [accept]);
 
   const navigate = React.useCallback(
-    async (section: ShellSection) => {
-      if (snapshot?.navigation.section === section) return;
+    async (section: RendererShellSection) => {
+      const applicationSection = toApplicationSection(section);
+      if (
+        snapshot &&
+        normalizeRendererSection(snapshot.navigation.section) === section &&
+        snapshot.navigation.section !== "tasks"
+      )
+        return;
       window.history.replaceState(null, "", `#/${section}`);
-      accept(await window.voice2text.navigate(section));
+      accept(await window.voice2text.navigate(applicationSection));
     },
-    [accept, snapshot?.navigation.section],
+    [accept, snapshot],
   );
 
   const requestBootstrapAction = React.useCallback(
@@ -82,12 +98,25 @@ export function useApplicationShell() {
   };
 }
 
-export function parseShellDeepLink(hash: string): ShellSection | null {
+export function parseShellDeepLink(hash: string): RendererShellSection | null {
   const value = hash.replace(/^#\/?/, "").split("/")[0];
-  return value === "library" ||
-    value === "tasks" ||
-    value === "companion" ||
-    value === "settings"
-    ? value
-    : null;
+  if (value === "audio" || value === "library" || value === "tasks") {
+    return "audio";
+  }
+  return value === "companion" || value === "settings" ? value : null;
+}
+
+function isLegacyAudioDeepLink(hash: string): boolean {
+  const value = hash.replace(/^#\/?/, "").split("/")[0];
+  return value === "library" || value === "tasks";
+}
+
+export function normalizeRendererSection(
+  section: ShellSection,
+): RendererShellSection {
+  return section === "library" || section === "tasks" ? "audio" : section;
+}
+
+function toApplicationSection(section: RendererShellSection): ShellSection {
+  return section === "audio" ? "library" : section;
 }

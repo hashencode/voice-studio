@@ -1,14 +1,16 @@
 import * as React from "react";
 
 import { AppSidebar } from "@/components/app-sidebar";
-import {
-  SidebarInset,
-  SidebarProvider,
-  SidebarTrigger,
-  useSidebar,
-} from "@/components/ui/sidebar";
+import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar";
+import { Button } from "@/components/ui/button";
 import { CaptureWorkspace } from "@/features/capture/capture-workspace";
 import { CompanionFeature } from "@/features/companion/companion-feature";
+import {
+  ContextPanePlaceholder,
+  ContextPaneShell,
+} from "@/features/shell/context-pane-shell";
+import type { RendererShellSection } from "@/features/shell/context-pane-contract";
+import { useContextPaneShell } from "@/features/shell/use-context-pane-shell";
 import {
   CapabilityUnavailable,
   LoadingShell,
@@ -17,14 +19,15 @@ import {
   ReconciliationSurface,
   ShellLoadError,
 } from "@/features/shell/shell-surfaces";
-import { useApplicationShell } from "@/features/shell/use-application-shell";
+import {
+  normalizeRendererSection,
+  useApplicationShell,
+} from "@/features/shell/use-application-shell";
 import { LibraryFeature } from "@/features/library/library-feature";
 import { AudioWorkspaceFeature } from "@/features/audios/audio-workspace-feature";
 import { AiSettingsFeature } from "@/features/settings/ai-settings-feature";
 import { TasksFeature } from "@/features/tasks/tasks-feature";
 import type { ApplicationSnapshot } from "@shared/contracts";
-
-const SIDEBAR_STORAGE_KEY = "voice2text.shell.sidebar-open.v1";
 
 export default function App() {
   const {
@@ -40,35 +43,58 @@ export default function App() {
     cancelProcessing,
     retryProcessing,
   } = useApplicationShell();
-  const [sidebarOpen, setSidebarOpen] = React.useState(() =>
-    readSidebarPreference(),
-  );
+  const current = snapshot
+    ? normalizeRendererSection(snapshot.navigation.section)
+    : "audio";
+  const pane = useContextPaneShell(current);
+  const paneTriggerRef = React.useRef<HTMLButtonElement>(null);
 
   if (loadError) return <ShellLoadError message={loadError} />;
   if (!snapshot) return <LoadingShell />;
 
-  const updateSidebar = (open: boolean) => {
-    setSidebarOpen(open);
-    window.localStorage.setItem(SIDEBAR_STORAGE_KEY, String(open));
-  };
-
   return (
-    <SidebarProvider open={sidebarOpen} onOpenChange={updateSidebar}>
-      <AppSidebar current={snapshot.navigation.section} onNavigate={navigate} />
+    <SidebarProvider>
+      <AppSidebar current={current} onNavigate={navigate} />
+      {pane.paneSection && pane.open ? (
+        <ContextPaneShell
+          section={pane.paneSection}
+          presentation={pane.presentation}
+          triggerRef={paneTriggerRef}
+          onRequestClose={pane.requestClose}
+        >
+          <ContextPanePlaceholder section={pane.paneSection} />
+        </ContextPaneShell>
+      ) : null}
       <SidebarInset>
         <header className="flex min-h-16 shrink-0 flex-wrap items-center gap-3 border-b px-4 py-2">
-          <AccessibleSidebarTrigger />
-          <div className="min-w-0">
-            <p className="truncate text-sm font-medium">
-              {sectionTitle(snapshot.navigation.section)}
-            </p>
-            <p className="truncate text-xs text-muted-foreground">
-              Electron 独立资料库 · Flutter Desktop 仅作行为参考
-            </p>
-          </div>
+          {pane.paneSection ? (
+            <ContextPaneTrigger
+              ref={paneTriggerRef}
+              section={pane.paneSection}
+              open={pane.open}
+              onToggle={pane.toggle}
+            />
+          ) : null}
+          <p className="truncate text-sm font-medium">
+            {sectionTitle(current)}
+          </p>
         </header>
         {snapshot.connectivity === "offline" ? <OfflineBanner /> : null}
-        <main id="main-content" className="flex-1 overflow-auto p-4 sm:p-6">
+        <main
+          id="main-content"
+          data-context-pane-background="true"
+          className="flex-1 overflow-auto p-4 sm:p-6"
+          onPointerDown={(event) => {
+            if (
+              pane.presentation === "overlay" &&
+              pane.open &&
+              event.target === event.currentTarget
+            ) {
+              pane.requestClose("background");
+              paneTriggerRef.current?.focus();
+            }
+          }}
+        >
           <ShellContent
             snapshot={snapshot}
             onNavigate={navigate}
@@ -104,7 +130,7 @@ function ShellContent({
   onRetry,
 }: {
   snapshot: ApplicationSnapshot;
-  onNavigate: (section: ApplicationSnapshot["navigation"]["section"]) => void;
+  onNavigate: (section: RendererShellSection) => void;
   onBootstrapAction: Parameters<typeof ProfileBlocker>[0]["onAction"];
   operationError: string | null;
   importPending: boolean;
@@ -151,18 +177,18 @@ function ShellContent({
       <ProfileBlocker profile={snapshot.profile} onAction={onBootstrapAction} />
     );
   }
-  const navigateToTasks = () => onNavigate("tasks");
+  const navigateToAudio = () => onNavigate("audio");
   const recovery =
     snapshot.reconciliation.length > 0 ? (
       <ReconciliationSurface
         items={snapshot.reconciliation}
-        onNavigateTasks={() => void navigateToTasks()}
+        onNavigateAudio={() => void navigateToAudio()}
       />
     ) : null;
 
   let section: React.ReactNode;
-  switch (snapshot.navigation.section) {
-    case "library":
+  switch (normalizeRendererSection(snapshot.navigation.section)) {
+    case "audio":
       section = (
         <div className="space-y-4">
           {operationError ? <OperationError message={operationError} /> : null}
@@ -176,22 +202,14 @@ function ShellContent({
             onImport={onImport}
           />
           <AudioWorkspaceFeature />
-        </div>
-      );
-      break;
-    case "tasks":
-      section = (
-        <div className="space-y-4">
-          {operationError ? <OperationError message={operationError} /> : null}
-          {snapshot.capability.processing === "unavailable" ? (
-            <CapabilityUnavailable reason={snapshot.capability.reason} />
+          {tasks.length > 0 ? (
+            <TasksFeature
+              tasks={tasks}
+              pendingJobActions={pendingJobActions}
+              onCancel={onCancel}
+              onRetry={onRetry}
+            />
           ) : null}
-          <TasksFeature
-            tasks={tasks}
-            pendingJobActions={pendingJobActions}
-            onCancel={onCancel}
-            onRetry={onRetry}
-          />
         </div>
       );
       break;
@@ -238,29 +256,36 @@ function Page({
   );
 }
 
-function AccessibleSidebarTrigger() {
-  const { state } = useSidebar();
-  const label = state === "expanded" ? "折叠侧边栏" : "展开侧边栏";
+const ContextPaneTrigger = React.forwardRef<
+  HTMLButtonElement,
+  {
+    section: "audio" | "companion";
+    open: boolean;
+    onToggle: () => void;
+  }
+>(function ContextPaneTrigger({ section, open, onToggle }, ref) {
+  const sectionLabel = section === "audio" ? "音频" : "互联";
+  const label = `${open ? "收起" : "打开"}${sectionLabel}上下文面板`;
   return (
-    <SidebarTrigger aria-label={label} title={label} className="shrink-0" />
+    <Button
+      ref={ref}
+      type="button"
+      variant="ghost"
+      size="icon"
+      aria-label={label}
+      aria-expanded={open}
+      onClick={onToggle}
+      className="shrink-0"
+    >
+      <span aria-hidden="true">{open ? "‹" : "›"}</span>
+    </Button>
   );
-}
+});
 
-function sectionTitle(
-  section: ApplicationSnapshot["navigation"]["section"],
-): string {
+function sectionTitle(section: RendererShellSection): string {
   return {
-    library: "会议库",
-    tasks: "转写任务",
-    companion: "Companion",
+    audio: "音频",
+    companion: "互联",
     settings: "设置",
   }[section];
-}
-
-function readSidebarPreference(): boolean {
-  try {
-    return window.localStorage.getItem(SIDEBAR_STORAGE_KEY) !== "false";
-  } catch {
-    return true;
-  }
 }

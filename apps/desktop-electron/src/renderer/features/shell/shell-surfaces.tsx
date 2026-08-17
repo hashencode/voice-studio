@@ -91,10 +91,10 @@ export function OfflineBanner() {
 
 export function ReconciliationSurface({
   items,
-  onNavigateTasks,
+  onNavigateAudio,
 }: {
   items: ApplicationSnapshot["reconciliation"];
-  onNavigateTasks: () => void;
+  onNavigateAudio: () => void;
 }) {
   const hasProcessing = items.some((item) => item.kind === "processing");
   return (
@@ -116,8 +116,8 @@ export function ReconciliationSurface({
         ))}
       </ul>
       {hasProcessing ? (
-        <Button className="mt-4" onClick={onNavigateTasks}>
-          前往转写任务并选择重试
+        <Button className="mt-4" onClick={onNavigateAudio}>
+          查看相关音频并选择重试
         </Button>
       ) : null}
       <p className="mt-4 text-sm text-muted-foreground">

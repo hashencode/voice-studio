@@ -8,10 +8,10 @@ import {
   SidebarMenuButton,
   SidebarMenuItem,
 } from "@/components/ui/sidebar";
-import type { ShellSection } from "@shared/contracts";
+import type { RendererShellSection } from "@/features/shell/context-pane-contract";
 
 export interface ShellNavigationItem {
-  section: ShellSection;
+  section: RendererShellSection;
   title: string;
   icon: LucideIcon;
 }
@@ -22,10 +22,16 @@ export function NavMain({
   onNavigate,
 }: {
   items: readonly ShellNavigationItem[];
-  current: ShellSection;
-  onNavigate: (section: ShellSection) => void;
+  current: RendererShellSection;
+  onNavigate: (section: RendererShellSection) => void;
 }) {
   const buttons = React.useRef<Array<HTMLButtonElement | null>>([]);
+  const [rovingSection, setRovingSection] =
+    React.useState<RendererShellSection | null>(null);
+  const rovingIndex = Math.max(
+    0,
+    items.findIndex((item) => item.section === (rovingSection ?? current)),
+  );
 
   const handleKeyDown = (
     event: React.KeyboardEvent<HTMLButtonElement>,
@@ -39,12 +45,15 @@ export function NavMain({
     else if (event.key === "End") target = items.length - 1;
     else return;
     event.preventDefault();
+    const targetItem = items[target];
+    if (!targetItem) return;
+    setRovingSection(targetItem.section);
     buttons.current[target]?.focus();
   };
 
   return (
     <SidebarGroup>
-      <SidebarGroupLabel>工作台</SidebarGroupLabel>
+      <SidebarGroupLabel className="sr-only">工作台</SidebarGroupLabel>
       <SidebarMenu>
         {items.map((item, index) => (
           <SidebarMenuItem key={item.section}>
@@ -53,14 +62,20 @@ export function NavMain({
                 buttons.current[index] = node;
               }}
               type="button"
-              tooltip={item.title}
+              tooltip={{ children: item.title, hidden: false }}
               isActive={current === item.section}
+              tabIndex={rovingIndex === index ? 0 : -1}
               aria-current={current === item.section ? "page" : undefined}
-              onClick={() => onNavigate(item.section)}
+              aria-label={item.title}
+              className="mx-auto size-10 justify-center p-0"
+              onClick={() => {
+                setRovingSection(item.section);
+                onNavigate(item.section);
+              }}
               onKeyDown={(event) => handleKeyDown(event, index)}
             >
               <item.icon aria-hidden="true" />
-              <span>{item.title}</span>
+              <span className="sr-only">{item.title}</span>
             </SidebarMenuButton>
           </SidebarMenuItem>
         ))}

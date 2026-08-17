@@ -4,14 +4,21 @@ import { afterEach } from "vitest";
 
 afterEach(() => {
   if (typeof document !== "undefined") cleanup();
-  if (typeof window !== "undefined") window.localStorage.clear();
+  if (typeof window !== "undefined") {
+    window.localStorage.clear();
+    Object.defineProperty(window, "innerWidth", {
+      configurable: true,
+      value: 1024,
+      writable: true,
+    });
+  }
 });
 
 if (typeof window !== "undefined") {
   Object.defineProperty(window, "matchMedia", {
     configurable: true,
     value: (query: string) => ({
-      matches: false,
+      matches: mediaQueryMatches(query, window.innerWidth),
       media: query,
       onchange: null,
       addEventListener: () => undefined,
@@ -21,6 +28,14 @@ if (typeof window !== "undefined") {
       dispatchEvent: () => false,
     }),
   });
+}
+
+function mediaQueryMatches(query: string, width: number): boolean {
+  const maxWidth = query.match(/max-width:\s*(\d+)px/);
+  if (maxWidth) return width <= Number(maxWidth[1]);
+  const minWidth = query.match(/min-width:\s*(\d+)px/);
+  if (minWidth) return width >= Number(minWidth[1]);
+  return false;
 }
 
 class TestResizeObserver {

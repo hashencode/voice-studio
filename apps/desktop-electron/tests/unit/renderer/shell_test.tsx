@@ -2,9 +2,11 @@
 
 import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
+import { createRef } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import App from "../../../src/renderer/App";
+import { ContextPaneShell } from "../../../src/renderer/features/shell/context-pane-shell";
 import type {
   ApplicationSnapshot,
   ProcessingTask,
@@ -38,6 +40,7 @@ function installApi(
   snapshot: ApplicationSnapshot,
   overrides: Partial<Voice2TextDesktopApi> = {},
 ) {
+  let current = snapshot;
   const api: Voice2TextDesktopApi = {
     ...companionRendererStubs(),
     getAiSettings: vi.fn(async () => testAiSettings()),
@@ -74,12 +77,15 @@ function installApi(
     retryFormalTranscript: vi.fn(),
     onCaptionSnapshot: vi.fn(() => () => undefined),
     onOperationEvent: vi.fn(() => () => undefined),
-    getApplicationSnapshot: vi.fn(async () => snapshot),
-    navigate: vi.fn(async (section) => ({
-      ...snapshot,
-      revision: snapshot.revision + 1,
-      navigation: { section },
-    })),
+    getApplicationSnapshot: vi.fn(async () => current),
+    navigate: vi.fn(async (section) => {
+      current = {
+        ...current,
+        revision: current.revision + 1,
+        navigation: { section },
+      };
+      return current;
+    }),
     requestBootstrapAction: vi.fn(async () => snapshot),
     onApplicationSnapshot: vi.fn(() => () => undefined),
     ...overrides,
@@ -126,8 +132,15 @@ describe("application shell", () => {
     ).toBeVisible();
 
     const navigation = screen.getByRole("navigation", { name: "工作站主导航" });
-    const library = within(navigation).getByRole("button", { name: "会议库" });
-    expect(library).toHaveAttribute("aria-current", "page");
+    const audio = within(navigation).getByRole("button", { name: "音频" });
+    expect(audio).toHaveAttribute("aria-current", "page");
+    expect(within(navigation).getAllByRole("button")).toHaveLength(3);
+    expect(
+      within(navigation).queryByRole("button", { name: "转写任务" }),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.getByRole("complementary", { name: "音频上下文面板" }),
+    ).toHaveAttribute("data-presentation", "docked");
 
     expect(
       screen.getByRole("complementary", { name: "录制工作区" }),
@@ -136,6 +149,97 @@ describe("application shell", () => {
     await waitFor(() => expect(api.navigate).toHaveBeenCalledWith("settings"));
     expect(
       screen.getByRole("complementary", { name: "录制工作区" }),
+    ).toBeVisible();
+  });
+
+  it("keeps independent first-use pane preferences and hides settings without writing", async () => {
+    const api = installApi(readySnapshot);
+    const writes = vi.spyOn(Storage.prototype, "setItem");
+    const user = userEvent.setup();
+    render(<App />);
+
+    const navigation = await screen.findByRole("navigation", {
+      name: "工作站主导航",
+    });
+    expect(
+      screen.getByRole("complementary", { name: "音频上下文面板" }),
+    ).toBeVisible();
+    expect(writes).not.toHaveBeenCalled();
+
+    await user.click(within(navigation).getByRole("button", { name: "设置" }));
+    await waitFor(() => expect(api.navigate).toHaveBeenCalledWith("settings"));
+    expect(screen.queryByLabelText("上下文面板")).not.toBeInTheDocument();
+    expect(writes).not.toHaveBeenCalled();
+
+    await user.click(within(navigation).getByRole("button", { name: "互联" }));
+    expect(
+      await screen.findByRole("complementary", { name: "互联上下文面板" }),
+    ).toBeVisible();
+    await user.click(
+      screen.getByRole("button", { name: "关闭互联上下文面板" }),
+    );
+    expect(writes).toHaveBeenCalledTimes(1);
+
+    await user.click(within(navigation).getByRole("button", { name: "音频" }));
+    expect(
+      await screen.findByRole("complementary", { name: "音频上下文面板" }),
+    ).toBeVisible();
+    expect(writes).toHaveBeenCalledTimes(1);
+
+    await user.click(within(navigation).getByRole("button", { name: "互联" }));
+    expect(
+      screen.queryByRole("complementary", { name: "互联上下文面板" }),
+    ).not.toBeInTheDocument();
+    expect(writes).toHaveBeenCalledTimes(1);
+  });
+
+  it("restores persisted pane preferences independently", async () => {
+    window.localStorage.setItem(
+      "voice2text.shell.context-panes.v1",
+      JSON.stringify({ audio: "closed", companion: "open" }),
+    );
+    const api = installApi(readySnapshot);
+    const user = userEvent.setup();
+    render(<App />);
+
+    expect(
+      await screen.findByRole("button", { name: "打开音频上下文面板" }),
+    ).toBeVisible();
+    expect(
+      screen.queryByRole("complementary", { name: "音频上下文面板" }),
+    ).not.toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: "互联" }));
+    await waitFor(() => expect(api.navigate).toHaveBeenCalledWith("companion"));
+    expect(
+      screen.getByRole("complementary", { name: "互联上下文面板" }),
+    ).toBeVisible();
+  });
+
+  it("does not treat context-pane child controls as dismissal", async () => {
+    const onRequestClose = vi.fn();
+    const triggerRef = createRef<HTMLButtonElement>();
+    const user = userEvent.setup();
+    render(
+      <>
+        <button ref={triggerRef} type="button">
+          trigger
+        </button>
+        <ContextPaneShell
+          section="audio"
+          presentation="overlay"
+          triggerRef={triggerRef}
+          onRequestClose={onRequestClose}
+        >
+          <button type="button">选择音频 A</button>
+        </ContextPaneShell>
+      </>,
+    );
+
+    await user.click(screen.getByRole("button", { name: "选择音频 A" }));
+    expect(onRequestClose).not.toHaveBeenCalled();
+    expect(
+      screen.getByRole("complementary", { name: "音频上下文面板" }),
     ).toBeVisible();
   });
 
@@ -179,7 +283,7 @@ describe("application shell", () => {
   });
 
   it("announces offline and unavailable capability without color-only meaning", async () => {
-    installApi({
+    const api = installApi({
       ...readySnapshot,
       connectivity: "offline",
       capability: {
@@ -195,6 +299,11 @@ describe("application shell", () => {
     ).toHaveTextContent("离线");
     expect(screen.getByRole("alert")).toHaveTextContent(
       "当前设备缺少本地处理运行时",
+    );
+    await waitFor(() => expect(api.navigate).toHaveBeenCalledWith("library"));
+    expect(screen.getByRole("button", { name: "音频" })).toHaveAttribute(
+      "aria-current",
+      "page",
     );
   });
 
@@ -246,11 +355,11 @@ describe("application shell", () => {
     ).toBeVisible();
 
     const reviewTasks = screen.getByRole("button", {
-      name: "前往转写任务并选择重试",
+      name: "查看相关音频并选择重试",
     });
     reviewTasks.focus();
     await user.keyboard("{Enter}");
-    await waitFor(() => expect(api.navigate).toHaveBeenCalledWith("tasks"));
+    expect(api.navigate).not.toHaveBeenCalled();
     expect(
       await screen.findByRole("button", { name: "重试 中断的周会.wav" }),
     ).toBeEnabled();
