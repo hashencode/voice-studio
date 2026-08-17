@@ -8,7 +8,7 @@ import 'package:sqflite/sqflite.dart';
 import '../../../data/sqlite/app_database.dart';
 import '../../records/model/recording_entity.dart';
 import '../../records/repository/recordings_repository.dart';
-import '../../records/service/meeting_deletion_coordinator.dart';
+import '../../records/service/audio_deletion_coordinator.dart';
 import '../service/android_companion_platform.dart';
 
 class MobileCompanionPeer {
@@ -55,18 +55,17 @@ class MobileCompanionRepository {
   MobileCompanionRepository({
     AppDatabase? database,
     RecordingsRepository? recordingsRepository,
-    MeetingDeletionCoordinator? deletionCoordinator,
+    AudioDeletionCoordinator? deletionCoordinator,
     CompanionPlatformPort platform = const AndroidCompanionPlatform(),
   }) : _database = database ?? AppDatabase.instance,
        _recordingsRepository =
            recordingsRepository ?? RecordingsRepository(database: database),
-       _deletionCoordinator =
-           deletionCoordinator ?? MeetingDeletionCoordinator(),
+       _deletionCoordinator = deletionCoordinator ?? AudioDeletionCoordinator(),
        _platform = platform;
 
   final AppDatabase _database;
   final RecordingsRepository _recordingsRepository;
-  final MeetingDeletionCoordinator _deletionCoordinator;
+  final AudioDeletionCoordinator _deletionCoordinator;
   final CompanionPlatformPort _platform;
 
   Future<CompanionIdentity> identity() async {
@@ -224,7 +223,7 @@ class MobileCompanionRepository {
     if (recording == null) {
       throw const CompanionProtocolException(
         'SOURCE_MISSING',
-        'Mobile meeting no longer exists.',
+        'Mobile audio no longer exists.',
       );
     }
     final source = File(recording.filePath);

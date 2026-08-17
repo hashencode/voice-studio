@@ -35,8 +35,8 @@ python3 benchmark/evaluate_speaker_diarization.py
 python3 benchmark/validate_speaker_diarization_candidates.py
 
 echo "[6/19] Paired-PC provider protocol contract"
-python3 -m unittest tool/test_validate_meeting_intelligence_provider_contract.py
-python3 tool/validate_meeting_intelligence_provider_contract.py
+python3 -m unittest tool/test_validate_audio_intelligence_provider_contract.py
+python3 tool/validate_audio_intelligence_provider_contract.py
 
 echo "[7/19] Companion media transfer protocol contract"
 python3 -m unittest tool/test_validate_companion_media_transfer_contract.py
@@ -73,11 +73,9 @@ dart test \
   packages/audio_workflows \
   packages/companion_protocol \
   packages/desktop_sherpa_worker \
-  packages/meeting_core \
-  packages/processing_contracts \
-  packages/meeting_workflows
+  packages/processing_contracts
 python3 tool/build_cache_guard.py
-flutter test packages/meeting_storage/test
+flutter test packages/audio_storage/test
 
 echo "[14/19] Flutter analyze"
 python3 tool/build_cache_guard.py
@@ -133,13 +131,13 @@ assert (root / model["licensePath"]).is_file()
 assert (root / manifest["generation"]["script"]).is_file()
 PY
 
-echo "[mobile flow] Meeting flow harness contract"
-test -f "$MOBILE_ROOT/integration_test/meeting_offline_flow_test.dart"
-test -f "$MOBILE_ROOT/integration_test/meeting_recovery_flow_test.dart"
-test -f "$MOBILE_ROOT/integration_test/meeting_intelligence_flow_test.dart"
+echo "[mobile flow] Audio flow harness contract"
+test -f "$MOBILE_ROOT/integration_test/audio_offline_flow_test.dart"
+test -f "$MOBILE_ROOT/integration_test/audio_recovery_flow_test.dart"
+test -f "$MOBILE_ROOT/integration_test/audio_intelligence_flow_test.dart"
 test -f "$MOBILE_ROOT/integration_test/u8_companion_lan_smoke_test.dart"
-test -x tool/run_meeting_flow_smoke.sh
-test -x tool/run_deepseek_meeting_smoke.sh
+test -x tool/run_audio_flow_smoke.sh
+test -x tool/run_deepseek_audio_smoke.sh
 test -f "$MOBILE_ROOT/android/app/src/androidTest/AndroidManifest.xml"
 test -f "$MOBILE_ROOT/android/app/src/androidTest/java/com/voice2text/app/test/ShareReceiverActivity.java"
 

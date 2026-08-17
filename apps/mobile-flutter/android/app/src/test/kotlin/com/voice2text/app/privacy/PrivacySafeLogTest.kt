@@ -31,7 +31,7 @@ class PrivacySafeLogTest {
     fun `formatter rejects an unsafe event name`() {
         assertEquals(
             "event=invalid_event",
-            PrivacySafeLog.format("meeting title: confidential"),
+            PrivacySafeLog.format("audio title: confidential"),
         )
     }
 }

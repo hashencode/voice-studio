@@ -31,7 +31,7 @@ void main() {
   });
 
   test('non-AI export keeps anonymous speaker labels and timestamps', () {
-    final output = NonAiMeetingExport.toWebVtt(const [
+    final output = NonAiAudioExport.toWebVtt(const [
       ProcessingTranscriptSegment(
         startSeconds: 1.25,
         endSeconds: 2.5,
@@ -54,7 +54,7 @@ void main() {
         const ProcessingJobSupervisor().run(
           engine: engine,
           request: const ProcessingRequest(
-            sourcePath: 'private/meeting.wav',
+            sourcePath: 'private/audio.wav',
             sourceSha256:
                 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
             durationSeconds: 10,
@@ -72,7 +72,7 @@ void main() {
   );
 
   test('review correction preserves timing and anonymous speaker identity', () {
-    final review = ReviewableMeetingTranscript(const [
+    final review = ReviewableAudioTranscript(const [
       ProcessingTranscriptSegment(
         startSeconds: 2,
         endSeconds: 3,

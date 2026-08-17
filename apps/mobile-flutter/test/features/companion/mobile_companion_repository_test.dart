@@ -65,30 +65,33 @@ void main() {
     },
   );
 
-  test('v1 invitation is rejected before peer or credential mutation', () async {
-    await expectLater(
-      repository.acceptPairingInvite(
-        encodedPayload: _invite(
-          code: '123456',
-          schema: 'companion-media-transfer/v1',
+  test(
+    'v1 invitation is rejected before peer or credential mutation',
+    () async {
+      await expectLater(
+        repository.acceptPairingInvite(
+          encodedPayload: _invite(
+            code: '123456',
+            schema: 'companion-media-transfer/v1',
+          ),
+          confirmedShortCode: '123456',
+          nowMs: 1000,
         ),
-        confirmedShortCode: '123456',
-        nowMs: 1000,
-      ),
-      throwsA(
-        isA<CompanionProtocolException>().having(
-          (error) => error.code,
-          'code',
-          'UNSUPPORTED_COMPANION_PROTOCOL',
+        throwsA(
+          isA<CompanionProtocolException>().having(
+            (error) => error.code,
+            'code',
+            'UNSUPPORTED_COMPANION_PROTOCOL',
+          ),
         ),
-      ),
-    );
-    expect(await database.query('companion_peers'), isEmpty);
-    expect(platform.values, isEmpty);
-  });
+      );
+      expect(await database.query('companion_peers'), isEmpty);
+      expect(platform.values, isEmpty);
+    },
+  );
 
   test(
-    'expired invitation and unpair fail closed without deleting meetings',
+    'expired invitation and unpair fail closed without deleting audios',
     () async {
       await expectLater(
         repository.acceptPairingInvite(
@@ -111,14 +114,14 @@ void main() {
       );
       await database.insert('recordings', <String, Object?>{
         'file_path': '/private/mobile.wav',
-        'display_name': 'Mobile meeting',
+        'display_name': 'Mobile audio',
         'group_name': null,
         'deleted_at_ms': null,
         'is_favorite': 0,
         'session_id': null,
         'asset_kind': 'recording',
         'fingerprint_sha256': 'a'.padRight(64, 'a'),
-        'source_display_name': 'Mobile meeting',
+        'source_display_name': 'Mobile audio',
         'deletion_state': 'active',
         'duration_ms': 1000,
         'created_at_ms': 1,

@@ -1,6 +1,6 @@
 import 'package:flutter/foundation.dart';
 
-import '../features/importing/service/meeting_media_import_port.dart';
+import '../features/importing/service/audio_media_import_port.dart';
 import '../features/recording/engine/android_recorder_engine.dart';
 import '../features/recording/engine/recorder_port.dart';
 import '../features/recording/engine/unavailable_recorder_engine.dart';
@@ -22,7 +22,7 @@ class AppPlatformComposition {
       return AppPlatformComposition(
         transcriptionPort: AndroidTranscriptionService(),
         recorderPort: AndroidRecorderEngine(),
-        mediaImportPort: AndroidMeetingMediaImportPort(),
+        mediaImportPort: AndroidAudioMediaImportPort(),
         recordingRecoveryEnabled: true,
         notificationPermissionEnabled: true,
       );
@@ -31,7 +31,7 @@ class AppPlatformComposition {
     return AppPlatformComposition(
       transcriptionPort: UnavailableTranscriptionService(platform: platform),
       recorderPort: UnavailableRecorderEngine(platform: platform),
-      mediaImportPort: const UnavailableMeetingMediaImportPort(),
+      mediaImportPort: const UnavailableAudioMediaImportPort(),
       recordingRecoveryEnabled: false,
       notificationPermissionEnabled: false,
     );
@@ -39,7 +39,7 @@ class AppPlatformComposition {
 
   final TranscriptionPort transcriptionPort;
   final RecorderPort recorderPort;
-  final MeetingMediaImportPort mediaImportPort;
+  final AudioMediaImportPort mediaImportPort;
   final bool recordingRecoveryEnabled;
   final bool notificationPermissionEnabled;
 }

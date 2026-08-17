@@ -3,7 +3,7 @@ import 'dart:convert';
 import 'package:sqflite/sqflite.dart';
 
 import '../../../data/sqlite/app_database.dart';
-import '../model/meeting_speaker_entity.dart';
+import '../model/audio_speaker_entity.dart';
 import '../model/speaker_turn_entity.dart';
 
 class SpeakerTurnDraft {
@@ -70,7 +70,7 @@ class SpeakerRepository {
       final speakerIds = <String, int>{};
       for (var index = 0; index < keys.length; index++) {
         final key = keys[index];
-        await transaction.insert('meeting_speakers', <String, Object?>{
+        await transaction.insert('audio_speakers', <String, Object?>{
           'recording_id': recordingId,
           'generation_id': generationId,
           'stable_key': key,
@@ -80,7 +80,7 @@ class SpeakerRepository {
           'updated_at_ms': now,
         }, conflictAlgorithm: ConflictAlgorithm.ignore);
         final rows = await transaction.query(
-          'meeting_speakers',
+          'audio_speakers',
           columns: <String>['id'],
           where: 'generation_id = ? AND stable_key = ?',
           whereArgs: <Object>[generationId, key],
@@ -129,15 +129,15 @@ class SpeakerRepository {
     });
   }
 
-  Future<List<MeetingSpeakerEntity>> listSpeakers(int generationId) async {
+  Future<List<AudioSpeakerEntity>> listSpeakers(int generationId) async {
     final db = await _database.database;
     final rows = await db.query(
-      'meeting_speakers',
+      'audio_speakers',
       where: 'generation_id = ?',
       whereArgs: <Object>[generationId],
       orderBy: 'id ASC',
     );
-    return rows.map(MeetingSpeakerEntity.fromMap).toList(growable: false);
+    return rows.map(AudioSpeakerEntity.fromMap).toList(growable: false);
   }
 
   Future<List<SpeakerTurnEntity>> listTurns(int generationId) async {
@@ -181,7 +181,7 @@ class SpeakerRepository {
     final db = await _database.database;
     await db.transaction<void>((transaction) async {
       final rows = await transaction.query(
-        'meeting_speakers',
+        'audio_speakers',
         where: 'id = ?',
         whereArgs: <Object>[speakerId],
         limit: 1,
@@ -192,7 +192,7 @@ class SpeakerRepository {
       if (previous == normalized) return;
       final now = DateTime.now().millisecondsSinceEpoch;
       await transaction.update(
-        'meeting_speakers',
+        'audio_speakers',
         <String, Object?>{
           'display_name': normalized,
           'source': 'manual',

@@ -1,6 +1,6 @@
 import 'package:audio_core/audio_core.dart';
 
-/// Input shared by future Audio workflows without retaining Meeting aliases.
+/// Input shared by future Audio workflows without retaining Audio aliases.
 final class AudioWorkflowTarget {
   const AudioWorkflowTarget({required this.audioId});
 

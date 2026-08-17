@@ -344,7 +344,7 @@ void main() {
           ),
           RecordingInputDevice(
             id: 42,
-            name: '会议耳机',
+            name: '音频耳机',
             type: RecordingInputDeviceType.bluetooth,
             canSelect: true,
           ),
@@ -408,7 +408,7 @@ void main() {
           ),
           RecordingInputDevice(
             id: 42,
-            name: '会议耳机',
+            name: '音频耳机',
             type: RecordingInputDeviceType.bluetooth,
             canSelect: true,
           ),
@@ -462,7 +462,7 @@ void main() {
           ),
           RecordingInputDevice(
             id: 42,
-            name: '会议耳机',
+            name: '音频耳机',
             type: RecordingInputDeviceType.bluetooth,
             canSelect: true,
           ),

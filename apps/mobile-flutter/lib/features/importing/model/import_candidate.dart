@@ -1,5 +1,5 @@
-import 'package:meeting_core/meeting_core.dart';
+import 'package:audio_core/audio_core.dart';
 
-export 'package:meeting_core/meeting_core.dart' show MeetingMediaCandidate;
+export 'package:audio_core/audio_core.dart' show AudioMediaCandidate;
 
-typedef ImportCandidate = MeetingMediaCandidate;
+typedef ImportCandidate = AudioMediaCandidate;

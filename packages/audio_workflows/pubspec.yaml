@@ -10,6 +10,7 @@ resolution: workspace
 
 dependencies:
   audio_core: any
+  processing_contracts: any
 
 dev_dependencies:
   test: any

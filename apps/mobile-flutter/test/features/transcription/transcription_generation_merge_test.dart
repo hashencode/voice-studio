@@ -15,7 +15,7 @@ void main() {
     () async {
       final fixture = await openRecordingTestDatabase();
       addTearDown(fixture.database.close);
-      const path = '/meetings/retry-generation.m4a';
+      const path = '/audios/retry-generation.m4a';
       final recordingId = await _insertRecording(
         fixture.appDatabase,
         fixture.database,
@@ -57,7 +57,7 @@ void main() {
       for (final protection in <String>['edit', 'evidence']) {
         final fixture = await openRecordingTestDatabase();
         try {
-          final path = '/meetings/protected-$protection.m4a';
+          final path = '/audios/protected-$protection.m4a';
           final recordingId = await _insertRecording(
             fixture.appDatabase,
             fixture.database,
@@ -102,7 +102,7 @@ void main() {
     () async {
       final fixture = await openRecordingTestDatabase();
       addTearDown(fixture.database.close);
-      const path = '/meetings/rollback.m4a';
+      const path = '/audios/rollback.m4a';
       await _insertRecording(fixture.appDatabase, fixture.database, path);
       final jobs = TranscriptionJobsRepository(database: fixture.appDatabase);
       final job = await _claim(jobs, path);

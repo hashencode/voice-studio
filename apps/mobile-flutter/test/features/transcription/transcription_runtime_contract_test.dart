@@ -22,11 +22,11 @@ void main() {
           .setMockMethodCallHandler(channel, (MethodCall call) async {
             captured = call;
             return <String, Object?>{
-              'mergedText': '会议转写',
+              'mergedText': '音频转写',
               'segments': <Map<String, Object?>>[
                 <String, Object?>{
                   'sequenceId': 0,
-                  'text': '会议转写',
+                  'text': '音频转写',
                   'startMs': 0,
                   'endMs': 1200,
                   'isFinal': true,
@@ -40,7 +40,7 @@ void main() {
       final TranscriptionResult result = await AndroidTranscriptionService()
           .transcribe(
             TranscriptionRequest(
-              recordingPath: '/private/meeting.m4a',
+              recordingPath: '/private/audio.m4a',
               durationMs: 1200,
               modelId: 'paraformer-zh',
               attemptCount: 3,
@@ -48,7 +48,7 @@ void main() {
             jobId: 41,
           );
 
-      expect(result.mergedText, '会议转写');
+      expect(result.mergedText, '音频转写');
       expect(result.segments, hasLength(1));
       expect(result.segments.single.confidence, isNull);
       expect(captured?.method, 'transcribe');

@@ -1,7 +1,7 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:voice2text_flutter/app/platform_composition.dart';
-import 'package:voice2text_flutter/features/importing/service/meeting_import_service.dart';
+import 'package:voice2text_flutter/features/importing/service/audio_import_service.dart';
 import 'package:voice2text_flutter/features/recording/engine/recorder_port.dart';
 import 'package:voice2text_flutter/features/recording/engine/unavailable_recorder_engine.dart';
 import 'package:voice2text_flutter/features/transcription/service/transcription_port.dart';
@@ -14,7 +14,7 @@ void main() {
       final composition = AppPlatformComposition.forTarget(
         TargetPlatform.macOS,
       );
-      final importService = MeetingImportService(
+      final importService = AudioImportService(
         mediaImportPort: composition.mediaImportPort,
       );
       addTearDown(importService.dispose);
@@ -39,7 +39,7 @@ void main() {
       await expectLater(
         composition.transcriptionPort.transcribe(
           TranscriptionRequest(
-            recordingPath: '/private/meeting.wav',
+            recordingPath: '/private/audio.wav',
             durationMs: 1000,
             modelId: 'test',
           ),
@@ -59,7 +59,7 @@ void main() {
       await expectLater(
         importService.pickAndImport(),
         throwsA(
-          isA<MeetingImportException>().having(
+          isA<AudioImportException>().having(
             (failure) => failure.code,
             'code',
             'IMPORT_CAPABILITY_UNAVAILABLE',

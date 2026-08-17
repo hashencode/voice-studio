@@ -9,8 +9,8 @@ MANIFEST="$MOBILE_ROOT/android/app/src/main/AndroidManifest.xml"
 BACKUP_RULES="$MOBILE_ROOT/android/app/src/main/res/xml/backup_rules.xml"
 EXTRACTION_RULES="$MOBILE_ROOT/android/app/src/main/res/xml/data_extraction_rules.xml"
 FILE_PATHS="$MOBILE_ROOT/android/app/src/main/res/xml/file_paths.xml"
-SECRET_STORE="$MOBILE_ROOT/android/app/src/main/kotlin/com/voice2text/app/privacy/MeetingApiSecretStore.kt"
-DEEPSEEK_PROVIDER="$MOBILE_ROOT/lib/features/meeting_intelligence/service/deepseek_meeting_intelligence_provider.dart"
+SECRET_STORE="$MOBILE_ROOT/android/app/src/main/kotlin/com/voice2text/app/privacy/AudioApiSecretStore.kt"
+DEEPSEEK_PROVIDER="$MOBILE_ROOT/lib/features/audio_intelligence/service/deepseek_audio_intelligence_provider.dart"
 COMPANION_ANDROID_STORE="$MOBILE_ROOT/android/app/src/main/kotlin/com/voice2text/app/companion/CompanionCredentialStore.kt"
 COMPANION_ANDROID_PLATFORM="$MOBILE_ROOT/android/app/src/main/kotlin/com/voice2text/app/companion/CompanionPlatformPlugin.kt"
 COMPANION_CRYPTO="packages/companion_protocol/lib/src/companion_crypto.dart"
@@ -34,13 +34,13 @@ require_literal "$MANIFEST" '<uses-permission android:name="android.permission.I
 require_literal "$BACKUP_RULES" '<exclude domain="database" path="." />'
 require_literal "$BACKUP_RULES" '<exclude domain="sharedpref" path="." />'
 require_literal "$BACKUP_RULES" '<exclude domain="device_sharedpref" path="." />'
-require_literal "$BACKUP_RULES" '<exclude domain="file" path="meetings" />'
+require_literal "$BACKUP_RULES" '<exclude domain="file" path="audios" />'
 require_literal "$BACKUP_RULES" '<exclude domain="file" path="logs" />'
 require_literal "$BACKUP_RULES" '<exclude domain="file" path="diagnostics" />'
 require_literal "$EXTRACTION_RULES" '<exclude domain="database" path="." />'
 require_literal "$EXTRACTION_RULES" '<exclude domain="sharedpref" path="." />'
 require_literal "$EXTRACTION_RULES" '<exclude domain="device_sharedpref" path="." />'
-require_literal "$EXTRACTION_RULES" '<exclude domain="file" path="meetings" />'
+require_literal "$EXTRACTION_RULES" '<exclude domain="file" path="audios" />'
 require_literal "$EXTRACTION_RULES" '<exclude domain="file" path="logs" />'
 require_literal "$EXTRACTION_RULES" '<exclude domain="file" path="diagnostics" />'
 require_literal "$EXTRACTION_RULES" '<cloud-backup>'
@@ -58,7 +58,7 @@ require_literal "$COMPANION_CRYPTO" 'Hkdf(hmac: Hmac.sha256(), outputLength: 64)
 require_literal "$COMPANION_CRYPTO" 'AesGcm.with256bits()'
 require_literal "$COMPANION_CRYPTO" "'REPLAY_REJECTED'"
 
-require_literal "$FILE_PATHS" 'path="meetings/exports/"'
+require_literal "$FILE_PATHS" 'path="audios/exports/"'
 require_literal "$FILE_PATHS" 'path="voice2text/sharing/ephemeral/"'
 if rg -q '<root-path|<external-path' "$FILE_PATHS" ||
   rg -Fq 'path="."' "$FILE_PATHS" ||
@@ -68,10 +68,10 @@ fi
 
 if rg -n \
   'https?://|Authorization|Bearer |api[_-]?key|client[_-]?secret' \
-  "$MOBILE_ROOT/lib/features/meeting_intelligence" \
-  -g '!deepseek_meeting_intelligence_provider.dart' \
-  -g '!meeting_intelligence_http_client.dart' >/dev/null; then
-  fail "meeting intelligence code outside the isolated transport contains an endpoint or credential shape"
+  "$MOBILE_ROOT/lib/features/audio_intelligence" \
+  -g '!deepseek_audio_intelligence_provider.dart' \
+  -g '!audio_intelligence_http_client.dart' >/dev/null; then
+  fail "audio intelligence code outside the isolated transport contains an endpoint or credential shape"
 fi
 
 if rg -q 'sk-[A-Za-z0-9]{20,}' \
@@ -100,12 +100,12 @@ if rg -n '\b(debugPrint|print)\(' \
 fi
 
 if rg -n \
-  '\b(recordingPath|recording_path|resultText|transcriptText|meetingTitle|filePath|displayName|uri|content|message)\b\s+to\b' \
+  '\b(recordingPath|recording_path|resultText|transcriptText|audioTitle|filePath|displayName|uri|content|message)\b\s+to\b' \
   "$MOBILE_ROOT/android/app/src/main/kotlin/com/voice2text/app/MainActivity.kt" >/dev/null ||
   rg -n \
-    "['\"](recordingPath|recording_path|resultText|transcriptText|meetingTitle|filePath|displayName|uri|content|message)['\"]\\s*:" \
+    "['\"](recordingPath|recording_path|resultText|transcriptText|audioTitle|filePath|displayName|uri|content|message)['\"]\\s*:" \
     "$MOBILE_ROOT/lib/app/app.dart" >/dev/null; then
-  fail "structured production logs may expose meeting content or identifiers"
+  fail "structured production logs may expose audio content or identifiers"
 fi
 
 if rg -q 'android:usesCleartextTraffic="true"' "$MANIFEST"; then

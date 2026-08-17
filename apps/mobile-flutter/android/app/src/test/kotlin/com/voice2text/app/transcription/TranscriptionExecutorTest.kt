@@ -190,7 +190,7 @@ class TranscriptionExecutorTest {
         enablePunctuation: Boolean = false,
     ) =
         TranscriptionRequest(
-            recordingPath = "/private/meeting.m4a",
+            recordingPath = "/private/audio.m4a",
             durationMs = 1000,
             modelId = modelId,
             sampleRateHz = 16000,

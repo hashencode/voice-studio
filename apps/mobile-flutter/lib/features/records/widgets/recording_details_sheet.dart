@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_ui_mobile/flutter_ui_mobile.dart';
 
 import '../../../app/router.dart';
-import '../../meetings/meeting_detail_page.dart';
+import '../../audios/audio_detail_page.dart';
 import '../../shared/utils/formatters.dart';
 import '../../transcription/model/transcription_job_entity.dart';
 
@@ -79,8 +79,8 @@ Future<void> showRecordingDetailsSheet({
                   child: GooButton(
                     iconName: GooIcons.play,
                     onPressed: () =>
-                        controller.closeWithResult(AppRoutes.meetingDetail),
-                    child: const Text('打开会议工作区'),
+                        controller.closeWithResult(AppRoutes.audioDetail),
+                    child: const Text('打开音频工作区'),
                   ),
                 ),
               ],
@@ -89,10 +89,10 @@ Future<void> showRecordingDetailsSheet({
         },
   );
   if (!context.mounted || destination == null) return;
-  if (destination == AppRoutes.meetingDetail) {
+  if (destination == AppRoutes.audioDetail) {
     await Navigator.of(context).pushNamed(
       destination,
-      arguments: MeetingDetailArguments(recordingId: recordingId!),
+      arguments: AudioDetailArguments(recordingId: recordingId!),
     );
     return;
   }

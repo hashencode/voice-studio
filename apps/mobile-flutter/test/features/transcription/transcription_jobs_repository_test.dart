@@ -1,78 +1,9 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:sqflite_common_ffi/sqflite_ffi.dart';
-import 'package:voice2text_flutter/data/sqlite/app_database.dart';
 import 'package:voice2text_flutter/features/transcription/repository/transcription_jobs_repository.dart';
 
 import '../recording/recording_test_database.dart';
 
 void main() {
-  test(
-    'v12 migration preserves jobs and resolves duplicate active keys',
-    () async {
-      sqfliteFfiInit();
-      final database = await databaseFactoryFfi.openDatabase(
-        inMemoryDatabasePath,
-      );
-      addTearDown(database.close);
-      await database.execute('''
-      CREATE TABLE transcription_jobs (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        recording_path TEXT NOT NULL,
-        duration_ms INTEGER NOT NULL,
-        status TEXT NOT NULL,
-        recording_mode TEXT NOT NULL DEFAULT 'standard',
-        source TEXT NOT NULL DEFAULT 'standard_offline',
-        failure_stage TEXT,
-        progress REAL,
-        created_at_ms INTEGER NOT NULL,
-        updated_at_ms INTEGER NOT NULL,
-        result_text TEXT,
-        error_message TEXT
-      )
-    ''');
-      for (var index = 0; index < 2; index += 1) {
-        await database.insert('transcription_jobs', <String, Object?>{
-          'recording_path': '/legacy/meeting.m4a',
-          'duration_ms': 1000,
-          'status': 'pending',
-          'recording_mode': 'standard',
-          'source': 'standard_offline',
-          'created_at_ms': index + 1,
-          'updated_at_ms': index + 1,
-        });
-      }
-
-      await AppDatabase.migrateTranscriptionQueue(database);
-      await AppDatabase.migrateTranscriptionQueue(database);
-
-      final columns = await database.rawQuery(
-        'PRAGMA table_info(transcription_jobs)',
-      );
-      final rows = await database.query(
-        'transcription_jobs',
-        orderBy: 'id ASC',
-      );
-      expect(
-        columns.map((row) => row['name']),
-        containsAll(<String>[
-          'stage',
-          'attempt_count',
-          'cancel_requested',
-          'error_code',
-          'dedupe_key',
-          'started_at_ms',
-          'completed_at_ms',
-          'heartbeat_at_ms',
-        ]),
-      );
-      expect(rows.where((row) => row['status'] == 'pending'), hasLength(1));
-      expect(
-        rows.where((row) => row['error_code'] == 'DUPLICATE_QUEUE_JOB'),
-        hasLength(1),
-      );
-    },
-  );
-
   test('enqueue is idempotent while a matching job is active', () async {
     final fixture = await openRecordingTestDatabase();
     addTearDown(fixture.database.close);
@@ -81,12 +12,12 @@ void main() {
     );
 
     final first = await repository.enqueue(
-      recordingPath: '/meetings/one.m4a',
+      recordingPath: '/audios/one.m4a',
       durationMs: 1000,
       source: 'standard_offline',
     );
     final second = await repository.enqueue(
-      recordingPath: '/meetings/one.m4a',
+      recordingPath: '/audios/one.m4a',
       durationMs: 1000,
       source: 'standard_offline',
     );
@@ -104,11 +35,11 @@ void main() {
       database: fixture.appDatabase,
     );
     final first = await repository.enqueue(
-      recordingPath: '/meetings/first.m4a',
+      recordingPath: '/audios/first.m4a',
       durationMs: 1000,
     );
     final second = await repository.enqueue(
-      recordingPath: '/meetings/second.m4a',
+      recordingPath: '/audios/second.m4a',
       durationMs: 1000,
     );
 
@@ -128,7 +59,7 @@ void main() {
       database: fixture.appDatabase,
     );
     final processing = await repository.enqueue(
-      recordingPath: '/meetings/progress.m4a',
+      recordingPath: '/audios/progress.m4a',
       durationMs: 1000,
     );
     await repository.claimNextPending();
@@ -149,7 +80,7 @@ void main() {
     expect(progressed?.stage, 'vad');
 
     final pending = await repository.enqueue(
-      recordingPath: '/meetings/cancel.m4a',
+      recordingPath: '/audios/cancel.m4a',
       durationMs: 1000,
     );
     final cancellation = await repository.requestCancellation(pending.jobId);
@@ -166,12 +97,12 @@ void main() {
       database: fixture.appDatabase,
     );
     final nativeActive = await repository.enqueue(
-      recordingPath: '/meetings/native-active.m4a',
+      recordingPath: '/audios/native-active.m4a',
       durationMs: 1000,
     );
     await repository.claimNextPending();
     final interrupted = await repository.enqueue(
-      recordingPath: '/meetings/interrupted.m4a',
+      recordingPath: '/audios/interrupted.m4a',
       durationMs: 1000,
     );
     await repository.claimNextPending();
@@ -204,7 +135,7 @@ void main() {
         database: fixture.appDatabase,
       );
       final stale = await repository.enqueue(
-        recordingPath: '/meetings/stale.m4a',
+        recordingPath: '/audios/stale.m4a',
         durationMs: 1000,
       );
       await repository.claimNextPending();
@@ -242,7 +173,7 @@ void main() {
         database: fixture.appDatabase,
       );
       final first = await repository.enqueue(
-        recordingPath: '/meetings/repeated.m4a',
+        recordingPath: '/audios/repeated.m4a',
         durationMs: 1000,
       );
       await repository.claimNextPending();
@@ -253,27 +184,27 @@ void main() {
         message: '模型不可用',
       );
       final newest = await repository.enqueue(
-        recordingPath: '/meetings/repeated.m4a',
+        recordingPath: '/audios/repeated.m4a',
         durationMs: 1000,
       );
       final other = await repository.enqueue(
-        recordingPath: '/meetings/other.m4a',
+        recordingPath: '/audios/other.m4a',
         durationMs: 2000,
       );
 
       final jobs = await repository.findLatestByRecordingPaths(<String>[
-        '/meetings/repeated.m4a',
+        '/audios/repeated.m4a',
         ...List<String>.generate(
           501,
-          (int index) => '/meetings/missing-$index.m4a',
+          (int index) => '/audios/missing-$index.m4a',
         ),
-        '/meetings/other.m4a',
+        '/audios/other.m4a',
       ]);
 
-      expect(jobs['/meetings/repeated.m4a']?.id, newest.jobId);
-      expect(jobs['/meetings/repeated.m4a']?.status, 'pending');
-      expect(jobs['/meetings/other.m4a']?.id, other.jobId);
-      expect(jobs, isNot(contains('/meetings/missing-0.m4a')));
+      expect(jobs['/audios/repeated.m4a']?.id, newest.jobId);
+      expect(jobs['/audios/repeated.m4a']?.status, 'pending');
+      expect(jobs['/audios/other.m4a']?.id, other.jobId);
+      expect(jobs, isNot(contains('/audios/missing-0.m4a')));
     },
   );
 }

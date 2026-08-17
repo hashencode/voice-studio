@@ -1,5 +1,5 @@
 name: audio_storage
-description: Fresh-only Audio storage contract for Voice2Text applications.
+description: Fresh-only Audio SQLite schema and database factory for Voice2Text.
 publish_to: none
 version: 0.1.0
 
@@ -10,6 +10,13 @@ resolution: workspace
 
 dependencies:
   audio_core: any
+  flutter:
+    sdk: flutter
+  path: ^1.9.1
+  path_provider: ^2.1.6
+  sqflite: ^2.4.2+1
+  sqflite_common_ffi: ^2.4.0+3
 
 dev_dependencies:
-  test: any
+  flutter_test:
+    sdk: flutter

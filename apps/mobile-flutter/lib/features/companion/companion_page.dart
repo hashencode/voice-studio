@@ -56,9 +56,7 @@ class _CompanionPageState extends State<CompanionPage> {
       if (requestPermission) {
         final permission = await Permission.nearbyWifiDevices.request();
         if (!permission.isGranted) {
-          throw PlatformException(
-            code: 'LOCAL_NETWORK_PERMISSION_DENIED',
-          );
+          throw PlatformException(code: 'LOCAL_NETWORK_PERMISSION_DENIED');
         }
       }
       await _platform.startDiscovery();
@@ -247,7 +245,7 @@ class _CompanionPageState extends State<CompanionPage> {
           ),
         ],
         child: const GooText(
-          '永久删除只在 receipt 已验证后可用，会删除手机上的会议原件和本地派生数据。',
+          '永久删除只在 receipt 已验证后可用，会删除手机上的音频原件和本地派生数据。',
           variant: GooTextVariant.body,
         ),
       ),
@@ -259,7 +257,7 @@ class _CompanionPageState extends State<CompanionPage> {
         context: context,
         builder: (_) => GooDialog.confirmation(
           title: '永久删除手机原件？',
-          description: '此操作不可撤销；桌面 receipt 和桌面会议不受影响。',
+          description: '此操作不可撤销；桌面 receipt 和桌面音频不受影响。',
           actions: const <GooDialogAction>[
             GooDialogAction(label: '取消', result: false),
             GooDialogAction(
@@ -331,7 +329,7 @@ class _CompanionPageState extends State<CompanionPage> {
                         .toList(growable: false),
                   ),
                 const SizedBox(height: 20),
-                const GooText('手机会议', variant: GooTextVariant.subtitle),
+                const GooText('手机音频', variant: GooTextVariant.subtitle),
                 const SizedBox(height: 8),
                 if (_sending) ...<Widget>[
                   LinearProgressIndicator(value: _progress),
@@ -348,14 +346,14 @@ class _CompanionPageState extends State<CompanionPage> {
                   children: _recordings.isEmpty
                       ? const <Widget>[
                           GooListItem(
-                            title: '没有可发送的会议',
+                            title: '没有可发送的音频',
                             subtitle: '录音和本地导入仍可照常使用',
                           ),
                         ]
                       : _recordings
                             .map(
                               (recording) => GooListItem(
-                                title: recording.displayName ?? '未命名会议',
+                                title: recording.displayName ?? '未命名音频',
                                 subtitle:
                                     '${Duration(milliseconds: recording.durationMs).inMinutes} 分钟'
                                     ' · 点击选择已配对桌面',
@@ -407,7 +405,7 @@ String _message(String code) => switch (code) {
   'PAIRING_CODE_MISMATCH' => '六位短码不一致，未建立配对',
   'PEER_KEY_CHANGED' => '桌面身份密钥已变化，必须重新配对',
   'PAIRING_REPAIR_REQUIRED' => '配对凭据不可用，请解除后重新配对',
-  'INSUFFICIENT_DISK_SPACE' => 'Mac 空间不足，未提交会议，手机原件仍保留',
+  'INSUFFICIENT_DISK_SPACE' => 'Mac 空间不足，未提交音频，手机原件仍保留',
   'TRANSFER_CANCELED' => '传输已取消，手机原件仍保留',
   'CONNECTION_CLOSED' => '网络中断；下次只会续传缺失分块',
   _ => '传输未完成（$code），手机原件仍保留',

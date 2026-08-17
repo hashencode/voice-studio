@@ -205,7 +205,7 @@ void main() {
     await tester.pumpAndSettle();
     expect(selectionClickCount(platformCalls), 1);
 
-    await tester.tap(find.text('会议音频'));
+    await tester.tap(find.text('音频音频'));
     await tester.pumpAndSettle();
 
     expect(selectionClickCount(platformCalls), 1);

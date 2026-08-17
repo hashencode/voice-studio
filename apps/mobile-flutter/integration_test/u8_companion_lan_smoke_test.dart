@@ -11,9 +11,9 @@ void main() {
   testWidgets(
     'physical Android sends, resumes, dedupes, and retains source',
     (tester) async {
-    const host = String.fromEnvironment('U8_LAN_HOST');
-    const port = int.fromEnvironment('U8_LAN_PORT');
-    const runId = String.fromEnvironment('U8_RUN_ID', defaultValue: '1');
+      const host = String.fromEnvironment('U8_LAN_HOST');
+      const port = int.fromEnvironment('U8_LAN_PORT');
+      const runId = String.fromEnvironment('U8_RUN_ID', defaultValue: '1');
       expect(host, isNotEmpty);
       expect(port, greaterThan(0));
 
@@ -21,7 +21,7 @@ void main() {
       addTearDown(() async {
         if (await root.exists()) await root.delete(recursive: true);
       });
-      final source = File('${root.path}/u8-large-meeting.wav');
+      final source = File('${root.path}/u8-large-audio.wav');
       final sink = source.openWrite();
       const marker = 'VOICE2TEXT_U8_SECRET_MEETING_CONTENT_';
       final block = <int>[
@@ -40,9 +40,9 @@ void main() {
       expect(size, 24 * 1024 * 1024);
       final digest = await sha256.bind(source.openRead()).first;
       final manifest = CompanionTransferManifest(
-      transferId: 'u8-physical-transfer-$runId',
-      sourceAssetId: 'u8-physical-recording-$runId',
-        displayName: 'u8-large-meeting.wav',
+        transferId: 'u8-physical-transfer-$runId',
+        sourceAssetId: 'u8-physical-recording-$runId',
+        displayName: 'u8-large-audio.wav',
         sizeBytes: size,
         wholeFileSha256: digest.toString(),
         chunkBytes: companionDefaultChunkBytes,

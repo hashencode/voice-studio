@@ -13,7 +13,4 @@ workspace:
   - packages/audio_workflows
   - packages/companion_protocol
   - packages/desktop_sherpa_worker
-  - packages/meeting_core
-  - packages/meeting_storage
   - packages/processing_contracts
-  - packages/meeting_workflows

@@ -169,14 +169,14 @@ else
   add_todo "执行 flutter test 并修复失败用例"
 fi
 
-# 8) meeting product-loop and privacy boundaries
-if [[ -f "$MOBILE_ROOT/integration_test/meeting_offline_flow_test.dart" ]] &&
-   [[ -f "$MOBILE_ROOT/integration_test/meeting_recovery_flow_test.dart" ]] &&
-   [[ -x "$ROOT/tool/run_meeting_flow_smoke.sh" ]]; then
-  ok "会议离线流、恢复流和真机脚本存在"
+# 8) audio product-loop and privacy boundaries
+if [[ -f "$MOBILE_ROOT/integration_test/audio_offline_flow_test.dart" ]] &&
+   [[ -f "$MOBILE_ROOT/integration_test/audio_recovery_flow_test.dart" ]] &&
+   [[ -x "$ROOT/tool/run_audio_flow_smoke.sh" ]]; then
+  ok "音频离线流、恢复流和真机脚本存在"
 else
-  err "会议产品闭环集成测试或真机脚本缺失/不可执行"
-  add_todo "补齐 apps/mobile-flutter/integration_test/meeting_*_flow_test.dart 并 chmod +x tool/run_meeting_flow_smoke.sh"
+  err "音频产品闭环集成测试或真机脚本缺失/不可执行"
+  add_todo "补齐 apps/mobile-flutter/integration_test/audio_*_flow_test.dart 并 chmod +x tool/run_audio_flow_smoke.sh"
 fi
 
 if ./tool/check_privacy_contract.sh >/dev/null 2>&1; then

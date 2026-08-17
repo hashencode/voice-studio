@@ -13,7 +13,7 @@ void main() {
     final fixture = await openRecordingTestDatabase();
     addTearDown(fixture.database.close);
     final recordings = RecordingsRepository(database: fixture.appDatabase);
-    const path = '/meetings/segments.m4a';
+    const path = '/audios/segments.m4a';
     await recordings.insert(filePath: path, durationMs: 3000);
     final jobs = TranscriptionJobsRepository(database: fixture.appDatabase);
     final queued = await jobs.enqueue(recordingPath: path, durationMs: 3000);
@@ -48,7 +48,7 @@ void main() {
       final fixture = await openRecordingTestDatabase();
       addTearDown(fixture.database.close);
       final recordings = RecordingsRepository(database: fixture.appDatabase);
-      const path = '/meetings/review-state.m4a';
+      const path = '/audios/review-state.m4a';
       await recordings.insert(filePath: path, durationMs: 3000);
       final jobs = TranscriptionJobsRepository(database: fixture.appDatabase);
       await jobs.enqueue(recordingPath: path, durationMs: 3000);

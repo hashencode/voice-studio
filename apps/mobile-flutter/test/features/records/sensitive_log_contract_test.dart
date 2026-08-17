@@ -6,10 +6,10 @@ import 'package:voice2text_flutter/app/logging/privacy_safe_log.dart';
 void main() {
   test('Dart formatter only emits allowlisted anonymous metadata', () {
     final formatted = PrivacySafeLog.format('transcription_failed', {
-      'category': '/data/user/0/private/meeting.m4a',
+      'category': '/data/user/0/private/audio.m4a',
       'status': 'failed',
       'count': 2,
-      'title': '董事会会议',
+      'title': '董事会音频',
       'transcript': '敏感正文',
       'deviceSerial': 'stable-device-id',
     });
@@ -21,7 +21,7 @@ void main() {
     );
     for (final sensitive in <String>[
       '/data/',
-      '董事会会议',
+      '董事会音频',
       '敏感正文',
       'stable-device-id',
     ]) {
@@ -66,7 +66,7 @@ void main() {
         isNot(
           matches(
             RegExp(
-              r'\b(recordingPath|resultText|transcriptText|meetingTitle|'
+              r'\b(recordingPath|resultText|transcriptText|audioTitle|'
               r'filePath|displayName|uri|message)\b\s+to\b',
             ),
           ),
@@ -85,7 +85,7 @@ void main() {
     ];
     final forbidden = RegExp(
       r'(/data/|/storage/|content://|file://|recording_path|result_text|'
-      r'transcript|meetingTitle|deviceSerial|android_id|imei)',
+      r'transcript|audioTitle|deviceSerial|android_id|imei)',
       caseSensitive: false,
     );
 

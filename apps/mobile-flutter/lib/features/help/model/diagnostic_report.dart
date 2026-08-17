@@ -93,8 +93,8 @@ class DiagnosticReport {
     'deviceProtection': deviceProtection.toJson(),
     'transcription': transcription.toJson(),
     'privacy': const <String, Object?>{
-      'meetingContentIncluded': false,
-      'meetingTitlesIncluded': false,
+      'audioContentIncluded': false,
+      'audioTitlesIncluded': false,
       'privatePathsIncluded': false,
       'contentUrisIncluded': false,
       'stableDeviceIdentifiersIncluded': false,

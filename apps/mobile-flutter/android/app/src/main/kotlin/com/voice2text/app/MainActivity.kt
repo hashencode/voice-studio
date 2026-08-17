@@ -14,16 +14,16 @@ import com.voice2text.app.importing.DocumentImportCoordinator
 import com.voice2text.app.importing.ImportedMediaException
 import com.voice2text.app.importing.SharedMediaRequestQueue
 import com.voice2text.app.privacy.PrivacySafeLog
-import com.voice2text.app.privacy.MeetingApiSecretStore
-import com.voice2text.app.privacy.MeetingApiSecretUnavailableException
+import com.voice2text.app.privacy.AudioApiSecretStore
+import com.voice2text.app.privacy.AudioApiSecretUnavailableException
 import com.voice2text.app.recording.RecordingForegroundService
 import com.voice2text.app.recording.RecordingInputDeviceCatalog
 import com.voice2text.app.recording.RecordingRecoveryManager
 import com.voice2text.app.recording.RecordingSessionException
 import com.voice2text.app.sharing.EphemeralShareCoordinator
 import com.voice2text.app.sharing.EphemeralShareException
-import com.voice2text.app.sharing.MeetingShareCoordinator
-import com.voice2text.app.sharing.MeetingShareException
+import com.voice2text.app.sharing.AudioShareCoordinator
+import com.voice2text.app.sharing.AudioShareException
 import com.voice2text.app.transcription.TranscriptionRequest
 import com.voice2text.app.transcription.TranscriptionEventStream
 import com.voice2text.app.transcription.TranscriptionExecutor
@@ -48,10 +48,10 @@ class MainActivity : FlutterActivity() {
         transcriptionEventStream.emit(it)
     }
     private val importCoordinator by lazy { DocumentImportCoordinator(this) }
-    private val shareCoordinator by lazy { MeetingShareCoordinator(this) }
+    private val shareCoordinator by lazy { AudioShareCoordinator(this) }
     private val ephemeralShareCoordinator by lazy { EphemeralShareCoordinator(this) }
     private val inputDeviceCatalog by lazy { RecordingInputDeviceCatalog(this) }
-    private val meetingApiSecretStore by lazy { MeetingApiSecretStore(this) }
+    private val audioApiSecretStore by lazy { AudioApiSecretStore(this) }
     private val sharedMediaRequests = SharedMediaRequestQueue()
     private val importExecutor = Executors.newSingleThreadExecutor()
     private val importActive = AtomicBoolean(false)
@@ -125,22 +125,22 @@ class MainActivity : FlutterActivity() {
                     "listRecordingRecoveries" -> handleListRecordingRecoveries(result)
                     "recoverRecording" -> handleRecoverRecording(call, result)
                     "discardRecordingRecovery" -> handleDiscardRecording(call, result)
-                    "pickMeetingMedia" -> handlePickMeetingMedia(result)
-                    "hasPendingSharedMeetingMedia" ->
+                    "pickAudioMedia" -> handlePickAudioMedia(result)
+                    "hasPendingSharedAudioMedia" ->
                         result.success(canConsumeSharedMedia())
-                    "consumeSharedMeetingMedia" -> handleConsumeSharedMeetingMedia(result)
-                    "cancelMeetingImport" -> handleCancelMeetingImport(result)
+                    "consumeSharedAudioMedia" -> handleConsumeSharedAudioMedia(result)
+                    "cancelAudioImport" -> handleCancelAudioImport(result)
                     "discardImportedMedia" -> handleDiscardImportedMedia(call, result)
-                    "shareMeetingFile" -> handleShareMeetingFile(call, result)
+                    "shareAudioFile" -> handleShareAudioFile(call, result)
                     "discardShareExport" -> handleDiscardShareExport(call, result)
                     "shareEphemeralArtifact" -> handleShareEphemeralArtifact(call, result)
                     "discardEphemeralArtifact" -> handleDiscardEphemeralArtifact(call, result)
                     "getDeviceProtection" -> handleGetDeviceProtection(result)
                     "getBuildInfo" -> handleGetBuildInfo(result)
-                    "setMeetingApiSecret" -> handleSetMeetingApiSecret(call, result)
-                    "getMeetingApiSecret" -> handleGetMeetingApiSecret(call, result)
-                    "hasMeetingApiSecret" -> handleHasMeetingApiSecret(call, result)
-                    "deleteMeetingApiSecret" -> handleDeleteMeetingApiSecret(call, result)
+                    "setAudioApiSecret" -> handleSetAudioApiSecret(call, result)
+                    "getAudioApiSecret" -> handleGetAudioApiSecret(call, result)
+                    "hasAudioApiSecret" -> handleHasAudioApiSecret(call, result)
+                    "deleteAudioApiSecret" -> handleDeleteAudioApiSecret(call, result)
                     "transcribe" -> handleTranscribe(call, result)
                     "cancelTranscriptionJob" -> handleCancelTranscriptionJob(call, result)
                     "getActiveTranscriptionJobIds" ->
@@ -368,7 +368,7 @@ class MainActivity : FlutterActivity() {
         }
     }
 
-    private fun handlePickMeetingMedia(result: MethodChannel.Result) {
+    private fun handlePickAudioMedia(result: MethodChannel.Result) {
         if (pendingImportResult != null || importActive.get()) {
             result.error("IMPORT_ALREADY_ACTIVE", "已有导入任务正在等待选择", null)
             return
@@ -389,7 +389,7 @@ class MainActivity : FlutterActivity() {
         }
     }
 
-    private fun handleConsumeSharedMeetingMedia(result: MethodChannel.Result) {
+    private fun handleConsumeSharedAudioMedia(result: MethodChannel.Result) {
         if (pendingImportResult != null || !importActive.compareAndSet(false, true)) {
             result.success(null)
             return
@@ -404,7 +404,7 @@ class MainActivity : FlutterActivity() {
         executeMediaImport(Uri.parse(uriString), result, "shared", "导入分享媒体失败")
     }
 
-    private fun handleCancelMeetingImport(result: MethodChannel.Result) {
+    private fun handleCancelAudioImport(result: MethodChannel.Result) {
         importCoordinator.cancelActiveImport()
         result.success(null)
     }
@@ -427,7 +427,7 @@ class MainActivity : FlutterActivity() {
         }
     }
 
-    private fun handleShareMeetingFile(call: MethodCall, result: MethodChannel.Result) {
+    private fun handleShareAudioFile(call: MethodCall, result: MethodChannel.Result) {
         val path = call.argument<String>("path").orEmpty()
         val displayName = call.argument<String>("displayName")
         try {
@@ -437,12 +437,12 @@ class MainActivity : FlutterActivity() {
                     "readOnly" to true,
                 ),
             )
-        } catch (error: MeetingShareException) {
+        } catch (error: AudioShareException) {
             result.error(error.code, error.message, null)
         } catch (error: Exception) {
             PrivacySafeLog.error(
                 tag,
-                "meeting_share_failed",
+                "audio_share_failed",
                 mapOf("category" to error.javaClass.simpleName),
             )
             result.error("SHARE_FAILED", "无法打开系统分享", null)
@@ -555,47 +555,47 @@ class MainActivity : FlutterActivity() {
         }
     }
 
-    private fun handleSetMeetingApiSecret(
+    private fun handleSetAudioApiSecret(
         call: MethodCall,
         result: MethodChannel.Result,
     ) {
         val providerId = call.argument<String>("providerId").orEmpty()
         val secret = call.argument<String>("secret").orEmpty()
         try {
-            meetingApiSecretStore.set(providerId, secret)
+            audioApiSecretStore.set(providerId, secret)
             result.success(null)
         } catch (_: IllegalArgumentException) {
             result.error("INVALID_MEETING_API_SECRET", "密钥格式无效", null)
         } catch (_: Exception) {
-            PrivacySafeLog.error(tag, "meeting_api_secret_write_failed")
+            PrivacySafeLog.error(tag, "audio_api_secret_write_failed")
             result.error("MEETING_API_SECRET_WRITE_FAILED", "密钥无法安全保存", null)
         }
     }
 
-    private fun handleGetMeetingApiSecret(
+    private fun handleGetAudioApiSecret(
         call: MethodCall,
         result: MethodChannel.Result,
     ) {
         val providerId = call.argument<String>("providerId").orEmpty()
         try {
-            result.success(meetingApiSecretStore.get(providerId))
-        } catch (_: MeetingApiSecretUnavailableException) {
+            result.success(audioApiSecretStore.get(providerId))
+        } catch (_: AudioApiSecretUnavailableException) {
             result.error("MEETING_API_SECRET_UNAVAILABLE", "密钥已失效，请重新输入", null)
         } catch (_: IllegalArgumentException) {
             result.error("INVALID_MEETING_API_PROVIDER", "提供商标识无效", null)
         } catch (_: Exception) {
-            PrivacySafeLog.error(tag, "meeting_api_secret_read_failed")
+            PrivacySafeLog.error(tag, "audio_api_secret_read_failed")
             result.error("MEETING_API_SECRET_READ_FAILED", "密钥无法读取", null)
         }
     }
 
-    private fun handleHasMeetingApiSecret(
+    private fun handleHasAudioApiSecret(
         call: MethodCall,
         result: MethodChannel.Result,
     ) {
         val providerId = call.argument<String>("providerId").orEmpty()
         try {
-            result.success(meetingApiSecretStore.has(providerId))
+            result.success(audioApiSecretStore.has(providerId))
         } catch (_: IllegalArgumentException) {
             result.error("INVALID_MEETING_API_PROVIDER", "提供商标识无效", null)
         } catch (_: Exception) {
@@ -603,18 +603,18 @@ class MainActivity : FlutterActivity() {
         }
     }
 
-    private fun handleDeleteMeetingApiSecret(
+    private fun handleDeleteAudioApiSecret(
         call: MethodCall,
         result: MethodChannel.Result,
     ) {
         val providerId = call.argument<String>("providerId").orEmpty()
         try {
-            meetingApiSecretStore.delete(providerId)
+            audioApiSecretStore.delete(providerId)
             result.success(null)
         } catch (_: IllegalArgumentException) {
             result.error("INVALID_MEETING_API_PROVIDER", "提供商标识无效", null)
         } catch (_: Exception) {
-            PrivacySafeLog.error(tag, "meeting_api_secret_delete_failed")
+            PrivacySafeLog.error(tag, "audio_api_secret_delete_failed")
             result.error("MEETING_API_SECRET_DELETE_FAILED", "密钥无法删除", null)
         }
     }
@@ -687,7 +687,7 @@ class MainActivity : FlutterActivity() {
 
     private fun notifySharedMediaAvailable() {
         if (!canConsumeSharedMedia()) return
-        methodChannel?.invokeMethod("sharedMeetingMediaAvailable", null)
+        methodChannel?.invokeMethod("sharedAudioMediaAvailable", null)
     }
 
     companion object {

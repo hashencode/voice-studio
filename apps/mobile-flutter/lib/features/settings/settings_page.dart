@@ -2,8 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_ui_mobile/flutter_ui_mobile.dart';
 
 import '../../app/theme/theme_mode_controller.dart';
-import '../meeting_intelligence/service/meeting_api_secret_store.dart';
-import '../meeting_intelligence/service/meeting_intelligence_provider.dart';
+import '../audio_intelligence/service/audio_api_secret_store.dart';
+import '../audio_intelligence/service/audio_intelligence_provider.dart';
 import 'model/transcription_model_descriptor.dart';
 import 'repository/app_settings_repository.dart';
 import '../shared/widgets/build_info_footer.dart';
@@ -13,7 +13,7 @@ class SettingsPage extends StatefulWidget {
   const SettingsPage({super.key, this.repository, this.secretStore});
 
   final AppSettingsRepository? repository;
-  final MeetingApiSecretStore? secretStore;
+  final AudioApiSecretStore? secretStore;
 
   @override
   State<SettingsPage> createState() => _SettingsPageState();
@@ -21,7 +21,7 @@ class SettingsPage extends StatefulWidget {
 
 class _SettingsPageState extends State<SettingsPage> {
   late final AppSettingsRepository _repository;
-  late final MeetingApiSecretStore _secretStore;
+  late final AudioApiSecretStore _secretStore;
 
   bool _loading = true;
   String _modelId = 'paraformer-zh';
@@ -29,13 +29,12 @@ class _SettingsPageState extends State<SettingsPage> {
   bool _enablePunctuation = true;
   bool _isDarkMode = false;
   int? _recentlyDeletedRetentionDays;
-  MeetingProcessingLocation _meetingProcessingLocation =
-      MeetingProcessingLocation.onDevice;
-  String _meetingAiProviderId = 'deepseek';
-  bool _meetingAiSecretConfigured = false;
-  final TextEditingController _meetingAiModelController =
-      TextEditingController();
-  final TextEditingController _meetingApiSecretController =
+  AudioProcessingLocation _audioProcessingLocation =
+      AudioProcessingLocation.onDevice;
+  String _audioAiProviderId = 'deepseek';
+  bool _audioAiSecretConfigured = false;
+  final TextEditingController _audioAiModelController = TextEditingController();
+  final TextEditingController _audioApiSecretController =
       TextEditingController();
   AppSettings? _loadedSettings;
 
@@ -43,23 +42,23 @@ class _SettingsPageState extends State<SettingsPage> {
   void initState() {
     super.initState();
     _repository = widget.repository ?? AppSettingsRepository();
-    _secretStore = widget.secretStore ?? const MeetingApiSecretStore();
+    _secretStore = widget.secretStore ?? const AudioApiSecretStore();
     _load();
   }
 
   @override
   void dispose() {
-    _meetingAiModelController.dispose();
-    _meetingApiSecretController.dispose();
+    _audioAiModelController.dispose();
+    _audioApiSecretController.dispose();
     super.dispose();
   }
 
   Future<void> _load() async {
     final AppSettings settings = await _repository.load();
-    var secretConfigured = settings.meetingAiSecretConfigured;
-    if (secretConfigured && settings.meetingAiProviderId != null) {
+    var secretConfigured = settings.audioAiSecretConfigured;
+    if (secretConfigured && settings.audioAiProviderId != null) {
       secretConfigured = await _secretStore
-          .hasSecret(settings.meetingAiProviderId!)
+          .hasSecret(settings.audioAiProviderId!)
           .catchError((_) => false);
     }
     final TranscriptionModelDescriptor selectedModel =
@@ -75,11 +74,11 @@ class _SettingsPageState extends State<SettingsPage> {
           selectedModel.punctuationReady && settings.enablePunctuation;
       _isDarkMode = settings.isDarkMode;
       _recentlyDeletedRetentionDays = settings.recentlyDeletedRetentionDays;
-      _meetingProcessingLocation = settings.meetingProcessingLocation;
-      _meetingAiProviderId = settings.meetingAiProviderId ?? 'deepseek';
-      _meetingAiModelController.text =
-          settings.meetingAiModelId ?? 'deepseek-v4-flash';
-      _meetingAiSecretConfigured = secretConfigured;
+      _audioProcessingLocation = settings.audioProcessingLocation;
+      _audioAiProviderId = settings.audioAiProviderId ?? 'deepseek';
+      _audioAiModelController.text =
+          settings.audioAiModelId ?? 'deepseek-v4-flash';
+      _audioAiSecretConfigured = secretConfigured;
       _loadedSettings = settings;
       _loading = false;
     });
@@ -91,16 +90,16 @@ class _SettingsPageState extends State<SettingsPage> {
     final AppThemeModeController themeController = AppThemeModeScope.of(
       context,
     );
-    var secretConfigured = _meetingAiSecretConfigured;
-    final enteredSecret = _meetingApiSecretController.text.trim();
+    var secretConfigured = _audioAiSecretConfigured;
+    final enteredSecret = _audioApiSecretController.text.trim();
     if (enteredSecret.isNotEmpty) {
       try {
         await _secretStore.save(
-          providerId: _meetingAiProviderId,
+          providerId: _audioAiProviderId,
           secret: enteredSecret,
         );
         secretConfigured = true;
-        _meetingApiSecretController.clear();
+        _audioApiSecretController.clear();
       } catch (_) {
         if (!mounted) return;
         GooToastScope.of(context).error('云端密钥无法安全保存');
@@ -114,28 +113,28 @@ class _SettingsPageState extends State<SettingsPage> {
       isDarkMode: _isDarkMode,
       recentlyDeletedRetentionDays: _recentlyDeletedRetentionDays,
       clearRecentlyDeletedRetention: _recentlyDeletedRetentionDays == null,
-      meetingProcessingLocation: _meetingProcessingLocation,
-      meetingAiProviderId: _meetingAiProviderId,
-      meetingAiModelId: _meetingAiModelController.text.trim(),
-      meetingAiSecretConfigured: secretConfigured,
+      audioProcessingLocation: _audioProcessingLocation,
+      audioAiProviderId: _audioAiProviderId,
+      audioAiModelId: _audioAiModelController.text.trim(),
+      audioAiSecretConfigured: secretConfigured,
     );
     await _repository.save(updatedSettings);
     await themeController.setDarkMode(_isDarkMode);
     if (!mounted) return;
     _loadedSettings = updatedSettings;
-    _meetingAiSecretConfigured = secretConfigured;
+    _audioAiSecretConfigured = secretConfigured;
     GooSnackbarScope.maybeOf(context)?.show(message: '设置已保存');
   }
 
-  Future<void> _chooseMeetingProcessingLocation() async {
-    final selected = await showGooPanel<MeetingProcessingLocation>(
+  Future<void> _chooseAudioProcessingLocation() async {
+    final selected = await showGooPanel<AudioProcessingLocation>(
       context: context,
       title: 'AI 处理位置',
-      semanticLabel: '选择会议智能处理位置',
+      semanticLabel: '选择音频智能处理位置',
       builder:
           (
             BuildContext context,
-            GooPanelController<MeetingProcessingLocation> controller,
+            GooPanelController<AudioProcessingLocation> controller,
             ScrollController scrollController,
           ) {
             return ListView(
@@ -143,7 +142,7 @@ class _SettingsPageState extends State<SettingsPage> {
               padding: const EdgeInsets.all(16),
               children: <Widget>[
                 const GooText(
-                  '只有选择云端直连并在单次生成前确认，会议文本才会离开设备。PC 配对尚未开放。',
+                  '只有选择云端直连并在单次生成前确认，音频文本才会离开设备。PC 配对尚未开放。',
                   variant: GooTextVariant.body,
                 ),
                 const SizedBox(height: 16),
@@ -152,22 +151,22 @@ class _SettingsPageState extends State<SettingsPage> {
                   children: <Widget>[
                     GooListItem(
                       title: '本机',
-                      subtitle: '不上传会议内容；本地会议智能模型尚未配置',
+                      subtitle: '不上传音频内容；本地音频智能模型尚未配置',
                       selected:
-                          _meetingProcessingLocation ==
-                          MeetingProcessingLocation.onDevice,
+                          _audioProcessingLocation ==
+                          AudioProcessingLocation.onDevice,
                       onTap: () => controller.closeWithResult(
-                        MeetingProcessingLocation.onDevice,
+                        AudioProcessingLocation.onDevice,
                       ),
                     ),
                     GooListItem(
                       title: '云端直连',
                       subtitle: '使用用户自己的 DeepSeek 账户和密钥',
                       selected:
-                          _meetingProcessingLocation ==
-                          MeetingProcessingLocation.cloudDirect,
+                          _audioProcessingLocation ==
+                          AudioProcessingLocation.cloudDirect,
                       onTap: () => controller.closeWithResult(
-                        MeetingProcessingLocation.cloudDirect,
+                        AudioProcessingLocation.cloudDirect,
                       ),
                     ),
                   ],
@@ -178,21 +177,21 @@ class _SettingsPageState extends State<SettingsPage> {
     );
     if (!mounted || selected == null) return;
     setState(() {
-      _meetingProcessingLocation = selected;
+      _audioProcessingLocation = selected;
     });
   }
 
-  Future<void> _deleteMeetingApiSecret() async {
+  Future<void> _deleteAudioApiSecret() async {
     final loadedSettings = _loadedSettings;
     if (loadedSettings == null) return;
     try {
-      await _secretStore.delete(_meetingAiProviderId);
-      final updated = loadedSettings.copyWith(meetingAiSecretConfigured: false);
+      await _secretStore.delete(_audioAiProviderId);
+      final updated = loadedSettings.copyWith(audioAiSecretConfigured: false);
       await _repository.save(updated);
       if (!mounted) return;
       setState(() {
-        _meetingAiSecretConfigured = false;
-        _meetingApiSecretController.clear();
+        _audioAiSecretConfigured = false;
+        _audioApiSecretController.clear();
         _loadedSettings = updated;
       });
       GooToastScope.of(context).success('云端密钥已删除');
@@ -218,7 +217,7 @@ class _SettingsPageState extends State<SettingsPage> {
               padding: const EdgeInsets.all(16),
               children: <Widget>[
                 const GooText(
-                  '只会永久清理已在“最近删除”中达到期限的会议。默认关闭，不影响正常会议。',
+                  '只会永久清理已在“最近删除”中达到期限的音频。默认关闭，不影响正常音频。',
                   variant: GooTextVariant.body,
                 ),
                 const SizedBox(height: 16),
@@ -283,27 +282,27 @@ class _SettingsPageState extends State<SettingsPage> {
             children: <Widget>[
               GooListItem(
                 title: '处理位置',
-                subtitle: switch (_meetingProcessingLocation) {
-                  MeetingProcessingLocation.onDevice => '本机；不会上传会议内容',
-                  MeetingProcessingLocation.cloudDirect => '云端直连；每次生成前仍需确认',
-                  MeetingProcessingLocation.pairedPc => 'PC 配对；尚未开放',
+                subtitle: switch (_audioProcessingLocation) {
+                  AudioProcessingLocation.onDevice => '本机；不会上传音频内容',
+                  AudioProcessingLocation.cloudDirect => '云端直连；每次生成前仍需确认',
+                  AudioProcessingLocation.pairedPc => 'PC 配对；尚未开放',
                 },
                 showGuide: true,
-                onTap: _chooseMeetingProcessingLocation,
+                onTap: _chooseAudioProcessingLocation,
               ),
-              if (_meetingProcessingLocation ==
-                  MeetingProcessingLocation.cloudDirect)
+              if (_audioProcessingLocation ==
+                  AudioProcessingLocation.cloudDirect)
                 const GooListItem(
                   title: '云端提供商',
                   subtitle: 'DeepSeek（使用用户自己的账户）',
                 ),
             ],
           ),
-          if (_meetingProcessingLocation ==
-              MeetingProcessingLocation.cloudDirect) ...<Widget>[
+          if (_audioProcessingLocation ==
+              AudioProcessingLocation.cloudDirect) ...<Widget>[
             const SizedBox(height: 8),
             GooInput(
-              controller: _meetingAiModelController,
+              controller: _audioAiModelController,
               label: '模型 ID',
               placeholder: '输入 DeepSeek 模型 ID',
               showClearButton: true,
@@ -312,12 +311,12 @@ class _SettingsPageState extends State<SettingsPage> {
             ),
             const SizedBox(height: 8),
             GooInput(
-              controller: _meetingApiSecretController,
+              controller: _audioApiSecretController,
               label: 'API 密钥',
-              helperText: _meetingAiSecretConfigured
+              helperText: _audioAiSecretConfigured
                   ? '已安全保存；留空将保持现有密钥'
-                  : '由 Android Keystore 保护，不写入会议数据库',
-              placeholder: _meetingAiSecretConfigured
+                  : '由 Android Keystore 保护，不写入音频数据库',
+              placeholder: _audioAiSecretConfigured
                   ? '输入新密钥以替换'
                   : '输入自己的 DeepSeek 密钥',
               obscureText: true,
@@ -325,13 +324,13 @@ class _SettingsPageState extends State<SettingsPage> {
               autocorrect: false,
               enableSuggestions: false,
             ),
-            if (_meetingAiSecretConfigured) ...<Widget>[
+            if (_audioAiSecretConfigured) ...<Widget>[
               const SizedBox(height: 8),
               Align(
                 alignment: Alignment.centerRight,
                 child: GooButton(
                   variant: GooButtonVariant.secondary,
-                  onPressed: _deleteMeetingApiSecret,
+                  onPressed: _deleteAudioApiSecret,
                   child: const Text('删除云端密钥'),
                 ),
               ),
@@ -355,7 +354,7 @@ class _SettingsPageState extends State<SettingsPage> {
               ),
               GooListItem(
                 title: '自动恢复标点',
-                subtitle: '使用本地模型处理新转写，不会上传会议内容',
+                subtitle: '使用本地模型处理新转写，不会上传音频内容',
                 trailing: GooSwitch(
                   value: _enablePunctuation,
                   onChanged: (bool value) {
@@ -380,7 +379,7 @@ class _SettingsPageState extends State<SettingsPage> {
               GooListItem(
                 title: '最近删除自动清理',
                 subtitle: _recentlyDeletedRetentionDays == null
-                    ? '已关闭；不会自动永久删除会议'
+                    ? '已关闭；不会自动永久删除音频'
                     : '保留 $_recentlyDeletedRetentionDays 天；只清理最近删除',
                 showGuide: true,
                 semanticLabel:
@@ -389,7 +388,7 @@ class _SettingsPageState extends State<SettingsPage> {
                 onTap: _chooseRetentionPolicy,
               ),
               GooListItem(
-                title: '发送会议到 Mac',
+                title: '发送音频到 Mac',
                 subtitle: '用户确认配对、加密分块续传；receipt 前绝不删除手机原件',
                 leadingIconName: GooIcons.computer,
                 showGuide: true,

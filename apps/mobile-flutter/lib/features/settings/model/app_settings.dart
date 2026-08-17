@@ -1,4 +1,4 @@
-import '../../meeting_intelligence/service/meeting_intelligence_provider.dart';
+import '../../audio_intelligence/service/audio_intelligence_provider.dart';
 
 class AppSettings {
   AppSettings({
@@ -10,10 +10,10 @@ class AppSettings {
     this.recordingConsentAcceptedAtMs,
     this.recentlyDeletedRetentionDays,
     this.retentionLastSuccessfulScanAtMs,
-    this.meetingProcessingLocation = MeetingProcessingLocation.onDevice,
-    this.meetingAiProviderId,
-    this.meetingAiModelId,
-    this.meetingAiSecretConfigured = false,
+    this.audioProcessingLocation = AudioProcessingLocation.onDevice,
+    this.audioAiProviderId,
+    this.audioAiModelId,
+    this.audioAiSecretConfigured = false,
   });
 
   final String modelId;
@@ -24,10 +24,10 @@ class AppSettings {
   final int? recordingConsentAcceptedAtMs;
   final int? recentlyDeletedRetentionDays;
   final int? retentionLastSuccessfulScanAtMs;
-  final MeetingProcessingLocation meetingProcessingLocation;
-  final String? meetingAiProviderId;
-  final String? meetingAiModelId;
-  final bool meetingAiSecretConfigured;
+  final AudioProcessingLocation audioProcessingLocation;
+  final String? audioAiProviderId;
+  final String? audioAiModelId;
+  final bool audioAiSecretConfigured;
 
   static const String supportedModelId = 'paraformer-zh';
   static const String supportedRecordingMode = 'standard';
@@ -40,7 +40,7 @@ class AppSettings {
       enablePunctuation: true,
       isDarkMode: false,
       recordingConsentVersion: 0,
-      meetingProcessingLocation: MeetingProcessingLocation.onDevice,
+      audioProcessingLocation: AudioProcessingLocation.onDevice,
     );
   }
 
@@ -53,10 +53,10 @@ class AppSettings {
     int? recordingConsentAcceptedAtMs,
     int? recentlyDeletedRetentionDays,
     int? retentionLastSuccessfulScanAtMs,
-    Object? meetingProcessingLocation,
-    String? meetingAiProviderId,
-    String? meetingAiModelId,
-    bool meetingAiSecretConfigured = false,
+    Object? audioProcessingLocation,
+    String? audioAiProviderId,
+    String? audioAiModelId,
+    bool audioAiSecretConfigured = false,
   }) {
     return AppSettings(
       modelId: modelId == supportedModelId ? modelId! : supportedModelId,
@@ -70,12 +70,12 @@ class AppSettings {
           ? recentlyDeletedRetentionDays
           : null,
       retentionLastSuccessfulScanAtMs: retentionLastSuccessfulScanAtMs,
-      meetingProcessingLocation: MeetingProcessingLocation.fromStorage(
-        meetingProcessingLocation,
+      audioProcessingLocation: AudioProcessingLocation.fromStorage(
+        audioProcessingLocation,
       ),
-      meetingAiProviderId: _nonEmpty(meetingAiProviderId),
-      meetingAiModelId: _nonEmpty(meetingAiModelId),
-      meetingAiSecretConfigured: meetingAiSecretConfigured,
+      audioAiProviderId: _nonEmpty(audioAiProviderId),
+      audioAiModelId: _nonEmpty(audioAiModelId),
+      audioAiSecretConfigured: audioAiSecretConfigured,
     );
   }
 
@@ -91,12 +91,12 @@ class AppSettings {
     int? recentlyDeletedRetentionDays,
     bool clearRecentlyDeletedRetention = false,
     int? retentionLastSuccessfulScanAtMs,
-    MeetingProcessingLocation? meetingProcessingLocation,
-    String? meetingAiProviderId,
-    bool clearMeetingAiProvider = false,
-    String? meetingAiModelId,
-    bool clearMeetingAiModel = false,
-    bool? meetingAiSecretConfigured,
+    AudioProcessingLocation? audioProcessingLocation,
+    String? audioAiProviderId,
+    bool clearAudioAiProvider = false,
+    String? audioAiModelId,
+    bool clearAudioAiModel = false,
+    bool? audioAiSecretConfigured,
   }) {
     return AppSettings(
       modelId: modelId ?? this.modelId,
@@ -113,16 +113,16 @@ class AppSettings {
       retentionLastSuccessfulScanAtMs:
           retentionLastSuccessfulScanAtMs ??
           this.retentionLastSuccessfulScanAtMs,
-      meetingProcessingLocation:
-          meetingProcessingLocation ?? this.meetingProcessingLocation,
-      meetingAiProviderId: clearMeetingAiProvider
+      audioProcessingLocation:
+          audioProcessingLocation ?? this.audioProcessingLocation,
+      audioAiProviderId: clearAudioAiProvider
           ? null
-          : meetingAiProviderId ?? this.meetingAiProviderId,
-      meetingAiModelId: clearMeetingAiModel
+          : audioAiProviderId ?? this.audioAiProviderId,
+      audioAiModelId: clearAudioAiModel
           ? null
-          : meetingAiModelId ?? this.meetingAiModelId,
-      meetingAiSecretConfigured:
-          meetingAiSecretConfigured ?? this.meetingAiSecretConfigured,
+          : audioAiModelId ?? this.audioAiModelId,
+      audioAiSecretConfigured:
+          audioAiSecretConfigured ?? this.audioAiSecretConfigured,
     );
   }
 

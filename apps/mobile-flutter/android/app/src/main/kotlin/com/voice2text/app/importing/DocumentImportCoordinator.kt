@@ -33,11 +33,11 @@ class DocumentImportCoordinator(
     private val context: Context,
     private val inspector: ImportedMediaInspector = ImportedMediaInspector(context),
 ) {
-    private val meetingRoot = File(context.filesDir, AudioContract.MEETING_DIR_NAME)
+    private val audioRoot = File(context.filesDir, AudioContract.MEETING_DIR_NAME)
     private val stagingRoot =
-        File(File(meetingRoot, AudioContract.IMPORT_DIR_NAME), AudioContract.IMPORT_IN_PROGRESS_DIR_NAME)
+        File(File(audioRoot, AudioContract.IMPORT_DIR_NAME), AudioContract.IMPORT_IN_PROGRESS_DIR_NAME)
     private val completeRoot =
-        File(File(meetingRoot, AudioContract.IMPORT_DIR_NAME), AudioContract.IMPORT_COMPLETE_DIR_NAME)
+        File(File(audioRoot, AudioContract.IMPORT_DIR_NAME), AudioContract.IMPORT_COMPLETE_DIR_NAME)
 
     init {
         stagingRoot.mkdirs()
@@ -86,7 +86,7 @@ class DocumentImportCoordinator(
                                 "媒体文件不能超过 2 GiB",
                             )
                         }
-                        if (meetingRoot.usableSpace < AudioContract.MINIMUM_STORAGE_RESERVE_BYTES) {
+                        if (audioRoot.usableSpace < AudioContract.MINIMUM_STORAGE_RESERVE_BYTES) {
                             throw ImportedMediaException(
                                 "LOW_STORAGE",
                                 "存储空间不足，导入已安全停止",
@@ -154,7 +154,7 @@ class DocumentImportCoordinator(
 
     private fun ensureStorageReserve(sourceBytes: Long) {
         val required = sourceBytes + AudioContract.MINIMUM_STORAGE_RESERVE_BYTES
-        if (meetingRoot.usableSpace < required) {
+        if (audioRoot.usableSpace < required) {
             throw ImportedMediaException("LOW_STORAGE", "存储空间不足，无法安全导入媒体")
         }
     }

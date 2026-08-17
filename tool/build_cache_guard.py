@@ -56,15 +56,6 @@ FLUTTER_PROJECTS = (
         pathlib.Path("packages/desktop_sherpa_worker"),
         cache_limit_gib=0.5,
     ),
-    FlutterProject(pathlib.Path("packages/meeting_core"), cache_limit_gib=0.5),
-    FlutterProject(
-        pathlib.Path("packages/meeting_storage"),
-        cache_limit_gib=0.5,
-    ),
-    FlutterProject(
-        pathlib.Path("packages/meeting_workflows"),
-        cache_limit_gib=0.5,
-    ),
     FlutterProject(
         pathlib.Path("packages/processing_contracts"),
         cache_limit_gib=0.5,

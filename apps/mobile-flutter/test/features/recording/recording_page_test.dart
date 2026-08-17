@@ -42,7 +42,7 @@ void main() {
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 500));
 
-    expect(find.text('开始会议录音'), findsOneWidget);
+    expect(find.text('开始音频录音'), findsOneWidget);
     expect(find.textContaining('只在本机处理'), findsOneWidget);
     expect(find.text('已获得同意'), findsOneWidget);
     expect((await recorder.getState()).state, 'idle');
@@ -50,7 +50,7 @@ void main() {
     await tester.tap(find.text('取消'));
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 500));
-    expect(find.text('开始会议录音'), findsNothing);
+    expect(find.text('开始音频录音'), findsNothing);
     expect((await recorder.getState()).state, 'idle');
   });
 
@@ -114,7 +114,7 @@ void main() {
         ),
         RecordingInputDevice(
           id: 42,
-          name: '会议耳机',
+          name: '音频耳机',
           type: RecordingInputDeviceType.bluetooth,
           canSelect: true,
         ),
@@ -139,13 +139,13 @@ void main() {
     await tester.tap(find.textContaining('输入设备'));
     await tester.pumpAndSettle();
     expect(find.text('系统自动选择'), findsOneWidget);
-    expect(find.text('会议耳机'), findsOneWidget);
+    expect(find.text('音频耳机'), findsOneWidget);
 
-    await tester.tap(find.text('会议耳机'));
+    await tester.tap(find.text('音频耳机'));
     await tester.pumpAndSettle();
 
     expect(recorder.preferredInputDeviceId, 42);
-    expect(find.textContaining('输入设备：会议耳机'), findsOneWidget);
+    expect(find.textContaining('输入设备：音频耳机'), findsOneWidget);
   });
 
   testWidgets(

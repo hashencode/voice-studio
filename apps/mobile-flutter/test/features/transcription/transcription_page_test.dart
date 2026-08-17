@@ -238,7 +238,7 @@ TranscriptionJobEntity _job({
 }) {
   return TranscriptionJobEntity(
     id: id,
-    recordingPath: '/meetings/$id.m4a',
+    recordingPath: '/audios/$id.m4a',
     recordingId: id,
     generationId: null,
     durationMs: id == 7 ? 65_000 : 120_000,

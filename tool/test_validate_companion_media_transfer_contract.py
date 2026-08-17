@@ -20,7 +20,7 @@ class CompanionMediaTransferContractTest(unittest.TestCase):
 
     def test_manifest_rejects_unknown_fields_and_bad_chunk_math(self) -> None:
         manifest = sample_manifest()
-        manifest["sourcePath"] = "/private/mobile/meeting.wav"
+        manifest["sourcePath"] = "/private/mobile/audio.wav"
         with self.assertRaisesRegex(ContractError, "exact"):
             validate_manifest(manifest)
 
@@ -48,7 +48,7 @@ class CompanionMediaTransferContractTest(unittest.TestCase):
 
     def test_envelope_rejects_provider_schema_alias(self) -> None:
         envelope = {
-            "schema": "meeting_intelligence_provider/v1",
+            "schema": "audio_intelligence_provider/v1",
             "type": "manifest",
             "messageId": "message-1",
             "sessionId": "session-1",

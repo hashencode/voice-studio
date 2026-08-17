@@ -3,7 +3,7 @@ import 'dart:io';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
-  test('Android backup policies exclude every meeting content root', () {
+  test('Android backup policies exclude every audio content root', () {
     final String manifest = File(
       'android/app/src/main/AndroidManifest.xml',
     ).readAsStringSync();
@@ -20,7 +20,7 @@ void main() {
       manifest,
       contains('android:dataExtractionRules="@xml/data_extraction_rules"'),
     );
-    for (final String path in <String>['meetings', 'recordings', 'exports']) {
+    for (final String path in <String>['audios', 'recordings', 'exports']) {
       expect(legacyRules, contains('domain="file" path="$path"'));
       expect(extractionRules, contains('domain="file" path="$path"'));
     }

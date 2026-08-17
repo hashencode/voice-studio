@@ -9,7 +9,7 @@ class ImportedMediaInspectorTest {
     fun validAudioMetadataPasses() {
         ImportedMediaInspector.validate(
             ImportedMediaMetadata(
-                displayName = "meeting.m4a",
+                displayName = "audio.m4a",
                 mimeType = "audio/mp4",
                 sizeBytes = 1024L,
                 durationMs = 60_000L,
@@ -49,12 +49,12 @@ class ImportedMediaInspectorTest {
     @Test
     fun displayNameCannotEscapeManagedDirectory() {
         assertEquals(
-            "meeting.mp3",
-            ImportedMediaInspector.sanitizeDisplayName("../../meeting.mp3"),
+            "audio.mp3",
+            ImportedMediaInspector.sanitizeDisplayName("../../audio.mp3"),
         )
         assertEquals(
-            "meeting.mp3",
-            ImportedMediaInspector.sanitizeDisplayName("..\\..\\meeting.mp3"),
+            "audio.mp3",
+            ImportedMediaInspector.sanitizeDisplayName("..\\..\\audio.mp3"),
         )
         assertEquals("导入媒体", ImportedMediaInspector.sanitizeDisplayName("  "))
     }

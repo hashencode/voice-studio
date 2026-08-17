@@ -2,11 +2,11 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:voice2text_flutter/features/speakers/model/speaker_turn_entity.dart';
 import 'package:voice2text_flutter/features/speakers/repository/speaker_repository.dart';
 
-import '../meeting_intelligence/meeting_intelligence_test_fixture.dart';
+import '../audio_intelligence/audio_intelligence_test_fixture.dart';
 
 void main() {
   test('persists anonymous turns, assignments and rename revision', () async {
-    final fixture = await createMeetingIntelligenceFixture();
+    final fixture = await createAudioIntelligenceFixture();
     addTearDown(fixture.database.close);
     final repository = SpeakerRepository(database: fixture.appDatabase);
 
@@ -69,7 +69,7 @@ void main() {
   });
 
   test('invalid automatic result rolls back atomically', () async {
-    final fixture = await createMeetingIntelligenceFixture();
+    final fixture = await createAudioIntelligenceFixture();
     addTearDown(fixture.database.close);
     final repository = SpeakerRepository(database: fixture.appDatabase);
 
@@ -93,7 +93,7 @@ void main() {
   });
 
   test('recording deletion cascades speaker graph', () async {
-    final fixture = await createMeetingIntelligenceFixture();
+    final fixture = await createAudioIntelligenceFixture();
     addTearDown(fixture.database.close);
     final repository = SpeakerRepository(database: fixture.appDatabase);
     await repository.replaceAutomaticResult(
@@ -123,7 +123,7 @@ void main() {
       whereArgs: <Object>[fixture.recordingId],
     );
     for (final table in <String>[
-      'meeting_speakers',
+      'audio_speakers',
       'speaker_turns',
       'transcript_speaker_assignments',
       'speaker_revisions',

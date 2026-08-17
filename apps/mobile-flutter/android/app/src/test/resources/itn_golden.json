@@ -18,8 +18,8 @@
     {
       "id": "time_24_hour",
       "category": "time",
-      "input": "会议在十四点三十分开始",
-      "expected": "会议在14:30开始",
+      "input": "音频在十四点三十分开始",
+      "expected": "音频在14:30开始",
       "transformed": true
     },
     {
@@ -46,8 +46,8 @@
     {
       "id": "ambiguous_approximate_time",
       "category": "ambiguous",
-      "input": "会议在三点左右",
-      "expected": "会议在三点左右",
+      "input": "音频在三点左右",
+      "expected": "音频在三点左右",
       "transformed": false
     },
     {

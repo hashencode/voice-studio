@@ -67,7 +67,7 @@ class SpeakerDiarizationResourceGateTest {
                 SpeakerDiarizationProbeSupport.candidateId(),
             ).use { engine ->
                 SherpaSpeakerEmbeddingExtractor(context, registry).use { extractor ->
-                    MeetingSpeakerClusterReconciler(
+                    AudioSpeakerClusterReconciler(
                         similarityThreshold =
                             SpeakerDiarizationProbeSupport.RECONCILIATION_THRESHOLD,
                     ).use { reconciler ->

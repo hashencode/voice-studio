@@ -11,34 +11,34 @@ internal data class SpeakerSemanticInterval(
     val startSample: Long,
     val endSampleExclusive: Long,
     val kind: SpeakerSemanticKind,
-    val meetingSpeakerKeys: Set<String> = emptySet(),
+    val audioSpeakerKeys: Set<String> = emptySet(),
     val unknownSpeakerCount: Int = 0,
 ) {
     init {
         require(startSample >= 0) { "说话人语义区间起点不能为负数" }
         require(endSampleExclusive > startSample) { "说话人语义区间必须具有正长度" }
-        require(meetingSpeakerKeys.all(String::isNotBlank)) {
-            "会议级说话人 key 不能为空"
+        require(audioSpeakerKeys.all(String::isNotBlank)) {
+            "音频级说话人 key 不能为空"
         }
         require(unknownSpeakerCount >= 0) { "未知说话人数不能为负数" }
         when (kind) {
             SpeakerSemanticKind.ASSIGNED -> {
-                require(meetingSpeakerKeys.size == 1 && unknownSpeakerCount == 0) {
-                    "assigned 区间必须且只能包含一个会议级说话人"
+                require(audioSpeakerKeys.size == 1 && unknownSpeakerCount == 0) {
+                    "assigned 区间必须且只能包含一个音频级说话人"
                 }
             }
             SpeakerSemanticKind.OVERLAP -> {
-                require(meetingSpeakerKeys.size + unknownSpeakerCount >= 2) {
+                require(audioSpeakerKeys.size + unknownSpeakerCount >= 2) {
                     "overlap 区间必须包含至少两个活动说话人"
                 }
             }
             SpeakerSemanticKind.UNKNOWN -> {
-                require(meetingSpeakerKeys.isEmpty() && unknownSpeakerCount >= 1) {
+                require(audioSpeakerKeys.isEmpty() && unknownSpeakerCount >= 1) {
                     "unknown 区间必须保留至少一个未归属活动说话人"
                 }
             }
             SpeakerSemanticKind.SILENCE -> {
-                require(meetingSpeakerKeys.isEmpty() && unknownSpeakerCount == 0) {
+                require(audioSpeakerKeys.isEmpty() && unknownSpeakerCount == 0) {
                     "silence 区间不能包含说话人"
                 }
             }

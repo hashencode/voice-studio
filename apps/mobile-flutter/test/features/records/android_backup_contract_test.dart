@@ -25,7 +25,7 @@ void main() {
       '<exclude domain="root" path="." />',
       '<exclude domain="database" path="." />',
       '<exclude domain="sharedpref" path="." />',
-      '<exclude domain="file" path="meetings" />',
+      '<exclude domain="file" path="audios" />',
       '<exclude domain="file" path="logs" />',
       '<exclude domain="file" path="diagnostics" />',
       '<exclude domain="external" path="." />',

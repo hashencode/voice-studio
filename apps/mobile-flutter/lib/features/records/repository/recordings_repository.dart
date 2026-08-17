@@ -237,7 +237,7 @@ class RecordingsRepository {
     final recording = recordingRows.single;
     final recordingPath = recording['file_path'] as String;
     final assets = await db.query(
-      'meeting_assets',
+      'audio_assets',
       columns: <String>['path'],
       where: 'recording_id = ?',
       whereArgs: <Object>[recordingId],
@@ -265,12 +265,12 @@ class RecordingsRepository {
         if (path?.isNotEmpty == true) paths.add(path!);
       }
     }
-    final meetingRoot = _managedMeetingRoot(recordingPath);
-    if (meetingRoot != null) {
+    final audioRoot = _managedAudioRoot(recordingPath);
+    if (audioRoot != null) {
       for (final sessionId in sessionIds) {
         paths.add(
           p.join(
-            meetingRoot,
+            audioRoot,
             AudioContract.recordingJournalDirName,
             '$sessionId${AudioContract.recordingJournalSuffix}',
           ),
@@ -286,7 +286,7 @@ class RecordingsRepository {
     required String kind,
   }) async {
     final db = await _database.database;
-    await db.insert('meeting_assets', <String, Object?>{
+    await db.insert('audio_assets', <String, Object?>{
       'recording_id': recordingId,
       'path': path,
       'kind': kind,
@@ -294,7 +294,7 @@ class RecordingsRepository {
     }, conflictAlgorithm: ConflictAlgorithm.ignore);
   }
 
-  Future<void> deleteMeetingGraph({
+  Future<void> deleteAudioGraph({
     required int recordingId,
     required String recordingPath,
   }) async {
@@ -321,7 +321,7 @@ class RecordingsRepository {
         whereArgs: <Object>[recordingId],
       );
       await transaction.delete(
-        'meeting_assets',
+        'audio_assets',
         where: 'recording_id = ?',
         whereArgs: <Object>[recordingId],
       );
@@ -393,11 +393,11 @@ class RecordingsRepository {
   }
 }
 
-String? _managedMeetingRoot(String filePath) {
+String? _managedAudioRoot(String filePath) {
   final normalized = p.normalize(filePath);
   final marker =
       '${p.separator}files${p.separator}'
-      '${AudioContract.meetingDirName}${p.separator}';
+      '${AudioContract.audioDirName}${p.separator}';
   final markerIndex = normalized.indexOf(marker);
   if (markerIndex < 0) return null;
   return normalized.substring(0, markerIndex + marker.length - 1);

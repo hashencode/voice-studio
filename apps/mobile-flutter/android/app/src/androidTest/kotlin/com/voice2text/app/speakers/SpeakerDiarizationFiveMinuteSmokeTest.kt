@@ -75,7 +75,7 @@ class SpeakerDiarizationFiveMinuteSmokeTest {
                 SpeakerDiarizationProbeSupport.candidateId(),
             ).use { engine ->
                 SherpaSpeakerEmbeddingExtractor(context, registry).use { extractor ->
-                    MeetingSpeakerClusterReconciler(
+                    AudioSpeakerClusterReconciler(
                         similarityThreshold =
                             SpeakerDiarizationProbeSupport.RECONCILIATION_THRESHOLD,
                     ).use { reconciler ->
@@ -182,8 +182,8 @@ class SpeakerDiarizationFiveMinuteSmokeTest {
                                 )
                                 .put("kind", interval.kind.name)
                                 .put(
-                                    "meetingSpeakerKeys",
-                                    JSONArray(interval.meetingSpeakerKeys.sorted()),
+                                    "audioSpeakerKeys",
+                                    JSONArray(interval.audioSpeakerKeys.sorted()),
                                 )
                                 .put(
                                     "unknownSpeakerCount",

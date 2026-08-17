@@ -96,7 +96,7 @@ class S3ProductizationScopeTest(unittest.TestCase):
             secret_prefix + "x" * 24,
             "Authorization: Bearer fake-value",
             "api_key=fake-value",
-            "full_prompt=fictional meeting text",
+            "full_prompt=fictional audio text",
         )
         for fixture in fixtures:
             with self.subTest(fixture=fixture.split("=")[0]):

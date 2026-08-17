@@ -7,19 +7,19 @@
     "providerId": "deepseek",
     "processingLocation": "cloudDirect",
     "secureSecretStore": true,
-    "explicitPerMeetingConsent": true,
+    "explicitPerAudioConsent": true,
     "boundedPersistentJobs": true,
     "liveSmoke": "OPTIONAL_NOT_RUN",
     "evidence": [
       {
-        "path": "apps/mobile-flutter/lib/features/meeting_intelligence/service/deepseek_meeting_intelligence_provider.dart",
-        "sha256": "7ae3242b40962efa79d4379f585e0d373b27ce0158c2df1d8de15ed9ccd8573b"
+        "path": "apps/mobile-flutter/lib/features/audio_intelligence/service/deepseek_audio_intelligence_provider.dart",
+        "sha256": "8f37fd0724005573f555bc45c002dfc5338bbd3358ba8cab3d39f0a1420e3681"
       }
     ]
   },
   "structuredNotes": {
     "status": "PASS",
-    "outputSchema": "meeting_intelligence_output/v1",
+    "outputSchema": "audio_intelligence_output/v1",
     "templates": [
       "general",
       "weekly",
@@ -58,8 +58,8 @@
     "runtimePresent": false,
     "mobileAdapterPresent": false,
     "productEntrance": false,
-    "schemaPath": "docs/contracts/meeting-intelligence-provider-v1.schema.json",
-    "schemaSha256": "3d4048ae56bc4a4a9ac12e592348d0d7401b17d52a04e896386bfd8e6dc9920d"
+    "schemaPath": "docs/contracts/audio-intelligence-provider-v1.schema.json",
+    "schemaSha256": "ecbf568eae66c560f27c525b1dce0a82189e97aed2290acd0ac464c31240cb26"
   },
   "desktopWorkstationTransition": {
     "decisionId": "DESKTOP-FIRST-MEETING-WORKSTATION-2026-07-26",

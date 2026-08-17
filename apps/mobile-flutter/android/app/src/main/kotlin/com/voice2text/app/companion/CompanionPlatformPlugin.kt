@@ -158,7 +158,7 @@ class CompanionPlatformPlugin(
                         attributes["fingerprint"]?.toString(Charsets.UTF_8) ?: return
                     val capability =
                         attributes["capability"]?.toString(Charsets.UTF_8) ?: return
-                    if (capability != "media-transfer/v1") return
+                    if (capability != "audio-transfer/v2") return
                     discovered[resolved.serviceName] =
                         mapOf(
                             "deviceId" to deviceId,

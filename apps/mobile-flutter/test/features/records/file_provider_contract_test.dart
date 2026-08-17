@@ -19,7 +19,7 @@ void main() {
       );
       expect(manifest, contains('android:exported="false"'));
       expect(manifest, contains('android:grantUriPermissions="true"'));
-      expect(paths, contains('path="meetings/exports/"'));
+      expect(paths, contains('path="audios/exports/"'));
       expect(RegExp(r'<files-path\b').allMatches(paths), hasLength(1));
       expect(paths, isNot(contains('<root-path')));
       expect(paths, isNot(contains('<external-path')));

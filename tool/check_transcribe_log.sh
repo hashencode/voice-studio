@@ -15,11 +15,11 @@ fi
 echo "Checking log: $LOG_FILE"
 
 if rg -n \
-  "resultText=|mergedText=|transcript(Text)?=|meetingTitle=|Authorization:|Bearer [A-Za-z0-9._-]+|/data/(user|data)/[^ ]+/files/meetings/" \
+  "resultText=|mergedText=|transcript(Text)?=|audioTitle=|Authorization:|Bearer [A-Za-z0-9._-]+|/data/(user|data)/[^ ]+/files/audios/" \
   "$LOG_FILE" >/dev/null 2>&1; then
   echo "Result: FAIL (found transcript, credential, title, or sensitive full-path data)"
   rg -n \
-    "resultText=|mergedText=|transcript(Text)?=|meetingTitle=|Authorization:|Bearer [A-Za-z0-9._-]+|/data/(user|data)/[^ ]+/files/meetings/" \
+    "resultText=|mergedText=|transcript(Text)?=|audioTitle=|Authorization:|Bearer [A-Za-z0-9._-]+|/data/(user|data)/[^ ]+/files/audios/" \
     "$LOG_FILE" | head -n 20
   exit 3
 fi

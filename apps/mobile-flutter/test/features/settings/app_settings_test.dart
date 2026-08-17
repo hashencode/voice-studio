@@ -1,5 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:voice2text_flutter/features/meeting_intelligence/service/meeting_intelligence_provider.dart';
+import 'package:voice2text_flutter/features/audio_intelligence/service/audio_intelligence_provider.dart';
 import 'package:voice2text_flutter/features/settings/model/app_settings.dart';
 
 void main() {
@@ -11,13 +11,10 @@ void main() {
     expect(settings.enablePunctuation, isTrue);
     expect(settings.recentlyDeletedRetentionDays, isNull);
     expect(settings.retentionLastSuccessfulScanAtMs, isNull);
-    expect(
-      settings.meetingProcessingLocation,
-      MeetingProcessingLocation.onDevice,
-    );
-    expect(settings.meetingAiProviderId, isNull);
-    expect(settings.meetingAiModelId, isNull);
-    expect(settings.meetingAiSecretConfigured, isFalse);
+    expect(settings.audioProcessingLocation, AudioProcessingLocation.onDevice);
+    expect(settings.audioAiProviderId, isNull);
+    expect(settings.audioAiModelId, isNull);
+    expect(settings.audioAiSecretConfigured, isFalse);
   });
 
   test('cloud AI preferences normalize and remain non-secret', () {
@@ -25,26 +22,26 @@ void main() {
       modelId: 'paraformer-zh',
       autoTranscribe: true,
       isDarkMode: false,
-      meetingProcessingLocation: 'cloudDirect',
-      meetingAiProviderId: ' deepseek ',
-      meetingAiModelId: ' deepseek-v4-flash ',
-      meetingAiSecretConfigured: true,
+      audioProcessingLocation: 'cloudDirect',
+      audioAiProviderId: ' deepseek ',
+      audioAiModelId: ' deepseek-v4-flash ',
+      audioAiSecretConfigured: true,
     );
 
     expect(
-      settings.meetingProcessingLocation,
-      MeetingProcessingLocation.cloudDirect,
+      settings.audioProcessingLocation,
+      AudioProcessingLocation.cloudDirect,
     );
-    expect(settings.meetingAiProviderId, 'deepseek');
-    expect(settings.meetingAiModelId, 'deepseek-v4-flash');
-    expect(settings.meetingAiSecretConfigured, isTrue);
+    expect(settings.audioAiProviderId, 'deepseek');
+    expect(settings.audioAiModelId, 'deepseek-v4-flash');
+    expect(settings.audioAiSecretConfigured, isTrue);
 
     final local = settings.copyWith(
-      meetingProcessingLocation: MeetingProcessingLocation.onDevice,
-      meetingAiSecretConfigured: false,
+      audioProcessingLocation: AudioProcessingLocation.onDevice,
+      audioAiSecretConfigured: false,
     );
-    expect(local.meetingProcessingLocation, MeetingProcessingLocation.onDevice);
-    expect(local.meetingAiSecretConfigured, isFalse);
+    expect(local.audioProcessingLocation, AudioProcessingLocation.onDevice);
+    expect(local.audioAiSecretConfigured, isFalse);
   });
 
   test('legacy product selections normalize to the single runtime', () {

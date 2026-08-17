@@ -4,7 +4,7 @@ object AudioContract {
     const val RECORDER_CHANNEL = "voice2text/recorder"
     const val TRANSCRIPTION_EVENT_CHANNEL = "voice2text/transcription_events"
 
-    const val MEETING_DIR_NAME = "meetings"
+    const val MEETING_DIR_NAME = "audios"
     const val RECORDING_DIR_NAME = "recordings"
     const val RECORDING_IN_PROGRESS_DIR_NAME = "in-progress"
     const val RECORDING_COMPLETE_DIR_NAME = "complete"
@@ -18,7 +18,7 @@ object AudioContract {
     const val RECORDING_EXTENSION = "m4a"
     const val RECORDING_STAGING_EXTENSION = "m4a.partial"
 
-    const val RECORDING_NOTIFICATION_CHANNEL_ID = "meeting_recording"
+    const val RECORDING_NOTIFICATION_CHANNEL_ID = "audio_recording"
     const val RECORDING_NOTIFICATION_ID = 4101
     const val RECORDING_CONSENT_VERSION = 1
 

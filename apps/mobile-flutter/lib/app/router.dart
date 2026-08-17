@@ -3,8 +3,8 @@ import 'package:flutter/widgets.dart';
 import '../features/home/home_page.dart';
 import '../features/companion/companion_page.dart';
 import '../features/help/help_page.dart';
-import '../features/importing/service/meeting_import_service.dart';
-import '../features/meetings/meeting_detail_page.dart';
+import '../features/importing/service/audio_import_service.dart';
+import '../features/audios/audio_detail_page.dart';
 import '../features/recording/recording_page.dart';
 import '../features/recording/engine/recorder_port.dart';
 import '../features/recording/service/recording_startup_reconciler.dart';
@@ -22,18 +22,18 @@ class AppRoutes {
   static const String settings = '/settings';
   static const String help = '/help';
   static const String companion = '/companion';
-  static const String meetingDetail = '/meeting';
+  static const String audioDetail = '/audio';
 
   static Map<String, WidgetBuilder> buildMap({
     required TranscriptionQueueCoordinator transcriptionQueueCoordinator,
-    required MeetingImportService meetingImportService,
+    required AudioImportService audioImportService,
     required RecordingStartupReconciler recordingStartupReconciler,
     required RecorderPort recorderPort,
     required TranscriptionPort transcriptionPort,
     required bool notificationPermissionEnabled,
   }) => <String, WidgetBuilder>{
     home: (_) => HomePage(
-      meetingImportService: meetingImportService,
+      audioImportService: audioImportService,
       recordingStartupReconciler: recordingStartupReconciler,
       retryRecordings: transcriptionQueueCoordinator.retryRecordings,
     ),
@@ -49,22 +49,22 @@ class AppRoutes {
     settings: (_) => const SettingsPage(),
     help: (_) => const HelpPage(),
     companion: (_) => const CompanionPage(),
-    meetingDetail: (context) {
+    audioDetail: (context) {
       final arguments =
-          ModalRoute.of(context)?.settings.arguments as MeetingDetailArguments?;
+          ModalRoute.of(context)?.settings.arguments as AudioDetailArguments?;
       if (arguments == null) {
-        return const _InvalidMeetingRoute();
+        return const _InvalidAudioRoute();
       }
-      return MeetingDetailPage(recordingId: arguments.recordingId);
+      return AudioDetailPage(recordingId: arguments.recordingId);
     },
   };
 }
 
-class _InvalidMeetingRoute extends StatelessWidget {
-  const _InvalidMeetingRoute();
+class _InvalidAudioRoute extends StatelessWidget {
+  const _InvalidAudioRoute();
 
   @override
   Widget build(BuildContext context) {
-    return const Center(child: Text('缺少会议参数'));
+    return const Center(child: Text('缺少音频参数'));
   }
 }

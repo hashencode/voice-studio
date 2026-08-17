@@ -6,12 +6,12 @@ import 'package:lucide_icons_flutter/lucide_icons.dart';
 import 'package:path/path.dart' as p;
 
 import '../../app/theme/theme_mode_controller.dart';
-import '../importing/service/meeting_import_service.dart';
+import '../importing/service/audio_import_service.dart';
 import '../importing/widgets/import_progress_panel.dart';
-import '../meetings/service/meeting_export_service.dart';
-import '../records/service/meeting_deletion_coordinator.dart';
-import '../records/service/meeting_batch_operation_service.dart';
-import '../records/service/meeting_share_service.dart';
+import '../audios/service/audio_export_service.dart';
+import '../records/service/audio_deletion_coordinator.dart';
+import '../records/service/audio_batch_operation_service.dart';
+import '../records/service/audio_share_service.dart';
 import 'model/folder_entity.dart';
 import 'repository/folders_repository.dart';
 import '../records/model/recording_entity.dart';
@@ -25,7 +25,7 @@ import '../transcription/repository/transcript_segments_repository.dart';
 import 'home_tokens.dart';
 
 const String _allTab = 'all';
-const String _meetingTab = 'meeting';
+const String _audioTab = 'audio';
 const String _recentlyDeletedTab = 'recentlyDeleted';
 
 enum _HomeViewMode { loading, empty, normal, selection }
@@ -38,10 +38,10 @@ class HomePage extends StatefulWidget {
     this.transcriptionJobsRepository,
     this.transcriptSegmentsRepository,
     this.recordingStartupReconciler,
-    this.meetingImportService,
-    this.meetingDeletionCoordinator,
-    this.meetingShareService,
-    this.meetingBatchOperationService,
+    this.audioImportService,
+    this.audioDeletionCoordinator,
+    this.audioShareService,
+    this.audioBatchOperationService,
     this.retryRecordings,
   });
 
@@ -50,10 +50,10 @@ class HomePage extends StatefulWidget {
   final TranscriptionJobsRepository? transcriptionJobsRepository;
   final TranscriptSegmentsRepository? transcriptSegmentsRepository;
   final RecordingStartupReconciler? recordingStartupReconciler;
-  final MeetingImportService? meetingImportService;
-  final MeetingDeletionCoordinator? meetingDeletionCoordinator;
-  final MeetingShareService? meetingShareService;
-  final MeetingBatchOperationService? meetingBatchOperationService;
+  final AudioImportService? audioImportService;
+  final AudioDeletionCoordinator? audioDeletionCoordinator;
+  final AudioShareService? audioShareService;
+  final AudioBatchOperationService? audioBatchOperationService;
   final RetryRecordings? retryRecordings;
 
   @override
@@ -65,11 +65,11 @@ class _HomePageState extends State<HomePage> {
   late final FoldersRepository _foldersRepository;
   late final TranscriptionJobsRepository _transcriptionJobsRepository;
   late final RecordingStartupReconciler _recordingStartupReconciler;
-  late final MeetingImportService _meetingImportService;
-  late final bool _ownsMeetingImportService;
-  late final MeetingDeletionCoordinator _meetingDeletionCoordinator;
-  late final MeetingShareService _meetingShareService;
-  late final MeetingBatchOperationService _meetingBatchOperationService;
+  late final AudioImportService _audioImportService;
+  late final bool _ownsAudioImportService;
+  late final AudioDeletionCoordinator _audioDeletionCoordinator;
+  late final AudioShareService _audioShareService;
+  late final AudioBatchOperationService _audioBatchOperationService;
   StreamSubscription<void>? _sharedMediaSubscription;
 
   List<_RecordingPreview> _items = const <_RecordingPreview>[];
@@ -87,7 +87,7 @@ class _HomePageState extends State<HomePage> {
 
   List<_HomeTabSpec> get _tabs => <_HomeTabSpec>[
     const _HomeTabSpec(id: _allTab, label: '全部音频'),
-    const _HomeTabSpec(id: _meetingTab, label: '会议音频'),
+    const _HomeTabSpec(id: _audioTab, label: '音频音频'),
     ..._folders.map(
       (FolderEntity folder) =>
           _HomeTabSpec(id: folder.name, label: folder.name),
@@ -157,30 +157,30 @@ class _HomePageState extends State<HomePage> {
         widget.transcriptionJobsRepository ?? TranscriptionJobsRepository();
     _recordingStartupReconciler =
         widget.recordingStartupReconciler ?? RecordingStartupReconciler();
-    _ownsMeetingImportService = widget.meetingImportService == null;
-    _meetingImportService =
-        widget.meetingImportService ?? MeetingImportService();
-    _meetingDeletionCoordinator =
-        widget.meetingDeletionCoordinator ?? MeetingDeletionCoordinator();
-    _meetingShareService = widget.meetingShareService ?? MeetingShareService();
-    _meetingBatchOperationService =
-        widget.meetingBatchOperationService ??
-        MeetingBatchOperationService(
+    _ownsAudioImportService = widget.audioImportService == null;
+    _audioImportService = widget.audioImportService ?? AudioImportService();
+    _audioDeletionCoordinator =
+        widget.audioDeletionCoordinator ?? AudioDeletionCoordinator();
+    _audioShareService = widget.audioShareService ?? AudioShareService();
+    _audioBatchOperationService =
+        widget.audioBatchOperationService ??
+        AudioBatchOperationService(
           recordingsRepository: _repository,
           transcriptionJobsRepository: _transcriptionJobsRepository,
           transcriptSegmentsRepository:
               widget.transcriptSegmentsRepository ??
               TranscriptSegmentsRepository(),
-          meetingDeletionCoordinator: _meetingDeletionCoordinator,
+          audioDeletionCoordinator: _audioDeletionCoordinator,
           retryRecordings: widget.retryRecordings,
         );
     _selectionController = GooSelectionController<int>(
       enableHapticFeedback: true,
     )..addListener(_handleSelectionChanged);
     _searchController = TextEditingController();
-    unawaited(_meetingBatchOperationService.cleanupStaleArtifacts());
-    _sharedMediaSubscription = _meetingImportService.sharedMediaAvailable
-        .listen((_) => _requestSharedImportScan());
+    unawaited(_audioBatchOperationService.cleanupStaleArtifacts());
+    _sharedMediaSubscription = _audioImportService.sharedMediaAvailable.listen(
+      (_) => _requestSharedImportScan(),
+    );
     _load();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _requestSharedImportScan();
@@ -190,8 +190,8 @@ class _HomePageState extends State<HomePage> {
   @override
   void dispose() {
     _sharedMediaSubscription?.cancel();
-    if (_ownsMeetingImportService) {
-      _meetingImportService.dispose();
+    if (_ownsAudioImportService) {
+      _audioImportService.dispose();
     }
     _selectionController
       ..removeListener(_handleSelectionChanged)
@@ -213,17 +213,17 @@ class _HomePageState extends State<HomePage> {
     if (_handlingSharedImports) return;
     _handlingSharedImports = true;
     try {
-      while (mounted && await _meetingImportService.hasPendingSharedImport()) {
+      while (mounted && await _audioImportService.hasPendingSharedImport()) {
         if (!mounted) return;
         _showFeedback('正在导入分享的媒体…');
-        final MeetingImportOutcome? outcome = await _meetingImportService
+        final AudioImportOutcome? outcome = await _audioImportService
             .consumeSharedImport();
         if (outcome == null || !mounted) break;
         await _load();
         if (!mounted) return;
-        _showFeedback(outcome.inserted ? '已从系统分享创建会议记录' : '该分享媒体已存在，未重复创建记录');
+        _showFeedback(outcome.inserted ? '已从系统分享创建音频记录' : '该分享媒体已存在，未重复创建记录');
       }
-    } on MeetingImportException catch (error) {
+    } on AudioImportException catch (error) {
       if (mounted) {
         await _showMessageDialog(error.message);
       }
@@ -495,7 +495,7 @@ class _HomePageState extends State<HomePage> {
   bool _isReservedGroupName(String name) {
     final String normalized = name.trim().toLowerCase();
     return normalized == _allTab ||
-        normalized == _meetingTab ||
+        normalized == _audioTab ||
         normalized == _recentlyDeletedTab.toLowerCase();
   }
 
@@ -592,7 +592,7 @@ class _HomePageState extends State<HomePage> {
     _RecordingPreview item, {
     required String targetGroup,
   }) async {
-    final result = await _meetingBatchOperationService.move(<int>[
+    final result = await _audioBatchOperationService.move(<int>[
       item.id,
     ], targetGroup: targetGroup);
     if (!mounted) return;
@@ -661,7 +661,7 @@ class _HomePageState extends State<HomePage> {
       if (!mounted || created == null) return;
       resolvedGroup = created;
     }
-    final result = await _meetingBatchOperationService.move(
+    final result = await _audioBatchOperationService.move(
       _selectedIds,
       targetGroup: resolvedGroup,
     );
@@ -673,7 +673,7 @@ class _HomePageState extends State<HomePage> {
 
   Future<void> _retrySelected() async {
     if (!_canRetrySelection) return;
-    final result = await _meetingBatchOperationService.retry(_selectedIds);
+    final result = await _audioBatchOperationService.retry(_selectedIds);
     if (!mounted) return;
     _showBatchFeedback('重试', result);
     _selectionController.clearSelection(haptic: false);
@@ -682,14 +682,14 @@ class _HomePageState extends State<HomePage> {
 
   Future<void> _exportSelected() async {
     if (!_canExportSelection) return;
-    final format = await showGooPanel<MeetingExportFormat>(
+    final format = await showGooPanel<AudioExportFormat>(
       context: context,
       title: '批量导出格式',
       semanticLabel: '选择批量导出格式',
       builder:
           (
             BuildContext context,
-            GooPanelController<MeetingExportFormat> controller,
+            GooPanelController<AudioExportFormat> controller,
             ScrollController scrollController,
           ) {
             return _BatchExportFormatPanel(
@@ -700,7 +700,7 @@ class _HomePageState extends State<HomePage> {
     );
     if (!mounted || format == null) return;
     _showFeedback('正在生成批量导出…');
-    final result = await _meetingBatchOperationService.export(
+    final result = await _audioBatchOperationService.export(
       _selectedIds,
       format: format,
     );
@@ -710,7 +710,7 @@ class _HomePageState extends State<HomePage> {
       return;
     }
     try {
-      await _meetingBatchOperationService.shareExport(result);
+      await _audioBatchOperationService.shareExport(result);
       if (!mounted) return;
       _showBatchFeedback('导出', result);
       _selectionController.clearSelection(haptic: false);
@@ -859,7 +859,7 @@ class _HomePageState extends State<HomePage> {
 
   Future<void> _shareItem(_RecordingPreview item) async {
     try {
-      await _meetingShareService.share(
+      await _audioShareService.share(
         recordingId: item.id,
         path: item.filePath,
         displayName: item.title,
@@ -870,21 +870,21 @@ class _HomePageState extends State<HomePage> {
     }
   }
 
-  Future<void> _importMeetingMedia() async {
-    final outcome = await showGooPanel<MeetingImportOutcome?>(
+  Future<void> _importAudioMedia() async {
+    final outcome = await showGooPanel<AudioImportOutcome?>(
       context: context,
-      title: '导入会议媒体',
+      title: '导入音频媒体',
       useRootNavigator: true,
       enableBackdropDismiss: false,
       enableDragDismiss: false,
       builder:
           (
             BuildContext context,
-            GooPanelController<MeetingImportOutcome?> panelController,
+            GooPanelController<AudioImportOutcome?> panelController,
             ScrollController scrollController,
           ) {
             return ImportProgressPanel(
-              service: _meetingImportService,
+              service: _audioImportService,
               onCancel: panelController.close,
               onCompleted: panelController.closeWithResult,
               scrollController: scrollController,
@@ -958,8 +958,8 @@ class _HomePageState extends State<HomePage> {
 
     final ids = items.map((item) => item.id);
     final result = isRecentlyDeleted
-        ? await _meetingBatchOperationService.permanentlyDelete(ids)
-        : await _meetingBatchOperationService.softDelete(ids);
+        ? await _audioBatchOperationService.permanentlyDelete(ids)
+        : await _audioBatchOperationService.softDelete(ids);
     if (!mounted) return;
     _showBatchFeedback(isRecentlyDeleted ? '彻底删除' : '删除', result);
     if (isRecentlyDeleted &&
@@ -970,7 +970,7 @@ class _HomePageState extends State<HomePage> {
     await _load();
   }
 
-  void _showBatchFeedback(String action, MeetingBatchOperationResult result) {
+  void _showBatchFeedback(String action, AudioBatchOperationResult result) {
     _showFeedback(
       '$action完成：成功 ${result.succeededCount}，'
       '跳过 ${result.skippedCount}，失败 ${result.failedCount}',
@@ -993,7 +993,7 @@ class _HomePageState extends State<HomePage> {
     switch (_activeTab) {
       case _recentlyDeletedTab:
         return '最近删除为空';
-      case _meetingTab:
+      case _audioTab:
       case _allTab:
       default:
         return '暂无录音文件';
@@ -1022,11 +1022,9 @@ class _HomePageState extends State<HomePage> {
       actions: <GooAppBarIconAction>[
         GooAppBarIconAction(
           iconName: GooIcons.upload,
-          semanticLabel: _meetingImportService.isAvailable ? '导入' : '导入能力尚未配置',
-          tooltip: _meetingImportService.isAvailable ? '导入' : '当前平台尚未配置真实导入能力',
-          onPressed: _meetingImportService.isAvailable
-              ? _importMeetingMedia
-              : null,
+          semanticLabel: _audioImportService.isAvailable ? '导入' : '导入能力尚未配置',
+          tooltip: _audioImportService.isAvailable ? '导入' : '当前平台尚未配置真实导入能力',
+          onPressed: _audioImportService.isAvailable ? _importAudioMedia : null,
         ),
         GooAppBarIconAction(
           iconName: themeController?.isDarkMode == true
@@ -1080,7 +1078,7 @@ class _HomePageState extends State<HomePage> {
       GooToolBarItem(
         iconName: GooIcons.download,
         label: '导出',
-        semanticLabel: '导出所选会议转写',
+        semanticLabel: '导出所选音频转写',
         onPressed: _canExportSelection ? _exportSelected : null,
       ),
       GooToolBarItem(
@@ -1258,7 +1256,7 @@ class _HomeContent extends StatelessWidget {
     switch (mode) {
       case _HomeViewMode.loading:
         return const Center(
-          child: GooSpinner(semanticLabel: '正在加载会议记录', liveRegion: true),
+          child: GooSpinner(semanticLabel: '正在加载音频记录', liveRegion: true),
         );
       case _HomeViewMode.empty:
         return LayoutBuilder(
@@ -1431,7 +1429,7 @@ class _MoveGroupPanel extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final List<_HomeTabSpec> targets = <_HomeTabSpec>[
-      const _HomeTabSpec(id: _meetingTab, label: '会议音频'),
+      const _HomeTabSpec(id: _audioTab, label: '音频音频'),
       ...folders.map((String name) => _HomeTabSpec(id: name, label: name)),
     ];
 
@@ -1447,7 +1445,7 @@ class _MoveGroupPanel extends StatelessWidget {
             ...targets.map(
               (_HomeTabSpec target) => GooListItem(
                 title: target.label,
-                leadingIconName: target.id == _meetingTab
+                leadingIconName: target.id == _audioTab
                     ? GooIcons.group
                     : GooIcons.folder,
                 onTap: () => controller.closeWithResult(target.id),
@@ -1473,7 +1471,7 @@ class _BatchExportFormatPanel extends StatelessWidget {
     required this.scrollController,
   });
 
-  final GooPanelController<MeetingExportFormat> controller;
+  final GooPanelController<AudioExportFormat> controller;
   final ScrollController scrollController;
 
   @override
@@ -1489,7 +1487,7 @@ class _BatchExportFormatPanel extends StatelessWidget {
         const SizedBox(height: 12),
         GooList(
           style: GooListStyle.grouped,
-          children: MeetingExportFormat.values
+          children: AudioExportFormat.values
               .map(
                 (format) => GooListItem(
                   title: _exportFormatLabel(format),
@@ -1708,22 +1706,22 @@ String _normalizeSearchText(String value) {
       .join(' ');
 }
 
-String _exportFormatLabel(MeetingExportFormat format) {
+String _exportFormatLabel(AudioExportFormat format) {
   return switch (format) {
-    MeetingExportFormat.text => '纯文本 TXT',
-    MeetingExportFormat.markdown => 'Markdown',
-    MeetingExportFormat.json => '结构化 JSON',
-    MeetingExportFormat.srt => '字幕 SRT',
-    MeetingExportFormat.vtt => '字幕 VTT',
+    AudioExportFormat.text => '纯文本 TXT',
+    AudioExportFormat.markdown => 'Markdown',
+    AudioExportFormat.json => '结构化 JSON',
+    AudioExportFormat.srt => '字幕 SRT',
+    AudioExportFormat.vtt => '字幕 VTT',
   };
 }
 
-String _exportFormatDescription(MeetingExportFormat format) {
+String _exportFormatDescription(AudioExportFormat format) {
   return switch (format) {
-    MeetingExportFormat.text => '只保留转写正文',
-    MeetingExportFormat.markdown => '包含标题和时间范围',
-    MeetingExportFormat.json => '包含片段字段与复核状态',
-    MeetingExportFormat.srt => '适合常见字幕工具',
-    MeetingExportFormat.vtt => '适合 Web 与标准字幕流程',
+    AudioExportFormat.text => '只保留转写正文',
+    AudioExportFormat.markdown => '包含标题和时间范围',
+    AudioExportFormat.json => '包含片段字段与复核状态',
+    AudioExportFormat.srt => '适合常见字幕工具',
+    AudioExportFormat.vtt => '适合 Web 与标准字幕流程',
   };
 }

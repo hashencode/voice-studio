@@ -3,7 +3,7 @@ class AudioContract {
   static const String transcriptionEventChannel =
       'voice2text/transcription_events';
 
-  static const String meetingDirName = 'meetings';
+  static const String audioDirName = 'audios';
   static const String recordingDirName = 'recordings';
   static const String recordingInProgressDirName = 'in-progress';
   static const String recordingCompleteDirName = 'complete';

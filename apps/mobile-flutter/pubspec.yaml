@@ -40,12 +40,12 @@ dependencies:
   # Use with the CupertinoIcons class for iOS style icons.
   cupertino_icons: ^1.0.8
   crypto: ^3.0.7
-  meeting_core:
-    path: ../../packages/meeting_core
-  meeting_storage:
-    path: ../../packages/meeting_storage
-  meeting_workflows:
-    path: ../../packages/meeting_workflows
+  audio_core:
+    path: ../../packages/audio_core
+  audio_storage:
+    path: ../../packages/audio_storage
+  audio_workflows:
+    path: ../../packages/audio_workflows
   processing_contracts:
     path: ../../packages/processing_contracts
   flutter_ui_mobile:

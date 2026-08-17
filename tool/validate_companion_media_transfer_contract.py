@@ -11,7 +11,7 @@ from typing import Any
 ROOT = Path(__file__).resolve().parents[1]
 SCHEMA_PATH = ROOT / "docs/contracts/companion-media-transfer-v1.schema.json"
 ARCHITECTURE_PATH = ROOT / "docs/architecture/companion-media-transfer-v1.md"
-PROVIDER_PATH = ROOT / "docs/contracts/meeting-intelligence-provider-v1.schema.json"
+PROVIDER_PATH = ROOT / "docs/contracts/audio-intelligence-provider-v1.schema.json"
 PROTOCOL = "companion-media-transfer/v1"
 CAPABILITY = "media-transfer/v1"
 SHA256 = re.compile(r"^[a-f0-9]{64}$")
@@ -114,7 +114,7 @@ def validate_repository() -> None:
     architecture = ARCHITECTURE_PATH.read_text(encoding="utf-8")
     require(schema["properties"]["schema"]["const"] == PROTOCOL, "schema protocol mismatch")
     require(CAPABILITY not in json.dumps(provider), "provider v1 was extended with media transfer")
-    require("meeting_intelligence_provider/v1" not in json.dumps(schema), "media schema aliases provider v1")
+    require("audio_intelligence_provider/v1" not in json.dumps(schema), "media schema aliases provider v1")
     for phrase in (
         "Android Keystore",
         "macOS Keychain",
@@ -133,7 +133,7 @@ def sample_manifest() -> dict[str, Any]:
         "schema": PROTOCOL,
         "transferId": "transfer-sample-1",
         "sourceAssetId": "mobile-recording-1",
-        "displayName": "meeting.wav",
+        "displayName": "audio.wav",
         "sizeBytes": 8192,
         "wholeFileSha256": "a" * 64,
         "chunkBytes": 4096,

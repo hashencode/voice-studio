@@ -35,7 +35,7 @@ class DiagnosticShareService {
             'contents': <String>['diagnostic-report.json'],
             'retentionHours': 24,
             'readOnlyShare': true,
-            'meetingDataIncluded': false,
+            'audioDataIncluded': false,
             'rawLogsIncluded': false,
           }),
     );

@@ -128,7 +128,7 @@ class SpeakerTurnStitcherTest {
     ) = SpeakerWindowActivity(
         startSample = start,
         endSampleExclusive = end,
-        meetingSpeakerKey = key,
+        audioSpeakerKey = key,
     )
 
     private fun interval(
@@ -140,7 +140,7 @@ class SpeakerTurnStitcherTest {
         startSample = start,
         endSampleExclusive = end,
         kind = kind,
-        meetingSpeakerKeys = keys.toSet(),
+        audioSpeakerKeys = keys.toSet(),
         unknownSpeakerCount = if (kind == SpeakerSemanticKind.UNKNOWN) 1 else 0,
     )
 }

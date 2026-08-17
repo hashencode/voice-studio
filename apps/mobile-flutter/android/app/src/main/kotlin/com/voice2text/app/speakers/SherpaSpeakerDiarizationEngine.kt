@@ -127,7 +127,7 @@ internal class SherpaSpeakerDiarizationEngine(
     fun processSemanticWindow(
         window: SpeakerPcmWindow,
         embeddingExtractor: SherpaSpeakerEmbeddingExtractor,
-        reconciler: MeetingSpeakerClusterReconciler,
+        reconciler: AudioSpeakerClusterReconciler,
         sampleRate: Int = 16_000,
         numberOfSpeakers: Int = -1,
     ): SpeakerSemanticWindowResult {
@@ -166,7 +166,7 @@ internal class SherpaSpeakerDiarizationEngine(
         val reconciliationNanos =
             maxOf(0L, System.nanoTime() - reconciliationStarted)
         val assignmentByLocal = assignments.associateBy(
-            MeetingSpeakerAssignment::localSpeakerIndex,
+            AudioSpeakerAssignment::localSpeakerIndex,
         )
         return SpeakerSemanticWindowResult(
             evidence =
@@ -184,8 +184,8 @@ internal class SherpaSpeakerDiarizationEngine(
                             SpeakerWindowActivity(
                                 startSample = window.startSample + startOffset,
                                 endSampleExclusive = window.startSample + endOffset,
-                                meetingSpeakerKey =
-                                    assignmentByLocal[turn.speakerIndex]?.meetingSpeakerKey,
+                                audioSpeakerKey =
+                                    assignmentByLocal[turn.speakerIndex]?.audioSpeakerKey,
                             )
                         },
                 ),

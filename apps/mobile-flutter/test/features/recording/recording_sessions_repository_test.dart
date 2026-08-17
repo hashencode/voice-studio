@@ -1,5 +1,4 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:voice2text_flutter/data/sqlite/app_database.dart';
 import 'package:voice2text_flutter/features/recording/engine/recorder_port.dart';
 import 'package:voice2text_flutter/features/recording/repository/recording_sessions_repository.dart';
 
@@ -7,7 +6,7 @@ import 'recording_test_database.dart';
 
 void main() {
   test(
-    'migration adds consent, session ownership, and recovery schema',
+    'fresh Audio schema includes consent, session ownership, and recovery',
     () async {
       final fixture = await openRecordingTestDatabase();
       addTearDown(fixture.database.close);
@@ -34,8 +33,6 @@ void main() {
         ]),
       );
       expect(sessionTables, hasLength(1));
-
-      await AppDatabase.migrateRecordingSessions(fixture.database);
     },
   );
 

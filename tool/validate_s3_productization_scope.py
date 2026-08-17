@@ -98,7 +98,7 @@ def validate_scope_contract(
     cloud = _mapping(manifest.get("cloudDirect"), "cloudDirect")
     _require(cloud.get("status") == "PASS", "cloudDirect must be PASS")
     _require(cloud.get("processingLocation") == "cloudDirect", "cloud location mismatch")
-    for field in ("secureSecretStore", "explicitPerMeetingConsent", "boundedPersistentJobs"):
+    for field in ("secureSecretStore", "explicitPerAudioConsent", "boundedPersistentJobs"):
         _require(cloud.get(field) is True, f"cloudDirect.{field} must be true")
     _require(
         cloud.get("liveSmoke") == "OPTIONAL_NOT_RUN",
@@ -113,7 +113,7 @@ def validate_scope_contract(
     notes = _mapping(manifest.get("structuredNotes"), "structuredNotes")
     _require(notes.get("status") == "PASS", "structuredNotes must be PASS")
     _require(
-        notes.get("outputSchema") == "meeting_intelligence_output/v1",
+        notes.get("outputSchema") == "audio_intelligence_output/v1",
         "output schema mismatch",
     )
     _require(len(notes.get("templates") or []) == 7, "general plus six templates required")
@@ -302,7 +302,7 @@ def _validate_no_dead_routes(root: Path, *, speaker_product_closed: bool) -> Non
     manifest_text = (mobile_root / "android/app/src/main/AndroidManifest.xml").read_text(encoding="utf-8")
     _require("android.permission.CAMERA" not in manifest_text, "camera permission exists before PC runtime")
     forbidden_pc_files = [
-        mobile_root / "lib/features/meeting_intelligence/service/paired_pc_meeting_intelligence_provider.dart",
+        mobile_root / "lib/features/audio_intelligence/service/paired_pc_audio_intelligence_provider.dart",
         mobile_root / "lib/features/settings/pc_pairing_page.dart",
         mobile_root / "lib/features/settings/qr_pairing_page.dart",
     ]

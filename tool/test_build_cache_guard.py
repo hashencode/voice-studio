@@ -28,9 +28,6 @@ class BuildCacheGuardTest(unittest.TestCase):
                 "packages/audio_workflows": 0.5,
                 "packages/companion_protocol": 0.5,
                 "packages/desktop_sherpa_worker": 0.5,
-                "packages/meeting_core": 0.5,
-                "packages/meeting_storage": 0.5,
-                "packages/meeting_workflows": 0.5,
                 "packages/processing_contracts": 0.5,
             },
         )

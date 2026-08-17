@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_ui_mobile/flutter_ui_mobile.dart';
 
-import '../service/meeting_import_service.dart';
+import '../service/audio_import_service.dart';
 
 class ImportProgressPanel extends StatefulWidget {
   const ImportProgressPanel({
@@ -12,9 +12,9 @@ class ImportProgressPanel extends StatefulWidget {
     this.scrollController,
   });
 
-  final MeetingImportService service;
+  final AudioImportService service;
   final VoidCallback onCancel;
-  final ValueChanged<MeetingImportOutcome> onCompleted;
+  final ValueChanged<AudioImportOutcome> onCompleted;
   final ScrollController? scrollController;
 
   @override
@@ -23,7 +23,7 @@ class ImportProgressPanel extends StatefulWidget {
 
 class _ImportProgressPanelState extends State<ImportProgressPanel> {
   bool _busy = false;
-  MeetingImportOutcome? _outcome;
+  AudioImportOutcome? _outcome;
   String? _error;
 
   @override
@@ -50,7 +50,7 @@ class _ImportProgressPanelState extends State<ImportProgressPanel> {
         _busy = false;
         _outcome = outcome;
       });
-    } on MeetingImportException catch (error) {
+    } on AudioImportException catch (error) {
       if (!mounted) return;
       setState(() {
         _busy = false;
@@ -107,7 +107,7 @@ class _ImportProgressPanelState extends State<ImportProgressPanel> {
           GooUpload(
             enabled: !_busy,
             files: files,
-            title: _busy ? '正在导入到本机' : '选择会议媒体',
+            title: _busy ? '正在导入到本机' : '选择音频媒体',
             description: '支持含音轨的音频或视频；内容只复制到本机。',
             helperText: '系统会验证真实音轨，不依赖文件名或扩展名。',
             limitsText: '单个文件不超过 2 GiB，时长不超过 4 小时。',

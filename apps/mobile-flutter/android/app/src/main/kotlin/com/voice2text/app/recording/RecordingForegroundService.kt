@@ -280,7 +280,7 @@ class RecordingForegroundService : Service(), AudioManager.OnAudioFocusChangeLis
         }
         return builder
             .setSmallIcon(applicationInfo.icon)
-            .setContentTitle("会议录音进行中")
+            .setContentTitle("音频录音进行中")
             .setContentText(status)
             .setContentIntent(openIntent)
             .setOngoing(true)
@@ -302,10 +302,10 @@ class RecordingForegroundService : Service(), AudioManager.OnAudioFocusChangeLis
         manager.createNotificationChannel(
             NotificationChannel(
                 AudioContract.RECORDING_NOTIFICATION_CHANNEL_ID,
-                "会议录音",
+                "音频录音",
                 NotificationManager.IMPORTANCE_LOW,
             ).apply {
-                description = "持续显示会议录音状态和停止入口"
+                description = "持续显示音频录音状态和停止入口"
                 setShowBadge(false)
             },
         )

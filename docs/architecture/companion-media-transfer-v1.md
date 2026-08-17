@@ -2,7 +2,7 @@
 
 `companion-media-transfer/v1` transfers immutable source media from the mobile
 app to a paired desktop. It is deliberately separate from
-`meeting_intelligence_provider/v1`, which remains the frozen
+`audio_intelligence_provider/v1`, which remains the frozen
 transcript-to-structured-notes protocol.
 
 ## Trust and discovery
@@ -22,7 +22,7 @@ credential and fresh 32-byte nonces using HKDF-SHA256. Every encrypted envelope
 has an authenticated session ID and monotonic counter. Replayed, expired,
 unknown-peer, or authentication-failed messages are rejected before transfer
 state changes. No API key, reusable credential, filesystem path, transcript, or
-meeting bytes appear in discovery or unencrypted framing.
+audio bytes appear in discovery or unencrypted framing.
 
 ## Transfer and commit
 

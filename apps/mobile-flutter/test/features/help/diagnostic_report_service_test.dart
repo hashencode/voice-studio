@@ -16,7 +16,7 @@ void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
   test(
-    'report aggregates allowlisted metadata without reading meeting payloads',
+    'report aggregates allowlisted metadata without reading audio payloads',
     () async {
       const channel = MethodChannel('diagnostic-report-test');
       final messenger =
@@ -44,8 +44,8 @@ void main() {
       addTearDown(fixture.database.close);
       final recordingId = await fixture.database
           .insert('recordings', <String, Object?>{
-            'file_path': '/data/user/0/private/secret-meeting.m4a',
-            'display_name': '董事会秘密会议',
+            'file_path': '/data/user/0/private/secret-audio.m4a',
+            'display_name': '董事会秘密音频',
             'duration_ms': 1000,
             'created_at_ms': 1,
           });
@@ -92,8 +92,8 @@ void main() {
       expect(report.transcription.averageProcessingMs, 400);
       expect(report.transcription.maximumProcessingMs, 500);
       for (final forbidden in <String>[
-        'secret-meeting',
-        '董事会秘密会议',
+        'secret-audio',
+        '董事会秘密音频',
         '敏感转写正文',
         'content://private/error',
         '/data/user/0',
@@ -155,7 +155,7 @@ void main() {
         (entry) => entry.name == 'diagnostic-report.json',
       );
       final reportJson = utf8.decode(reportEntry.content as List<int>);
-      expect(reportJson, contains('"meetingContentIncluded": false'));
+      expect(reportJson, contains('"audioContentIncluded": false'));
       expect(reportJson, isNot(contains('content://')));
       expect(reportJson, isNot(contains('/data/')));
 
@@ -183,7 +183,7 @@ Future<void> _insertJob(
   required int completedAtMs,
 }) async {
   await database.insert('transcription_jobs', <String, Object?>{
-    'recording_path': '/data/user/0/private/secret-meeting.m4a',
+    'recording_path': '/data/user/0/private/secret-audio.m4a',
     'recording_id': recordingId,
     'duration_ms': 1000,
     'status': status,

@@ -217,8 +217,8 @@ abstract interface class ProcessingEnginePort {
   });
 }
 
-class NonAiMeetingExport {
-  const NonAiMeetingExport._();
+class NonAiAudioExport {
+  const NonAiAudioExport._();
 
   static String toWebVtt(List<ProcessingTranscriptSegment> segments) {
     final buffer = StringBuffer('WEBVTT\n\n');
@@ -251,8 +251,8 @@ class NonAiMeetingExport {
   }
 }
 
-class ReviewableMeetingTranscript {
-  ReviewableMeetingTranscript(List<ProcessingTranscriptSegment> segments)
+class ReviewableAudioTranscript {
+  ReviewableAudioTranscript(List<ProcessingTranscriptSegment> segments)
     : _segments = List<ProcessingTranscriptSegment>.of(segments);
 
   final List<ProcessingTranscriptSegment> _segments;

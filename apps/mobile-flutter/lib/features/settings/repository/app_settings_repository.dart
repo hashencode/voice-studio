@@ -32,11 +32,11 @@ class AppSettingsRepository {
           row['recently_deleted_retention_days'] as int?,
       retentionLastSuccessfulScanAtMs:
           row['retention_last_successful_scan_at_ms'] as int?,
-      meetingProcessingLocation: row['meeting_processing_location'],
-      meetingAiProviderId: row['meeting_ai_provider_id'] as String?,
-      meetingAiModelId: row['meeting_ai_model_id'] as String?,
-      meetingAiSecretConfigured:
-          (row['meeting_ai_secret_configured'] as int? ?? 0) == 1,
+      audioProcessingLocation: row['audio_processing_location'],
+      audioAiProviderId: row['audio_ai_provider_id'] as String?,
+      audioAiModelId: row['audio_ai_model_id'] as String?,
+      audioAiSecretConfigured:
+          (row['audio_ai_secret_configured'] as int? ?? 0) == 1,
     );
     final normalizedRecordingMode = AppSettings.normalizeRecordingMode(
       row['recording_mode'] as String?,
@@ -62,12 +62,10 @@ class AppSettingsRepository {
       'recently_deleted_retention_days': settings.recentlyDeletedRetentionDays,
       'retention_last_successful_scan_at_ms':
           settings.retentionLastSuccessfulScanAtMs,
-      'meeting_processing_location': settings.meetingProcessingLocation.name,
-      'meeting_ai_provider_id': settings.meetingAiProviderId,
-      'meeting_ai_model_id': settings.meetingAiModelId,
-      'meeting_ai_secret_configured': settings.meetingAiSecretConfigured
-          ? 1
-          : 0,
+      'audio_processing_location': settings.audioProcessingLocation.name,
+      'audio_ai_provider_id': settings.audioAiProviderId,
+      'audio_ai_model_id': settings.audioAiModelId,
+      'audio_ai_secret_configured': settings.audioAiSecretConfigured ? 1 : 0,
     }, conflictAlgorithm: ConflictAlgorithm.replace);
   }
 

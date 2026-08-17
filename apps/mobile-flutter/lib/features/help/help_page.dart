@@ -63,11 +63,11 @@ class _HelpPageState extends State<HelpPage> {
       subtitle: '私有存储、备份排除和临时只读分享',
       icon: GooIcons.privacy,
       body:
-          '会议数据库、录音和派生文件保存在应用私有存储，并从 Android 云备份和设备迁移中排除。'
+          '音频数据库、录音和派生文件保存在应用私有存储，并从 Android 云备份和设备迁移中排除。'
           '这表示“由设备安全设置保护”，不代表应用实现了独立内容加密。\n\n'
           '普通删除会先进入最近删除；永久删除会清理数据库图和受管文件。'
           '自动清理默认关闭，只处理达到所选期限的最近删除记录。\n\n'
-          '导出和诊断通过系统分享以临时只读 URI 发送。应用不会创建公开链接或静默上传会议数据。',
+          '导出和诊断通过系统分享以临时只读 URI 发送。应用不会创建公开链接或静默上传音频数据。',
     ),
   ];
 
@@ -167,7 +167,7 @@ class _HelpPageState extends State<HelpPage> {
                 const GooText('不会包含', variant: GooTextVariant.subtitle),
                 const SizedBox(height: 8),
                 const GooText(
-                  '会议标题或正文、完整路径、内容 URI、原始日志、设备序列号、Android ID 或其他稳定设备标识。',
+                  '音频标题或正文、完整路径、内容 URI、原始日志、设备序列号、Android ID 或其他稳定设备标识。',
                   variant: GooTextVariant.body,
                 ),
                 const SizedBox(height: 16),

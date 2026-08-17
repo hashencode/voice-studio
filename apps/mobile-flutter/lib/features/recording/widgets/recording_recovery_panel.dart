@@ -65,7 +65,7 @@ class _RecordingRecoveryPanelState extends State<RecordingRecoveryPanel> {
       padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
       children: <Widget>[
         const GooText(
-          '检测到上次异常退出留下的录音。可恢复的文件会保存为正式会议；无效文件只能安全清理。',
+          '检测到上次异常退出留下的录音。可恢复的文件会保存为正式音频；无效文件只能安全清理。',
           variant: GooTextVariant.body,
           tone: GooTextTone.secondary,
         ),

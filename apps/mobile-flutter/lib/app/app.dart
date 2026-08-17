@@ -4,9 +4,9 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_ui_mobile/flutter_ui_mobile.dart';
 
-import '../features/importing/service/meeting_import_service.dart';
+import '../features/importing/service/audio_import_service.dart';
 import '../features/recording/service/recording_startup_reconciler.dart';
-import '../features/records/service/meeting_retention_service.dart';
+import '../features/records/service/audio_retention_service.dart';
 import '../features/settings/repository/app_settings_repository.dart';
 import '../features/transcription/repository/transcription_jobs_repository.dart';
 import '../features/transcription/service/transcription_job_reconciler.dart';
@@ -28,9 +28,9 @@ class _Voice2TextAppState extends State<Voice2TextApp> {
   late final AppThemeModeController _themeController;
   late final AppPlatformComposition _platformComposition;
   late final TranscriptionQueueCoordinator _transcriptionQueueCoordinator;
-  late final MeetingImportService _meetingImportService;
+  late final AudioImportService _audioImportService;
   late final RecordingStartupReconciler _recordingStartupReconciler;
-  late final MeetingRetentionService _meetingRetentionService;
+  late final AudioRetentionService _audioRetentionService;
 
   @override
   void initState() {
@@ -46,7 +46,7 @@ class _Voice2TextAppState extends State<Voice2TextApp> {
       settingsRepository: AppSettingsRepository(),
       reconciler: TranscriptionJobReconciler(repository: jobsRepository),
     );
-    _meetingImportService = MeetingImportService(
+    _audioImportService = AudioImportService(
       mediaImportPort: _platformComposition.mediaImportPort,
       onQueueChanged: _transcriptionQueueCoordinator.kick,
     );
@@ -55,7 +55,7 @@ class _Voice2TextAppState extends State<Voice2TextApp> {
       enabled: _platformComposition.recordingRecoveryEnabled,
       onQueueChanged: _transcriptionQueueCoordinator.kick,
     );
-    _meetingRetentionService = MeetingRetentionService();
+    _audioRetentionService = AudioRetentionService();
     unawaited(_startQueueSafely());
     unawaited(_scanRetentionSafely());
   }
@@ -63,7 +63,7 @@ class _Voice2TextAppState extends State<Voice2TextApp> {
   @override
   void dispose() {
     _themeController.dispose();
-    _meetingImportService.dispose();
+    _audioImportService.dispose();
     unawaited(_transcriptionQueueCoordinator.dispose());
     super.dispose();
   }
@@ -81,7 +81,7 @@ class _Voice2TextAppState extends State<Voice2TextApp> {
 
   Future<void> _scanRetentionSafely() async {
     try {
-      final result = await _meetingRetentionService.scan();
+      final result = await _audioRetentionService.scan();
       PrivacySafeLog.info('retention_scan_completed', <String, Object?>{
         'status': result.status.name,
         'examined': result.examinedCount,
@@ -119,7 +119,7 @@ class _Voice2TextAppState extends State<Voice2TextApp> {
             initialRoute: AppRoutes.home,
             routes: AppRoutes.buildMap(
               transcriptionQueueCoordinator: _transcriptionQueueCoordinator,
-              meetingImportService: _meetingImportService,
+              audioImportService: _audioImportService,
               recordingStartupReconciler: _recordingStartupReconciler,
               recorderPort: _platformComposition.recorderPort,
               transcriptionPort: _platformComposition.transcriptionPort,

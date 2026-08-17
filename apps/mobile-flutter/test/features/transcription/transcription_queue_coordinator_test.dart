@@ -36,11 +36,11 @@ void main() {
 
       await coordinator.start();
       final first = await coordinator.enqueue(
-        recordingPath: '/meetings/first.m4a',
+        recordingPath: '/audios/first.m4a',
         durationMs: 1000,
       );
       final second = await coordinator.enqueue(
-        recordingPath: '/meetings/second.m4a',
+        recordingPath: '/audios/second.m4a',
         durationMs: 2000,
       );
       await _eventually(() => port.startedJobIds.length == 1);
@@ -79,7 +79,7 @@ void main() {
 
     await coordinator.start();
     final queued = await coordinator.enqueue(
-      recordingPath: '/meetings/cancel.m4a',
+      recordingPath: '/audios/cancel.m4a',
       durationMs: 1000,
     );
     await _eventually(() => port.startedJobIds.contains(queued.jobId));
@@ -110,7 +110,7 @@ void main() {
 
     await coordinator.start();
     final queued = await coordinator.enqueue(
-      recordingPath: '/meetings/model-failure.m4a',
+      recordingPath: '/audios/model-failure.m4a',
       durationMs: 1000,
     );
     await _eventually(() => port.startedJobIds.contains(queued.jobId));
@@ -153,7 +153,7 @@ void main() {
 
     await coordinator.start();
     final queued = await coordinator.enqueue(
-      recordingPath: '/meetings/punctuation-setting.m4a',
+      recordingPath: '/audios/punctuation-setting.m4a',
       durationMs: 1000,
     );
     await _eventually(() => port.requests.length == 1);
@@ -203,7 +203,7 @@ void main() {
       'punctuation',
     ]) {
       final queued = await coordinator.enqueue(
-        recordingPath: '/meetings/$stage.m4a',
+        recordingPath: '/audios/$stage.m4a',
         durationMs: 1000,
       );
       await _eventually(() => port.startedJobIds.contains(queued.jobId));
@@ -242,7 +242,7 @@ void main() {
     addTearDown(coordinator.dispose);
     await coordinator.start();
     final queued = await coordinator.enqueue(
-      recordingPath: '/meetings/persistence.m4a',
+      recordingPath: '/audios/persistence.m4a',
       durationMs: 1000,
     );
     await _eventually(() => port.startedJobIds.contains(queued.jobId));
@@ -266,7 +266,7 @@ void main() {
         database: fixture.appDatabase,
       );
       final queued = await repository.enqueue(
-        recordingPath: '/meetings/restart.m4a',
+        recordingPath: '/audios/restart.m4a',
         durationMs: 1000,
       );
       await repository.claimNextPending();
@@ -301,7 +301,7 @@ void main() {
         database: fixture.appDatabase,
       );
       final queued = await repository.enqueue(
-        recordingPath: '/meetings/native-resume.m4a',
+        recordingPath: '/audios/native-resume.m4a',
         durationMs: 1000,
       );
       await repository.claimNextPending();

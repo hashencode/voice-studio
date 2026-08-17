@@ -320,7 +320,7 @@ class _RecordingPageState extends State<RecordingPage>
           });
           GooToastScope.of(
             context,
-          ).success(note == null ? '备注已清除' : '备注已保存到会议时间线');
+          ).success(note == null ? '备注已清除' : '备注已保存到音频时间线');
         }
       } catch (_) {
         if (mounted) {
@@ -408,7 +408,7 @@ class _RecordingPageState extends State<RecordingPage>
       dismissible: false,
       builder: (BuildContext context) {
         return const GooDialog<bool>.confirmation(
-          title: '开始会议录音',
+          title: '开始音频录音',
           description:
               '请先确认已获得参会者同意。录音与离线转写默认只在本机处理；'
               '锁屏或切到后台后，系统通知会持续显示录音状态。',

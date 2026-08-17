@@ -23,12 +23,12 @@ void main() {
         entries: <EphemeralArchiveEntry>[
           EphemeralArchiveEntry(
             id: 'one',
-            name: '会议一.md',
+            name: '音频一.md',
             write: (File target) => target.writeAsString('# one'),
           ),
           EphemeralArchiveEntry(
             id: 'two',
-            name: '会议二.md',
+            name: '音频二.md',
             write: (_) async => throw const EphemeralArchiveEntryException(
               'transcript_unavailable',
             ),
@@ -51,9 +51,9 @@ void main() {
       );
       expect(
         archive.files.map((file) => file.name),
-        containsAll(<String>['会议一.md', 'manifest.json']),
+        containsAll(<String>['音频一.md', 'manifest.json']),
       );
-      expect(archive.files.map((file) => file.name), isNot(contains('会议二.md')));
+      expect(archive.files.map((file) => file.name), isNot(contains('音频二.md')));
       expect(
         await root
             .list(recursive: true)
@@ -96,12 +96,12 @@ void main() {
         entries: <EphemeralArchiveEntry>[
           EphemeralArchiveEntry(
             id: 'one',
-            name: 'Meeting?.txt',
+            name: 'Audio?.txt',
             write: (target) => target.writeAsString('one'),
           ),
           EphemeralArchiveEntry(
             id: 'two',
-            name: 'meeting_.txt',
+            name: 'audio_.txt',
             write: (target) => target.writeAsString('two'),
           ),
         ],

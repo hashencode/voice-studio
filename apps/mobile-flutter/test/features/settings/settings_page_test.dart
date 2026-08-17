@@ -5,8 +5,8 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:flutter_ui_mobile/flutter_ui_mobile.dart';
 import 'package:voice2text_flutter/app/theme/app_theme.dart';
 import 'package:voice2text_flutter/app/theme/theme_mode_controller.dart';
-import 'package:voice2text_flutter/features/meeting_intelligence/service/meeting_api_secret_store.dart';
-import 'package:voice2text_flutter/features/meeting_intelligence/service/meeting_intelligence_provider.dart';
+import 'package:voice2text_flutter/features/audio_intelligence/service/audio_api_secret_store.dart';
+import 'package:voice2text_flutter/features/audio_intelligence/service/audio_intelligence_provider.dart';
 import 'package:voice2text_flutter/features/settings/model/app_settings.dart';
 import 'package:voice2text_flutter/features/settings/repository/app_settings_repository.dart';
 import 'package:voice2text_flutter/features/settings/settings_page.dart';
@@ -118,13 +118,10 @@ void main() {
 
     expect(secretStore.secrets['deepseek'], 'transient-secret');
     final saved = repository.savedSettings.last;
-    expect(
-      saved.meetingProcessingLocation,
-      MeetingProcessingLocation.cloudDirect,
-    );
-    expect(saved.meetingAiProviderId, 'deepseek');
-    expect(saved.meetingAiSecretConfigured, isTrue);
-    expect(saved.meetingAiModelId, 'deepseek-v4-flash');
+    expect(saved.audioProcessingLocation, AudioProcessingLocation.cloudDirect);
+    expect(saved.audioAiProviderId, 'deepseek');
+    expect(saved.audioAiSecretConfigured, isTrue);
+    expect(saved.audioAiModelId, 'deepseek-v4-flash');
   });
 }
 
@@ -147,7 +144,7 @@ class _MemorySettingsRepository extends AppSettingsRepository {
   }
 }
 
-class _MemorySecretStore extends MeetingApiSecretStore {
+class _MemorySecretStore extends AudioApiSecretStore {
   final Map<String, String> secrets = <String, String>{};
 
   @override

@@ -12,7 +12,7 @@ void main() {
       database: fixture.appDatabase,
     );
     final stale = await repository.enqueue(
-      recordingPath: '/meetings/stale.m4a',
+      recordingPath: '/audios/stale.m4a',
       durationMs: 1000,
     );
     await repository.claimNextPending();
@@ -23,7 +23,7 @@ void main() {
       whereArgs: <Object>[stale.jobId],
     );
     final fresh = await repository.enqueue(
-      recordingPath: '/meetings/fresh.m4a',
+      recordingPath: '/audios/fresh.m4a',
       durationMs: 1000,
     );
     await repository.claimNextPending();

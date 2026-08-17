@@ -21,8 +21,8 @@ void main() {
       5,
       (int index) => RecordingEntity(
         id: index + 1,
-        filePath: '/meetings/${index + 1}.m4a',
-        displayName: '会议 ${index + 1}',
+        filePath: '/audios/${index + 1}.m4a',
+        displayName: '音频 ${index + 1}',
         groupName: null,
         deletedAtMs: null,
         isFavorite: false,
@@ -119,7 +119,7 @@ void main() {
       final active = <RecordingEntity>[
         RecordingEntity(
           id: 1,
-          filePath: '/meetings/project.m4a',
+          filePath: '/audios/project.m4a',
           displayName: 'Project   Alpha',
           groupName: null,
           deletedAtMs: null,
@@ -129,7 +129,7 @@ void main() {
         ),
         RecordingEntity(
           id: 2,
-          filePath: '/meetings/chinese.m4a',
+          filePath: '/audios/chinese.m4a',
           displayName: '客户访谈',
           groupName: null,
           deletedAtMs: null,

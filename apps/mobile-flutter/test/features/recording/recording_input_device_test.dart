@@ -5,13 +5,13 @@ void main() {
   test('recording input device parses the native selection contract', () {
     final device = RecordingInputDevice.fromMap(<Object?, Object?>{
       'id': 42,
-      'name': '会议耳机',
+      'name': '音频耳机',
       'inputDeviceType': 'bluetooth',
       'canSelect': true,
     });
 
     expect(device.id, 42);
-    expect(device.name, '会议耳机');
+    expect(device.name, '音频耳机');
     expect(device.type, RecordingInputDeviceType.bluetooth);
     expect(device.canSelect, isTrue);
   });

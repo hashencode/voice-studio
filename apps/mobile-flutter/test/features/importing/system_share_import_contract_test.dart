@@ -22,7 +22,7 @@ void main() {
 
     expect(activity, contains('captureSharedIntent(intent)'));
     expect(activity, contains('override fun onNewIntent(intent: Intent)'));
-    expect(activity, contains('"consumeSharedMeetingMedia"'));
-    expect(activity, contains('"sharedMeetingMediaAvailable"'));
+    expect(activity, contains('"consumeSharedAudioMedia"'));
+    expect(activity, contains('"sharedAudioMediaAvailable"'));
   });
 }

@@ -5,13 +5,13 @@ import kotlin.math.min
 internal data class SpeakerWindowActivity(
     val startSample: Long,
     val endSampleExclusive: Long,
-    val meetingSpeakerKey: String?,
+    val audioSpeakerKey: String?,
 ) {
     init {
         require(startSample >= 0) { "窗口活动起点不能为负数" }
         require(endSampleExclusive > startSample) { "窗口活动必须具有正长度" }
-        require(meetingSpeakerKey == null || meetingSpeakerKey.isNotBlank()) {
-            "会议级说话人 key 不能为空"
+        require(audioSpeakerKey == null || audioSpeakerKey.isNotBlank()) {
+            "音频级说话人 key 不能为空"
         }
     }
 }
@@ -118,8 +118,8 @@ internal class SpeakerTurnStitcher {
         if (active.isEmpty()) {
             return SpeakerSemanticInterval(start, end, SpeakerSemanticKind.SILENCE)
         }
-        val assignedKeys = active.mapNotNull(SpeakerWindowActivity::meetingSpeakerKey).toSet()
-        val unknownCount = active.count { it.meetingSpeakerKey == null }
+        val assignedKeys = active.mapNotNull(SpeakerWindowActivity::audioSpeakerKey).toSet()
+        val unknownCount = active.count { it.audioSpeakerKey == null }
         val activeSpeakerCount = assignedKeys.size + unknownCount
         return when {
             activeSpeakerCount >= 2 -> {
@@ -127,7 +127,7 @@ internal class SpeakerTurnStitcher {
                     startSample = start,
                     endSampleExclusive = end,
                     kind = SpeakerSemanticKind.OVERLAP,
-                    meetingSpeakerKeys = assignedKeys,
+                    audioSpeakerKeys = assignedKeys,
                     unknownSpeakerCount = unknownCount,
                 )
             }
@@ -136,7 +136,7 @@ internal class SpeakerTurnStitcher {
                     startSample = start,
                     endSampleExclusive = end,
                     kind = SpeakerSemanticKind.ASSIGNED,
-                    meetingSpeakerKeys = assignedKeys,
+                    audioSpeakerKeys = assignedKeys,
                 )
             }
             else -> {
@@ -159,7 +159,7 @@ internal class SpeakerTurnStitcher {
             previous != null &&
             previous.endSampleExclusive == next.startSample &&
             previous.kind == next.kind &&
-            previous.meetingSpeakerKeys == next.meetingSpeakerKeys &&
+            previous.audioSpeakerKeys == next.audioSpeakerKeys &&
             previous.unknownSpeakerCount == next.unknownSpeakerCount
         ) {
             intervals[intervals.lastIndex] =
