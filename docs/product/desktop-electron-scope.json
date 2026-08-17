@@ -24,15 +24,15 @@
   },
   "targets": {
     "macos": {
-      "status": "BLOCKED",
-      "closureDisposition": "MACOS_ELECTRON_CLOSURE_BLOCKED",
+      "status": "PASS",
+      "closureDisposition": "MACOS_ELECTRON_CLOSED_FOR_WINDOWS_ENTRY",
       "evidence": {
         "path": "docs/product/desktop-electron-evidence.json",
-        "sha256": "7e0afa2e59bc1b60a0ab4d36662c522ffd13440761e0d7d7a0b34fe2cb6b24ba"
+        "sha256": "eef8d0c88c3f2a1eb96ff9885743ac7a6e2d1703e9b4429a9e45eebabd4faf94"
       }
     },
     "windows": {
-      "status": "BLOCKED_BY_MACOS_CLOSURE",
+      "status": "READY_FOR_INDEPENDENT_U13",
       "inheritsMacosPass": false,
       "evidence": null
     }
@@ -138,7 +138,7 @@
     },
     {
       "id": "accessibility.desktop",
-      "status": "BLOCKED",
+      "status": "PASS",
       "evidenceBindingIds": [
         "gate-accessibility.desktop",
         "manual-voiceover"

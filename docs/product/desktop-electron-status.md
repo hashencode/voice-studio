@@ -2,9 +2,9 @@
 
 ## Current decision
 
-macOS Electron closure is **BLOCKED** under the `DEVELOPMENT_ONLY` U12 gate.
-Windows remains `BLOCKED_BY_MACOS_CLOSURE`; no macOS result has been reused for
-Windows and U13 has not started.
+macOS Electron closure is **PASS** under the `DEVELOPMENT_ONLY` U12 gate.
+Windows is `READY_FOR_INDEPENDENT_U13`; no macOS result is reused for Windows,
+and U13 must produce its own target-specific package and product-flow evidence.
 
 The packaged macOS application, native helper, workers, runtimes, models,
 resource manifest, dependency lock, source revision, target fingerprint,
@@ -15,20 +15,19 @@ product-flow gate passed against one package manifest on the declared Apple M2
 target. Each automated result has a privacy-safe, source/package/target-bound
 execution receipt under `docs/product/electron-closure-receipts/`.
 
-Closure is not declared only because the locked GUI prevented the bounded
-VoiceOver/minimum-window/200%-scaling/reduced-motion accessibility procedure
-from being executed. Automated keyboard, focus, minimum-window, scaling,
-reduced-motion, and non-drag checks passed; VoiceOver remains `NOT_RUN` and is
-not inferred from DOM or packaged automation.
+The bounded `macos-voiceover-navigation-v1` procedure also passed against the
+same target and package manifest in 315,351 ms. VoiceOver, keyboard navigation,
+visible focus, dialog containment and restoration, minimum-window operation,
+200% text scaling, reduced motion, and non-drag alternatives were observed in
+the packaged application. The temporary VoiceOver and reduced-motion settings
+were restored after the session.
 
-## Required to unblock macOS
+## Next target gate
 
-1. On the same target and package manifest, execute the bounded accessibility
-   procedure `macos-voiceover-navigation-v1` within ten minutes and record PASS
-   for keyboard, focus, VoiceOver, minimum window size, 200% text scaling,
-   reduced motion, and non-drag alternatives.
-2. Regenerate the evidence bindings and change macOS to `PASS` only after
-   `tool/validate_electron_desktop_scope.py` accepts the complete record.
+U13 may now begin on Windows hardware or an approved Windows target environment.
+It must repeat install, package, process-tree, native capability, feature,
+accessibility, privacy, and packaged-artifact validation without importing this
+macOS PASS.
 
 ## Bounded accessibility procedure
 

@@ -2,10 +2,10 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "schema": "voice2text-desktop-electron-evidence/v1",
   "unit": "U12",
-  "status": "BLOCKED",
-  "disposition": "MACOS_ELECTRON_CLOSURE_BLOCKED",
+  "status": "PASS",
+  "disposition": "MACOS_ELECTRON_CLOSED_FOR_WINDOWS_ENTRY",
   "developmentPosture": "DEVELOPMENT_ONLY",
-  "capturedAt": "2026-08-15T08:02:02+08:00",
+  "capturedAt": "2026-08-17T10:27:48+08:00",
   "source": {
     "revision": "ded2f8d6cbdc0116887762ccac893e3575d39b8d",
     "tree": "c0842e3b0b306a58cec996ff30958618fb959558",
@@ -384,16 +384,16 @@
     {
       "id": "manual-voiceover",
       "mode": "bounded-manual",
-      "status": "NOT_RUN",
+      "status": "PASS",
       "procedureId": "macos-voiceover-navigation-v1",
       "maximumMinutes": 10,
-      "elapsedMilliseconds": 0,
+      "elapsedMilliseconds": 315351,
       "targetFingerprintSha256": "c426e6d59fa483026cdd66c49e9edf33c96a4ce55e5f90ff2a61ef9d52da92d3",
       "packageManifestSha256": "7f9c11f2fd6d3a83a38050897b6f3605a57234f671c49fff1e584dbaff64a124",
       "definitionPath": "docs/product/desktop-electron-status.md",
-      "definitionSha256": "3ad7b0bada964e63836fa6302f7fe5e295d4f050da3d81b6724d5f4d392f36ed",
-      "receiptPath": null,
-      "receiptSha256": null
+      "definitionSha256": "ee6618b0d576cc0880dde2987dc5b87f62bcf02c48802798d957276f53171c27",
+      "receiptPath": "docs/product/electron-closure-receipts/manual-voiceover.json",
+      "receiptSha256": "a088dfd299c5cc064327656818bd36047ef1733734552fc8a014c87595d4951e"
     }
   ],
   "capabilityEvidence": [
@@ -497,7 +497,7 @@
     },
     {
       "id": "accessibility.desktop",
-      "status": "BLOCKED",
+      "status": "PASS",
       "evidenceBindingIds": [
         "gate-accessibility.desktop",
         "manual-voiceover"
@@ -505,7 +505,7 @@
     }
   ],
   "accessibility": {
-    "status": "BLOCKED",
+    "status": "PASS",
     "checks": [
       {
         "id": "keyboard",
@@ -523,7 +523,7 @@
       },
       {
         "id": "voiceover",
-        "status": "NOT_RUN",
+        "status": "PASS",
         "evidenceBindingIds": [
           "manual-voiceover"
         ]
@@ -582,7 +582,8 @@
       "gate-settings.ai",
       "gate-settings.runtime",
       "gate-settings.security",
-      "gate-shell.navigation"
+      "gate-shell.navigation",
+      "manual-voiceover"
     ]
   },
   "validationSessions": [
@@ -601,11 +602,9 @@
     "packagedProductFlows": "PASS",
     "artifactInspection": "PASS",
     "privacy": "PASS",
-    "accessibility": "NOT_RUN_LOCKED_GUI",
+    "accessibility": "PASS",
     "rootDevCheck": "PASS",
     "uiWatcher": "PASS"
   },
-  "blockers": [
-    "ACCESSIBILITY_MANUAL_NOT_RUN_LOCKED_GUI"
-  ]
+  "blockers": []
 }
