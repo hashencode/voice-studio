@@ -3,6 +3,7 @@ set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$ROOT"
+MOBILE_ROOT="$ROOT/apps/mobile-flutter"
 
 DEVICE_ID="${1:-${DEVICE_ID:-}}"
 PACKAGE_NAME="com.voice2text.app"
@@ -45,16 +46,17 @@ python3 benchmark/prepare_s2_noise_audio.py
 test -s "$NOISE_ROOT/generated_manifest.json"
 
 echo "[3/7] Build app and AndroidTest APKs"
+python3 "$ROOT/tool/build_cache_guard.py"
 (
-  cd android
+  cd "$MOBILE_ROOT/android"
   ./gradlew :app:assembleDebug :app:assembleDebugAndroidTest
 )
 
 echo "[4/7] Install without clearing app-private data"
 adb -s "$DEVICE_ID" install -r -d \
-  build/app/outputs/flutter-apk/app-debug.apk >/dev/null
+  "$MOBILE_ROOT/build/app/outputs/flutter-apk/app-debug.apk" >/dev/null
 adb -s "$DEVICE_ID" install -r -d \
-  build/app/outputs/apk/androidTest/debug/app-debug-androidTest.apk >/dev/null
+  "$MOBILE_ROOT/build/app/outputs/apk/androidTest/debug/app-debug-androidTest.apk" >/dev/null
 
 echo "[5/7] Stage pinned model and fixtures"
 adb -s "$DEVICE_ID" shell mkdir -p "$REMOTE_ROOT"

@@ -506,7 +506,7 @@ ASR。桌面主工作站由 `DESKTOP-FIRST-MEETING-WORKSTATION-2026-07-26`
 - docs/architecture/dual-transcription-pipeline.md：已归档的双线路研究，仅作为未来 PC Live VAD 输入。
 - benchmark/README.md 与 benchmark/asr_benchmark_results_2026-07-05.md：模型与 VAD 评测资产。
 - docs/REAL_DEVICE_REGRESSION_MATRIX.md：现有真机回归方法和历史证据。
-- lib/ 与 android/ 当前代码：当前能力状态的最终事实来源。
+- `apps/mobile-flutter/lib/` 与 `apps/mobile-flutter/android/` 当前代码：移动端能力状态的最终事实来源。
 
 ---
 

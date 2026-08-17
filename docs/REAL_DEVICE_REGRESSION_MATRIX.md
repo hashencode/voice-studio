@@ -56,7 +56,7 @@
 - 设备与窗口：Xiaomi M2102J2SC（thyme，Android 13/API 33），
   1080×2340、440 dpi；按当前目标用户群与设备年代作为中端参考机，不按
   首发营销定位归类。
-- 标点媒体：`assets/sherpa/wav/test.wav`，272.398 秒。2026-07-24 真机
+- 标点媒体：`apps/mobile-flutter/assets/sherpa/wav/test.wav`，272.398 秒。2026-07-24 真机
   instrumentation 结果为 known-text 389 ms、关闭标点转写 10,385 ms、
   开启标点转写 13,804 ms、19 个片段；去标点正文 SHA-256 为
   `15ef3d6aef35b238d68d0f4165d032732487607ad62dbbc7c73b34764495d63c`。

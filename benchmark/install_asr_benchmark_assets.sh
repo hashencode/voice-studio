@@ -3,6 +3,7 @@ set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$ROOT"
+MOBILE_ROOT="$ROOT/apps/mobile-flutter"
 APP_ID="${2:-com.voice2text.app}"
 LOCAL_ROOT="$ROOT/build/asr_benchmark"
 STAGING="$LOCAL_ROOT/staging"
@@ -62,7 +63,7 @@ adb -s "$DEVICE_ID" get-state >/dev/null
 
 require_file "$MANIFEST_FILE"
 require_file "$PROFILES_FILE"
-require_file "$ROOT/assets/sherpa/onnx/silero-vad.onnx"
+require_file "$MOBILE_ROOT/assets/sherpa/onnx/silero-vad.onnx"
 
 if [[ ! -d "$LOCAL_ROOT/models" ]] || [[ -z "$(find "$LOCAL_ROOT/models" -mindepth 1 -maxdepth 1 -type d 2>/dev/null)" ]]; then
   echo "No extracted models found under $LOCAL_ROOT/models"
@@ -166,7 +167,7 @@ for audio_case in manifest["audioCases"]:
         shutil.copy2(source, target)
 PY
 mkdir -p "$STAGING/vad"
-cp "$ROOT/assets/sherpa/onnx/silero-vad.onnx" "$STAGING/vad/silero-vad.onnx"
+cp "$MOBILE_ROOT/assets/sherpa/onnx/silero-vad.onnx" "$STAGING/vad/silero-vad.onnx"
 
 adb -s "$DEVICE_ID" shell "rm -rf '$REMOTE_TMP'"
 adb -s "$DEVICE_ID" push "$STAGING" "$REMOTE_TMP" >/dev/null

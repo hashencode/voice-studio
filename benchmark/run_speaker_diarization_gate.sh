@@ -3,6 +3,7 @@ set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$ROOT"
+MOBILE_ROOT="$ROOT/apps/mobile-flutter"
 
 PHASE=""
 CANDIDATE=""
@@ -152,10 +153,11 @@ python3 benchmark/prepare_speaker_diarization_fixtures.py \
   --manifest "$SCREENING_CONTRACT"
 
 echo "[4/8] Build app and AndroidTest APKs"
+python3 "$ROOT/tool/build_cache_guard.py"
 GRADLE_BIN="${GRADLE_BIN:-}"
 if [[ -z "$GRADLE_BIN" ]]; then
-  if [[ -x "$ROOT/android/gradlew" ]]; then
-    GRADLE_BIN="$ROOT/android/gradlew"
+  if [[ -x "$MOBILE_ROOT/android/gradlew" ]]; then
+    GRADLE_BIN="$MOBILE_ROOT/android/gradlew"
   else
     GRADLE_CACHE_ROOT="${GRADLE_USER_HOME:-$HOME/.gradle}"
     GRADLE_BIN="$(
@@ -166,19 +168,19 @@ if [[ -z "$GRADLE_BIN" ]]; then
   fi
 fi
 if [[ -z "$GRADLE_BIN" || ! -x "$GRADLE_BIN" ]]; then
-  echo "Gradle 8.14 is unavailable; set GRADLE_BIN or restore android/gradlew." >&2
+  echo "Gradle 8.14 is unavailable; set GRADLE_BIN or restore apps/mobile-flutter/android/gradlew." >&2
   exit 2
 fi
 (
-  cd android
+  cd "$MOBILE_ROOT/android"
   "$GRADLE_BIN" :app:assembleDebug :app:assembleDebugAndroidTest
 )
 
 echo "[5/8] Install and stage candidate artifacts in app-private storage"
 adb -s "$DEVICE_ID" install -r -d \
-  build/app/outputs/flutter-apk/app-debug.apk >/dev/null
+  "$MOBILE_ROOT/build/app/outputs/flutter-apk/app-debug.apk" >/dev/null
 adb -s "$DEVICE_ID" install -r -d \
-  build/app/outputs/apk/androidTest/debug/app-debug-androidTest.apk >/dev/null
+  "$MOBILE_ROOT/build/app/outputs/apk/androidTest/debug/app-debug-androidTest.apk" >/dev/null
 adb -s "$DEVICE_ID" shell mkdir -p "$REMOTE_ROOT"
 adb -s "$DEVICE_ID" push "$SEGMENTATION_MODEL" "$REMOTE_ROOT/segmentation.onnx" >/dev/null
 adb -s "$DEVICE_ID" push "$EMBEDDING_MODEL" "$REMOTE_ROOT/embedding.onnx" >/dev/null

@@ -3,7 +3,7 @@
   "reviewedAt": "2026-07-25",
   "runtime": {
     "id": "sherpa-onnx-android-1.13.3",
-    "artifact": "android/app/libs/sherpa-onnx.aar",
+    "artifact": "apps/mobile-flutter/android/app/libs/sherpa-onnx.aar",
     "sha256": "243ad797a3b6e75ebbeaf7a2ab4aec0777e7d71b730685abb762a120940b07b6",
     "license": {
       "status": "clear",
@@ -33,7 +33,7 @@
       },
       "artifact": {
         "kind": "git_lfs",
-        "path": "assets/sherpa/asr/paraformer-zh.zip",
+        "path": "apps/mobile-flutter/assets/sherpa/asr/paraformer-zh.zip",
         "sha256": "f30431419edcf2663e8fa487523376cb98500c64d17018bd2f1fbee0abcd93bc",
         "bytes": 217315861
       },
@@ -53,7 +53,7 @@
         ]
       },
       "evidence": [
-        "android/app/src/main/kotlin/com/voice2text/app/transcription/RealSherpaTranscriptionEngine.kt",
+        "apps/mobile-flutter/android/app/src/main/kotlin/com/voice2text/app/transcription/RealSherpaTranscriptionEngine.kt",
         "benchmark/S2_ASR_CAPABILITY_REVIEW.md"
       ]
     },

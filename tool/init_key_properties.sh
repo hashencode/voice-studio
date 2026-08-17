@@ -2,8 +2,9 @@
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
-TEMPLATE="$ROOT/android/key.properties.example"
-TARGET="$ROOT/android/key.properties"
+MOBILE_ROOT="$ROOT/apps/mobile-flutter"
+TEMPLATE="$MOBILE_ROOT/android/key.properties.example"
+TARGET="$MOBILE_ROOT/android/key.properties"
 
 if [[ ! -f "$TEMPLATE" ]]; then
   echo "Template not found: $TEMPLATE"

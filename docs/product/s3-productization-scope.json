@@ -12,7 +12,7 @@
     "liveSmoke": "OPTIONAL_NOT_RUN",
     "evidence": [
       {
-        "path": "lib/features/meeting_intelligence/service/deepseek_meeting_intelligence_provider.dart",
+        "path": "apps/mobile-flutter/lib/features/meeting_intelligence/service/deepseek_meeting_intelligence_provider.dart",
         "sha256": "7ae3242b40962efa79d4379f585e0d373b27ce0158c2df1d8de15ed9ccd8573b"
       }
     ]

@@ -3,6 +3,7 @@ set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$ROOT"
+MOBILE_ROOT="$ROOT/apps/mobile-flutter"
 APP_ID="${APP_ID:-com.voice2text.app}"
 SEGMENT_WINDOW_MS="${SEGMENT_WINDOW_MS:-12000}"
 RESULT_DIR="$ROOT/build/asr_benchmark/results"
@@ -61,8 +62,12 @@ else
 fi
 
 echo "[3/6] Building and installing debug APK"
-flutter build apk --debug >/dev/null
-adb -s "$DEVICE_ID" install -r "$ROOT/build/app/outputs/flutter-apk/app-debug.apk" >/dev/null
+python3 "$ROOT/tool/build_cache_guard.py"
+(
+  cd "$MOBILE_ROOT"
+  flutter build apk --debug >/dev/null
+)
+adb -s "$DEVICE_ID" install -r "$MOBILE_ROOT/build/app/outputs/flutter-apk/app-debug.apk" >/dev/null
 
 echo "[4/6] Installing benchmark assets"
 "$ROOT/benchmark/install_asr_benchmark_assets.sh" "$DEVICE_ID" "$APP_ID"

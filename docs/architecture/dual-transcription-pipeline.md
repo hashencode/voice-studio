@@ -19,11 +19,11 @@
 
 当前项目是 Android 优先的 Flutter 重构工程。现有主链路已经可用：
 
-- `lib/features/recording/` 管理录音流程和状态机。
-- `lib/features/transcription/` 管理转写任务列表、失败重试和原生转写调用。
-- `android/app/src/main/kotlin/com/voice2text/app/MainActivity.kt` 使用 `MediaRecorder` 录制 `m4a/aac`。
-- `android/app/src/main/kotlin/com/voice2text/app/transcription/AudioTranscoder.kt` 将 `m4a` 转为 `wav(16k mono)`。
-- `android/app/src/main/kotlin/com/voice2text/app/transcription/RealSherpaTranscriptionEngine.kt` 使用 Sherpa `OfflineRecognizer` 识别完整 wav。
+- `apps/mobile-flutter/lib/features/recording/` 管理录音流程和状态机。
+- `apps/mobile-flutter/lib/features/transcription/` 管理转写任务列表、失败重试和原生转写调用。
+- `apps/mobile-flutter/android/app/src/main/kotlin/com/voice2text/app/MainActivity.kt` 使用 `MediaRecorder` 录制 `m4a/aac`。
+- `apps/mobile-flutter/android/app/src/main/kotlin/com/voice2text/app/transcription/AudioTranscoder.kt` 将 `m4a` 转为 `wav(16k mono)`。
+- `apps/mobile-flutter/android/app/src/main/kotlin/com/voice2text/app/transcription/RealSherpaTranscriptionEngine.kt` 使用 Sherpa `OfflineRecognizer` 识别完整 wav。
 - `pubspec.yaml` 已包含 `paraformer-zh`、VAD、标点、降噪等 Sherpa 相关资产。
 - `docs/REAL_DEVICE_REGRESSION_MATRIX.md` 记录了当前 real 模式的真机回归通过证据。
 
@@ -546,7 +546,7 @@ transcript_segments
 
 ## 18. 需要实施期确认的问题
 
-- 当前 `android/app/libs/sherpa-onnx.aar` 是否包含 online/streaming recognizer API。
+- 当前 `apps/mobile-flutter/android/app/libs/sherpa-onnx.aar` 是否包含 online/streaming recognizer API。
 - 当前 `paraformer-zh.zip` 是否适合短片段识别；如不适合，需要 streaming 或更适合短音频的模型。
 - VAD 资产 `silero-vad.onnx`、`ten-vad.onnx` 的 JNI/API 接入方式。
 - Android 侧 m4a 写入方案采用 `MediaCodec + MediaMuxer` 还是先保存 wav/pcm 后转码。

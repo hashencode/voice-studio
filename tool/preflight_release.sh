@@ -3,6 +3,7 @@ set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$ROOT"
+MOBILE_ROOT="$ROOT/apps/mobile-flutter"
 
 python3 tool/build_cache_guard.py
 
@@ -15,23 +16,23 @@ warn() { echo "[WARN] $1"; warns=$((warns+1)); }
 err() { echo "[ERR] $1"; failures=$((failures+1)); }
 add_todo() { TODOS+=("$1"); }
 
-PUBSPEC="$ROOT/pubspec.yaml"
-MANIFEST="$ROOT/android/app/src/main/AndroidManifest.xml"
-GRADLE="$ROOT/android/app/build.gradle.kts"
-APK_DEBUG="$ROOT/build/app/outputs/flutter-apk/app-debug.apk"
+PUBSPEC="$MOBILE_ROOT/pubspec.yaml"
+MANIFEST="$MOBILE_ROOT/android/app/src/main/AndroidManifest.xml"
+GRADLE="$MOBILE_ROOT/android/app/build.gradle.kts"
+APK_DEBUG="$MOBILE_ROOT/build/app/outputs/flutter-apk/app-debug.apk"
 
-AAR="$ROOT/android/app/libs/sherpa-onnx.aar"
+AAR="$MOBILE_ROOT/android/app/libs/sherpa-onnx.aar"
 if [[ -f "$AAR" ]]; then
   ok "Sherpa AAR 存在"
 else
-  err "缺少 Sherpa AAR: android/app/libs/sherpa-onnx.aar"
-  add_todo "执行: cp /Users/studio/Documents/GitHub/voice2text/modules/sherpa/android/libs/sherpa-onnx.aar android/app/libs/sherpa-onnx.aar"
+  err "缺少 Sherpa AAR: apps/mobile-flutter/android/app/libs/sherpa-onnx.aar"
+  add_todo "执行: cp /Users/studio/Documents/GitHub/voice2text/modules/sherpa/android/libs/sherpa-onnx.aar apps/mobile-flutter/android/app/libs/sherpa-onnx.aar"
 fi
 
-CONTRACT_DART="$ROOT/lib/app/contracts/audio_contract.dart"
-CONTRACT_KT="$ROOT/android/app/src/main/kotlin/com/voice2text/app/contracts/AudioContract.kt"
-KEY_PROPS="$ROOT/android/key.properties"
-KEY_EXAMPLE="$ROOT/android/key.properties.example"
+CONTRACT_DART="$MOBILE_ROOT/lib/app/contracts/audio_contract.dart"
+CONTRACT_KT="$MOBILE_ROOT/android/app/src/main/kotlin/com/voice2text/app/contracts/AudioContract.kt"
+KEY_PROPS="$MOBILE_ROOT/android/key.properties"
+KEY_EXAMPLE="$MOBILE_ROOT/android/key.properties.example"
 
 # 1) version
 version_line="$(rg '^version:' "$PUBSPEC" || true)"
@@ -53,7 +54,7 @@ if rg -q 'android.permission.RECORD_AUDIO' "$MANIFEST"; then
   ok "AndroidManifest 已声明 RECORD_AUDIO"
 else
   err "AndroidManifest 缺少 RECORD_AUDIO 权限"
-  add_todo "在 android/app/src/main/AndroidManifest.xml 增加: <uses-permission android:name=\"android.permission.RECORD_AUDIO\" />"
+  add_todo "在 apps/mobile-flutter/android/app/src/main/AndroidManifest.xml 增加: <uses-permission android:name=\"android.permission.RECORD_AUDIO\" />"
 fi
 
 # 3) contracts
@@ -61,7 +62,7 @@ if [[ -f "$CONTRACT_DART" && -f "$CONTRACT_KT" ]]; then
   ok "Dart/Kotlin 契约文件存在"
 else
   err "契约文件缺失（audio_contract.dart 或 AudioContract.kt）"
-  add_todo "补齐契约文件: lib/app/contracts/audio_contract.dart 与 android/.../contracts/AudioContract.kt"
+  add_todo "补齐 apps/mobile-flutter 下的 Dart/Kotlin 音频契约文件"
 fi
 
 if ./tool/check_audio_contract.sh >/dev/null 2>&1; then
@@ -82,16 +83,16 @@ fi
 if [[ -f "$KEY_EXAMPLE" ]]; then
   ok "key.properties.example 模板存在"
 else
-  err "缺少 android/key.properties.example 模板"
-  add_todo "创建 android/key.properties.example 模板"
+  err "缺少 apps/mobile-flutter/android/key.properties.example 模板"
+  add_todo "创建 apps/mobile-flutter/android/key.properties.example 模板"
 fi
 
 if [[ -f "$KEY_PROPS" ]]; then
-  ok "检测到 android/key.properties"
+  ok "检测到 apps/mobile-flutter/android/key.properties"
 
   if rg -q '^applicationId=com.example.voice2text_flutter$' "$KEY_PROPS"; then
     warn "key.properties.applicationId 仍是默认示例值"
-    add_todo "编辑 android/key.properties: applicationId=com.yourcompany.voice2text"
+    add_todo "编辑 apps/mobile-flutter/android/key.properties: applicationId=com.yourcompany.voice2text"
   fi
 
   if rg -q '^storeFile=' "$KEY_PROPS" && rg -q '^storePassword=' "$KEY_PROPS" && rg -q '^keyAlias=' "$KEY_PROPS" && rg -q '^keyPassword=' "$KEY_PROPS"; then
@@ -103,23 +104,23 @@ if [[ -f "$KEY_PROPS" ]]; then
 
   if rg -q '^applicationId=com.yourcompany.voice2text$' "$KEY_PROPS"; then
     err "key.properties.applicationId 仍是模板占位值"
-    add_todo "将 android/key.properties 的 applicationId 改成你自己的包名"
+    add_todo "将 apps/mobile-flutter/android/key.properties 的 applicationId 改成你自己的包名"
   fi
   if rg -q '^storePassword=REPLACE_ME$' "$KEY_PROPS" || rg -q '^keyPassword=REPLACE_ME$' "$KEY_PROPS"; then
     err "key.properties 仍包含 REPLACE_ME 占位密钥"
-    add_todo "将 android/key.properties 的 storePassword/keyPassword 替换为真实值"
+    add_todo "将 apps/mobile-flutter/android/key.properties 的 storePassword/keyPassword 替换为真实值"
   fi
   if rg -q '^storeFile=/absolute/path/to/your-upload-keystore.jks$' "$KEY_PROPS"; then
     err "key.properties.storeFile 仍是模板占位路径"
-    add_todo "将 android/key.properties 的 storeFile 改为真实 keystore 绝对路径"
+    add_todo "将 apps/mobile-flutter/android/key.properties 的 storeFile 改为真实 keystore 绝对路径"
   fi
   store_file_val="$(rg '^storeFile=' "$KEY_PROPS" | head -1 | cut -d '=' -f2- || true)"
   if [[ -z "$store_file_val" ]]; then
     err "key.properties.storeFile 为空"
-    add_todo "在 android/key.properties 填写 storeFile 绝对路径"
+    add_todo "在 apps/mobile-flutter/android/key.properties 填写 storeFile 绝对路径"
   elif [[ ! -f "$store_file_val" ]]; then
     err "storeFile 指向的 keystore 不存在: $store_file_val"
-    add_todo "确认 keystore 文件存在，并更新 android/key.properties 的 storeFile"
+    add_todo "确认 keystore 文件存在，并更新 apps/mobile-flutter/android/key.properties 的 storeFile"
   else
     ok "keystore 文件存在: $store_file_val"
   fi
@@ -129,8 +130,8 @@ if [[ -f "$KEY_PROPS" ]]; then
     add_todo "执行 ./tool/set_signing_passwords.sh 写入真实签名密码"
   fi
 else
-  warn "未检测到 android/key.properties，release 会回退 debug 签名"
-  add_todo "执行 ./tool/init_key_properties.sh 生成 android/key.properties"
+  warn "未检测到 apps/mobile-flutter/android/key.properties，release 会回退 debug 签名"
+  add_todo "执行 ./tool/init_key_properties.sh 生成 apps/mobile-flutter/android/key.properties"
 fi
 
 # 5) app id fallback check
@@ -154,14 +155,14 @@ else
 fi
 
 # 7) baseline quality gates
-if flutter analyze >/dev/null 2>&1; then
+if (cd "$MOBILE_ROOT" && flutter analyze >/dev/null 2>&1); then
   ok "flutter analyze 通过"
 else
   err "flutter analyze 未通过"
   add_todo "执行 flutter analyze 并修复错误"
 fi
 
-if flutter test >/dev/null 2>&1; then
+if (cd "$MOBILE_ROOT" && flutter test >/dev/null 2>&1); then
   ok "flutter test 通过"
 else
   err "flutter test 未通过"
@@ -169,13 +170,13 @@ else
 fi
 
 # 8) meeting product-loop and privacy boundaries
-if [[ -f "$ROOT/integration_test/meeting_offline_flow_test.dart" ]] &&
-   [[ -f "$ROOT/integration_test/meeting_recovery_flow_test.dart" ]] &&
+if [[ -f "$MOBILE_ROOT/integration_test/meeting_offline_flow_test.dart" ]] &&
+   [[ -f "$MOBILE_ROOT/integration_test/meeting_recovery_flow_test.dart" ]] &&
    [[ -x "$ROOT/tool/run_meeting_flow_smoke.sh" ]]; then
   ok "会议离线流、恢复流和真机脚本存在"
 else
   err "会议产品闭环集成测试或真机脚本缺失/不可执行"
-  add_todo "补齐 integration_test/meeting_*_flow_test.dart 并 chmod +x tool/run_meeting_flow_smoke.sh"
+  add_todo "补齐 apps/mobile-flutter/integration_test/meeting_*_flow_test.dart 并 chmod +x tool/run_meeting_flow_smoke.sh"
 fi
 
 if ./tool/check_privacy_contract.sh >/dev/null 2>&1; then

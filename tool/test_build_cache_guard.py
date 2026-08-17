@@ -21,7 +21,7 @@ class BuildCacheGuardTest(unittest.TestCase):
                 for project in MODULE.FLUTTER_PROJECTS
             },
             {
-                ".": 7.0,
+                "apps/mobile-flutter": 7.0,
                 "apps/codex_ui_reproduction": 0.5,
                 "packages/companion_protocol": 0.5,
                 "packages/desktop_sherpa_worker": 0.5,
@@ -41,12 +41,10 @@ class BuildCacheGuardTest(unittest.TestCase):
                 for name in directory_names
                 if name not in {".dart_tool", ".git", "build"}
             ]
-            if "pubspec.yaml" in file_names:
+            if "pubspec.yaml" in file_names and pathlib.Path(directory) != root:
                 relative_path = pathlib.Path(directory).relative_to(root)
                 discovered.add(
-                    pathlib.Path(".")
-                    if relative_path == pathlib.Path(".")
-                    else relative_path
+                    relative_path
                 )
 
         configured = {
@@ -173,7 +171,7 @@ class BuildCacheGuardTest(unittest.TestCase):
         )
         self.assertEqual(
             removed,
-            [root / "android" / ".gradle"],
+            [root / "apps/mobile-flutter" / "android" / ".gradle"],
         )
 
     def test_dry_run_reports_without_cleaning(self):
@@ -213,7 +211,7 @@ class BuildCacheGuardTest(unittest.TestCase):
         process_cwds = {
             123: pathlib.Path("/tmp/another-app"),
             456: root / "apps" / "desktop",
-            457: root / "android",
+            457: root / "apps/mobile-flutter" / "android",
         }
 
         active = MODULE.active_build_processes(
@@ -331,6 +329,10 @@ class BuildCacheGuardTest(unittest.TestCase):
                         script.index('cd "$ROOT"'),
                         script.index("python3 tool/build_cache_guard.py"),
                     )
+                    self.assertLess(
+                        script.index('cd "$MOBILE_ROOT"'),
+                        script.index("flutter build apk"),
+                    )
 
     def test_ui_watcher_exits_through_cleanup_on_signal(self):
         root = pathlib.Path(__file__).resolve().parent.parent
@@ -345,6 +347,15 @@ class BuildCacheGuardTest(unittest.TestCase):
         self.assertIn("trap 'exit 0' INT TERM", script)
         self.assertLess(guard, script.index('mkdir -p "$LOG_DIR"', start))
         self.assertLess(guard, script.index("flutter_command=(", start))
+        self.assertIn("../../pubspec.lock", script)
+        self.assertIn("android/*|assets/*|pubspec.yaml|../../pubspec.lock", script)
+
+    def test_android_smoke_keeps_logs_under_repository_build(self):
+        root = pathlib.Path(__file__).resolve().parent.parent
+        script = (root / "tool" / "run_android_smoke.sh").read_text()
+
+        self.assertIn('LOG_DIR="$ROOT/build/smoke"', script)
+        self.assertIn('$ROOT/tool/check_transcribe_log.sh $LOG_FILE', script)
 
     def test_dev_check_validates_removal_before_desktop_foundation(self):
         root = pathlib.Path(__file__).resolve().parent.parent

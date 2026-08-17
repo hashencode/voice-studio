@@ -2,8 +2,9 @@
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
-DART_FILE="$ROOT/lib/app/contracts/audio_contract.dart"
-KOTLIN_FILE="$(find "$ROOT/android/app/src/main/kotlin" -type f -path '*/contracts/AudioContract.kt' | head -n1)"
+MOBILE_ROOT="$ROOT/apps/mobile-flutter"
+DART_FILE="$MOBILE_ROOT/lib/app/contracts/audio_contract.dart"
+KOTLIN_FILE="$(find "$MOBILE_ROOT/android/app/src/main/kotlin" -type f -path '*/contracts/AudioContract.kt' | head -n1)"
 
 if [[ -z "$KOTLIN_FILE" || ! -f "$KOTLIN_FILE" ]]; then
   echo "Audio contract check failed: Kotlin AudioContract.kt not found."

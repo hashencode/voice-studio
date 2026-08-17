@@ -68,13 +68,13 @@ python3 benchmark/evaluate_online_transducer_candidate.py \
 ## Reproduce current contract
 
 ```bash
-flutter test \
+cd apps/mobile-flutter && flutter test \
   test/features/transcription/transcription_result_contract_test.dart \
   test/features/transcription/transcript_segments_repository_test.dart \
   test/features/meetings/meeting_review_controller_test.dart \
   test/features/meetings/transcript_timeline_test.dart
 
-cd android
+cd apps/mobile-flutter/android
 ./gradlew :app:testDebugUnitTest \
   --tests 'com.voice2text.app.transcription.TranscriptionResultTest' \
   --tests 'com.voice2text.app.transcription.VadTimestampMapperTest'

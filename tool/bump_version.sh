@@ -2,7 +2,7 @@
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
-PUBSPEC="$ROOT/pubspec.yaml"
+PUBSPEC="$ROOT/apps/mobile-flutter/pubspec.yaml"
 
 if [[ ! -f "$PUBSPEC" ]]; then
   echo "pubspec.yaml not found"

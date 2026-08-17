@@ -71,7 +71,7 @@ android {
 
     sourceSets {
         getByName("debug").apply {
-            java.srcDir("../../benchmark/android/src/debug/kotlin")
+            java.srcDir("../../../../benchmark/android/src/debug/kotlin")
         }
     }
 }

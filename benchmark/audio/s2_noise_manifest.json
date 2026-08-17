@@ -4,12 +4,12 @@
   "model": {
     "family": "GTCRN",
     "upstreamName": "gtcrn_simple.onnx",
-    "packagedPath": "assets/sherpa/onnx/speech-enhancement.onnx",
+    "packagedPath": "apps/mobile-flutter/assets/sherpa/onnx/speech-enhancement.onnx",
     "downloadUrl": "https://github.com/k2-fsa/sherpa-onnx/releases/download/speech-enhancement-models/gtcrn_simple.onnx",
     "sha256": "e77603ac0c23dac3227dd2d7135b3a585cbee2679048aecfa886657d3ae1b534",
     "bytes": 535638,
     "license": "MIT",
-    "licensePath": "assets/sherpa/onnx/GTCRN_LICENSE.txt",
+    "licensePath": "apps/mobile-flutter/assets/sherpa/onnx/GTCRN_LICENSE.txt",
     "upstreamProject": "https://github.com/Xiaobin-Rong/gtcrn"
   },
   "source": {

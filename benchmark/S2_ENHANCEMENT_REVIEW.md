@@ -23,14 +23,14 @@ This work does not claim acoustic echo cancellation. GTCRN is evaluated only as 
 
 ## Asset provenance
 
-- Packaged file: `assets/sherpa/onnx/speech-enhancement.onnx`
+- Packaged file: `apps/mobile-flutter/assets/sherpa/onnx/speech-enhancement.onnx`
 - Upstream name: `gtcrn_simple.onnx`
 - Upstream release: `https://github.com/k2-fsa/sherpa-onnx/releases/download/speech-enhancement-models/gtcrn_simple.onnx`
 - Size: 535,638 bytes
 - SHA-256: `e77603ac0c23dac3227dd2d7135b3a585cbee2679048aecfa886657d3ae1b534`
 - Verification: the packaged file is byte-identical to the official Sherpa release asset.
 - Model family: GTCRN, from the official `Xiaobin-Rong/gtcrn` project.
-- Model license: MIT; the packaged notice is `assets/sherpa/onnx/GTCRN_LICENSE.txt`.
+- Model license: MIT; the packaged notice is `apps/mobile-flutter/assets/sherpa/onnx/GTCRN_LICENSE.txt`.
 - Runtime: sherpa-onnx Android AAR v1.13.3, Apache-2.0.
 
 ## Implemented experiment boundary

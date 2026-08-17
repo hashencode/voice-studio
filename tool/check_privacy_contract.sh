@@ -3,15 +3,16 @@ set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$ROOT"
+MOBILE_ROOT="apps/mobile-flutter"
 
-MANIFEST="android/app/src/main/AndroidManifest.xml"
-BACKUP_RULES="android/app/src/main/res/xml/backup_rules.xml"
-EXTRACTION_RULES="android/app/src/main/res/xml/data_extraction_rules.xml"
-FILE_PATHS="android/app/src/main/res/xml/file_paths.xml"
-SECRET_STORE="android/app/src/main/kotlin/com/voice2text/app/privacy/MeetingApiSecretStore.kt"
-DEEPSEEK_PROVIDER="lib/features/meeting_intelligence/service/deepseek_meeting_intelligence_provider.dart"
-COMPANION_ANDROID_STORE="android/app/src/main/kotlin/com/voice2text/app/companion/CompanionCredentialStore.kt"
-COMPANION_ANDROID_PLATFORM="android/app/src/main/kotlin/com/voice2text/app/companion/CompanionPlatformPlugin.kt"
+MANIFEST="$MOBILE_ROOT/android/app/src/main/AndroidManifest.xml"
+BACKUP_RULES="$MOBILE_ROOT/android/app/src/main/res/xml/backup_rules.xml"
+EXTRACTION_RULES="$MOBILE_ROOT/android/app/src/main/res/xml/data_extraction_rules.xml"
+FILE_PATHS="$MOBILE_ROOT/android/app/src/main/res/xml/file_paths.xml"
+SECRET_STORE="$MOBILE_ROOT/android/app/src/main/kotlin/com/voice2text/app/privacy/MeetingApiSecretStore.kt"
+DEEPSEEK_PROVIDER="$MOBILE_ROOT/lib/features/meeting_intelligence/service/deepseek_meeting_intelligence_provider.dart"
+COMPANION_ANDROID_STORE="$MOBILE_ROOT/android/app/src/main/kotlin/com/voice2text/app/companion/CompanionCredentialStore.kt"
+COMPANION_ANDROID_PLATFORM="$MOBILE_ROOT/android/app/src/main/kotlin/com/voice2text/app/companion/CompanionPlatformPlugin.kt"
 COMPANION_CRYPTO="packages/companion_protocol/lib/src/companion_crypto.dart"
 
 fail() {
@@ -67,43 +68,43 @@ fi
 
 if rg -n \
   'https?://|Authorization|Bearer |api[_-]?key|client[_-]?secret' \
-  lib/features/meeting_intelligence \
+  "$MOBILE_ROOT/lib/features/meeting_intelligence" \
   -g '!deepseek_meeting_intelligence_provider.dart' \
   -g '!meeting_intelligence_http_client.dart' >/dev/null; then
   fail "meeting intelligence code outside the isolated transport contains an endpoint or credential shape"
 fi
 
 if rg -q 'sk-[A-Za-z0-9]{20,}' \
-  lib android/app/src/main/kotlin benchmark docs/product \
+  "$MOBILE_ROOT/lib" "$MOBILE_ROOT/android/app/src/main/kotlin" benchmark docs/product \
   apps/desktop-electron/src packages/desktop_macos_native/Sources; then
   fail "source, product evidence, or benchmark output contains a credential-shaped literal"
 fi
 
 if rg -n \
   '(Authorization[[:space:]]*[:=][[:space:]]*Bearer|full[_-]?prompt[[:space:]]*[:=]|api[_-]?key[[:space:]]*[:=])' \
-  lib/features/diagnostics android/app/src/main/kotlin/com/voice2text/app/diagnostics \
+  "$MOBILE_ROOT/lib/features/diagnostics" "$MOBILE_ROOT/android/app/src/main/kotlin/com/voice2text/app/diagnostics" \
   2>/dev/null >/dev/null; then
   fail "diagnostics production code contains a secret/header/full-prompt shape"
 fi
 
 if rg -n '\bLog\.(v|d|i|w|e)\(' \
-  android/app/src/main/kotlin \
+  "$MOBILE_ROOT/android/app/src/main/kotlin" \
   -g '!PrivacySafeLog.kt' >/dev/null; then
   fail "native production code bypasses PrivacySafeLog"
 fi
 
 if rg -n '\b(debugPrint|print)\(' \
-  lib \
+  "$MOBILE_ROOT/lib" \
   -g '!privacy_safe_log.dart' >/dev/null; then
   fail "Dart production code bypasses PrivacySafeLog"
 fi
 
 if rg -n \
   '\b(recordingPath|recording_path|resultText|transcriptText|meetingTitle|filePath|displayName|uri|content|message)\b\s+to\b' \
-  android/app/src/main/kotlin/com/voice2text/app/MainActivity.kt >/dev/null ||
+  "$MOBILE_ROOT/android/app/src/main/kotlin/com/voice2text/app/MainActivity.kt" >/dev/null ||
   rg -n \
     "['\"](recordingPath|recording_path|resultText|transcriptText|meetingTitle|filePath|displayName|uri|content|message)['\"]\\s*:" \
-    lib/app/app.dart >/dev/null; then
+    "$MOBILE_ROOT/lib/app/app.dart" >/dev/null; then
   fail "structured production logs may expose meeting content or identifiers"
 fi
 

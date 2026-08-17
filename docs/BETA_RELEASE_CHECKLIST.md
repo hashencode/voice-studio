@@ -25,7 +25,7 @@ Requirement: `Preflight result: PASS` with **0 errors**.
 
 4. Build release APK:
 ```bash
-flutter build apk --release
+cd apps/mobile-flutter && flutter build apk --release
 ```
 
 5. Smoke test on device/emulator:

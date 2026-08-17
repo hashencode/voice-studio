@@ -2,8 +2,9 @@
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
-TARGET="$ROOT/android/key.properties"
-TEMPLATE="$ROOT/android/key.properties.example"
+MOBILE_ROOT="$ROOT/apps/mobile-flutter"
+TARGET="$MOBILE_ROOT/android/key.properties"
+TEMPLATE="$MOBILE_ROOT/android/key.properties.example"
 
 if [[ ! -f "$TARGET" ]]; then
   if [[ -f "$TEMPLATE" ]]; then
@@ -78,7 +79,7 @@ if [[ "${1:-}" == "--non-interactive-example" ]]; then
   exit 0
 fi
 
-echo "Configure android/key.properties"
+echo "Configure apps/mobile-flutter/android/key.properties"
 app_id="$(prompt "applicationId (e.g. com.company.voice2text)" "applicationId")"
 while ! validate_app_id "$app_id"; do
   echo "Invalid applicationId format. Example: com.company.voice2text"

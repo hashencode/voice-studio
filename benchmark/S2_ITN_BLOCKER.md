@@ -35,7 +35,7 @@ The golden outputs define the acceptance contract for a future licensed backend.
 python3 benchmark/validate_itn_assets.py
 python3 benchmark/validate_itn_assets.py --require-enabled  # expected BLOCKED
 
-cd android
+cd apps/mobile-flutter/android
 ./gradlew :app:testDebugUnitTest \
   --tests 'com.voice2text.app.transcription.TextNormalizationPostProcessorTest' \
   --tests 'com.voice2text.app.transcription.TranscriptionExecutorTest'
@@ -44,7 +44,7 @@ cd android
 ## Conditions to open the gate
 
 1. Record the exact upstream artifact, version, SHA-256, model/rule family, license, and redistribution terms.
-2. Package the asset under `assets/sherpa/itn/` and add only those verified files to `pubspec.yaml`.
+2. Package the asset under `apps/mobile-flutter/assets/sherpa/itn/` and add only those verified files to `apps/mobile-flutter/pubspec.yaml`.
 3. Implement the production `CompleteMatchItnBackend` or AAR FST/FAR configuration without substring guessing.
 4. Pass the committed golden fixture, ambiguity preservation, idempotence, punctuation ordering, segment invariants, error-stage, long-transcript performance, and physical-device production-path checks.
 5. Only then change both Android and Dart ITN gates to `available=true`, `verified=true`.

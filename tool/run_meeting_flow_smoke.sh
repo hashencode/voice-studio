@@ -2,7 +2,8 @@
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
-cd "$ROOT"
+MOBILE_ROOT="$ROOT/apps/mobile-flutter"
+cd "$MOBILE_ROOT"
 
 DEVICE_ID="${1:-${DEVICE_ID:-}}"
 PACKAGE_NAME="com.voice2text.app"
@@ -16,6 +17,7 @@ if len(devices) != 1:
 print(devices[0]["id"])
 ')"
 fi
+python3 "$ROOT/tool/build_cache_guard.py"
 
 PRESERVE_ROOT="$(mktemp -d "${TMPDIR:-/tmp}/voice2text-meeting-smoke.XXXXXX")"
 PRESERVE_ARCHIVE="$PRESERVE_ROOT/app-data.tar"

@@ -3,7 +3,8 @@
 set -uo pipefail
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
-cd "$ROOT"
+MOBILE_ROOT="$ROOT/apps/mobile-flutter"
+cd "$MOBILE_ROOT"
 
 usage() {
   cat <<'USAGE'
@@ -15,13 +16,13 @@ Environment:
   DEBOUNCE_SECONDS    Stable period before action. Defaults to 60.
   POLL_SECONDS        File polling interval. Defaults to 2.
   RELOAD_CHECK_SECONDS Seconds to inspect flutter output after reload. Defaults to 12.
-  PID_FILE            Flutter run pid file. Defaults to build/flutter-ui.pid.
+  PID_FILE            Flutter run pid file. Defaults to root build/flutter-ui.pid.
   EXTRA_FLUTTER_ARGS  Extra args appended to flutter run.
 
 Behavior:
   - lib/*.dart changes: hot reload after DEBOUNCE_SECONDS without new changes.
   - lib/main.dart changes: hot restart.
-  - android/, assets/, pubspec.yaml, pubspec.lock changes: restart flutter run, rebuilding the app.
+  - android/, assets/, pubspec.yaml, or the workspace pubspec.lock changes: rebuild the app.
 USAGE
 }
 
@@ -34,10 +35,16 @@ DEVICE_ID="${1:-${DEVICE_ID:-}}"
 DEBOUNCE_SECONDS="${DEBOUNCE_SECONDS:-60}"
 POLL_SECONDS="${POLL_SECONDS:-2}"
 RELOAD_CHECK_SECONDS="${RELOAD_CHECK_SECONDS:-12}"
-PID_FILE="${PID_FILE:-build/flutter-ui.pid}"
-LOG_DIR="build/watch"
+PID_FILE="${PID_FILE:-$ROOT/build/flutter-ui.pid}"
+LOG_DIR="$ROOT/build/watch"
 RUN_LOG="$LOG_DIR/flutter-run-$(date +%Y%m%d-%H%M%S).log"
 WATCHER_PID_FILE="${WATCHER_PID_FILE:-$LOG_DIR/watch-ui-device.pid}"
+
+if stat -f "%m" "$0" >/dev/null 2>&1; then
+  STAT_STYLE="bsd"
+else
+  STAT_STYLE="gnu"
+fi
 
 SNAPSHOT_BEFORE="$(mktemp "${TMPDIR:-/tmp}/voice2text-watch-before.XXXXXX")"
 SNAPSHOT_AFTER="$(mktemp "${TMPDIR:-/tmp}/voice2text-watch-after.XXXXXX")"
@@ -77,7 +84,7 @@ resolve_device_id() {
 
 stat_one() {
   local path="$1"
-  if stat -f "%m %z %N" "$path" >/dev/null 2>&1; then
+  if [[ "$STAT_STYLE" == "bsd" ]]; then
     stat -f "%m %z %N" "$path"
   else
     stat -c "%Y %s %n" "$path"
@@ -88,7 +95,7 @@ write_snapshot() {
   local output="$1"
   local root
   {
-    for root in lib android assets pubspec.yaml pubspec.lock analysis_options.yaml; do
+    for root in lib android assets pubspec.yaml analysis_options.yaml ../../pubspec.lock; do
       if [[ -f "$root" ]]; then
         printf '%s\0' "$root"
       elif [[ -d "$root" ]]; then
@@ -133,7 +140,7 @@ classify_pending_action() {
   local path
   while IFS= read -r path; do
     case "$path" in
-      android/*|assets/*|pubspec.yaml|pubspec.lock)
+      android/*|assets/*|pubspec.yaml|../../pubspec.lock)
         echo "rebuild"
         return
         ;;

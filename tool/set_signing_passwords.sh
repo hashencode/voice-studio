@@ -2,7 +2,7 @@
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
-TARGET="$ROOT/android/key.properties"
+TARGET="$ROOT/apps/mobile-flutter/android/key.properties"
 
 if [[ ! -f "$TARGET" ]]; then
   echo "Missing $TARGET"

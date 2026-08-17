@@ -3,7 +3,7 @@ set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 SRC_ROOT="/Users/studio/Documents/GitHub/voice2text/assets/sherpa"
-DST_ROOT="$ROOT/assets/sherpa"
+DST_ROOT="$ROOT/apps/mobile-flutter/assets/sherpa"
 
 mkdir -p "$DST_ROOT/asr" "$DST_ROOT/onnx" "$DST_ROOT/wav"
 

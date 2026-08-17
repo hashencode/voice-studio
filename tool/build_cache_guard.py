@@ -31,7 +31,7 @@ class FlutterProject(NamedTuple):
 
 FLUTTER_PROJECTS = (
     FlutterProject(
-        pathlib.Path("."),
+        pathlib.Path("apps/mobile-flutter"),
         cache_limit_gib=7.0,
         clean_android_gradle=True,
     ),
@@ -157,8 +157,6 @@ def remove_directory_tree(path: pathlib.Path) -> None:
 
 
 def cache_label(project: FlutterProject, relative_path: pathlib.Path) -> str:
-    if project.relative_path == pathlib.Path("."):
-        return relative_path.as_posix()
     return (project.relative_path / relative_path).as_posix()
 
 

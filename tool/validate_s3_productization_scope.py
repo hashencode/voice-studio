@@ -298,19 +298,20 @@ def validate_scope_contract(
 
 
 def _validate_no_dead_routes(root: Path, *, speaker_product_closed: bool) -> None:
-    manifest_text = (root / "android/app/src/main/AndroidManifest.xml").read_text(encoding="utf-8")
+    mobile_root = root / "apps/mobile-flutter"
+    manifest_text = (mobile_root / "android/app/src/main/AndroidManifest.xml").read_text(encoding="utf-8")
     _require("android.permission.CAMERA" not in manifest_text, "camera permission exists before PC runtime")
     forbidden_pc_files = [
-        root / "lib/features/meeting_intelligence/service/paired_pc_meeting_intelligence_provider.dart",
-        root / "lib/features/settings/pc_pairing_page.dart",
-        root / "lib/features/settings/qr_pairing_page.dart",
+        mobile_root / "lib/features/meeting_intelligence/service/paired_pc_meeting_intelligence_provider.dart",
+        mobile_root / "lib/features/settings/pc_pairing_page.dart",
+        mobile_root / "lib/features/settings/qr_pairing_page.dart",
     ]
     _require(not any(path.exists() for path in forbidden_pc_files), "PC pairing product route exists")
     if speaker_product_closed:
         forbidden_speaker_files = [
-            root / "android/app/src/main/kotlin/com/voice2text/app/speakers/SpeakerDiarizationExecutor.kt",
-            root / "lib/features/speakers/service/android_speaker_diarization_service.dart",
-            root / "lib/features/speakers/widgets/speaker_review_panel.dart",
+            mobile_root / "android/app/src/main/kotlin/com/voice2text/app/speakers/SpeakerDiarizationExecutor.kt",
+            mobile_root / "lib/features/speakers/service/android_speaker_diarization_service.dart",
+            mobile_root / "lib/features/speakers/widgets/speaker_review_panel.dart",
         ]
         _require(
             not any(path.exists() for path in forbidden_speaker_files),

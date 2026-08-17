@@ -68,11 +68,11 @@ Because the current gate failed, U4 does not reserve or modify schema v18. U7 re
 ## Reproduce current contract
 
 ```bash
-flutter test \
+cd apps/mobile-flutter && flutter test \
   test/features/transcription/transcription_runtime_contract_test.dart \
   test/features/settings/transcription_model_descriptor_test.dart
 
-cd android
+cd apps/mobile-flutter/android
 ./gradlew :app:testDebugUnitTest \
   --tests 'com.voice2text.app.transcription.TranscriptionEngineRouterTest'
 ```

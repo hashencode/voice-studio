@@ -32,7 +32,7 @@ PASS evidence.
 
 ## Reproducible API probe
 
-Extract `classes.jar` from `android/app/libs/sherpa-onnx.aar` and inspect these installed classes with `javap`:
+Extract `classes.jar` from `apps/mobile-flutter/android/app/libs/sherpa-onnx.aar` and inspect these installed classes with `javap`:
 
 - `OfflineRecognizerResult` exposes text, tokens, timestamps, language, emotion, event, and durations. It exposes no confidence, score, log probability, or token probability.
 - `OfflineRecognizerConfig` exposes `hotwordsFile`, `hotwordsScore`, `ruleFsts`, and `ruleFars`.
@@ -99,7 +99,7 @@ path was added.
 
 ### ITN
 
-The generic API surface is present, but the repository contains no `assets/sherpa/itn/` directory, rule FST, or FAR archive. No deterministic transformation can be enabled until its asset source, redistribution rights, complete-token behavior, and ambiguity fixtures are established.
+The generic API surface is present, but the mobile app contains no `apps/mobile-flutter/assets/sherpa/itn/` directory, rule FST, or FAR archive. No deterministic transformation can be enabled until its asset source, redistribution rights, complete-token behavior, and ambiguity fixtures are established.
 
 U2 now provides the fail-closed interface, structured `ITN_FAILED` stage, and golden/ambiguity fixture described in [`S2_ITN_BLOCKER.md`](S2_ITN_BLOCKER.md). Those integration artifacts do not change the closed product gate.
 
@@ -140,11 +140,11 @@ timestamps and the low-device run remain missing, and there is no AEC. See
 - [sherpa-onnx license](https://github.com/k2-fsa/sherpa-onnx/blob/master/LICENSE)
 - [sherpa-onnx hotword constraints](https://k2-fsa.github.io/sherpa/onnx/hotwords/index.html)
 - [sherpa-onnx speech enhancement API](https://k2-fsa.github.io/sherpa/onnx/c-api/html/speech_enhancement.html)
-- `android/app/libs/sherpa-onnx.aar`
-- `android/app/src/main/kotlin/com/voice2text/app/transcription/RealSherpaTranscriptionEngine.kt`
-- `android/app/src/main/kotlin/com/voice2text/app/transcription/TranscriptionModelRegistry.kt`
-- `assets/sherpa/asr/paraformer-zh.json`
-- `assets/sherpa/onnx/speech-enhancement.onnx`
+- `apps/mobile-flutter/android/app/libs/sherpa-onnx.aar`
+- `apps/mobile-flutter/android/app/src/main/kotlin/com/voice2text/app/transcription/RealSherpaTranscriptionEngine.kt`
+- `apps/mobile-flutter/android/app/src/main/kotlin/com/voice2text/app/transcription/TranscriptionModelRegistry.kt`
+- `apps/mobile-flutter/assets/sherpa/asr/paraformer-zh.json`
+- `apps/mobile-flutter/assets/sherpa/onnx/speech-enhancement.onnx`
 - `benchmark/asr_benchmark_manifest.json`
 - `benchmark/asr_model_candidates.json`
 - `benchmark/audio/online_transducer_candidate_manifest.json`

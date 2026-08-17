@@ -3,16 +3,18 @@
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+MOBILE_ROOT="$ROOT/apps/mobile-flutter"
 cd "$ROOT"
 
 DEVICE_ID="${1:-emulator-5554}"
 APP_ID="${2:-com.voice2text.app}"
 CAPTURE_SECONDS="${3:-60}"
 APK_PATH="build/app/outputs/flutter-apk/app-debug.apk"
-LOG_DIR="build/smoke"
+LOG_DIR="$ROOT/build/smoke"
 LOG_FILE="$LOG_DIR/logcat-$(date +%Y%m%d-%H%M%S).txt"
 
 python3 tool/build_cache_guard.py
+cd "$MOBILE_ROOT"
 
 mkdir -p "$LOG_DIR"
 
@@ -55,4 +57,4 @@ else
 fi
 
 echo "Smoke run finished."
-echo "Next: run ./tool/check_transcribe_log.sh $LOG_FILE"
+echo "Next: run $ROOT/tool/check_transcribe_log.sh $LOG_FILE"
