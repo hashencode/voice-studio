@@ -10,9 +10,8 @@ describe("live caption capability", () => {
     const operations = new Set(["worker-health", "asr", "diarization"]);
     expect(
       hasVerifiedLiveCaptionCapability({
-        command(operationId) {
-          if (!operations.has(operationId)) throw new Error("undeclared");
-          return {};
+        processingIdentity(operationId) {
+          return operations.has(operationId) ? {} : null;
         },
       }),
     ).toBe(false);
@@ -21,9 +20,8 @@ describe("live caption capability", () => {
   it("is available only when the verified catalog declares live-caption", () => {
     expect(
       hasVerifiedLiveCaptionCapability({
-        command(operationId) {
-          if (operationId !== "live-caption") throw new Error("undeclared");
-          return {};
+        processingIdentity(operationId) {
+          return operationId === "live-caption" ? {} : null;
         },
       }),
     ).toBe(true);

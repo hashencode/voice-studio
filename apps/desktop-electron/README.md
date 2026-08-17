@@ -9,9 +9,14 @@ does not open its profile, import its packages, or use it as a runtime fallback.
 
 ```bash
 bun ci
+bun run resources:worker
 bun run check
 bun run start
 ```
+
+`bun run resources:worker` is required on the first checkout and whenever the
+frozen worker/model resources change. Later development runs can use
+`bun run start` directly.
 
 `bun run package` builds the existing Dart/native desktop worker and its dynamic
 libraries into `resources/worker`, then packages them outside `app.asar`.

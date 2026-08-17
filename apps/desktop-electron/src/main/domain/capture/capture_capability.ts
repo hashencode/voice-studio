@@ -1,5 +1,5 @@
 export interface CaptureResourceCatalog {
-  command(operationId: string): unknown;
+  processingIdentity(operationId: string): unknown | null;
 }
 
 export function hasVerifiedLiveCaptionCapability(
@@ -7,8 +7,7 @@ export function hasVerifiedLiveCaptionCapability(
 ): boolean {
   if (!catalog) return false;
   try {
-    catalog.command("live-caption");
-    return true;
+    return catalog.processingIdentity("live-caption") !== null;
   } catch {
     return false;
   }

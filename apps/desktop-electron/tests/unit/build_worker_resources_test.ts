@@ -14,6 +14,7 @@ import { dirname, join, resolve } from "node:path";
 
 import { afterEach, describe, expect, it } from "vitest";
 
+import { hasVerifiedLiveCaptionCapability } from "../../src/main/domain/capture/capture_capability";
 import { ResourceCatalog } from "../../src/main/resources/resource_catalog";
 
 const roots: string[] = [];
@@ -91,6 +92,7 @@ describe("worker resource publication", () => {
         .digest("hex"),
       runtimeSha256: expect.stringMatching(/^[a-f0-9]{64}$/),
     });
+    expect(hasVerifiedLiveCaptionCapability(catalog)).toBe(true);
     const processingPipeline = catalog.processingPipelineIdentities();
     expect(processingPipeline?.asr).toEqual(processingPipeline?.diarization);
     expect(processingPipeline?.asr.modelSha256).not.toBe(
