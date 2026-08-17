@@ -1,0 +1,149 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://voice2text.example/contracts/companion-audio-transfer-v2.schema.json",
+  "title": "Companion Audio Transfer Protocol v2",
+  "type": "object",
+  "required": ["schema", "type", "messageId", "sessionId", "counter", "payload"],
+  "properties": {
+    "schema": {"const": "companion-audio-transfer/v2"},
+    "type": {
+      "enum": [
+        "discovery",
+        "pairingTranscript",
+        "capability",
+        "manifest",
+        "chunk",
+        "checkpoint",
+        "receipt",
+        "cancel",
+        "error"
+      ]
+    },
+    "messageId": {"$ref": "#/$defs/identifier"},
+    "sessionId": {"$ref": "#/$defs/identifier"},
+    "counter": {"type": "integer", "minimum": 0},
+    "payload": {"type": "object", "maxProperties": 32}
+  },
+  "additionalProperties": false,
+  "$defs": {
+    "identifier": {
+      "type": "string",
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$"
+    },
+    "sha256": {"type": "string", "pattern": "^[a-f0-9]{64}$"},
+    "fingerprint": {"type": "string", "pattern": "^[A-Z2-7]{20,64}$"},
+    "manifest": {
+      "type": "object",
+      "required": [
+        "schema",
+        "transferId",
+        "sourceAssetId",
+        "displayName",
+        "sizeBytes",
+        "wholeFileSha256",
+        "chunkBytes",
+        "chunkCount",
+        "createdAtMs"
+      ],
+      "properties": {
+        "schema": {"const": "companion-audio-transfer/v2"},
+        "transferId": {"$ref": "#/$defs/identifier"},
+        "sourceAssetId": {"$ref": "#/$defs/identifier"},
+        "displayName": {"type": "string", "minLength": 1, "maxLength": 160},
+        "sizeBytes": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 4294967296
+        },
+        "wholeFileSha256": {"$ref": "#/$defs/sha256"},
+        "chunkBytes": {
+          "type": "integer",
+          "minimum": 4096,
+          "maximum": 1048576
+        },
+        "chunkCount": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 65536
+        },
+        "createdAtMs": {"type": "integer", "minimum": 0}
+      },
+      "additionalProperties": false
+    },
+    "chunk": {
+      "type": "object",
+      "required": [
+        "transferId",
+        "index",
+        "offset",
+        "plaintextBytes",
+        "sha256"
+      ],
+      "properties": {
+        "transferId": {"$ref": "#/$defs/identifier"},
+        "index": {"type": "integer", "minimum": 0, "maximum": 65535},
+        "offset": {"type": "integer", "minimum": 0, "maximum": 4294967295},
+        "plaintextBytes": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 1048576
+        },
+        "sha256": {"$ref": "#/$defs/sha256"}
+      },
+      "additionalProperties": false
+    },
+    "checkpoint": {
+      "type": "object",
+      "required": [
+        "transferId",
+        "wholeFileSha256",
+        "missingChunks",
+        "updatedAtMs"
+      ],
+      "properties": {
+        "transferId": {"$ref": "#/$defs/identifier"},
+        "wholeFileSha256": {"$ref": "#/$defs/sha256"},
+        "missingChunks": {
+          "type": "array",
+          "maxItems": 65536,
+          "uniqueItems": true,
+          "items": {"type": "integer", "minimum": 0, "maximum": 65535}
+        },
+        "updatedAtMs": {"type": "integer", "minimum": 0}
+      },
+      "additionalProperties": false
+    },
+    "receipt": {
+      "type": "object",
+      "required": [
+        "schema",
+        "receiptId",
+        "transferId",
+        "wholeFileSha256",
+        "sizeBytes",
+        "desktopDeviceId",
+        "desktopDeviceName",
+        "desktopRecordingId",
+        "committedAtMs",
+        "signature"
+      ],
+      "properties": {
+        "schema": {"const": "companion-audio-transfer/v2"},
+        "receiptId": {"$ref": "#/$defs/identifier"},
+        "transferId": {"$ref": "#/$defs/identifier"},
+        "wholeFileSha256": {"$ref": "#/$defs/sha256"},
+        "sizeBytes": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 4294967296
+        },
+        "desktopDeviceId": {"$ref": "#/$defs/identifier"},
+        "desktopDeviceName": {"type": "string", "minLength": 1, "maxLength": 80},
+        "desktopRecordingId": {"type": "integer", "minimum": 1},
+        "committedAtMs": {"type": "integer", "minimum": 0},
+        "signature": {"type": "string", "minLength": 16, "maxLength": 256}
+      },
+      "additionalProperties": false
+    }
+  }
+}

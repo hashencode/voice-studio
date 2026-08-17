@@ -38,9 +38,9 @@ echo "[6/19] Paired-PC provider protocol contract"
 python3 -m unittest tool/test_validate_audio_intelligence_provider_contract.py
 python3 tool/validate_audio_intelligence_provider_contract.py
 
-echo "[7/19] Companion media transfer protocol contract"
-python3 -m unittest tool/test_validate_companion_media_transfer_contract.py
-python3 tool/validate_companion_media_transfer_contract.py
+echo "[7/19] Companion Audio transfer protocol contract"
+python3 -m unittest tool/test_validate_companion_audio_transfer_contract.py
+python3 tool/validate_companion_audio_transfer_contract.py
 
 echo "[8/19] S3 productization truth contract"
 python3 -m unittest tool/test_validate_s3_productization_scope.py

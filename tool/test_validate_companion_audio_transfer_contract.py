@@ -3,8 +3,9 @@ from __future__ import annotations
 import copy
 import unittest
 
-from tool.validate_companion_media_transfer_contract import (
+from tool.validate_companion_audio_transfer_contract import (
     ContractError,
+    LEGACY_PROTOCOL,
     PROTOCOL,
     sample_manifest,
     validate_envelope,
@@ -13,7 +14,7 @@ from tool.validate_companion_media_transfer_contract import (
 )
 
 
-class CompanionMediaTransferContractTest(unittest.TestCase):
+class CompanionAudioTransferContractTest(unittest.TestCase):
     def test_repository_and_samples_are_valid(self) -> None:
         validate_repository()
         self.assertEqual(validate_manifest(sample_manifest())["schema"], PROTOCOL)
@@ -54,6 +55,18 @@ class CompanionMediaTransferContractTest(unittest.TestCase):
             "sessionId": "session-1",
             "counter": 0,
             "payload": {},
+        }
+        with self.assertRaisesRegex(ContractError, "schema"):
+            validate_envelope(envelope)
+
+    def test_v1_is_rejected_before_payload_validation(self) -> None:
+        envelope = {
+            "schema": LEGACY_PROTOCOL,
+            "type": "manifest",
+            "messageId": "legacy-message-1",
+            "sessionId": "legacy-session-1",
+            "counter": 0,
+            "payload": {"privateKey": "must-not-be-read"},
         }
         with self.assertRaisesRegex(ContractError, "schema"):
             validate_envelope(envelope)

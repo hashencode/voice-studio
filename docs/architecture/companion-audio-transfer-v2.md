@@ -1,9 +1,11 @@
-# Companion media transfer v1
+# Companion Audio transfer v2
 
-`companion-media-transfer/v1` transfers immutable source media from the mobile
-app to a paired desktop. It is deliberately separate from
-`meeting_intelligence_provider/v1`, which remains the frozen
-transcript-to-structured-notes protocol.
+`companion-audio-transfer/v2` transfers immutable Audio source media from the
+mobile app to a paired desktop. It is deliberately separate from
+`audio_intelligence_provider/v1`, which remains the frozen
+transcript-to-structured-notes protocol. Peers advertise the exact
+`audio-transfer/v2` capability; v1 schemas and capabilities are rejected before
+pairing, credential, checkpoint, or transfer state changes.
 
 ## Trust and discovery
 
@@ -20,9 +22,9 @@ deletes the credential and unfinished checkpoints.
 Each connection derives directional AES-256-GCM keys from a 32-byte paired
 credential and fresh 32-byte nonces using HKDF-SHA256. Every encrypted envelope
 has an authenticated session ID and monotonic counter. Replayed, expired,
-unknown-peer, or authentication-failed messages are rejected before transfer
-state changes. No API key, reusable credential, filesystem path, transcript, or
-meeting bytes appear in discovery or unencrypted framing.
+unknown-peer, authentication-failed, or legacy-v1 messages are rejected before
+transfer state changes. No API key, reusable credential, filesystem path,
+transcript, or audio bytes appear in discovery or unencrypted framing.
 
 ## Transfer and commit
 
@@ -34,13 +36,13 @@ paths. Staging rejects traversal, links, non-regular files, invalid offsets,
 oversized metadata, sparse/size mismatches, overwrite conflicts, and storage
 shortage.
 
-After every chunk is present, the desktop reassembles the final bytes, recomputes
-the whole-file SHA-256, and feeds the staged file to the same private import
-commit and processing queue used by the desktop file picker. A signed receipt
-is created only after that durable commit. Repeated manifests or commit
-requests return the same receipt and recording ID.
+After every chunk is present, the desktop reassembles the final bytes,
+recomputes the whole-file SHA-256, and feeds the staged file to the same private
+import path and Audio processing queue used by the desktop file picker. A
+signed receipt is created only after that durable commit. Repeated manifests or
+commit requests return the same receipt and Audio ID.
 
-The mobile source remains authoritative until a valid receipt is stored. v1
+The mobile source remains authoritative until a valid receipt is stored. v2
 defaults to retaining it. The user may explicitly delete it after receipt,
 defer cleanup, or inspect the receipt from transfer history. Failed, canceled,
 offline, permission-denied, or duplicate transfers never delete the source.
@@ -53,4 +55,4 @@ Local-network permission denial, multicast isolation, or unavailable discovery
 keeps recording, mobile transcription/review/export, and ordinary desktop file
 import available. Cancellation is explicit and retryable. Restart reconciliation
 either resumes a valid checkpoint or removes an uncommitted temporary tree;
-committed recordings and stored receipts are not removed.
+committed Audio items and stored receipts are not removed.

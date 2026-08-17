@@ -6,7 +6,9 @@
     "packages/audio_storage",
     "packages/audio_workflows",
     "apps/desktop-electron/src/main/storage/audio_schema.ts",
-    "apps/desktop-electron/src/main/storage/audio_database.ts"
+    "apps/desktop-electron/src/main/storage/audio_database.ts",
+    "docs/architecture/companion-audio-transfer-v2.md",
+    "docs/contracts/companion-audio-transfer-v2.schema.json"
   ],
   "activeMeetingRenameInventory": [
     { "path": "README.md", "owner": "U9-U10 active documentation" },
@@ -36,6 +38,8 @@
     { "path": "docs/product/desktop-workstation-u7-evidence.json", "reason": "frozen completed-unit evidence" },
     { "path": "docs/product/desktop-workstation-u8-evidence.json", "reason": "frozen completed-unit evidence" },
     { "path": "docs/product/desktop-workstation-u9-evidence.json", "reason": "frozen completed-unit evidence" },
+    { "path": "docs/architecture/companion-media-transfer-v1.md", "reason": "frozen v1 architecture referenced by historical evidence" },
+    { "path": "docs/contracts/companion-media-transfer-v1.schema.json", "reason": "frozen v1 schema referenced by historical evidence" },
     { "path": "docs/solutions", "reason": "historical institutional learnings" },
     { "path": "docs/REAL_DESKTOP_REGRESSION_MATRIX.md", "reason": "historical physical-device evidence" },
     { "path": "docs/REAL_DEVICE_REGRESSION_MATRIX.md", "reason": "historical physical-device evidence" },

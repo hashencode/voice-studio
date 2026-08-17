@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Fail-closed semantic validator for companion media transfer v1."""
+"""Fail-closed semantic validator for companion Audio transfer v2."""
 
 from __future__ import annotations
 
@@ -9,11 +9,12 @@ from pathlib import Path
 from typing import Any
 
 ROOT = Path(__file__).resolve().parents[1]
-SCHEMA_PATH = ROOT / "docs/contracts/companion-media-transfer-v1.schema.json"
-ARCHITECTURE_PATH = ROOT / "docs/architecture/companion-media-transfer-v1.md"
+SCHEMA_PATH = ROOT / "docs/contracts/companion-audio-transfer-v2.schema.json"
+ARCHITECTURE_PATH = ROOT / "docs/architecture/companion-audio-transfer-v2.md"
 PROVIDER_PATH = ROOT / "docs/contracts/audio-intelligence-provider-v1.schema.json"
-PROTOCOL = "companion-media-transfer/v1"
-CAPABILITY = "media-transfer/v1"
+PROTOCOL = "companion-audio-transfer/v2"
+CAPABILITY = "audio-transfer/v2"
+LEGACY_PROTOCOL = "companion-media-transfer/v1"
 SHA256 = re.compile(r"^[a-f0-9]{64}$")
 IDENTIFIER = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$")
 ALLOWED_TYPES = {
@@ -114,16 +115,18 @@ def validate_repository() -> None:
     architecture = ARCHITECTURE_PATH.read_text(encoding="utf-8")
     require(schema["properties"]["schema"]["const"] == PROTOCOL, "schema protocol mismatch")
     require(CAPABILITY not in json.dumps(provider), "provider v1 was extended with media transfer")
-    require("audio_intelligence_provider/v1" not in json.dumps(schema), "media schema aliases provider v1")
+    require("audio_intelligence_provider/v1" not in json.dumps(schema), "Audio schema aliases provider v1")
     for phrase in (
         "Android Keystore",
         "macOS Keychain",
         "AES-256-GCM",
         "HKDF-SHA256",
         "missing chunk",
-        "same private import",
+        "Audio processing queue",
         "retaining",
         "separate SQLite",
+        CAPABILITY,
+        "v1 schemas and capabilities are rejected",
     ):
         require(phrase in architecture, f"architecture omits {phrase}")
 
@@ -155,7 +158,7 @@ def main() -> int:
             "payload": sample_manifest(),
         }
     )
-    print("Companion media transfer v1 contract valid.")
+    print("Companion Audio transfer v2 contract valid; v1 is rejection-only.")
     return 0
 
 
