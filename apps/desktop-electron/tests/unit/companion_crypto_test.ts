@@ -30,7 +30,7 @@ describe("Dart companion crypto wire contract", () => {
         receipts: true,
       }),
     ).toBe(
-      '{"schema":"companion-media-transfer/v1","sessionId":"session-vector","counter":0,"ciphertext":"qUG33d2XkOwfiWRbyuhQqtGaThywHD3r3xAJZkYmLURxYFpYC6VbNx/hnbnlM2iOSZA8FhWndb9F8NAZefDvnkvBqHTw9GvODKJ+W+xEr6/jP48QFB25vGg0fZq38MluUOz3wPuTBAUmH/wyl7SQfrVqfGX8tFHrstIzv3a9zcGPiB0QY9cHLNiySfwTCduoK2zH0Xw1rh+jUOIAcj0wCaw8na1umDwBLF4gOA==","mac":"UryOyuC7aEgaqwB7H2km1w=="}',
+      '{"schema":"companion-audio-transfer/v2","sessionId":"session-vector","counter":0,"ciphertext":"tfd1n0FSrmetR77aZdU5wQsNoPlNrZRYcATiaB42ZmcDIes1ZHt8Istcwc8fkqZm1LeLhW1SVyyYwYvekp9v0+G65j1U00FCytVGKSWPERuD2zn1bPvPXz5gAgRihfxC5WOPny5xHpMZFAUUk0z9l9xQ6UpQRiMMc1IXrpd/aGHP+wp+xsEwJyEicqxGgwLFp5qHbfbgIDfmj6xpyTQMHQYkDctOVqT0NOvfyg==","mac":"0QUdJJiCGBkmKf4j3EVySQ=="}',
     );
   });
 
@@ -117,7 +117,7 @@ describe("Dart companion crypto wire contract", () => {
       nowMs: () => 1_000,
     });
     const malformed = JSON.stringify({
-      schema: "companion-media-transfer/v1",
+      schema: "companion-audio-transfer/v2",
       sessionId: "session-1",
       counter: 0,
       ciphertext: "!!!!",

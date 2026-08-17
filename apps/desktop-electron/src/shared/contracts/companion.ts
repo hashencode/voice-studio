@@ -2,7 +2,8 @@ import { z } from "zod";
 
 import { sha256Schema } from "./import_processing";
 
-export const companionProtocol = "companion-media-transfer/v1" as const;
+export const companionProtocol = "companion-audio-transfer/v2" as const;
+export const companionCapability = "audio-transfer/v2" as const;
 export const companionLimits = Object.freeze({
   maximumMetadataBytes: 64 * 1024,
   maximumChunkBytes: 1024 * 1024,
@@ -138,7 +139,7 @@ export const companionTransferStateSchema = z.enum([
 
 export const companionSnapshotSchema = z
   .object({
-    protocolVersion: z.literal(1),
+    protocolVersion: z.literal(2),
     revision: z.number().int().nonnegative(),
     optIn: z.boolean(),
     discovery: z

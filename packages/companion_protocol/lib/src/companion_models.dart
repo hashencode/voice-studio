@@ -1,7 +1,7 @@
 import 'dart:convert';
 
-const String companionMediaTransferSchema = 'companion-media-transfer/v1';
-const String companionMediaTransferCapability = 'media-transfer/v1';
+const String companionMediaTransferSchema = 'companion-audio-transfer/v2';
+const String companionMediaTransferCapability = 'audio-transfer/v2';
 const int companionMaximumMetadataBytes = 64 * 1024;
 const int companionMaximumChunkBytes = 1024 * 1024;
 const int companionDefaultChunkBytes = 256 * 1024;

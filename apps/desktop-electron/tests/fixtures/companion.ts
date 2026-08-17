@@ -4,7 +4,7 @@ import type {
 } from "../../src/shared/contracts";
 
 export const disabledCompanionSnapshot: CompanionSnapshot = {
-  protocolVersion: 1,
+  protocolVersion: 2,
   revision: 1,
   optIn: false,
   discovery: {

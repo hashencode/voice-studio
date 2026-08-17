@@ -2,6 +2,8 @@ import { createHash, randomBytes, timingSafeEqual } from "node:crypto";
 import { networkInterfaces } from "node:os";
 
 import {
+  companionCapability,
+  companionProtocol,
   companionPairingInviteSchema,
   companionSnapshotSchema,
   companionTransferManifestSchema,
@@ -327,7 +329,7 @@ export class CompanionService {
     this.pendingPairingKeyPair = pairingKeyPair;
     this.pairingAttempts = 0;
     this.pairingInvite = companionPairingInviteSchema.parse({
-      schema: "companion-media-transfer/v1",
+      schema: companionProtocol,
       pairingId,
       shortCode: shortCode.toString().padStart(6, "0"),
       displayHandle: [
@@ -455,7 +457,7 @@ export class CompanionService {
       "initiatorEphemeralPublicKey",
     );
     const expectedTranscript: CompanionPairingTranscriptValue = {
-      schema: "companion-media-transfer/v1",
+      schema: companionProtocol,
       pairingId: invite.pairingId,
       initiatorDeviceId: input.deviceId,
       initiatorFingerprint: input.fingerprint,
@@ -468,7 +470,7 @@ export class CompanionService {
         .update(`${invite.pairingId}:${invite.shortCode}`)
         .digest("hex"),
       expiresAtMs: invite.expiresAtMs,
-      capabilities: ["media-transfer/v1"],
+      capabilities: [companionCapability],
     };
     const canonical = canonicalCompanionPairingTranscript(expectedTranscript);
     const presentedCanonical = canonicalCompanionPairingTranscript(
@@ -732,7 +734,7 @@ export class CompanionService {
       );
     }
     const unsigned = {
-      schema: "companion-media-transfer/v1" as const,
+      schema: companionProtocol,
       receiptId: `receipt-${manifest.transferId}`,
       transferId: manifest.transferId,
       wholeFileSha256: manifest.wholeFileSha256,
@@ -773,7 +775,7 @@ export class CompanionService {
       updatedAtMs: transfer.updatedAtMs,
     }));
     return companionSnapshotSchema.parse({
-      protocolVersion: 1,
+      protocolVersion: 2,
       revision:
         settings.revision +
         this.runtimeRevision +

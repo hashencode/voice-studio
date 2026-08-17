@@ -2613,7 +2613,7 @@ async function runCompanionSmokeIfRequested(): Promise<void> {
   await writeCompanionSmokeJson(request.outputPath, {
     schemaVersion: 1,
     phase: request.phase === "verify" ? "restart-verified" : "committed",
-    protocol: "companion-media-transfer/v1",
+    protocol: "companion-audio-transfer/v2",
     transferIdSha256: createHash("sha256")
       .update(request.expectedTransferId)
       .digest("hex"),

@@ -215,7 +215,7 @@ describe("packaged macOS companion transfer", () => {
           expect.objectContaining({
             schemaVersion: 1,
             phase: "committed",
-            protocol: "companion-media-transfer/v1",
+            protocol: "companion-audio-transfer/v2",
             sourceSha256,
             normalizedSha256: expect.stringMatching(/^[a-f0-9]{64}$/),
             receiptSha256: expect.stringMatching(/^[a-f0-9]{64}$/),

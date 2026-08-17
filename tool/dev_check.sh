@@ -63,9 +63,14 @@ echo "[12/19] Desktop benchmark contract"
 ./tool/check_desktop_benchmark.sh
 
 echo "[13/19] Shared Dart workspace contract"
+python3 -m unittest tool/test_validate_audio_activity_boundary.py
+python3 tool/validate_audio_activity_boundary.py
 dart pub workspace list
 python3 tool/build_cache_guard.py
 dart test \
+  packages/audio_core \
+  packages/audio_storage \
+  packages/audio_workflows \
   packages/companion_protocol \
   packages/desktop_sherpa_worker \
   packages/meeting_core \

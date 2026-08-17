@@ -11,7 +11,11 @@ import {
   verify,
 } from "node:crypto";
 
-import { companionLimits, companionProtocol } from "../../../shared/contracts";
+import {
+  companionCapability,
+  companionLimits,
+  companionProtocol,
+} from "../../../shared/contracts";
 
 const initiatorDirection = 0x49325231;
 const responderDirection = 0x52324931;
@@ -41,7 +45,7 @@ export interface CompanionPairingTranscriptValue {
   responderEphemeralPublicKey: string;
   shortCodeHash: string;
   expiresAtMs: number;
-  capabilities: ["media-transfer/v1"];
+  capabilities: [typeof companionCapability];
 }
 
 export interface CompanionX25519KeyPair {
@@ -639,7 +643,7 @@ function validatePairingTranscript(
     !Number.isSafeInteger(value.expiresAtMs) ||
     value.expiresAtMs < 0 ||
     value.capabilities.length !== 1 ||
-    value.capabilities[0] !== "media-transfer/v1"
+    value.capabilities[0] !== companionCapability
   ) {
     throw new CompanionCryptoError(
       "INVALID_PAIRING_TRANSCRIPT",

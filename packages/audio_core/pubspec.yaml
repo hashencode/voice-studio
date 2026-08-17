@@ -1,0 +1,12 @@
+name: audio_core
+description: Authoritative Audio activity-domain values for Voice2Text applications.
+publish_to: none
+version: 0.1.0
+
+environment:
+  sdk: ^3.11.5
+
+resolution: workspace
+
+dev_dependencies:
+  test: any

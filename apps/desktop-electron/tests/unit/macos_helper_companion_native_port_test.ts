@@ -264,7 +264,7 @@ describe("U11 private companion native adapter", () => {
     ).toBe(true);
 
     const unsigned = {
-      schema: "companion-media-transfer/v1",
+      schema: "companion-audio-transfer/v2",
       receiptId: "receipt-transfer-1",
       transferId: "transfer-1",
       wholeFileSha256: "a".repeat(64),

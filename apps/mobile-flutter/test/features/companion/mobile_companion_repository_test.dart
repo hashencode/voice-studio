@@ -65,6 +65,28 @@ void main() {
     },
   );
 
+  test('v1 invitation is rejected before peer or credential mutation', () async {
+    await expectLater(
+      repository.acceptPairingInvite(
+        encodedPayload: _invite(
+          code: '123456',
+          schema: 'companion-media-transfer/v1',
+        ),
+        confirmedShortCode: '123456',
+        nowMs: 1000,
+      ),
+      throwsA(
+        isA<CompanionProtocolException>().having(
+          (error) => error.code,
+          'code',
+          'UNSUPPORTED_COMPANION_PROTOCOL',
+        ),
+      ),
+    );
+    expect(await database.query('companion_peers'), isEmpty);
+    expect(platform.values, isEmpty);
+  });
+
   test(
     'expired invitation and unpair fail closed without deleting meetings',
     () async {
@@ -112,9 +134,13 @@ void main() {
   );
 }
 
-String _invite({required String code, int expiresAtMs = 2000}) {
+String _invite({
+  required String code,
+  int expiresAtMs = 2000,
+  String schema = companionMediaTransferSchema,
+}) {
   final payload = <String, Object>{
-    'schema': companionMediaTransferSchema,
+    'schema': schema,
     'type': 'pairingInvite',
     'pairingId': 'pairing-1',
     'shortCode': code,

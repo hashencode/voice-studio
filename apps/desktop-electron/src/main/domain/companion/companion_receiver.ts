@@ -2,6 +2,7 @@ import { createHash, randomBytes } from "node:crypto";
 import { createServer, type Server, type Socket } from "node:net";
 
 import {
+  companionCapability,
   companionLimits,
   companionProtocol,
   companionTransferManifestSchema,
@@ -282,7 +283,13 @@ export class CompanionReceiver implements CompanionReceiverPort {
       helloKeys.push("initiatorEphemeralPublicKey");
     }
     exactKeys(hello, helloKeys);
-    if (hello.schema !== companionProtocol || hello.type !== "sessionHello") {
+    if (hello.schema !== companionProtocol) {
+      throw new CompanionReceiverError(
+        "UNSUPPORTED_COMPANION_PROTOCOL",
+        "companion protocol is unsupported",
+      );
+    }
+    if (hello.type !== "sessionHello") {
       throw new CompanionReceiverError(
         "INVALID_SESSION_HELLO",
         "session hello is invalid",
@@ -1268,7 +1275,7 @@ function parsePairingTranscript(
   if (
     !Array.isArray(capabilities) ||
     capabilities.length !== 1 ||
-    capabilities[0] !== "media-transfer/v1"
+    capabilities[0] !== companionCapability
   ) {
     throw new CompanionReceiverError(
       "INVALID_PAIRING_TRANSCRIPT",
@@ -1306,7 +1313,7 @@ function parsePairingTranscript(
     ),
     shortCodeHash: requireSha256(transcript.shortCodeHash, "shortCodeHash"),
     expiresAtMs: requireInteger(transcript.expiresAtMs, "expiresAtMs"),
-    capabilities: ["media-transfer/v1"],
+    capabilities: [companionCapability],
   };
 }
 

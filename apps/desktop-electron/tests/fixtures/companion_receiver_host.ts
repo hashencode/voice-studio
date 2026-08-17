@@ -77,7 +77,7 @@ const receiver = new CompanionReceiver({
       }
       seedImport(manifest.wholeFileSha256, manifest.sizeBytes);
       const receipt = {
-        schema: "companion-media-transfer/v1" as const,
+        schema: "companion-audio-transfer/v2" as const,
         receiptId: `receipt-${manifest.transferId}`,
         transferId: manifest.transferId,
         wholeFileSha256: manifest.wholeFileSha256,

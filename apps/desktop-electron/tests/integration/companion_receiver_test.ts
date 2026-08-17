@@ -14,7 +14,7 @@ import {
 import { openElectronDatabase } from "../../src/main/storage/database";
 import { TransferRepository } from "../../src/main/storage/repositories/transfer_repository";
 
-describe("companion-media-transfer/v1 Node receiver", () => {
+describe("companion-audio-transfer/v2 Node receiver", () => {
   let database: DatabaseSync | undefined;
   let root: string | undefined;
   let receiver: CompanionReceiver | undefined;
@@ -25,6 +25,76 @@ describe("companion-media-transfer/v1 Node receiver", () => {
     database = undefined;
     if (root) rmSync(root, { recursive: true, force: true });
     root = undefined;
+  });
+
+  it("rejects a v1 peer before repository or handler mutation", async () => {
+    database = openElectronDatabase(":memory:");
+    root = mkdtempSync(join(tmpdir(), "voice2text-companion-receiver-"));
+    const repository = new TransferRepository(database);
+    const resolveInvite = vi.fn(async () => null);
+    const confirmInvite = vi.fn(async () => {
+      throw new Error("unexpected pairing");
+    });
+    const commitInvite = vi.fn(async () => {
+      throw new Error("unexpected pairing");
+    });
+    const commit = vi.fn();
+    let reportError: ((code: string) => void) | undefined;
+    const errorCode = new Promise<string>((resolve) => {
+      reportError = resolve;
+    });
+    receiver = new CompanionReceiver({
+      root: join(root, "transfers"),
+      repository,
+      security: { readCredential: vi.fn() },
+      identity: {
+        ensureIdentity: vi.fn(async () => ({
+          deviceId: "desktop-1",
+          deviceName: "Studio Mac",
+          fingerprint: "D".repeat(32),
+        })),
+      },
+      handlers: { resolveInvite, confirmInvite, commitInvite, commit },
+      onSessionError: (code) => reportError?.(code),
+    });
+    const { port } = await receiver.start();
+    const socket = connect({ host: "127.0.0.1", port });
+    await new Promise<void>((resolve, reject) => {
+      socket.once("connect", resolve);
+      socket.once("error", reject);
+    });
+    await writeFrame(
+      socket,
+      0,
+      Buffer.from(
+        JSON.stringify({
+          schema: "companion-media-transfer/v1",
+          type: "sessionHello",
+          sessionId: "legacy-session-1",
+          deviceId: "legacy-mobile-1",
+          deviceName: "Legacy Phone",
+          fingerprint: "M".repeat(32),
+          pairingId: null,
+          initiatorNonce: Buffer.alloc(32, 0x11).toString("base64"),
+          issuedAtMs: Date.now(),
+        }),
+      ),
+    );
+
+    await expectSocketClose(socket);
+    await expect(errorCode).resolves.toBe("UNSUPPORTED_COMPANION_PROTOCOL");
+    expect(resolveInvite).not.toHaveBeenCalled();
+    expect(confirmInvite).not.toHaveBeenCalled();
+    expect(commitInvite).not.toHaveBeenCalled();
+    expect(commit).not.toHaveBeenCalled();
+    expect(
+      database.prepare("SELECT COUNT(*) AS count FROM companion_peers").get(),
+    ).toEqual({ count: 0 });
+    expect(
+      database
+        .prepare("SELECT COUNT(*) AS count FROM companion_transfers")
+        .get(),
+    ).toEqual({ count: 0 });
   });
 
   it("uses the real desktop identity and resumes only the missing verified chunks", async () => {
@@ -43,7 +113,7 @@ describe("companion-media-transfer/v1 Node receiver", () => {
     const commit = vi.fn(async (manifest, stagedSourcePath: string) => {
       expect(readFileSync(stagedSourcePath)).toEqual(source);
       const receipt = {
-        schema: "companion-media-transfer/v1" as const,
+        schema: "companion-audio-transfer/v2" as const,
         receiptId: `receipt-${manifest.transferId}`,
         transferId: manifest.transferId,
         wholeFileSha256: manifest.wholeFileSha256,
@@ -377,7 +447,7 @@ describe("companion-media-transfer/v1 Node receiver", () => {
 
 const source = Buffer.alloc(5_000, 0x7b);
 const manifest = {
-  schema: "companion-media-transfer/v1" as const,
+  schema: "companion-audio-transfer/v2" as const,
   transferId: "transfer-1",
   sourceAssetId: "asset-1",
   displayName: "meeting.wav",
@@ -401,7 +471,7 @@ async function connectClient(port: number, credential: Buffer) {
     0,
     Buffer.from(
       JSON.stringify({
-        schema: "companion-media-transfer/v1",
+        schema: "companion-audio-transfer/v2",
         type: "sessionHello",
         sessionId: "session-1",
         deviceId: "mobile-1",

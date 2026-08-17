@@ -103,6 +103,12 @@ class MobileCompanionRepository {
       );
     }
     final map = decoded.cast<String, Object?>();
+    if (map['schema'] != companionMediaTransferSchema) {
+      throw const CompanionProtocolException(
+        'UNSUPPORTED_COMPANION_PROTOCOL',
+        'Companion invitation protocol is unsupported.',
+      );
+    }
     final expected = <String>{
       'schema',
       'type',
@@ -116,7 +122,6 @@ class MobileCompanionRepository {
     };
     if (map.keys.toSet().difference(expected).isNotEmpty ||
         expected.difference(map.keys.toSet()).isNotEmpty ||
-        map['schema'] != companionMediaTransferSchema ||
         map['type'] != 'pairingInvite' ||
         map['shortCode'] != confirmedShortCode) {
       throw const CompanionProtocolException(

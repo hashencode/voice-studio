@@ -73,7 +73,7 @@ describe("U11 companion transfer authority", () => {
       pairedAtMs: 1,
     });
     const manifest = {
-      schema: "companion-media-transfer/v1" as const,
+      schema: "companion-audio-transfer/v2" as const,
       transferId: "transfer-1",
       sourceAssetId: "mobile-recording-1",
       displayName: "meeting.wav",
@@ -111,7 +111,7 @@ describe("U11 companion transfer authority", () => {
       pairedAtMs: 1,
     });
     const manifest = {
-      schema: "companion-media-transfer/v1" as const,
+      schema: "companion-audio-transfer/v2" as const,
       transferId: "transfer-1",
       sourceAssetId: "mobile-recording-1",
       displayName: "meeting.wav",
@@ -129,7 +129,7 @@ describe("U11 companion transfer authority", () => {
       repository.recordCommittedReceipt(
         manifest,
         {
-          schema: "companion-media-transfer/v1",
+          schema: "companion-audio-transfer/v2",
           receiptId: "receipt-transfer-1",
           transferId: "transfer-1",
           wholeFileSha256: manifest.wholeFileSha256,
@@ -170,7 +170,7 @@ describe("U11 companion transfer authority", () => {
     repository.recordCommittedReceipt(
       manifest,
       {
-        schema: "companion-media-transfer/v1",
+        schema: "companion-audio-transfer/v2",
         receiptId: "receipt-transfer-1",
         transferId: "transfer-1",
         wholeFileSha256: manifest.wholeFileSha256,
@@ -226,7 +226,7 @@ describe("U11 companion transfer authority", () => {
       pairedAtMs: 1,
     });
     const manifest = {
-      schema: "companion-media-transfer/v1" as const,
+      schema: "companion-audio-transfer/v2" as const,
       transferId: "transfer-cas-1",
       sourceAssetId: "asset-cas-1",
       displayName: "meeting.wav",

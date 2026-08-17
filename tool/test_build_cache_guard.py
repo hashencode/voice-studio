@@ -23,6 +23,9 @@ class BuildCacheGuardTest(unittest.TestCase):
             {
                 "apps/mobile-flutter": 7.0,
                 "apps/codex_ui_reproduction": 0.5,
+                "packages/audio_core": 0.5,
+                "packages/audio_storage": 0.5,
+                "packages/audio_workflows": 0.5,
                 "packages/companion_protocol": 0.5,
                 "packages/desktop_sherpa_worker": 0.5,
                 "packages/meeting_core": 0.5,

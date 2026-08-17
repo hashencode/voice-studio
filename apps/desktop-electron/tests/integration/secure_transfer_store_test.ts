@@ -179,7 +179,7 @@ function temporaryRoot(): string {
 
 function fixtureManifest(bytes: Buffer) {
   return {
-    schema: "companion-media-transfer/v1" as const,
+    schema: "companion-audio-transfer/v2" as const,
     transferId: "transfer-1",
     sourceAssetId: "asset-1",
     displayName: "meeting.wav",

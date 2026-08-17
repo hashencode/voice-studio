@@ -8,6 +8,9 @@ environment:
 workspace:
   - apps/mobile-flutter
   - apps/codex_ui_reproduction
+  - packages/audio_core
+  - packages/audio_storage
+  - packages/audio_workflows
   - packages/companion_protocol
   - packages/desktop_sherpa_worker
   - packages/meeting_core

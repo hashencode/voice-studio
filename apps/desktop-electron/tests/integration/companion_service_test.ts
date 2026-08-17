@@ -94,7 +94,7 @@ describe("U11 companion service lifecycle", () => {
       pairedAtMs: 1,
     });
     const manifest = {
-      schema: "companion-media-transfer/v1" as const,
+      schema: "companion-audio-transfer/v2" as const,
       transferId: "transfer-expired-first-restart",
       sourceAssetId: "mobile-recording-expired",
       displayName: "old.wav",
@@ -431,7 +431,7 @@ describe("U11 companion service lifecycle", () => {
       pairedAtMs: 1,
     });
     const manifest = {
-      schema: "companion-media-transfer/v1" as const,
+      schema: "companion-audio-transfer/v2" as const,
       transferId: "transfer-revoke-crash",
       sourceAssetId: "mobile-recording-1",
       displayName: "meeting.wav",
@@ -492,7 +492,7 @@ describe("U11 companion service lifecycle", () => {
       pairedAtMs: 1,
     });
     const manifest = {
-      schema: "companion-media-transfer/v1" as const,
+      schema: "companion-audio-transfer/v2" as const,
       transferId: "transfer-media-fence",
       sourceAssetId: "source-media-fence",
       displayName: "meeting.wav",
@@ -626,7 +626,7 @@ function pairingTranscript(
   peer: ReturnType<typeof pairingPeer>,
 ): CompanionPairingTranscriptValue {
   return {
-    schema: "companion-media-transfer/v1",
+    schema: "companion-audio-transfer/v2",
     pairingId: invitation.pairingId,
     initiatorDeviceId: peer.deviceId,
     initiatorFingerprint: peer.fingerprint,
@@ -638,7 +638,7 @@ function pairingTranscript(
       .update(`${invitation.pairingId}:${invitation.shortCode}`)
       .digest("hex"),
     expiresAtMs: invitation.expiresAtMs,
-    capabilities: ["media-transfer/v1"],
+    capabilities: ["audio-transfer/v2"],
   };
 }
 

@@ -24,7 +24,7 @@ const application: ApplicationSnapshot = {
 };
 
 const disabledSnapshot: CompanionSnapshot = {
-  protocolVersion: 1,
+  protocolVersion: 2,
   revision: 1,
   optIn: false,
   discovery: {
@@ -133,7 +133,7 @@ describe("companion Renderer flow", () => {
       revision: 5,
       pairing: { state: "awaiting-peer", errorCode: null },
       pairingInvite: {
-        schema: "companion-media-transfer/v1",
+        schema: "companion-audio-transfer/v2",
         pairingId: "pair-01",
         shortCode: "123456",
         displayHandle: "desktop:VOICE2TEXT:ABCD2345",
@@ -234,7 +234,7 @@ describe("companion Renderer flow", () => {
           revision: 5,
           errorCode: null,
           receipt: {
-            schema: "companion-media-transfer/v1",
+            schema: "companion-audio-transfer/v2",
             receiptId: "receipt-committed",
             transferId: "transfer-committed",
             wholeFileSha256: "b".repeat(64),

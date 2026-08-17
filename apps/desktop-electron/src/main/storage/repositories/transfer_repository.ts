@@ -218,7 +218,7 @@ export class TransferRepository {
         command.expectedRevision,
         command.resultRevision,
         JSON.stringify({
-          protocolVersion: 1,
+          protocolVersion: 2,
           revision: command.resultRevision,
         }),
         command.nowMs,

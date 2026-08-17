@@ -8,6 +8,30 @@ import 'package:crypto/crypto.dart';
 import 'package:test/test.dart';
 
 void main() {
+  test('v2 rejects a v1 envelope before exposing its payload', () {
+    expect(companionMediaTransferSchema, 'companion-audio-transfer/v2');
+    expect(companionMediaTransferCapability, 'audio-transfer/v2');
+    expect(
+      () => CompanionEnvelope.decode(
+        jsonEncode(<String, Object?>{
+          'schema': 'companion-media-transfer/v1',
+          'type': 'manifest',
+          'messageId': 'legacy-message-1',
+          'sessionId': 'legacy-session-1',
+          'counter': 0,
+          'payload': <String, Object?>{'legacy': true},
+        }),
+      ),
+      throwsA(
+        isA<CompanionProtocolException>().having(
+          (error) => error.code,
+          'code',
+          'UNSUPPORTED_SCHEMA',
+        ),
+      ),
+    );
+  });
+
   group('pairing and encrypted session', () {
     test('binds both identities and rejects fingerprint changes', () async {
       final initiator = await CompanionIdentity.fromSeed(

@@ -1,15 +1,37 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  companionProtocol,
   companionPairingInviteSchema,
+  companionSnapshotSchema,
   companionTransferManifestSchema,
   companionTransferReceiptSchema,
 } from "../../src/shared/contracts";
 
 describe("U11 companion contracts", () => {
+  it("uses the Audio v2 protocol and rejects Meeting-era payloads", () => {
+    expect(companionProtocol).toBe("companion-audio-transfer/v2");
+    expect(
+      companionTransferManifestSchema.safeParse({
+        schema: "companion-media-transfer/v1",
+        transferId: "legacy-transfer-1",
+        sourceAssetId: "legacy-meeting-1",
+        displayName: "legacy.wav",
+        sizeBytes: 4_096,
+        wholeFileSha256: "a".repeat(64),
+        chunkBytes: 4_096,
+        chunkCount: 1,
+        createdAtMs: 1,
+      }).success,
+    ).toBe(false);
+    expect(
+      companionSnapshotSchema.safeParse({ protocolVersion: 1 }).success,
+    ).toBe(false);
+  });
+
   it("freezes the versioned bounded transfer manifest", () => {
     const manifest = companionTransferManifestSchema.parse({
-      schema: "companion-media-transfer/v1",
+      schema: "companion-audio-transfer/v2",
       transferId: "transfer-1",
       sourceAssetId: "mobile-recording-1",
       displayName: "meeting.wav",
@@ -36,7 +58,7 @@ describe("U11 companion contracts", () => {
 
   it("exposes only a public manual endpoint and bounds invitation expiry", () => {
     const invitation = companionPairingInviteSchema.parse({
-      schema: "companion-media-transfer/v1",
+      schema: "companion-audio-transfer/v2",
       pairingId: "pair-1",
       shortCode: "123456",
       displayHandle: "pair-1:desktop-1:ABCDEFGHIJKL",
@@ -49,7 +71,7 @@ describe("U11 companion contracts", () => {
     expect(JSON.stringify(invitation)).not.toMatch(/credential|secret|token/i);
     expect(
       companionPairingInviteSchema.safeParse({
-        schema: "companion-media-transfer/v1",
+        schema: "companion-audio-transfer/v2",
         pairingId: "pair-1",
         shortCode: "12345",
         displayHandle: "pair-1:desktop-1:ABCDEFGHIJKL",
@@ -63,7 +85,7 @@ describe("U11 companion contracts", () => {
 
   it("requires a bounded signed durable receipt before sender deletion", () => {
     const receipt = companionTransferReceiptSchema.parse({
-      schema: "companion-media-transfer/v1",
+      schema: "companion-audio-transfer/v2",
       receiptId: "receipt-transfer-1",
       transferId: "transfer-1",
       wholeFileSha256: "a".repeat(64),

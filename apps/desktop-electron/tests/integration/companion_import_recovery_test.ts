@@ -126,7 +126,7 @@ function importingFixture() {
     pairedAtMs: 1,
   });
   const manifest = {
-    schema: "companion-media-transfer/v1" as const,
+    schema: "companion-audio-transfer/v2" as const,
     transferId: "transfer-import-crash",
     sourceAssetId: "source-import-crash",
     displayName: "meeting.wav",

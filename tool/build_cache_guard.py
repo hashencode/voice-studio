@@ -39,6 +39,15 @@ FLUTTER_PROJECTS = (
         pathlib.Path("apps/codex_ui_reproduction"),
         cache_limit_gib=0.5,
     ),
+    FlutterProject(pathlib.Path("packages/audio_core"), cache_limit_gib=0.5),
+    FlutterProject(
+        pathlib.Path("packages/audio_storage"),
+        cache_limit_gib=0.5,
+    ),
+    FlutterProject(
+        pathlib.Path("packages/audio_workflows"),
+        cache_limit_gib=0.5,
+    ),
     FlutterProject(
         pathlib.Path("packages/companion_protocol"),
         cache_limit_gib=0.5,
