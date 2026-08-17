@@ -312,6 +312,12 @@ class ElectronDesktopRemovalValidatorTest(unittest.TestCase):
                 validate_repository=False,
             )
 
+    def test_historical_protected_path_may_be_retired_later(self) -> None:
+        self.manifest["protectedPaths"][0]["path"] = (
+            "packages/retired-after-removal"
+        )
+        self.assertEqual(self._validate()["status"], "PASS")
+
     def test_rejects_remaining_flutter_desktop_tree(self) -> None:
         (self.root / "apps/desktop").mkdir(parents=True)
         with self.assertRaisesRegex(ValueError, "Flutter Desktop"):
@@ -323,7 +329,7 @@ class ElectronDesktopRemovalValidatorTest(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "Flutter Desktop"):
             self._validate()
 
-    def test_repository_mode_binds_base_blobs_and_protected_tree(self) -> None:
+    def test_repository_mode_binds_base_blobs_while_destinations_evolve(self) -> None:
         self._initialize_repository_fixture()
         self.assertEqual(self._validate_repository_fixture()["status"], "PASS")
 
@@ -331,15 +337,10 @@ class ElectronDesktopRemovalValidatorTest(unittest.TestCase):
             "destinationPath"
         ]
         protected.write_bytes(b"mutated\n")
-        with self.assertRaisesRegex(ValueError, "relocated authority hash drift"):
-            self._validate_repository_fixture()
+        self.assertEqual(self._validate_repository_fixture()["status"], "PASS")
         self.manifest["relocatedAuthorities"][0]["sha256"] = _sha256(protected)
-        protected_path = self.manifest["protectedPaths"][0]["path"]
-        self.manifest["protectedPaths"][0]["treeSha256"] = (
-            _tracked_path_tree_sha256(self.root, protected_path)
-        )
         self._write_manifest()
-        with self.assertRaisesRegex(ValueError, "differs from comparison base"):
+        with self.assertRaisesRegex(ValueError, "historical relocation"):
             self._validate_repository_fixture()
 
     def test_repository_mode_rejects_untracked_electron_source(self) -> None:

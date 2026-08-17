@@ -400,7 +400,7 @@ void main() {
     );
 
     test('resumes only missing chunks and receipt is idempotent', () async {
-      final bytes = utf8.encode('secure meeting media payload');
+      final bytes = utf8.encode('secure audio media payload');
       final manifest = _manifest(bytes, chunkBytes: 4096);
       final store = FileCompanionTransferStore(root: temporary);
       var commits = 0;
@@ -443,7 +443,7 @@ void main() {
     });
 
     test('chunk and whole-file hash mismatches never commit', () async {
-      final bytes = utf8.encode('secure meeting media payload');
+      final bytes = utf8.encode('secure audio media payload');
       final manifest = _manifest(bytes, chunkBytes: 4096);
       final store = FileCompanionTransferStore(root: temporary);
       var committed = false;
@@ -716,7 +716,7 @@ CompanionTransferManifest _manifest(
   return CompanionTransferManifest(
     transferId: 'transfer-1',
     sourceAssetId: 'mobile-recording-1',
-    displayName: 'meeting.wav',
+    displayName: 'audio.wav',
     sizeBytes: bytes.length,
     wholeFileSha256: sha256.convert(bytes).toString(),
     chunkBytes: chunkBytes,

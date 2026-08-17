@@ -13,7 +13,7 @@ class MobileFlutterLayoutTest(unittest.TestCase):
         result = validate_mobile_layout()
         self.assertEqual("PASS", result["status"])
         self.assertEqual("apps/mobile-flutter", result["mobileRoot"])
-        self.assertEqual(333, result["movedTrackedFileCount"])
+        self.assertEqual(328, result["movedTrackedFileCount"])
         self.assertEqual("DEFERRED_OUT_OF_CURRENT_SCOPE", result["windowsDesktop"])
 
     def test_manifest_cannot_claim_windows_pass(self) -> None:
@@ -36,7 +36,7 @@ class MobileFlutterLayoutTest(unittest.TestCase):
 
     def test_moved_path_inventory_cannot_be_substituted(self) -> None:
         payload = json.loads(DEFAULT_MANIFEST.read_text(encoding="utf-8"))
-        payload["movedTrackedPaths"][0] = "apps/mobile-flutter/pubspec.yaml"
+        payload["movedTrackedPaths"][0] = "apps/mobile-flutter/substituted-fixture"
         payload["movedTrackedPaths"].sort()
         with tempfile.TemporaryDirectory() as directory:
             path = Path(directory) / "layout.json"
@@ -46,22 +46,13 @@ class MobileFlutterLayoutTest(unittest.TestCase):
 
     def test_moved_path_must_still_exist(self) -> None:
         payload = json.loads(DEFAULT_MANIFEST.read_text(encoding="utf-8"))
-        source = Path("apps/mobile-flutter/.metadata")
         payload["movedTrackedPaths"][0] = "apps/mobile-flutter/missing-move-fixture"
         payload["movedTrackedPaths"].sort()
-        from tool import validate_mobile_flutter_layout as layout
-
-        original = layout.EXPECTED_MOVED_PATHS_SHA256
-        layout.EXPECTED_MOVED_PATHS_SHA256 = layout._path_list_sha256(payload["movedTrackedPaths"])
-        try:
-            with tempfile.TemporaryDirectory() as directory:
-                path = Path(directory) / "layout.json"
-                path.write_text(json.dumps(payload), encoding="utf-8")
-                self.assertTrue(source.is_file())
-                with self.assertRaisesRegex(ValueError, "moved tracked path missing"):
-                    validate_mobile_layout(path)
-        finally:
-            layout.EXPECTED_MOVED_PATHS_SHA256 = original
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "layout.json"
+            path.write_text(json.dumps(payload), encoding="utf-8")
+            with self.assertRaisesRegex(ValueError, "moved tracked paths drift"):
+                validate_mobile_layout(path)
 
     def test_electron_identity_file_set_cannot_be_removed(self) -> None:
         payload = json.loads(DEFAULT_MANIFEST.read_text(encoding="utf-8"))

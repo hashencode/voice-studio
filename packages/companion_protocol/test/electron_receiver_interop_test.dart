@@ -36,7 +36,7 @@ void main() {
         'voice2text-dart-electron-interop-',
       );
       final transferRoot = Directory('${temporary.path}/transfers');
-      final source = File('${temporary.path}/meeting.wav');
+      final source = File('${temporary.path}/audio.wav');
       final bytes = List<int>.generate(5000, (index) => index % 251);
       await source.writeAsBytes(bytes, flush: true);
       final credential = List<int>.generate(32, (index) => index + 1);
@@ -80,7 +80,7 @@ void main() {
         final manifest = CompanionTransferManifest(
           transferId: 'transfer-interop-1',
           sourceAssetId: 'asset-interop-1',
-          displayName: 'meeting.wav',
+          displayName: 'audio.wav',
           sizeBytes: bytes.length,
           wholeFileSha256: sha256.convert(bytes).toString(),
           chunkBytes: 4096,

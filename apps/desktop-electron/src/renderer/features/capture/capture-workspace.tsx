@@ -37,7 +37,7 @@ export function CaptureWorkspace({
     null,
   );
   const [setupOpen, setSetupOpen] = React.useState(false);
-  const [title, setTitle] = React.useState("会议录制");
+  const [title, setTitle] = React.useState("音频录制");
   const [captionEnabled, setCaptionEnabled] = React.useState(true);
   const [microphoneDeviceId, setMicrophoneDeviceId] = React.useState("");
   const [localCapture, setLocalCapture] = React.useState<{
@@ -244,7 +244,7 @@ export function CaptureWorkspace({
           );
           if (result) {
             setLocalCapture({
-              value: toCaptureView(result, "恢复的会议录制"),
+              value: toCaptureView(result, "恢复的音频录制"),
               basedOnRevision: applicationRevision,
             });
           }
@@ -384,7 +384,7 @@ function CaptureSetup({
           <Mic2 className="size-5" aria-hidden="true" />
         </span>
         <div className="min-w-0 flex-1">
-          <h2 className="font-semibold">会议录制</h2>
+          <h2 className="font-semibold">音频录制</h2>
           <p className="text-sm text-muted-foreground">
             跨页面持续运行，由本机安全保存。
           </p>
@@ -406,7 +406,7 @@ function CaptureSetup({
       <div>
         <p className="text-xs font-medium text-muted-foreground">本机录制</p>
         <h2 id="capture-setup-heading" className="font-semibold">
-          设置会议录制
+          设置音频录制
         </h2>
       </div>
       {preflight && blockers.length > 0 ? (
@@ -616,7 +616,7 @@ function ActiveCapture({
           <Button type="button" disabled={busy} onClick={onBeginAnother}>
             <Mic2 aria-hidden="true" />
             {capture.phase === "completed" || finalizedPartial
-              ? "录制另一个会议"
+              ? "录制另一个音频"
               : "重新设置录制"}
           </Button>
         </div>
@@ -691,7 +691,7 @@ function RecoverySurface({
       </div>
       {items.map((item) => (
         <div key={item.sessionId} className="rounded-lg border p-3 text-sm">
-          <p className="font-medium">中断的会议录制</p>
+          <p className="font-medium">中断的音频录制</p>
           <p className="mt-1 text-muted-foreground">
             {formatElapsed(item.captureTimelineMs)} · {item.finalizedChunkCount}{" "}
             个已完成分块 · {item.gapCount} 个时间缺口

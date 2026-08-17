@@ -40,7 +40,7 @@ class RecordingJournalStore(
 ) {
     constructor(context: Context) : this(
         File(
-            File(context.filesDir, AudioContract.MEETING_DIR_NAME),
+            File(context.filesDir, AudioContract.AUDIO_DIR_NAME),
             AudioContract.RECORDING_JOURNAL_DIR_NAME,
         ),
     )

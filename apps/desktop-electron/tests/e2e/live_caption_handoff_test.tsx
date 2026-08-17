@@ -23,7 +23,7 @@ const application: ApplicationSnapshot = {
   capture: {
     phase: "recording",
     sessionId: "session-caption-e2e-123456",
-    title: "字幕交接会议",
+    title: "字幕交接音频",
     elapsedMs: 14_000,
     captureMode: "dual_track",
   },

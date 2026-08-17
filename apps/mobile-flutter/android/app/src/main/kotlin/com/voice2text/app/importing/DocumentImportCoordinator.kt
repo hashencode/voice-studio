@@ -33,7 +33,7 @@ class DocumentImportCoordinator(
     private val context: Context,
     private val inspector: ImportedMediaInspector = ImportedMediaInspector(context),
 ) {
-    private val audioRoot = File(context.filesDir, AudioContract.MEETING_DIR_NAME)
+    private val audioRoot = File(context.filesDir, AudioContract.AUDIO_DIR_NAME)
     private val stagingRoot =
         File(File(audioRoot, AudioContract.IMPORT_DIR_NAME), AudioContract.IMPORT_IN_PROGRESS_DIR_NAME)
     private val completeRoot =

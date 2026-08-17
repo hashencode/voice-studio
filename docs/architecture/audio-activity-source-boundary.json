@@ -1,5 +1,5 @@
 {
-  "schema": "voice2text-audio-activity-source-boundary/v1",
+  "schema": "voice2text-audio-activity-source-boundary/v2",
   "canonicalActivityNoun": "Audio",
   "freshAudioBoundaries": [
     "packages/audio_core",
@@ -10,17 +10,27 @@
     "docs/architecture/companion-audio-transfer-v2.md",
     "docs/contracts/companion-audio-transfer-v2.schema.json"
   ],
-  "activeMeetingRenameInventory": [
-    { "path": "README.md", "owner": "U9-U10 active documentation" },
-    { "path": "apps/desktop-electron", "owner": "U10 Electron consumers" },
-    { "path": "packages/companion_protocol", "owner": "U8 protocol rejection fixtures" },
-    { "path": "packages/desktop_macos_native", "owner": "U10 native desktop vocabulary" },
-    { "path": "packages/desktop_sherpa_worker", "owner": "U10 worker vocabulary" },
-    { "path": "tool", "owner": "U9-U10 active validators" },
-    { "path": "docs/architecture", "owner": "U9-U10 active architecture" },
-    { "path": "docs/contracts", "owner": "U9-U10 active contracts" },
-    { "path": "docs/product", "owner": "U5 active product metadata" },
-    { "path": "docs/BETA_RELEASE_CHECKLIST.md", "owner": "U10 active release documentation" }
+  "activeTerminologyRoots": [
+    { "path": "apps/mobile-flutter", "owner": "U9 mobile Audio product" },
+    { "path": "apps/desktop-electron/src", "owner": "U10 Electron Audio product" },
+    { "path": "apps/desktop-electron/tests", "owner": "U10 Electron Audio tests" },
+    { "path": "packages/audio_core", "owner": "U8 Audio core" },
+    { "path": "packages/audio_storage", "owner": "U9 Audio storage" },
+    { "path": "packages/audio_workflows", "owner": "U9 Audio workflows" },
+    { "path": "packages/companion_protocol", "owner": "U8 Audio companion protocol" },
+    { "path": "packages/desktop_macos_native", "owner": "U10 macOS Audio bridge" },
+    { "path": "packages/desktop_sherpa_worker", "owner": "U10 desktop Audio worker" },
+    { "path": "packages/processing_contracts", "owner": "U9 Audio processing contracts" }
+  ],
+  "activeTerminologyFiles": [
+    "README.md",
+    "docs/BETA_RELEASE_CHECKLIST.md",
+    "docs/architecture/electron-audio-context-shell.md",
+    "docs/product/audio-sidebar-workstation.json",
+    "docs/product/desktop-electron-status.md",
+    "tool/update_mobile_flutter_layout.py",
+    "tool/validate_mobile_flutter_layout.py",
+    "tool/validate_audio_sidebar_workstation.py"
   ],
   "historicalMeetingAllowlist": [
     { "path": "benchmark", "reason": "frozen benchmark evidence and reproduction inputs" },
@@ -48,10 +58,18 @@
   "legacyRejectionAllowlist": [
     "apps/desktop-electron/src/main/profile/audio_profile.ts",
     "apps/desktop-electron/tests/integration/audio_profile_reset_test.ts",
+    "apps/desktop-electron/tests/integration/domain_ipc_test.ts",
     "apps/desktop-electron/tests/integration/companion_receiver_test.ts",
     "apps/desktop-electron/tests/unit/companion_contract_test.ts",
+    "apps/desktop-electron/tests/unit/ipc_contract_test.ts",
     "apps/mobile-flutter/test/features/companion/mobile_companion_repository_test.dart",
     "packages/companion_protocol/test/companion_protocol_test.dart"
+  ],
+  "compatibilityTerminologyAllowlist": [
+    {
+      "path": "packages/desktop_sherpa_worker/tool/desktop_sherpa_benchmark.dart",
+      "reason": "frozen benchmark fixture identifier bound by prior evidence"
+    }
   ],
   "protocol": {
     "schema": "companion-audio-transfer/v2",

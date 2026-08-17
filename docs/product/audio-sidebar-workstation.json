@@ -1,0 +1,85 @@
+{
+  "schema": "voice2text-audio-sidebar-workstation/v1",
+  "status": "DEVELOPMENT_COMPLETE_RELEASE_VALIDATION_PENDING",
+  "activityNoun": "Audio",
+  "navigation": {
+    "rail": [
+      { "id": "audio", "label": "音频" },
+      { "id": "companion", "label": "互联" },
+      { "id": "settings", "label": "设置" }
+    ],
+    "legacyRoutesNormalizeTo": "audio"
+  },
+  "contextPanes": {
+    "owners": ["audio", "companion"],
+    "preferencesAreIndependent": true,
+    "resizeWritesPreference": false,
+    "narrowPresentation": "non-modal-drawer",
+    "verifiedWidthPx": 880
+  },
+  "workspaces": {
+    "singleMeaningfulHeading": true,
+    "audioOwns": [
+      "record",
+      "import",
+      "search",
+      "list",
+      "detail",
+      "processing",
+      "playback",
+      "editing",
+      "intelligence",
+      "export"
+    ],
+    "standaloneTaskRoute": false,
+    "companionSelectionConnects": false,
+    "companionAvailabilityFallback": "unknown"
+  },
+  "storage": {
+    "profile": "voice2text-electron/v2",
+    "database": "audio.sqlite3",
+    "schemaVersion": 1,
+    "legacyAction": "timestamped-archive-before-fresh-open",
+    "migrationSupported": false
+  },
+  "protocol": {
+    "schema": "companion-audio-transfer/v2",
+    "capability": "audio-transfer/v2",
+    "snapshotVersion": 2,
+    "legacyRejectedBeforeMutation": true
+  },
+  "releaseCandidate": {
+    "status": "PENDING_U6_STABLE_CANDIDATE",
+    "sourceRevision": null,
+    "packageManifestSha256": null,
+    "automatedReceipt": null,
+    "manualReceipt": null,
+    "finalizeRebuilds": false
+  },
+  "historicalArtifacts": [
+    {
+      "path": "docs/product/desktop-electron-evidence.json",
+      "classification": "HISTORICAL_CLOSURE_PROOF_NOT_CURRENT_CANDIDATE"
+    },
+    {
+      "path": "docs/product/desktop-electron-removal.json",
+      "classification": "HISTORICAL_REMOVAL_PROOF"
+    },
+    {
+      "path": "docs/product/desktop-workstation-scope.json",
+      "classification": "HISTORICAL_WORKSTATION_SCOPE_NOT_CURRENT_CANDIDATE"
+    },
+    {
+      "path": "docs/product/electron-closure-receipts",
+      "classification": "IMMUTABLE_HISTORICAL_RECEIPTS"
+    }
+  ],
+  "authorities": {
+    "architecture": "docs/architecture/electron-audio-context-shell.md",
+    "activityBoundary": "docs/architecture/audio-activity-source-boundary.json",
+    "electronNavigation": "apps/desktop-electron/src/renderer/components/app-sidebar.tsx",
+    "electronStorage": "apps/desktop-electron/src/main/profile/profile_paths.ts",
+    "electronProtocol": "apps/desktop-electron/src/shared/contracts/companion.ts",
+    "dartProtocol": "packages/companion_protocol/lib/src/companion_models.dart"
+  }
+}

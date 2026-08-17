@@ -22,7 +22,7 @@ class AudioActivityBoundaryTest(unittest.TestCase):
     def test_repository_inventory_and_authorities_are_complete(self) -> None:
         MODULE.validate()
 
-    def test_unclassified_meeting_source_is_rejected(self) -> None:
+    def test_active_meeting_source_is_rejected(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             root = pathlib.Path(directory)
             rogue = root / "src" / "rogue.dart"
@@ -30,11 +30,13 @@ class AudioActivityBoundaryTest(unittest.TestCase):
             rogue.write_text("class MeetingLeak {}\n", encoding="utf-8")
 
             self.assertEqual(
-                MODULE.find_unclassified_meeting_paths(
+                MODULE.find_active_meeting_paths(
                     root,
-                    active=[],
+                    active_roots=["src"],
+                    active_files=[],
                     historical=[],
                     rejection=[],
+                    compatibility=[],
                 ),
                 ["src/rogue.dart"],
             )
@@ -47,13 +49,36 @@ class AudioActivityBoundaryTest(unittest.TestCase):
             historical.write_text("Completed Meeting plan.\n", encoding="utf-8")
 
             self.assertEqual(
-                MODULE.find_unclassified_meeting_paths(
+                MODULE.find_active_meeting_paths(
                     root,
-                    active=[],
+                    active_roots=["docs"],
+                    active_files=[],
                     historical=["docs/plans"],
                     rejection=[],
+                    compatibility=[],
                 ),
                 [],
+            )
+
+    def test_compatibility_exemption_is_exact(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = pathlib.Path(directory)
+            frozen = root / "src" / "frozen.dart"
+            rogue = root / "src" / "nested" / "rogue.dart"
+            rogue.parent.mkdir(parents=True)
+            frozen.write_text("const fixture = 'meeting-era';\n", encoding="utf-8")
+            rogue.write_text("class MeetingLeak {}\n", encoding="utf-8")
+
+            self.assertEqual(
+                MODULE.find_active_meeting_paths(
+                    root,
+                    active_roots=["src"],
+                    active_files=[],
+                    historical=[],
+                    rejection=[],
+                    compatibility=["src/frozen.dart"],
+                ),
+                ["src/nested/rogue.dart"],
             )
 
 

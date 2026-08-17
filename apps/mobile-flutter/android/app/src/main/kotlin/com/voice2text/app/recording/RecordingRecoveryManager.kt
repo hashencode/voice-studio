@@ -61,14 +61,14 @@ class RecordingRecoveryManager(
         journalStore = RecordingJournalStore(context),
         inProgressRoot = File(
             File(
-                File(context.filesDir, AudioContract.MEETING_DIR_NAME),
+                File(context.filesDir, AudioContract.AUDIO_DIR_NAME),
                 AudioContract.RECORDING_DIR_NAME,
             ),
             AudioContract.RECORDING_IN_PROGRESS_DIR_NAME,
         ),
         completeRoot = File(
             File(
-                File(context.filesDir, AudioContract.MEETING_DIR_NAME),
+                File(context.filesDir, AudioContract.AUDIO_DIR_NAME),
                 AudioContract.RECORDING_DIR_NAME,
             ),
             AudioContract.RECORDING_COMPLETE_DIR_NAME,

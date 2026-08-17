@@ -217,9 +217,9 @@ describe("capture workspace", () => {
 
     await userEvent
       .setup()
-      .click(screen.getByRole("button", { name: "录制另一个会议" }));
+      .click(screen.getByRole("button", { name: "录制另一个音频" }));
     expect(
-      await screen.findByRole("heading", { name: "设置会议录制" }),
+      await screen.findByRole("heading", { name: "设置音频录制" }),
     ).toBeVisible();
     expect(window.voice2text.preflightCapture).toHaveBeenCalledWith({
       requestPermissions: true,
@@ -437,7 +437,7 @@ describe("capture workspace", () => {
       screen.queryByRole("button", { name: "停止并保存" }),
     ).not.toBeInTheDocument();
     expect(
-      screen.getByRole("button", { name: "录制另一个会议" }),
+      screen.getByRole("button", { name: "录制另一个音频" }),
     ).toBeEnabled();
   });
 
@@ -468,7 +468,7 @@ describe("capture workspace", () => {
         capture={{
           phase: "recovery",
           sessionId: recoverable.sessionId,
-          title: "中断的会议录制",
+          title: "中断的音频录制",
           elapsedMs: recoverable.captureTimelineMs,
         }}
       />,

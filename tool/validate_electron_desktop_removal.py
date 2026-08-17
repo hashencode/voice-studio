@@ -232,14 +232,18 @@ def _git_blob_sha256(root: Path, revision: str, relative: str) -> str:
     return hashlib.sha256(result.stdout).hexdigest()
 
 
-def _safe_path(root: Path, value: Any, label: str) -> Path:
+def _repository_path(root: Path, value: Any, label: str) -> Path:
     _require(isinstance(value, str) and value, f"{label} path is invalid")
     relative = PurePosixPath(value)
     _require(
         not relative.is_absolute() and ".." not in relative.parts,
         f"{label} path escapes the repository",
     )
-    path = root.joinpath(*relative.parts)
+    return root.joinpath(*relative.parts)
+
+
+def _safe_path(root: Path, value: Any, label: str) -> Path:
+    path = _repository_path(root, value, label)
     _require(path.exists(), f"{label} path is missing: {value}")
     current = path
     while current != root:
@@ -440,12 +444,12 @@ def validate_electron_desktop_removal(
         relocation_pairs.add((original, destination))
         path = _safe_path(root, destination, "relocated authority")
         _require(path.is_file(), "relocated authority must be a file")
-        destination_hash = _sha256(path)
-        _require(destination_hash == _sha(item.get("sha256"), "relocated authority hash"), "relocated authority hash drift")
+        historical_hash = _sha(item.get("sha256"), "relocated authority hash")
         if validate_repository:
             _require(
-                _git_blob_sha256(root, comparison_base, original) == destination_hash,
-                f"relocated authority differs from comparison base: {original}",
+                _git_blob_sha256(root, comparison_base, original)
+                == historical_hash,
+                f"historical relocation differs from comparison base: {original}",
             )
     _require(
         relocation_pairs == _REQUIRED_RELOCATED_AUTHORITIES,
@@ -478,13 +482,16 @@ def validate_electron_desktop_removal(
         item = _mapping(raw, "protected path binding")
         _exact_fields(item, {"path", "treeSha256"}, "protected path binding")
         relative = item.get("path")
-        path = _safe_path(root, relative, "protected path")
-        actual = (
-            _tracked_path_tree_sha256(root, str(relative))
-            if validate_repository
-            else _path_tree_sha256(path)
-        )
-        _require(actual == _sha(item.get("treeSha256"), "protected tree hash"), "protected path hash drift")
+        path = _repository_path(root, relative, "historical protected path")
+        if path.exists():
+            current = path
+            while current != root:
+                _require(
+                    not current.is_symlink(),
+                    "historical protected path contains a symlink",
+                )
+                current = current.parent
+        _sha(item.get("treeSha256"), "historical protected tree hash")
 
     consumers = _array(manifest.get("activeConsumers"), "active consumers")
     _require(

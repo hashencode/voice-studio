@@ -4,7 +4,7 @@ object AudioContract {
     const val RECORDER_CHANNEL = "voice2text/recorder"
     const val TRANSCRIPTION_EVENT_CHANNEL = "voice2text/transcription_events"
 
-    const val MEETING_DIR_NAME = "audios"
+    const val AUDIO_DIR_NAME = "audios"
     const val RECORDING_DIR_NAME = "recordings"
     const val RECORDING_IN_PROGRESS_DIR_NAME = "in-progress"
     const val RECORDING_COMPLETE_DIR_NAME = "complete"

@@ -565,10 +565,10 @@ class MainActivity : FlutterActivity() {
             audioApiSecretStore.set(providerId, secret)
             result.success(null)
         } catch (_: IllegalArgumentException) {
-            result.error("INVALID_MEETING_API_SECRET", "密钥格式无效", null)
+            result.error("INVALID_AUDIO_API_SECRET", "密钥格式无效", null)
         } catch (_: Exception) {
             PrivacySafeLog.error(tag, "audio_api_secret_write_failed")
-            result.error("MEETING_API_SECRET_WRITE_FAILED", "密钥无法安全保存", null)
+            result.error("AUDIO_API_SECRET_WRITE_FAILED", "密钥无法安全保存", null)
         }
     }
 
@@ -580,12 +580,12 @@ class MainActivity : FlutterActivity() {
         try {
             result.success(audioApiSecretStore.get(providerId))
         } catch (_: AudioApiSecretUnavailableException) {
-            result.error("MEETING_API_SECRET_UNAVAILABLE", "密钥已失效，请重新输入", null)
+            result.error("AUDIO_API_SECRET_UNAVAILABLE", "密钥已失效，请重新输入", null)
         } catch (_: IllegalArgumentException) {
-            result.error("INVALID_MEETING_API_PROVIDER", "提供商标识无效", null)
+            result.error("INVALID_AUDIO_API_PROVIDER", "提供商标识无效", null)
         } catch (_: Exception) {
             PrivacySafeLog.error(tag, "audio_api_secret_read_failed")
-            result.error("MEETING_API_SECRET_READ_FAILED", "密钥无法读取", null)
+            result.error("AUDIO_API_SECRET_READ_FAILED", "密钥无法读取", null)
         }
     }
 
@@ -597,7 +597,7 @@ class MainActivity : FlutterActivity() {
         try {
             result.success(audioApiSecretStore.has(providerId))
         } catch (_: IllegalArgumentException) {
-            result.error("INVALID_MEETING_API_PROVIDER", "提供商标识无效", null)
+            result.error("INVALID_AUDIO_API_PROVIDER", "提供商标识无效", null)
         } catch (_: Exception) {
             result.success(false)
         }
@@ -612,10 +612,10 @@ class MainActivity : FlutterActivity() {
             audioApiSecretStore.delete(providerId)
             result.success(null)
         } catch (_: IllegalArgumentException) {
-            result.error("INVALID_MEETING_API_PROVIDER", "提供商标识无效", null)
+            result.error("INVALID_AUDIO_API_PROVIDER", "提供商标识无效", null)
         } catch (_: Exception) {
             PrivacySafeLog.error(tag, "audio_api_secret_delete_failed")
-            result.error("MEETING_API_SECRET_DELETE_FAILED", "密钥无法删除", null)
+            result.error("AUDIO_API_SECRET_DELETE_FAILED", "密钥无法删除", null)
         }
     }
 

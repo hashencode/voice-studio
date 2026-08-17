@@ -98,7 +98,7 @@ describe("Main IPC validation", () => {
     const fixture = handlers();
     await expect(
       fixture.handlers.invoke(ipcChannels.captureStart, trustedEvent, {
-        title: "会议",
+        title: "音频",
         captionEnabled: false,
         idempotencyKey: "capture-start-123456",
         sessionRoot: "/tmp/renderer-controlled",

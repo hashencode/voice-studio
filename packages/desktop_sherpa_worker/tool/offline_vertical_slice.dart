@@ -43,8 +43,8 @@ Future<void> main(List<String> arguments) async {
       }
     },
   );
-  final review = ReviewableMeetingTranscript(result.segments);
-  final vtt = NonAiMeetingExport.toWebVtt(review.segments);
+  final review = ReviewableAudioTranscript(result.segments);
+  final vtt = NonAiAudioExport.toWebVtt(review.segments);
   final vttFile = File('${outputRoot.path}/offline-vertical-slice.vtt');
   await vttFile.writeAsString(vtt, flush: true);
   final evidence = <String, Object?>{

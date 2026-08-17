@@ -8,7 +8,7 @@
   "asset": null,
   "goldenFixture": {
     "path": "apps/mobile-flutter/android/app/src/test/resources/itn_golden.json",
-    "sha256": "5d8dcb65f37ed09421b82891e436ea6d4496ade603e318c105beb556663a9938",
+    "sha256": "759a004614c56ae9eb526f95a14e6bfa3acd9a89bebddaf4f7b6ed6a990fbea7",
     "requiredTransformCategories": [
       "number",
       "date",

@@ -397,11 +397,11 @@ describe("audio workspace authority", () => {
   it("keeps 3001-segment open and search below the fixed p95 envelope", () => {
     const context = fixture();
     try {
-      const audio = createAudio(context, "两小时会议.wav");
+      const audio = createAudio(context, "两小时音频.wav");
       const segments = Array.from({ length: 3001 }, (_, index) => ({
         startSeconds: index * 2,
         endSeconds: index * 2 + 1.5,
-        text: index === 2999 ? "唯一检索目标" : `会议片段 ${index}`,
+        text: index === 2999 ? "唯一检索目标" : `音频片段 ${index}`,
         speakerAssignment: "anonymous",
         anonymousSpeakerKey: `speaker-${index % 5}`,
       }));
@@ -480,7 +480,7 @@ describe("audio workspace authority", () => {
       expect(saved[3]?.contents).toContain("00:00:00,000 --> 00:00:01,500");
       expect(saved[4]?.contents).toContain('"schemaVersion": 1');
       expect(
-        Buffer.byteLength(`${safeFilenameBase("会议".repeat(200))}.json`),
+        Buffer.byteLength(`${safeFilenameBase("音频".repeat(200))}.json`),
       ).toBeLessThanOrEqual(255);
     } finally {
       context.database.close();

@@ -23,7 +23,7 @@ void main() {
       });
       final source = File('${root.path}/u8-large-audio.wav');
       final sink = source.openWrite();
-      const marker = 'VOICE2TEXT_U8_SECRET_MEETING_CONTENT_';
+      const marker = 'VOICE2TEXT_U8_SECRET_AUDIO_CONTENT_';
       final block = <int>[
         ...marker.codeUnits,
         ...List<int>.generate(

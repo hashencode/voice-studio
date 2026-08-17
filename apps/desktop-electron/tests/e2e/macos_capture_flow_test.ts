@@ -163,7 +163,7 @@ describe("macOS capture parity flow", () => {
     try {
       const result = await service.start({
         sessionId: "session-partial-123456",
-        title: "部分轨道会议",
+        title: "部分轨道音频",
         idempotencyKey: "start-partial-123456",
         minimumFreeBytes: 1,
         captionEnabled: false,

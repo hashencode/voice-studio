@@ -212,7 +212,7 @@ describe("caption workspace", () => {
             sequence: 1,
             startMs: 0,
             endMs: 800,
-            text: "新会议字幕。",
+            text: "新音频字幕。",
             language: "zh",
           },
         ],
@@ -239,7 +239,7 @@ describe("caption workspace", () => {
         retryFormal={bridge.retryFormal}
       />,
     );
-    expect(await screen.findByText("新会议字幕。")).toBeVisible();
+    expect(await screen.findByText("新音频字幕。")).toBeVisible();
 
     oldLoad.resolve(initialSnapshot);
     bridge.emit({
@@ -263,7 +263,7 @@ describe("caption workspace", () => {
     await act(async () => await oldLoad.promise);
     expect(screen.queryByText("旧 attempt 不得回流。")).not.toBeInTheDocument();
     expect(screen.queryByText("先记录这一句。")).not.toBeInTheDocument();
-    expect(screen.getByText("新会议字幕。")).toBeVisible();
+    expect(screen.getByText("新音频字幕。")).toBeVisible();
   });
 
   it("throttles live announcements while keeping reading focus stable", async () => {

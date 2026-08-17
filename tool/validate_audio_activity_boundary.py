@@ -12,7 +12,8 @@ from typing import Any
 ROOT = pathlib.Path(__file__).resolve().parent.parent
 MANIFEST = ROOT / "docs/architecture/audio-activity-source-boundary.json"
 MEETING_PATTERN = re.compile(
-    r"(?:\bmeetings?\b|meeting_|Meeting[A-Z]|meeting-[a-z])"
+    r"(?:\bmeetings?\b|meeting_|meeting[A-Z]|meeting-[a-z])",
+    re.IGNORECASE,
 )
 TEXT_SUFFIXES = {
     ".dart",
@@ -59,9 +60,11 @@ def _load_manifest(path: pathlib.Path) -> dict[str, Any]:
         "schema",
         "canonicalActivityNoun",
         "freshAudioBoundaries",
-        "activeMeetingRenameInventory",
+        "activeTerminologyRoots",
+        "activeTerminologyFiles",
         "historicalMeetingAllowlist",
         "legacyRejectionAllowlist",
+        "compatibilityTerminologyAllowlist",
         "protocol",
         "storage",
     }
@@ -108,36 +111,50 @@ def _meeting_paths(root: pathlib.Path) -> list[str]:
     return sorted(matches)
 
 
-def find_unclassified_meeting_paths(
+def find_active_meeting_paths(
     root: pathlib.Path,
     *,
-    active: list[str],
+    active_roots: list[str],
+    active_files: list[str],
     historical: list[str],
     rejection: list[str],
+    compatibility: list[str],
 ) -> list[str]:
     return [
         path
         for path in _meeting_paths(root)
-        if path not in rejection
+        if (path in active_files or any(_is_inside(path, prefix) for prefix in active_roots))
+        and path not in rejection
+        and path not in compatibility
         and not any(_is_inside(path, prefix) for prefix in historical)
-        and not any(_is_inside(path, prefix) for prefix in active)
     ]
 
 
 def validate(root: pathlib.Path = ROOT, manifest_path: pathlib.Path = MANIFEST) -> None:
     manifest = _load_manifest(manifest_path)
     _require(
-        manifest["schema"] == "voice2text-audio-activity-source-boundary/v1",
+        manifest["schema"] == "voice2text-audio-activity-source-boundary/v2",
         "Audio activity boundary schema is invalid",
     )
     _require(
         manifest["canonicalActivityNoun"] == "Audio",
         "Audio must be the canonical activity noun",
     )
-    active = _path_entries(
-        manifest["activeMeetingRenameInventory"],
-        "active Meeting rename inventory",
+    active_roots = _path_entries(
+        manifest["activeTerminologyRoots"],
+        "active terminology roots",
         field="owner",
+    )
+    active_files = manifest["activeTerminologyFiles"]
+    _require(
+        isinstance(active_files, list)
+        and active_files
+        and all(isinstance(item, str) and item for item in active_files),
+        "active terminology files are invalid",
+    )
+    _require(
+        len(active_files) == len(set(active_files)),
+        "active terminology files contain duplicates",
     )
     historical = _path_entries(
         manifest["historicalMeetingAllowlist"],
@@ -145,6 +162,11 @@ def validate(root: pathlib.Path = ROOT, manifest_path: pathlib.Path = MANIFEST) 
         field="reason",
     )
     rejection = manifest["legacyRejectionAllowlist"]
+    compatibility = _path_entries(
+        manifest["compatibilityTerminologyAllowlist"],
+        "compatibility terminology allowlist",
+        field="reason",
+    )
     fresh = manifest["freshAudioBoundaries"]
     _require(
         isinstance(rejection, list) and all(isinstance(item, str) for item in rejection),
@@ -154,18 +176,27 @@ def validate(root: pathlib.Path = ROOT, manifest_path: pathlib.Path = MANIFEST) 
         isinstance(fresh, list) and all(isinstance(item, str) for item in fresh),
         "fresh Audio boundaries are invalid",
     )
-    for relative in [*active, *historical, *rejection, *fresh]:
+    for relative in [
+        *active_roots,
+        *active_files,
+        *historical,
+        *rejection,
+        *compatibility,
+        *fresh,
+    ]:
         _require((root / relative).exists(), f"bound path does not exist: {relative}")
-    unclassified = find_unclassified_meeting_paths(
+    active_meeting_paths = find_active_meeting_paths(
         root,
-        active=active,
+        active_roots=active_roots,
+        active_files=active_files,
         historical=historical,
         rejection=rejection,
+        compatibility=compatibility,
     )
     _require(
-        not unclassified,
-        "Meeting paths are outside the rename inventory/allowlists: "
-        + ", ".join(unclassified),
+        not active_meeting_paths,
+        "active sources contain Meeting vocabulary outside explicit compatibility/rejection evidence: "
+        + ", ".join(active_meeting_paths),
     )
     for relative in fresh:
         path = root / relative

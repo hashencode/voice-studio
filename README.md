@@ -25,8 +25,8 @@ python3 tool/build_cache_guard.py
 # 全量自检：重建 macOS 桌面产物并包含 debug APK 构建
 ./tool/dev_check.sh --with-build
 
-# 真机会议闭环：时间戳播放/编辑/搜索/导出 + 队列恢复/删除重试
-./tool/run_meeting_flow_smoke.sh <android-device-id>
+# 真机音频闭环：时间戳播放/编辑/搜索/导出 + 队列恢复/删除重试
+./tool/run_audio_flow_smoke.sh <android-device-id>
 
 # 单独构建
 flutter build apk --debug
@@ -68,8 +68,8 @@ Android debug APK 构建。该流程占用 6.30 GiB，按 25%（至少 0.5 GiB�
 
 - `lib/features/recording/`：录音流程与状态机
 - `lib/features/transcription/`：转写任务列表与重试
-- `lib/features/meetings/`：会议播放、时间轴、编辑、搜索与导出工作区
-- `lib/features/meeting_intelligence/`：证据、审核、持久任务与 DeepSeek 云端直连
+- `lib/features/audios/`：音频播放、时间轴、编辑、搜索与导出工作区
+- `lib/features/audio_intelligence/`：证据、审核、持久任务与 DeepSeek 云端直连
 - `lib/features/records/`：录音记录列表、详情、删除
 - `lib/features/settings/`：模型选择与自动转写配置
 - `lib/data/sqlite/`：本地数据库
@@ -112,7 +112,7 @@ Android debug APK 构建。该流程占用 6.30 GiB，按 25%（至少 0.5 GiB�
 决策 `S3-PRODUCTIZATION-2026-07-25` 当前为 `PARTIAL_PASS`：
 
 - DeepSeek `cloudDirect` 和结构化纪要闭环已实现。用户自己的密钥保存在
-  Android Keystore 边界内；只有逐场确认后，所显示范围的会议文本才会离开
+  Android Keystore 边界内；只有逐条确认后，所显示范围的音频文本才会离开
   设备。纪要可编辑、复核、发布并回到原文/音频证据。
 - 端侧说话人分离为 `DEFERRED_NO_ADMISSIBLE_CANDIDATE`：FP32 有界候选和
   唯一 INT8 fallback 已完成 Xiaomi 固定 5 分钟筛选，但语义均失败，projected

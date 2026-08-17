@@ -167,10 +167,10 @@ describe("audio AI Renderer e2e", () => {
       await screen.findByRole("button", { name: /打开 项目周会/ }),
     );
     await user.click(
-      await screen.findByRole("button", { name: "生成云端会议草稿" }),
+      await screen.findByRole("button", { name: "生成云端音频草稿" }),
     );
     const consent = await screen.findByRole("dialog", {
-      name: "本次会议云端处理同意",
+      name: "本次音频云端处理同意",
     });
     await user.click(within(consent).getByRole("checkbox"));
     await user.click(
@@ -189,7 +189,7 @@ describe("audio AI Renderer e2e", () => {
     const navigation = screen.getByRole("navigation", { name: "工作站主导航" });
     await user.click(within(navigation).getByRole("button", { name: "设置" }));
     expect(
-      await screen.findByRole("heading", { name: "可选会议智能" }),
+      await screen.findByRole("heading", { name: "可选音频智能" }),
     ).toBeVisible();
     await waitFor(() => expect(api.getAiSettings).toHaveBeenCalledTimes(1));
     expect(api.generateAudioAi).toHaveBeenCalledTimes(1);

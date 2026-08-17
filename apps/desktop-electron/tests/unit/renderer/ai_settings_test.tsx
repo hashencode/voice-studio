@@ -48,17 +48,17 @@ describe("AI settings security boundary", () => {
     render(<AiSettingsFeature api={desktop} />);
 
     expect(
-      await screen.findByRole("heading", { name: "可选会议智能" }),
+      await screen.findByRole("heading", { name: "可选音频智能" }),
     ).toBeVisible();
     expect(screen.getByText("DeepSeek · deepseek-chat")).toBeVisible();
     expect(
-      screen.getByText(/每次生成都需要针对当前会议单独同意/),
+      screen.getByText(/每次生成都需要针对当前音频单独同意/),
     ).toBeVisible();
 
     await user.click(screen.getByRole("button", { name: "配置提供商" }));
-    const dialog = screen.getByRole("dialog", { name: "配置会议智能提供商" });
+    const dialog = screen.getByRole("dialog", { name: "配置音频智能提供商" });
     await user.selectOptions(
-      within(dialog).getByRole("combobox", { name: "会议智能提供商" }),
+      within(dialog).getByRole("combobox", { name: "音频智能提供商" }),
       "openai-compatible",
     );
     await user.clear(within(dialog).getByRole("textbox", { name: "模型 ID" }));

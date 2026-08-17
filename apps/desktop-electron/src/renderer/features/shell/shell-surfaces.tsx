@@ -1,7 +1,6 @@
 import {
   AlertTriangle,
   CloudOff,
-  FolderOpen,
   LoaderCircle,
   RefreshCw,
   ShieldAlert,
@@ -58,7 +57,7 @@ export function ProfileBlocker({
       <ShieldAlert className="size-8 text-destructive" aria-hidden="true" />
       <h1 className="mt-4 text-xl font-semibold">本机资料库需要修复</h1>
       <p className="mt-2 text-sm text-muted-foreground">{profile.message}</p>
-      <p className="mt-3 text-sm">修复前，导入和创建会议等写入操作保持禁用。</p>
+      <p className="mt-3 text-sm">修复前，导入和创建音频等写入操作保持禁用。</p>
       <div className="mt-5 flex flex-wrap gap-2">
         <Button onClick={() => onAction("retry")}>
           <RefreshCw aria-hidden="true" />
@@ -67,9 +66,6 @@ export function ProfileBlocker({
         <Button variant="outline" onClick={() => onAction("repair-guidance")}>
           <Wrench aria-hidden="true" />
           查看修复建议
-        </Button>
-        <Button variant="secondary" disabled aria-disabled="true">
-          导入会议
         </Button>
       </div>
     </section>
@@ -127,69 +123,6 @@ export function ReconciliationSurface({
   );
 }
 
-export function LibrarySurface({
-  state,
-  writable,
-  importPending,
-  onImport,
-}: {
-  state: ApplicationSnapshot["library"];
-  writable: boolean;
-  importPending: boolean;
-  onImport?: () => void;
-}) {
-  return (
-    <section className="space-y-5">
-      <div className="flex flex-wrap items-start justify-between gap-4">
-        <div>
-          <p className="text-sm font-medium text-muted-foreground">
-            仅存储在这台设备
-          </p>
-          <h1 className="text-2xl font-semibold tracking-tight">本机会议</h1>
-        </div>
-        <div className="flex gap-2">
-          <Button disabled={!writable}>开始会议</Button>
-          <Button
-            variant="outline"
-            disabled={!writable || importPending}
-            aria-busy={importPending}
-            onClick={onImport}
-          >
-            {importPending ? "正在导入会议" : "导入会议"}
-          </Button>
-        </div>
-      </div>
-      {state.phase === "loading" ? (
-        <StateCard
-          icon={LoaderCircle}
-          title="正在加载会议库"
-          description="正在读取 Electron 独立资料库。"
-          busy
-        />
-      ) : state.phase === "error" ? (
-        <StateCard
-          icon={AlertTriangle}
-          title="会议库暂时不可用"
-          description={state.message}
-          alert
-        />
-      ) : state.phase === "empty" ? (
-        <StateCard
-          icon={FolderOpen}
-          title="还没有本机会议"
-          description="开始电脑会议，或安全导入已有音频和视频。"
-        />
-      ) : (
-        <StateCard
-          icon={FolderOpen}
-          title={`${state.audioCount} 个本机会议`}
-          description="会议详情将在后续迁移单元接入。"
-        />
-      )}
-    </section>
-  );
-}
-
 export function CapabilityUnavailable({ reason }: { reason: string }) {
   return (
     <section role="alert" className="rounded-xl border bg-card p-6">
@@ -197,41 +130,9 @@ export function CapabilityUnavailable({ reason }: { reason: string }) {
       <h2 className="mt-3 text-lg font-semibold">本地处理不可用</h2>
       <p className="mt-2 text-sm text-muted-foreground">{reason}</p>
       <p className="mt-3 text-sm">
-        会议资料不会因此丢失；可在设置中修复运行时后重试。
+        音频资料不会因此丢失；可在设置中修复运行时后重试。
       </p>
     </section>
-  );
-}
-
-function StateCard({
-  icon: Icon,
-  title,
-  description,
-  busy = false,
-  alert = false,
-}: {
-  icon: typeof FolderOpen;
-  title: string;
-  description: string;
-  busy?: boolean;
-  alert?: boolean;
-}) {
-  return (
-    <div
-      role={alert ? "alert" : busy ? "status" : undefined}
-      className="grid min-h-64 place-items-center rounded-xl border bg-card p-8 text-center"
-    >
-      <div>
-        <Icon
-          className={`mx-auto size-8 ${busy ? "animate-spin" : ""}`}
-          aria-hidden="true"
-        />
-        <h2 className="mt-4 text-lg font-semibold">{title}</h2>
-        <p className="mt-2 max-w-md text-sm text-muted-foreground">
-          {description}
-        </p>
-      </div>
-    </div>
   );
 }
 

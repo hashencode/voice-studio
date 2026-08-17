@@ -81,7 +81,7 @@ export function AiSettingsFeature({
   if (!settings) {
     return (
       <section role="alert" className="rounded-xl border bg-card p-5">
-        <h2 className="font-semibold">无法读取会议智能设置</h2>
+        <h2 className="font-semibold">无法读取音频智能设置</h2>
         <p className="mt-2 text-sm text-muted-foreground">{error}</p>
         <Button className="mt-4" variant="outline" onClick={() => void load()}>
           重新读取
@@ -96,10 +96,10 @@ export function AiSettingsFeature({
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
           <h2 id="ai-settings-title" className="text-xl font-semibold">
-            可选会议智能
+            可选音频智能
           </h2>
           <p className="mt-1 text-sm text-muted-foreground">
-            本地设置检查不会发送会议数据，也不会创建远程处理同意。
+            本地设置检查不会发送音频数据，也不会创建远程处理同意。
           </p>
         </div>
         <ProviderDialog settings={settings} api={api} onSaved={setSettings} />
@@ -125,7 +125,7 @@ export function AiSettingsFeature({
             </div>
           </div>
           <p className="mt-4 text-sm">
-            云端直连；每次生成都需要针对当前会议单独同意，不自动切换提供商或重试。
+            云端直连；每次生成都需要针对当前音频单独同意，不自动切换提供商或重试。
           </p>
         </section>
 
@@ -213,14 +213,14 @@ function ProviderDialog({
           配置提供商
         </Button>
       </DialogPrimitive.Trigger>
-      <DialogSurface title="配置会议智能提供商">
+      <DialogSurface title="配置音频智能提供商">
         <DialogPrimitive.Description className="text-sm text-muted-foreground">
           选择只作用于后续任务；运行中的任务保留原提供商和模型快照。
         </DialogPrimitive.Description>
         <label className="mt-4 block text-sm font-medium">
-          会议智能提供商
+          音频智能提供商
           <select
-            aria-label="会议智能提供商"
+            aria-label="音频智能提供商"
             className="mt-2 h-9 w-full rounded-md border bg-background px-3 text-sm"
             value={providerId}
             onChange={(event) => {
@@ -404,17 +404,17 @@ function FileVaultStatus({ settings }: { settings: AiSettingsSnapshot }) {
     enabled: {
       title: "FileVault 磁盘加密已启用",
       description:
-        "FileVault 是设备磁盘保护。应用未宣称会议数据库或音频具有应用层整库加密；API 密钥仍由 macOS 钥匙串保护。",
+        "FileVault 是设备磁盘保护。应用未宣称音频数据库或媒体文件具有应用层整库加密；API 密钥仍由 macOS 钥匙串保护。",
     },
     disabled: {
       title: "FileVault 磁盘加密未启用",
       description:
-        "会议数据库和音频没有应用层整库加密。建议在系统设置中启用 FileVault；API 密钥仍由 macOS 钥匙串保护。",
+        "音频数据库和媒体文件没有应用层整库加密。建议在系统设置中启用 FileVault；API 密钥仍由 macOS 钥匙串保护。",
     },
     unknown: {
       title: "无法确认 FileVault 状态",
       description:
-        "应用未宣称会议数据库或音频具有应用层整库加密。请在系统设置中核对 FileVault；API 密钥仍由 macOS 钥匙串保护。",
+        "应用未宣称音频数据库或媒体文件具有应用层整库加密。请在系统设置中核对 FileVault；API 密钥仍由 macOS 钥匙串保护。",
     },
   }[settings.deviceSecurity.fileVaultState];
   return (

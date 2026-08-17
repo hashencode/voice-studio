@@ -48,12 +48,12 @@ it("exposes export failures as a bounded typed response without a destination pa
     exportAudioResponseSchema.parse({
       state: "failed",
       code: "export-write-failed",
-      message: "会议导出失败，请重试。",
+      message: "音频导出失败，请重试。",
     }),
   ).toEqual({
     state: "failed",
     code: "export-write-failed",
-    message: "会议导出失败，请重试。",
+    message: "音频导出失败，请重试。",
   });
   expect(() =>
     exportAudioResponseSchema.parse({

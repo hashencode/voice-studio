@@ -12,9 +12,9 @@ Future<void> main(List<String> arguments) async {
   final credential = List<int>.generate(32, (index) => index);
   var capturedFrames = 0;
   var capturedBytes = 0;
-  var plaintextMeetingContentSeen = false;
+  var plaintextAudioContentSeen = false;
   var reusableCredentialSeen = false;
-  final marker = utf8.encode('VOICE2TEXT_U8_SECRET_MEETING_CONTENT_');
+  final marker = utf8.encode('VOICE2TEXT_U8_SECRET_AUDIO_CONTENT_');
   final credentialBase64 = utf8.encode(base64Encode(credential));
   final receiver = CompanionTransferReceiver(
     store: FileCompanionTransferStore(root: Directory('${root.path}/staging')),
@@ -54,7 +54,7 @@ Future<void> main(List<String> arguments) async {
     observeInboundFrame: (frame) {
       capturedFrames++;
       capturedBytes += frame.length;
-      plaintextMeetingContentSeen |= _contains(frame, marker);
+      plaintextAudioContentSeen |= _contains(frame, marker);
       reusableCredentialSeen |=
           _contains(frame, credential) || _contains(frame, credentialBase64);
     },
@@ -78,7 +78,7 @@ Future<void> main(List<String> arguments) async {
       'event': 'capture_summary',
       'frames': capturedFrames,
       'bytes': capturedBytes,
-      'plaintextMeetingContentSeen': plaintextMeetingContentSeen,
+      'plaintextAudioContentSeen': plaintextAudioContentSeen,
       'reusableCredentialSeen': reusableCredentialSeen,
     }),
   );

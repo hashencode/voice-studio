@@ -56,7 +56,7 @@ export function AudioAiFeature({
         if (active && next) accept(next);
       })
       .catch((cause: unknown) => {
-        if (active) setError(errorMessage(cause, "无法读取会议智能草稿"));
+        if (active) setError(errorMessage(cause, "无法读取音频智能草稿"));
       });
     return () => {
       active = false;
@@ -67,7 +67,7 @@ export function AudioAiFeature({
   const prepare = async (kind: RequestTarget["kind"]) => {
     if (pending) return;
     if (kind === "retry" && !snapshot) {
-      setError("无法确定要重试的云端任务，请重新载入会议");
+      setError("无法确定要重试的云端任务，请重新载入音频");
       return;
     }
     const target: RequestTarget =
@@ -126,7 +126,7 @@ export function AudioAiFeature({
             });
       accept(next);
     } catch (cause) {
-      setError(aiErrorMessage(cause, "云端会议草稿生成失败"));
+      setError(aiErrorMessage(cause, "云端音频草稿生成失败"));
     } finally {
       setConsentChecked(false);
       setPending(false);
@@ -135,8 +135,8 @@ export function AudioAiFeature({
 
   const buttonLabel =
     snapshot?.state === "completed"
-      ? "重新生成云端会议草稿"
-      : "生成云端会议草稿";
+      ? "重新生成云端音频草稿"
+      : "生成云端音频草稿";
   const canRetry =
     snapshot?.state === "failed" || snapshot?.state === "interrupted";
 
@@ -149,10 +149,10 @@ export function AudioAiFeature({
         <BrainCircuit className="mt-0.5 size-5" aria-hidden="true" />
         <div className="min-w-0 flex-1">
           <h2 id="audio-ai-title" className="font-semibold">
-            会议智能草稿
+            音频智能草稿
           </h2>
           <p className="mt-1 text-sm text-muted-foreground">
-            可选云端任务；不会发送音频、密钥、声纹或其他会议。
+            可选云端任务；不会发送音频、密钥、声纹或其他音频。
           </p>
         </div>
       </div>
@@ -201,7 +201,7 @@ export function AudioAiFeature({
               }}
             >
               <RotateCcw aria-hidden="true" />
-              重试云端会议草稿
+              重试云端音频草稿
             </Button>
             <Button
               type="button"
@@ -212,7 +212,7 @@ export function AudioAiFeature({
                 void prepare("generate");
               }}
             >
-              按当前内容重新生成云端会议草稿
+              按当前内容重新生成云端音频草稿
             </Button>
           </>
         ) : (
@@ -279,16 +279,16 @@ function ConsentDialog({
           }}
         >
           <DialogPrimitive.Title className="text-lg font-semibold">
-            本次会议云端处理同意
+            本次音频云端处理同意
           </DialogPrimitive.Title>
           {preview ? (
             <>
               <DialogPrimitive.Description className="mt-2 text-sm text-muted-foreground">
-                将会议标题“{preview.audioTitle}”以及本次会议的{" "}
+                将音频标题“{preview.audioTitle}”以及本次音频的{" "}
                 {preview.segmentCount}{" "}
                 个转写片段、时间范围和匿名说话人状态发送给{" "}
                 {providerLabel(preview.providerId)}。
-                不会发送音频、密钥、声纹或其他会议。
+                不会发送音频、密钥、声纹或其他音频。
               </DialogPrimitive.Description>
               <dl className="mt-4 grid gap-2 rounded-lg bg-muted p-3 text-sm">
                 <div>
@@ -312,7 +312,7 @@ function ConsentDialog({
                   checked={checked}
                   onChange={(event) => onCheckedChange(event.target.checked)}
                 />
-                <span>我同意仅针对本次会议发送会议标题与上述转写文本</span>
+                <span>我同意仅针对本次音频发送音频标题与上述转写文本</span>
               </label>
               <div className="mt-6 flex justify-end gap-2">
                 <DialogPrimitive.Close asChild>
@@ -339,7 +339,7 @@ function ConsentDialog({
 function AudioAiNote({ snapshot }: { snapshot: AudioAiSnapshot }) {
   if (!snapshot.note) return null;
   return (
-    <div className="mt-4 space-y-3" aria-label="云端会议草稿">
+    <div className="mt-4 space-y-3" aria-label="云端音频草稿">
       <p className="text-xs text-muted-foreground">
         {providerLabel(snapshot.providerId)} · {snapshot.modelId} · 需要人工核对
       </p>

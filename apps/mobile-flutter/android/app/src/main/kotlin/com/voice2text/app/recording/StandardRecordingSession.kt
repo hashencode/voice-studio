@@ -341,7 +341,7 @@ class StandardRecordingSession(
 
     private fun recordingRoot(): File =
         File(
-            File(context.filesDir, AudioContract.MEETING_DIR_NAME),
+            File(context.filesDir, AudioContract.AUDIO_DIR_NAME),
             AudioContract.RECORDING_DIR_NAME,
         )
 

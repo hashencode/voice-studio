@@ -33,13 +33,13 @@ cd apps/mobile-flutter && flutter build apk --release
 ```bash
 ./tool/run_android_smoke.sh
 ./tool/check_transcribe_log.sh
-./tool/run_meeting_flow_smoke.sh <android-device-id>
+./tool/run_audio_flow_smoke.sh <android-device-id>
 ```
 
 - Open app and accept the versioned recording consent.
 - Record, stop, and verify the persistent queue completes.
 - Import a supported media file and verify dedupe.
-- Open the meeting workspace; play, seek a segment, edit/undo, search, and export.
+- Open the Audio workspace; play, seek a segment, edit/undo, search, and export.
 - Verify the receiving app reads the shared file.
 - Retry a deliberately interrupted deletion and confirm no managed file or dependent row remains.
 - Verify the AI section says no production provider is configured; fixture evidence may be reviewed only in tests.
@@ -62,7 +62,7 @@ cd apps/mobile-flutter && flutter build apk --release
 - [x] Mid-tier Xiaomi M2102J2SC and low-tier EVA-AL10 queue restart/re-attachment passed without duplicate jobs on 2026-07-24.
 - [x] Low-tier EVA-AL10 M2 and M6-M10 physical scenarios passed: lock-screen/background notification stop; import/dedupe/share; force-stop queue recovery; real-audio playback, edit/search/undo and four-format export; deletion failure retention and zero-residue retry. Evidence: `build/device-evidence/2026-07-24-low-eva-al10-scenarios/summary.md`.
 - [x] `docs/REAL_DEVICE_REGRESSION_MATRIX.md` has no required `PENDING` entries.
-- [x] Production-source log/network scan contains no transcript body, meeting title, credential, endpoint, implicit upload path, or sensitive full path (2026-07-24).
+- [x] Production-source log/network scan contains no transcript body, Audio title, credential, endpoint, implicit upload path, or sensitive full path (2026-07-24).
 
 7. Archive artifact:
 - `build/app/outputs/flutter-apk/app-release.apk`

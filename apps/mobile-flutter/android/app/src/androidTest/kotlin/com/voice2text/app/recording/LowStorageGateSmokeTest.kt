@@ -98,7 +98,7 @@ class LowStorageGateSmokeTest {
     ): File {
         val recordingRoot =
             File(
-                File(context.filesDir, AudioContract.MEETING_DIR_NAME),
+                File(context.filesDir, AudioContract.AUDIO_DIR_NAME),
                 AudioContract.RECORDING_DIR_NAME,
             )
         val directory =

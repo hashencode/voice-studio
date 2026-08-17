@@ -21,7 +21,7 @@ class AudioShareException(
 class AudioShareCoordinator(
     private val context: Context,
 ) {
-    private val audioRoot = File(context.filesDir, AudioContract.MEETING_DIR_NAME)
+    private val audioRoot = File(context.filesDir, AudioContract.AUDIO_DIR_NAME)
     private val exportRoot = File(audioRoot, AudioContract.EXPORT_DIR_NAME)
 
     init {

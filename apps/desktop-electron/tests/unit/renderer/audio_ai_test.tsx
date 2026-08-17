@@ -75,7 +75,7 @@ describe("per-generation audio AI consent", () => {
     const user = userEvent.setup();
     render(<AudioAiFeature api={desktop} audioId={4} generationId={9} />);
     const generate = await screen.findByRole("button", {
-      name: "生成云端会议草稿",
+      name: "生成云端音频草稿",
     });
 
     generate.focus();
@@ -86,10 +86,10 @@ describe("per-generation audio AI consent", () => {
       templateId: "default",
     });
     const dialog = await screen.findByRole("dialog", {
-      name: "本次会议云端处理同意",
+      name: "本次音频云端处理同意",
     });
     expect(dialog).toHaveTextContent("2 个转写片段");
-    expect(dialog).toHaveTextContent("会议标题“项目周会”");
+    expect(dialog).toHaveTextContent("音频标题“项目周会”");
     expect(dialog).toHaveTextContent("https://api.deepseek.com");
     expect(
       within(dialog).getByRole("button", { name: "同意并生成草稿" }),
@@ -107,14 +107,14 @@ describe("per-generation audio AI consent", () => {
     render(<AudioAiFeature api={desktop} audioId={4} generationId={9} />);
 
     await user.click(
-      await screen.findByRole("button", { name: "生成云端会议草稿" }),
+      await screen.findByRole("button", { name: "生成云端音频草稿" }),
     );
     let dialog = await screen.findByRole("dialog", {
-      name: "本次会议云端处理同意",
+      name: "本次音频云端处理同意",
     });
     await user.click(
       within(dialog).getByRole("checkbox", {
-        name: "我同意仅针对本次会议发送会议标题与上述转写文本",
+        name: "我同意仅针对本次音频发送音频标题与上述转写文本",
       }),
     );
     await user.click(
@@ -140,14 +140,14 @@ describe("per-generation audio AI consent", () => {
     expect(await screen.findByText("准备发布清单")).toBeVisible();
 
     await user.click(
-      screen.getByRole("button", { name: "重新生成云端会议草稿" }),
+      screen.getByRole("button", { name: "重新生成云端音频草稿" }),
     );
     dialog = await screen.findByRole("dialog", {
-      name: "本次会议云端处理同意",
+      name: "本次音频云端处理同意",
     });
     expect(
       within(dialog).getByRole("checkbox", {
-        name: "我同意仅针对本次会议发送会议标题与上述转写文本",
+        name: "我同意仅针对本次音频发送音频标题与上述转写文本",
       }),
     ).not.toBeChecked();
     expect(desktop.prepareAudioAi).toHaveBeenCalledTimes(2);
@@ -165,10 +165,10 @@ describe("per-generation audio AI consent", () => {
     render(<AudioAiFeature api={desktop} audioId={4} generationId={9} />);
 
     await user.click(
-      await screen.findByRole("button", { name: "生成云端会议草稿" }),
+      await screen.findByRole("button", { name: "生成云端音频草稿" }),
     );
     const dialog = await screen.findByRole("dialog", {
-      name: "本次会议云端处理同意",
+      name: "本次音频云端处理同意",
     });
     await user.click(within(dialog).getByRole("checkbox"));
     await user.click(
@@ -201,10 +201,10 @@ describe("per-generation audio AI consent", () => {
     render(<AudioAiFeature api={desktop} audioId={4} generationId={9} />);
 
     await user.click(
-      await screen.findByRole("button", { name: "重试云端会议草稿" }),
+      await screen.findByRole("button", { name: "重试云端音频草稿" }),
     );
     const dialog = await screen.findByRole("dialog", {
-      name: "本次会议云端处理同意",
+      name: "本次音频云端处理同意",
     });
     await user.click(within(dialog).getByRole("checkbox"));
     await user.click(
@@ -243,11 +243,11 @@ describe("per-generation audio AI consent", () => {
 
     await user.click(
       await screen.findByRole("button", {
-        name: "按当前内容重新生成云端会议草稿",
+        name: "按当前内容重新生成云端音频草稿",
       }),
     );
     const dialog = await screen.findByRole("dialog", {
-      name: "本次会议云端处理同意",
+      name: "本次音频云端处理同意",
     });
     await user.click(within(dialog).getByRole("checkbox"));
     await user.click(
@@ -283,7 +283,7 @@ describe("per-generation audio AI consent", () => {
     render(<AudioAiFeature api={desktop} audioId={4} generationId={9} />);
 
     await user.click(
-      await screen.findByRole("button", { name: "重试云端会议草稿" }),
+      await screen.findByRole("button", { name: "重试云端音频草稿" }),
     );
     listener?.({
       ...interrupted,
@@ -292,7 +292,7 @@ describe("per-generation audio AI consent", () => {
       attempt: 0,
     });
     const dialog = await screen.findByRole("dialog", {
-      name: "本次会议云端处理同意",
+      name: "本次音频云端处理同意",
     });
     await user.click(within(dialog).getByRole("checkbox"));
     await user.click(

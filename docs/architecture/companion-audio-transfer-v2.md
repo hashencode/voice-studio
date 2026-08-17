@@ -10,7 +10,7 @@ pairing, credential, checkpoint, or transfer state changes.
 ## Trust and discovery
 
 The desktop listens on a dynamic private-LAN port and advertises
-`_voice2text-media._tcp` through DNS-SD. Discovery supplies an address, device
+`_voice2text-audio._tcp` through DNS-SD. Discovery supplies an address, device
 name, capability, and public-key fingerprint; it never establishes trust.
 Pairing requires a visible six-digit code or QR confirmation on both devices,
 binds both device identifiers and Ed25519 fingerprints into one signed
