@@ -54,12 +54,18 @@ export function useContextPaneShell(section: RendererShellSection) {
     updatePreference(paneSection, open ? "closed" : "open");
   }, [open, paneSection, updatePreference]);
 
+  const openPane = React.useCallback(() => {
+    if (!paneSection) return;
+    updatePreference(paneSection, "open");
+  }, [paneSection, updatePreference]);
+
   return {
     open,
     paneSection,
     presentation,
     requestClose,
     toggle,
+    openPane,
   };
 }
 

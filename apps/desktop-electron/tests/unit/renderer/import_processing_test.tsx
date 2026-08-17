@@ -4,66 +4,100 @@ import { act, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { expect, it, vi } from "vitest";
 
-import { LibraryFeature } from "../../../src/renderer/features/library/library-feature";
-import { TasksFeature } from "../../../src/renderer/features/tasks/tasks-feature";
+import { AudioRouteFeature } from "../../../src/renderer/features/audios/audio-route-feature";
+import type {
+  AudioSummary,
+  AudioWorkspaceSnapshot,
+  ProcessingTask,
+  Voice2TextDesktopApi,
+} from "../../../src/shared/contracts";
 
-it("imports through a business callback without exposing a source path", async () => {
-  const onImport = vi.fn(async () => undefined);
-  render(
-    <LibraryFeature
-      state={{ phase: "empty" }}
-      writable
-      importPending={false}
-      onImport={onImport}
-    />,
+const audio: AudioSummary = {
+  audioId: 3,
+  displayName: "项目音频.wav",
+  durationMs: 6_000,
+  createdAtMs: 1,
+  processingState: "running",
+  generationId: 9,
+  generationKind: "formal",
+  segmentCount: 1,
+};
+
+const workspace: AudioWorkspaceSnapshot = {
+  revision: 1,
+  summary: audio,
+  segments: [
+    {
+      id: 1,
+      stableKey: "0:0:1000",
+      sequenceId: 0,
+      text: "准备发布。",
+      machineText: "准备发布。",
+      startMs: 0,
+      endMs: 1_000,
+      reviewState: "unreviewed",
+      speakerState: "unknown",
+      speakerId: null,
+      speakerName: null,
+      speakerSource: "machine",
+    },
+  ],
+  speakers: [],
+  canUndo: false,
+  canRedo: false,
+};
+
+const running: ProcessingTask = {
+  id: 7,
+  audioId: 3,
+  displayName: audio.displayName,
+  state: "running",
+  phase: "asr",
+  progressFraction: 0.42,
+  attempt: 2,
+  errorCode: null,
+};
+
+it("renders the selected Audio task with the single applicable cancel action", async () => {
+  const cancel = vi.fn(async () => undefined);
+  renderRoute([running], { onCancel: cancel });
+  const user = userEvent.setup();
+  await user.click(
+    await screen.findByRole("button", { name: /打开 项目音频/ }),
   );
-  await userEvent
-    .setup()
-    .click(screen.getByRole("button", { name: "导入会议" }));
-  expect(onImport).toHaveBeenCalledWith();
+
+  expect(
+    screen.getByRole("progressbar", { name: "项目音频.wav 处理进度" }),
+  ).toHaveValue(0.42);
+  const button = screen.getByRole("button", { name: "取消 项目音频.wav" });
+  expect(screen.getAllByText("取消", { selector: "button" })).toHaveLength(1);
+  button.focus();
+  await user.keyboard("{Enter}");
+  expect(cancel).toHaveBeenCalledWith(7);
 });
 
-it("shows semantic task states, throttled progress, and keyboard cancel", async () => {
-  const cancel = vi.fn(async () => undefined);
-  render(
-    <TasksFeature
-      tasks={[
-        {
-          id: 7,
-          audioId: 3,
-          displayName: "项目周会.wav",
-          state: "running",
-          phase: "asr",
-          progressFraction: 0.42,
-          attempt: 2,
-          errorCode: null,
-        },
-        {
-          id: 8,
-          audioId: 4,
-          displayName: "取消任务.wav",
-          state: "canceled",
-          phase: "asr",
-          progressFraction: 0.2,
-          attempt: 1,
-          errorCode: "CANCELED",
-        },
-      ]}
-      pendingJobActions={new Map()}
-      onCancel={cancel}
-      onRetry={vi.fn()}
-    />,
+it("shows retry for failed/interrupted and hides completed chrome once transcript is ready", async () => {
+  const retry = vi.fn(async () => undefined);
+  const view = renderRoute(
+    [{ ...running, state: "failed", errorCode: "ASR_FAILED" }],
+    {
+      onRetry: retry,
+    },
+  );
+  const user = userEvent.setup();
+  await user.click(
+    await screen.findByRole("button", { name: /打开 项目音频/ }),
+  );
+  await user.click(screen.getByRole("button", { name: "重试 项目音频.wav" }));
+  expect(retry).toHaveBeenCalledWith(7, 2);
+
+  view.rerender(
+    route([{ ...running, state: "completed", progressFraction: 1 }]),
   );
   expect(
-    screen.getByRole("status", { name: "任务进度公告" }),
-  ).toHaveTextContent("项目周会.wav 正在识别 42%");
-  expect(screen.getByText("已取消", { selector: "span" })).toHaveTextContent(
-    "已取消",
-  );
-  const button = screen.getByRole("button", { name: "取消 项目周会.wav" });
-  button.focus();
-  await userEvent.setup().keyboard("{Enter}");
-  expect(cancel).toHaveBeenCalledWith(7);
+    screen.queryByRole("region", { name: "当前音频处理" }),
+  ).not.toBeInTheDocument();
+  expect(screen.getByRole("heading", { name: "项目音频.wav" })).toBeVisible();
 });
 
 it.each([
@@ -74,93 +108,75 @@ it.each([
 ] as const)(
   "announces a named %s terminal transition",
   async (state, label) => {
-    const running = {
-      id: 7,
-      audioId: 3,
-      displayName: "项目周会.wav",
-      state: "running" as const,
-      phase: "asr" as const,
-      progressFraction: 0.42,
-      attempt: 2,
-      errorCode: null,
-    };
-    const view = render(
-      <TasksFeature
-        tasks={[running]}
-        pendingJobActions={new Map()}
-        onCancel={vi.fn()}
-        onRetry={vi.fn()}
-      />,
-    );
-
-    view.rerender(
-      <TasksFeature
-        tasks={[
-          {
-            ...running,
-            state,
-            progressFraction: state === "completed" ? 1 : 0.42,
-          },
-        ]}
-        pendingJobActions={new Map()}
-        onCancel={vi.fn()}
-        onRetry={vi.fn()}
-      />,
-    );
+    const view = renderRoute([running]);
+    view.rerender(route([{ ...running, state }]));
     await act(async () => {
       await new Promise((resolve) => window.setTimeout(resolve, 800));
     });
-
     expect(
-      screen.getByRole("status", { name: "任务进度公告" }),
-    ).toHaveTextContent(`项目周会.wav ${label}`);
+      screen.getByRole("status", { name: "音频处理进度公告" }),
+    ).toHaveTextContent(`项目音频.wav ${label}`);
   },
 );
 
-it("announces the task that just became terminal when an older terminal task is listed first", async () => {
-  const olderCompleted = {
-    id: 6,
-    audioId: 2,
-    displayName: "旧会议.wav",
-    state: "completed" as const,
-    phase: "diarization" as const,
-    progressFraction: 1,
-    attempt: 1,
-    errorCode: null,
-  };
-  const running = {
-    id: 7,
-    audioId: 3,
-    displayName: "本次会议.wav",
-    state: "running" as const,
-    phase: "asr" as const,
-    progressFraction: 0.42,
-    attempt: 2,
-    errorCode: null,
-  };
-  const props = {
-    pendingJobActions: new Map(),
-    onCancel: vi.fn(),
-    onRetry: vi.fn(),
-  };
-  const view = render(
-    <TasksFeature tasks={[olderCompleted, running]} {...props} />,
-  );
+function renderRoute(
+  tasks: ProcessingTask[],
+  overrides: {
+    onCancel?: (jobId: number) => void;
+    onRetry?: (jobId: number, attempt: number) => void;
+  } = {},
+) {
+  return render(route(tasks, overrides));
+}
 
-  view.rerender(
-    <TasksFeature
-      tasks={[
-        olderCompleted,
-        { ...running, state: "failed", errorCode: "PROCESS_INTERRUPTED" },
-      ]}
-      {...props}
-    />,
+function route(
+  tasks: ProcessingTask[],
+  overrides: {
+    onCancel?: (jobId: number) => void;
+    onRetry?: (jobId: number, attempt: number) => void;
+  } = {},
+) {
+  return (
+    <AudioRouteFeature
+      api={desktopApi()}
+      tasks={tasks}
+      pendingJobActions={new Map()}
+      writable
+      paneOpen
+      onOpenPane={vi.fn()}
+      onRecord={vi.fn()}
+      onImport={vi.fn()}
+      onCancel={overrides.onCancel ?? vi.fn()}
+      onRetry={overrides.onRetry ?? vi.fn()}
+    />
   );
-  await act(async () => {
-    await new Promise((resolve) => window.setTimeout(resolve, 800));
-  });
+}
 
-  expect(
-    screen.getByRole("status", { name: "任务进度公告" }),
-  ).toHaveTextContent("本次会议.wav 处理失败");
-});
+function desktopApi() {
+  return {
+    getAudioAiSnapshot: vi.fn(async () => null),
+    prepareAudioAi: vi.fn(),
+    generateAudioAi: vi.fn(),
+    retryAudioAi: vi.fn(),
+    onAudioAiSnapshot: vi.fn(() => () => undefined),
+    listAudios: vi.fn(async () => [audio]),
+    openAudio: vi.fn(async () => workspace),
+    searchTranscript: vi.fn(async () => []),
+    editAudioSegment: vi.fn(),
+    undoAudioEdit: vi.fn(),
+    redoAudioEdit: vi.fn(),
+    renameAudioSpeaker: vi.fn(),
+    mergeAudioSpeakers: vi.fn(),
+    assignAudioSpeaker: vi.fn(),
+    controlAudioPlayback: vi.fn(async () => ({
+      audioId: null,
+      initialized: false,
+      playing: false,
+      positionMs: 0,
+      durationMs: 0,
+      speed: 1,
+      error: null,
+    })),
+    exportAudio: vi.fn(async () => ({ state: "canceled" as const })),
+  } as unknown as Voice2TextDesktopApi;
+}

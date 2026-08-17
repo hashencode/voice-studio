@@ -3,6 +3,12 @@ import * as React from "react";
 import { AppSidebar } from "@/components/app-sidebar";
 import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar";
 import { Button } from "@/components/ui/button";
+import {
+  AudioContextPane,
+  AudioMainWorkspace,
+  type AudioRouteController,
+  useAudioRouteController,
+} from "@/features/audios/audio-route-feature";
 import { CaptureWorkspace } from "@/features/capture/capture-workspace";
 import { CompanionFeature } from "@/features/companion/companion-feature";
 import {
@@ -23,10 +29,7 @@ import {
   normalizeRendererSection,
   useApplicationShell,
 } from "@/features/shell/use-application-shell";
-import { LibraryFeature } from "@/features/library/library-feature";
-import { AudioWorkspaceFeature } from "@/features/audios/audio-workspace-feature";
 import { AiSettingsFeature } from "@/features/settings/ai-settings-feature";
-import { TasksFeature } from "@/features/tasks/tasks-feature";
 import type { ApplicationSnapshot } from "@shared/contracts";
 
 export default function App() {
@@ -34,7 +37,6 @@ export default function App() {
     snapshot,
     loadError,
     operationError,
-    importPending,
     tasks,
     pendingJobActions,
     navigate,
@@ -48,6 +50,22 @@ export default function App() {
     : "audio";
   const pane = useContextPaneShell(current);
   const paneTriggerRef = React.useRef<HTMLButtonElement>(null);
+  const [recordRequest, setRecordRequest] = React.useState(0);
+  const audio = useAudioRouteController({
+    api: window.voice2text,
+    tasks,
+    pendingJobActions,
+    writable:
+      snapshot?.profile.phase === "ready" &&
+      snapshot.capability.processing === "available",
+    active: current === "audio",
+    enabled: snapshot !== null,
+    applicationRevision: snapshot?.revision ?? 0,
+    onRecord: () => setRecordRequest((value) => value + 1),
+    onImport: importAudio,
+    onCancel: cancelProcessing,
+    onRetry: retryProcessing,
+  });
 
   if (loadError) return <ShellLoadError message={loadError} />;
   if (!snapshot) return <LoadingShell />;
@@ -62,7 +80,11 @@ export default function App() {
           triggerRef={paneTriggerRef}
           onRequestClose={pane.requestClose}
         >
-          <ContextPanePlaceholder section={pane.paneSection} />
+          {pane.paneSection === "audio" ? (
+            <AudioContextPane controller={audio} />
+          ) : (
+            <ContextPanePlaceholder section={pane.paneSection} />
+          )}
         </ContextPaneShell>
       ) : null}
       <SidebarInset>
@@ -100,18 +122,15 @@ export default function App() {
             onNavigate={navigate}
             onBootstrapAction={requestBootstrapAction}
             operationError={operationError}
-            importPending={importPending}
-            tasks={tasks}
-            pendingJobActions={pendingJobActions}
-            onImport={importAudio}
-            onCancel={cancelProcessing}
-            onRetry={retryProcessing}
+            audio={audio}
+            onOpenAudioPane={pane.openPane}
           />
         </main>
       </SidebarInset>
       <CaptureWorkspace
         capture={snapshot.capture}
         applicationRevision={snapshot.revision}
+        recordRequest={recordRequest}
       />
     </SidebarProvider>
   );
@@ -122,23 +141,15 @@ function ShellContent({
   onNavigate,
   onBootstrapAction,
   operationError,
-  importPending,
-  tasks,
-  pendingJobActions,
-  onImport,
-  onCancel,
-  onRetry,
+  audio,
+  onOpenAudioPane,
 }: {
   snapshot: ApplicationSnapshot;
   onNavigate: (section: RendererShellSection) => void;
   onBootstrapAction: Parameters<typeof ProfileBlocker>[0]["onAction"];
   operationError: string | null;
-  importPending: boolean;
-  tasks: Parameters<typeof TasksFeature>[0]["tasks"];
-  pendingJobActions: Parameters<typeof TasksFeature>[0]["pendingJobActions"];
-  onImport: () => void;
-  onCancel: Parameters<typeof TasksFeature>[0]["onCancel"];
-  onRetry: Parameters<typeof TasksFeature>[0]["onRetry"];
+  audio: AudioRouteController;
+  onOpenAudioPane: () => void;
 }) {
   if (snapshot.profile.phase === "initializing") {
     return (
@@ -191,25 +202,14 @@ function ShellContent({
     case "audio":
       section = (
         <div className="space-y-4">
-          {operationError ? <OperationError message={operationError} /> : null}
           {snapshot.capability.processing === "unavailable" ? (
             <CapabilityUnavailable reason={snapshot.capability.reason} />
           ) : null}
-          <LibraryFeature
-            state={snapshot.library}
-            writable={snapshot.capability.processing === "available"}
-            importPending={importPending}
-            onImport={onImport}
+          <AudioMainWorkspace
+            controller={audio}
+            onOpenPane={onOpenAudioPane}
+            operationError={operationError}
           />
-          <AudioWorkspaceFeature />
-          {tasks.length > 0 ? (
-            <TasksFeature
-              tasks={tasks}
-              pendingJobActions={pendingJobActions}
-              onCancel={onCancel}
-              onRetry={onRetry}
-            />
-          ) : null}
         </div>
       );
       break;
@@ -228,14 +228,6 @@ function ShellContent({
     <div className="space-y-4">
       {recovery}
       {section}
-    </div>
-  );
-}
-
-function OperationError({ message }: { message: string }) {
-  return (
-    <div role="alert" className="rounded-lg border bg-card px-4 py-3 text-sm">
-      操作未完成：{message}
     </div>
   );
 }

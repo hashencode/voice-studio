@@ -33,7 +33,7 @@ export function AudioWorkspaceFeature({
     React.useState<AudioWorkspaceSnapshot | null>(null);
   const [error, setError] = React.useState<string | null>(null);
   const [pending, setPending] = React.useState(false);
-  const [status, setStatus] = React.useState("正在载入会议资料库");
+  const [status, setStatus] = React.useState("正在载入音频资料库");
   const [libraryQuery, setLibraryQuery] = React.useState("");
   const pendingRef = React.useRef(false);
 
@@ -47,10 +47,10 @@ export function AudioWorkspaceFeature({
         const next = await api.listAudios(query);
         setAudios(next);
         setStatus(
-          next.length === 0 ? "会议资料库为空" : `已载入 ${next.length} 个会议`,
+          next.length === 0 ? "音频资料库为空" : `已载入 ${next.length} 个音频`,
         );
       } catch (cause) {
-        setError(message(cause, "无法载入会议资料库"));
+        setError(message(cause, "无法载入音频资料库"));
       } finally {
         pendingRef.current = false;
         setPending(false);
@@ -67,11 +67,11 @@ export function AudioWorkspaceFeature({
         if (!active) return;
         setAudios(next);
         setStatus(
-          next.length === 0 ? "会议资料库为空" : `已载入 ${next.length} 个会议`,
+          next.length === 0 ? "音频资料库为空" : `已载入 ${next.length} 个音频`,
         );
       })
       .catch((cause: unknown) => {
-        if (active) setError(message(cause, "无法载入会议资料库"));
+        if (active) setError(message(cause, "无法载入音频资料库"));
       });
     return () => {
       active = false;
@@ -85,11 +85,11 @@ export function AudioWorkspaceFeature({
     setError(null);
     try {
       const next = await api.openAudio(audioId);
-      if (!next) throw new Error("会议不存在或已被移除");
+      if (!next) throw new Error("音频不存在或已被移除");
       setWorkspace(next);
       setStatus(`已打开 ${next.summary.displayName}`);
     } catch (cause) {
-      setError(message(cause, "无法打开会议"));
+      setError(message(cause, "无法打开音频"));
     } finally {
       pendingRef.current = false;
       setPending(false);
@@ -105,12 +105,12 @@ export function AudioWorkspaceFeature({
         className="space-y-5"
       >
         <div>
-          <p className="text-sm font-medium text-muted-foreground">本机会议</p>
+          <p className="text-sm font-medium text-muted-foreground">本机音频</p>
           <h1
             id="audio-library-title"
             className="text-2xl font-semibold tracking-tight"
           >
-            会议资料库
+            音频资料库
           </h1>
         </div>
         <form
@@ -122,7 +122,7 @@ export function AudioWorkspaceFeature({
           role="search"
         >
           <Input
-            aria-label="搜索会议资料库"
+            aria-label="搜索音频资料库"
             value={libraryQuery}
             onChange={(event) => setLibraryQuery(event.target.value)}
           />
@@ -140,15 +140,15 @@ export function AudioWorkspaceFeature({
         ) : audios?.length === 0 ? (
           <div className="grid min-h-52 place-items-center rounded-xl border bg-card p-8 text-center">
             <div>
-              <h2 className="text-lg font-semibold">还没有可复核的会议</h2>
+              <h2 className="text-lg font-semibold">还没有可复核的音频</h2>
               <p className="mt-2 text-sm text-muted-foreground">
-                导入并完成本地处理后，会议会出现在这里。
+                导入并完成本地处理后，音频会出现在这里。
               </p>
             </div>
           </div>
         ) : (
           <ul
-            aria-label="会议列表"
+            aria-label="音频列表"
             className="grid gap-3 md:grid-cols-2 xl:grid-cols-3"
           >
             {audios?.map((audio) => (
@@ -193,13 +193,44 @@ export function AudioWorkspaceFeature({
         const audioId = workspace.summary.audioId;
         setWorkspace(null);
         setError(null);
-        setStatus("已返回会议资料库");
+        setStatus("已返回音频资料库");
         window.requestAnimationFrame(() => {
           document
             .querySelector<HTMLButtonElement>(`[data-audio-id="${audioId}"]`)
             ?.focus();
         });
       }}
+    />
+  );
+}
+
+export function AudioDetailWorkspace({
+  api,
+  workspace,
+  routePending,
+  onWorkspaceChange,
+}: {
+  api: Voice2TextDesktopApi;
+  workspace: AudioWorkspaceSnapshot;
+  routePending: boolean;
+  onWorkspaceChange: (value: AudioWorkspaceSnapshot) => void;
+}) {
+  const [pending, setPending] = React.useState(false);
+  const [error, setError] = React.useState<string | null>(null);
+  const [status, setStatus] = React.useState(
+    `已打开 ${workspace.summary.displayName}`,
+  );
+  return (
+    <WorkspaceView
+      api={api}
+      workspace={workspace}
+      pending={pending || routePending}
+      error={error}
+      status={status}
+      setPending={setPending}
+      setError={setError}
+      setStatus={setStatus}
+      setWorkspace={onWorkspaceChange}
     />
   );
 }
@@ -225,7 +256,7 @@ function WorkspaceView({
   setError: (value: string | null) => void;
   setStatus: (value: string) => void;
   setWorkspace: (value: AudioWorkspaceSnapshot) => void;
-  onBack: () => void;
+  onBack?: () => void;
 }) {
   const [query, setQuery] = React.useState("");
   const [playback, setPlayback] = React.useState<AudioPlaybackSnapshot | null>(
@@ -240,9 +271,9 @@ function WorkspaceView({
 
   const requestPlaybackClose = React.useCallback(() => {
     if (playbackCloseRef.current) return playbackCloseRef.current;
-    const request = api
-      .controlAudioPlayback(workspace.summary.audioId, { action: "close" })
-      .then(() => undefined);
+    const request = Promise.resolve(
+      api.controlAudioPlayback(workspace.summary.audioId, { action: "close" }),
+    ).then(() => undefined);
     playbackCloseRef.current = request;
     void request.catch(() => {
       if (playbackCloseRef.current === request) playbackCloseRef.current = null;
@@ -250,14 +281,16 @@ function WorkspaceView({
     return request;
   }, [api, workspace.summary.audioId]);
 
-  React.useEffect(
-    () => () => {
+  const closesPlaybackOnUnmount = onBack !== undefined;
+  React.useEffect(() => {
+    if (!closesPlaybackOnUnmount) return;
+    return () => {
       void requestPlaybackClose().catch(() => undefined);
-    },
-    [requestPlaybackClose],
-  );
+    };
+  }, [closesPlaybackOnUnmount, requestPlaybackClose]);
 
   const closeAndGoBack = async () => {
+    if (!onBack) return;
     if (operationPendingRef.current) return;
     operationPendingRef.current = true;
     setPending(true);
@@ -267,9 +300,9 @@ function WorkspaceView({
       setPlayback(null);
       onBack();
     } catch (cause) {
-      const detail = message(cause, "会议音频关闭未完成");
+      const detail = message(cause, "音频关闭未完成");
       setError(detail);
-      setStatus(`会议音频关闭失败：${detail}`);
+      setStatus(`音频关闭失败：${detail}`);
     } finally {
       operationPendingRef.current = false;
       setPending(false);
@@ -297,7 +330,7 @@ function WorkspaceView({
       setWorkspace(await action());
       setStatus(success);
     } catch (cause) {
-      setError(message(cause, "会议修改未完成，请重新载入"));
+      setError(message(cause, "音频修改未完成，请重新载入"));
     } finally {
       operationPendingRef.current = false;
       setPending(false);
@@ -325,7 +358,7 @@ function WorkspaceView({
       setPlayback(next);
       setStatus(playbackStatus(next));
     } catch (cause) {
-      setError(message(cause, "会议音频操作未完成"));
+      setError(message(cause, "音频操作未完成"));
     } finally {
       operationPendingRef.current = false;
       setPending(false);
@@ -343,10 +376,10 @@ function WorkspaceView({
       else if (result.state === "canceled") setStatus("已取消导出");
       else {
         setError(result.message);
-        setStatus(`会议导出失败：${result.message}`);
+        setStatus(`音频导出失败：${result.message}`);
       }
     } catch (cause) {
-      setError(message(cause, "会议导出未完成"));
+      setError(message(cause, "音频导出未完成"));
     } finally {
       operationPendingRef.current = false;
       setPending(false);
@@ -361,15 +394,17 @@ function WorkspaceView({
     >
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
-          <Button
-            type="button"
-            variant="ghost"
-            size="sm"
-            disabled={pending}
-            onClick={() => void closeAndGoBack()}
-          >
-            返回资料库
-          </Button>
+          {onBack ? (
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              disabled={pending}
+              onClick={() => void closeAndGoBack()}
+            >
+              返回音频列表
+            </Button>
+          ) : null}
           <h1
             id="audio-title"
             className="mt-2 text-2xl font-semibold tracking-tight"
@@ -430,9 +465,9 @@ function WorkspaceView({
           onRetry={() =>
             void mutate(async () => {
               const next = await api.openAudio(workspace.summary.audioId);
-              if (!next) throw new Error("会议已不可用");
+              if (!next) throw new Error("音频已不可用");
               return next;
-            }, "已重新载入会议")
+            }, "已重新载入音频")
           }
         />
       ) : null}
@@ -475,7 +510,7 @@ function WorkspaceView({
           >
             <Input
               type="search"
-              aria-label="搜索会议转写"
+              aria-label="搜索音频转写"
               value={query}
               onChange={(event) => setQuery(event.target.value)}
             />
@@ -536,7 +571,7 @@ function WorkspaceView({
               <div>
                 <h2 className="font-semibold">转写尚未就绪</h2>
                 <p className="mt-2 text-sm text-muted-foreground">
-                  会议音频仍由本机保留；处理完成后可在这里复核。
+                  音频仍由本机保留；处理完成后可在这里复核。
                 </p>
               </div>
             </div>
@@ -576,7 +611,7 @@ function WorkspaceView({
           )}
         </div>
 
-        <aside aria-label="会议操作" className="space-y-4">
+        <aside aria-label="音频操作" className="space-y-4">
           {workspace.summary.generationId !== null ? (
             <AudioAiFeature
               key={`${workspace.summary.audioId}:${workspace.summary.generationId}`}
@@ -665,10 +700,10 @@ function VirtualTranscript({
       className="h-[34rem] overflow-auto rounded-xl border bg-card"
       onScroll={(event) => setScrollTop(event.currentTarget.scrollTop)}
       tabIndex={0}
-      aria-label="可滚动会议转写"
+      aria-label="可滚动音频转写"
     >
       <ul
-        aria-label="会议转写片段"
+        aria-label="音频转写片段"
         className="relative m-0 list-none p-0"
         style={{ height: workspace.segments.length * rowHeight }}
       >
@@ -820,13 +855,13 @@ function PlaybackPanel({
       className="space-y-3 rounded-xl border bg-card p-4"
     >
       <h2 id="playback-title" className="font-semibold">
-        会议音频
+        音频播放
       </h2>
       <Button
         type="button"
         className="w-full"
         disabled={pending}
-        aria-label={playing ? "暂停会议音频" : "播放会议音频"}
+        aria-label={playing ? "暂停音频" : "播放音频"}
         onClick={() => onAction({ action: playing ? "pause" : "play" })}
       >
         {playing ? <Pause aria-hidden="true" /> : <Play aria-hidden="true" />}
@@ -835,7 +870,7 @@ function PlaybackPanel({
       <label className="block text-xs text-muted-foreground">
         播放位置 {clock(playback?.positionMs ?? 0)}
         <input
-          aria-label="会议音频播放位置"
+          aria-label="音频播放位置"
           className="mt-2 w-full"
           type="range"
           min={0}
@@ -1037,13 +1072,13 @@ function AudioLoading() {
   return (
     <section
       role="status"
-      aria-label="正在载入会议资料库"
+      aria-label="正在载入音频资料库"
       className="grid min-h-64 place-items-center text-center"
     >
       <div>
-        <h1 className="text-xl font-semibold">正在载入会议资料库</h1>
+        <h1 className="text-xl font-semibold">正在载入音频资料库</h1>
         <p className="mt-2 text-sm text-muted-foreground">
-          正在读取 Electron 本机会议 authority。
+          正在读取 Electron 本机音频 authority。
         </p>
       </div>
     </section>
@@ -1065,7 +1100,7 @@ function RecoveryError({
       className="flex flex-wrap items-center justify-between gap-3 rounded-xl border bg-card p-4"
     >
       <div>
-        <p className="font-medium">会议工作区暂时不可用</p>
+        <p className="font-medium">音频工作区暂时不可用</p>
         <p className="mt-1 text-sm text-muted-foreground">{detail}</p>
       </div>
       <Button
@@ -1084,7 +1119,7 @@ function LiveStatus({ status }: { status: string }) {
   return (
     <p
       role="status"
-      aria-label="会议工作区状态"
+      aria-label="音频工作区状态"
       aria-live="polite"
       className="rounded-lg border bg-card px-3 py-2 text-sm text-muted-foreground"
     >
@@ -1125,7 +1160,7 @@ function generationLabel(kind: AudioSummary["generationKind"]): string {
 }
 
 function playbackStatus(snapshot: AudioPlaybackSnapshot): string {
-  if (!snapshot.initialized) return "会议音频已关闭";
+  if (!snapshot.initialized) return "音频已关闭";
   return snapshot.playing
     ? `正在播放，速度 ${snapshot.speed} 倍`
     : `已暂停在 ${clock(snapshot.positionMs)}`;

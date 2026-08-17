@@ -5,7 +5,7 @@ import type {
   BootstrapAction,
   ShellSection,
 } from "@shared/contracts";
-import { useProcessingTasks } from "@/features/tasks/use-processing-tasks";
+import { useProcessingTasks } from "@/features/processing/use-processing-tasks";
 import type { RendererShellSection } from "@/features/shell/context-pane-contract";
 
 export function useApplicationShell() {

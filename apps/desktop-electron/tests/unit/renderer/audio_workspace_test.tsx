@@ -125,7 +125,7 @@ it("supports keyboard open, search, edit, playback, speaker and export with sema
   ).toBeVisible();
 
   await user.type(
-    screen.getByRole("searchbox", { name: "搜索会议转写" }),
+    screen.getByRole("searchbox", { name: "搜索音频转写" }),
     "发布",
   );
   await user.keyboard("{Enter}");
@@ -142,7 +142,7 @@ it("supports keyboard open, search, edit, playback, speaker and export with sema
   await user.keyboard("{Control>}{Enter}{/Control}");
   await waitFor(() => expect(desktop.editAudioSegment).toHaveBeenCalled());
 
-  await user.click(screen.getByRole("button", { name: "播放会议音频" }));
+  await user.click(screen.getByRole("button", { name: "播放音频" }));
   await user.selectOptions(
     screen.getByRole("combobox", { name: "播放速度" }),
     "1.5",
@@ -157,9 +157,9 @@ it("supports keyboard open, search, edit, playback, speaker and export with sema
   });
   expect(desktop.exportAudio).toHaveBeenCalledWith(4, "txt");
   expect(
-    screen.getByRole("status", { name: "会议工作区状态" }),
+    screen.getByRole("status", { name: "音频工作区状态" }),
   ).toHaveTextContent("已导出 项目周会.wav.txt");
-  expect(screen.getByRole("status", { name: "会议工作区状态" })).toBeVisible();
+  expect(screen.getByRole("status", { name: "音频工作区状态" })).toBeVisible();
 
   const name = screen.getByRole("textbox", { name: "说话人 1 名称" });
   await user.clear(name);
@@ -177,7 +177,7 @@ it("supports keyboard open, search, edit, playback, speaker and export with sema
     expect.objectContaining({ segmentId: 12, state: "assigned", speakerId: 7 }),
   );
 
-  await user.click(screen.getByRole("button", { name: "返回资料库" }));
+  await user.click(screen.getByRole("button", { name: "返回音频列表" }));
   const restoredAudio = await screen.findByRole("button", {
     name: /打开 项目周会/,
   });
@@ -196,7 +196,7 @@ it("shows a recoverable list error and then the explicit empty state", async () 
     .setup()
     .click(screen.getByRole("button", { name: "重新载入" }));
   expect(
-    await screen.findByRole("heading", { name: "还没有可复核的会议" }),
+    await screen.findByRole("heading", { name: "还没有可复核的音频" }),
   ).toBeVisible();
   expect(listAudios).toHaveBeenCalledTimes(2);
 });
@@ -222,7 +222,7 @@ it("renders only a bounded virtual window for a 3001 segment transcript", async 
     .setup()
     .click(await screen.findByRole("button", { name: /打开 项目周会/ }));
 
-  await screen.findByRole("list", { name: "会议转写片段" });
+  await screen.findByRole("list", { name: "音频转写片段" });
   const items = screen.getAllByRole("listitem");
   expect(items.length).toBeLessThanOrEqual(40);
   expect(items[0]).toHaveAttribute("aria-setsize", "3001");
@@ -255,7 +255,7 @@ it("keeps search result identity and keyboard-navigates to segment 3000", async 
   );
 
   await user.type(
-    screen.getByRole("searchbox", { name: "搜索会议转写" }),
+    screen.getByRole("searchbox", { name: "搜索音频转写" }),
     "命中",
   );
   await user.keyboard("{Enter}");
@@ -302,16 +302,16 @@ it("closes playback once on workspace back and keeps close failures visible", as
   await user.click(
     await screen.findByRole("button", { name: /打开 项目周会/ }),
   );
-  await user.click(screen.getByRole("button", { name: "播放会议音频" }));
+  await user.click(screen.getByRole("button", { name: "播放音频" }));
 
-  await user.click(screen.getByRole("button", { name: "返回资料库" }));
+  await user.click(screen.getByRole("button", { name: "返回音频列表" }));
   expect(await screen.findByRole("alert")).toHaveTextContent(
     "无法关闭私有音频",
   );
   expect(screen.getByRole("heading", { name: "项目周会.wav" })).toBeVisible();
 
-  await user.click(screen.getByRole("button", { name: "返回资料库" }));
-  await screen.findByRole("heading", { name: "会议资料库" });
+  await user.click(screen.getByRole("button", { name: "返回音频列表" }));
+  await screen.findByRole("heading", { name: "音频资料库" });
   await waitFor(() =>
     expect(controlAudioPlayback).toHaveBeenCalledWith(4, {
       action: "close",
@@ -343,8 +343,8 @@ it("surfaces a typed export write failure instead of reporting cancellation", as
     "所选位置不可写，请选择其他位置",
   );
   expect(
-    screen.getByRole("status", { name: "会议工作区状态" }),
-  ).toHaveTextContent("会议导出失败");
+    screen.getByRole("status", { name: "音频工作区状态" }),
+  ).toHaveTextContent("音频导出失败");
   expect(screen.queryByText("已取消导出")).not.toBeInTheDocument();
 });
 

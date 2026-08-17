@@ -128,8 +128,9 @@ describe("application shell", () => {
       screen.getByRole("status", { name: "正在加载工作台" }),
     ).toBeVisible();
     expect(
-      await screen.findByRole("heading", { name: "还没有本机会议" }),
+      await screen.findByRole("heading", { name: "音频", level: 1 }),
     ).toBeVisible();
+    expect(await screen.findByText("还没有音频")).toBeVisible();
 
     const navigation = screen.getByRole("navigation", { name: "工作站主导航" });
     const audio = within(navigation).getByRole("button", { name: "音频" });
@@ -259,27 +260,35 @@ describe("application shell", () => {
     render(<App />);
 
     expect(await screen.findByRole("alert")).toHaveTextContent("可用空间不足");
-    expect(screen.getByRole("button", { name: "导入会议" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "导入音频" })).toBeDisabled();
     await user.click(screen.getByRole("button", { name: "重试初始化" }));
     expect(api.requestBootstrapAction).toHaveBeenCalledWith("retry");
     await user.click(screen.getByRole("button", { name: "查看修复建议" }));
     expect(api.requestBootstrapAction).toHaveBeenCalledWith("repair-guidance");
   });
 
-  it.each([
-    ["loading", "正在加载会议库"],
-    ["error", "会议库暂时不可用"],
-  ] as const)("renders the %s library surface", async (phase, heading) => {
-    installApi({
-      ...readySnapshot,
-      capture: { phase: "idle" },
-      library:
-        phase === "error"
-          ? { phase, message: "读取失败", retryable: true }
-          : { phase },
+  it("renders route-local Audio loading and recoverable error states", async () => {
+    const pending = new Promise<never>(() => undefined);
+    const first = installApi(
+      { ...readySnapshot, capture: { phase: "idle" } },
+      { listAudios: vi.fn(() => pending) },
+    );
+    const view = render(<App />);
+    expect(
+      await screen.findByRole("status", { name: "正在载入音频列表" }),
+    ).toBeVisible();
+    view.unmount();
+
+    first.listAudios = vi.fn(async () => {
+      throw new Error("读取失败");
+    });
+    Object.defineProperty(window, "voice2text", {
+      configurable: true,
+      value: first,
     });
     render(<App />);
-    expect(await screen.findByRole("heading", { name: heading })).toBeVisible();
+    expect(await screen.findByRole("alert")).toHaveTextContent("读取失败");
+    expect(screen.getByRole("button", { name: "重新载入" })).toBeEnabled();
   });
 
   it("announces offline and unavailable capability without color-only meaning", async () => {
@@ -343,6 +352,35 @@ describe("application shell", () => {
               },
             ] satisfies ProcessingTask[],
         ),
+        listAudios: vi.fn(async () => [
+          {
+            audioId: 9,
+            displayName: "中断的音频.wav",
+            durationMs: 1_000,
+            createdAtMs: 1,
+            processingState: "interrupted" as const,
+            generationId: null,
+            generationKind: null,
+            segmentCount: 0,
+          },
+        ]),
+        openAudio: vi.fn(async () => ({
+          revision: 1,
+          summary: {
+            audioId: 9,
+            displayName: "中断的音频.wav",
+            durationMs: 1_000,
+            createdAtMs: 1,
+            processingState: "interrupted" as const,
+            generationId: null,
+            generationKind: null,
+            segmentCount: 0,
+          },
+          segments: [],
+          speakers: [],
+          canUndo: false,
+          canRedo: false,
+        })),
       },
     );
     const user = userEvent.setup();
@@ -351,7 +389,7 @@ describe("application shell", () => {
     expect(recovery).toHaveTextContent("启动恢复需要确认");
     expect(recovery).toHaveTextContent("不会自动重试");
     expect(
-      screen.getByRole("heading", { name: "还没有本机会议" }),
+      screen.getByRole("heading", { name: "音频", level: 1 }),
     ).toBeVisible();
 
     const reviewTasks = screen.getByRole("button", {
@@ -360,6 +398,9 @@ describe("application shell", () => {
     reviewTasks.focus();
     await user.keyboard("{Enter}");
     expect(api.navigate).not.toHaveBeenCalled();
+    await user.click(
+      await screen.findByRole("button", { name: /打开 中断的音频/ }),
+    );
     expect(
       await screen.findByRole("button", { name: "重试 中断的周会.wav" }),
     ).toBeEnabled();

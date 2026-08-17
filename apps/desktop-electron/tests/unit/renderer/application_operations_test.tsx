@@ -41,6 +41,26 @@ const runningTask: ProcessingTask = {
   errorCode: null,
 };
 
+const runningAudio = {
+  audioId: 3,
+  displayName: "项目周会.wav",
+  durationMs: 6_000,
+  createdAtMs: 1,
+  processingState: "running" as const,
+  generationId: null,
+  generationKind: null,
+  segmentCount: 0,
+};
+
+const runningWorkspace = {
+  revision: 1,
+  summary: runningAudio,
+  segments: [],
+  speakers: [],
+  canUndo: false,
+  canRedo: false,
+};
+
 afterEach(() => {
   vi.restoreAllMocks();
   window.history.replaceState(null, "", "/");
@@ -75,8 +95,8 @@ function installOperationsApi(overrides: Partial<Voice2TextDesktopApi> = {}) {
     retryProcessing: vi.fn(),
     listProcessingTasks: vi.fn(async () => [runningTask]),
     importAudio: vi.fn(),
-    listAudios: vi.fn(async () => []),
-    openAudio: vi.fn(async () => null),
+    listAudios: vi.fn(async () => [runningAudio]),
+    openAudio: vi.fn(async () => runningWorkspace),
     searchTranscript: vi.fn(async () => []),
     editAudioSegment: vi.fn(),
     undoAudioEdit: vi.fn(),
@@ -153,17 +173,17 @@ describe("renderer processing operation races", () => {
     const user = userEvent.setup();
     render(<App />);
 
-    const action = await screen.findByRole("button", { name: "导入会议" });
+    const action = await screen.findByRole("button", { name: "导入音频" });
     await user.dblClick(action);
     expect(importAudio).toHaveBeenCalledTimes(1);
-    expect(screen.getByRole("button", { name: "正在导入会议" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "正在导入音频" })).toBeDisabled();
     expect(
-      screen.getByRole("button", { name: "正在导入会议" }),
+      screen.getByRole("button", { name: "正在导入音频" }),
     ).toHaveAttribute("aria-busy", "true");
 
     request.reject(new Error("导入失败"));
     expect(await screen.findByRole("alert")).toHaveTextContent("导入失败");
-    expect(screen.getByRole("button", { name: "导入会议" })).toBeEnabled();
+    expect(screen.getByRole("button", { name: "导入音频" })).toBeEnabled();
   });
 
   it.each([
@@ -195,6 +215,10 @@ describe("renderer processing operation races", () => {
       const user = userEvent.setup();
       render(<App />);
 
+      await user.click(
+        await screen.findByRole("button", { name: /打开 项目周会/ }),
+      );
+
       const action = await screen.findByRole("button", { name: button });
       await user.dblClick(action);
       expect(api[method]).toHaveBeenCalledTimes(1);
@@ -209,6 +233,9 @@ describe("renderer processing operation races", () => {
   it("merges repeated known progress deltas without full-list IPC refresh", async () => {
     const { api, emit } = installOperationsApi();
     render(<App />);
+    await userEvent
+      .setup()
+      .click(await screen.findByRole("button", { name: /打开 项目周会/ }));
     expect(
       await screen.findByRole("progressbar", { name: "项目周会.wav 处理进度" }),
     ).toHaveValue(0.1);
@@ -249,6 +276,9 @@ describe("renderer processing operation races", () => {
     const { api, emit } = installOperationsApi({ listProcessingTasks });
     render(<App />);
     await waitFor(() => expect(api.listProcessingTasks).toHaveBeenCalledOnce());
+    await userEvent
+      .setup()
+      .click(await screen.findByRole("button", { name: /打开 项目周会/ }));
 
     emit({
       protocolVersion: 2,
@@ -269,7 +299,7 @@ describe("renderer processing operation races", () => {
     first.resolve([runningTask]);
 
     expect(
-      await screen.findByText("已完成", { selector: "span" }),
+      await screen.findByRole("heading", { name: "已完成" }),
     ).toBeVisible();
     await waitFor(() =>
       expect(api.listProcessingTasks).toHaveBeenCalledTimes(2),
@@ -292,7 +322,7 @@ describe("renderer processing operation races", () => {
     };
     emit(unknown);
     emit(unknown);
-    expect(screen.getByText("已完成", { selector: "span" })).toBeVisible();
+    expect(screen.getByRole("heading", { name: "已完成" })).toBeVisible();
 
     second.resolve([
       { ...runningTask, state: "completed", progressFraction: 1 },
@@ -357,6 +387,10 @@ describe("renderer processing operation races", () => {
     });
     const user = userEvent.setup();
     render(<App />);
+
+    await user.click(
+      await screen.findByRole("button", { name: /打开 项目周会/ }),
+    );
 
     await user.click(
       await screen.findByRole("button", { name: "重试 项目周会.wav" }),

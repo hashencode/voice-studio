@@ -27,9 +27,11 @@ let commandSequence = 0;
 export function CaptureWorkspace({
   capture,
   applicationRevision,
+  recordRequest,
 }: {
   capture: ApplicationSnapshot["capture"];
   applicationRevision: number;
+  recordRequest?: number;
 }) {
   const [preflight, setPreflight] = React.useState<CapturePreflight | null>(
     null,
@@ -54,6 +56,7 @@ export function CaptureWorkspace({
   const preflightAlertRef = React.useRef<HTMLDivElement>(null);
   const errorRef = React.useRef<HTMLDivElement>(null);
   const titleRef = React.useRef<HTMLInputElement>(null);
+  const lastRecordRequestRef = React.useRef(recordRequest ?? 0);
   const recoverySessionId =
     capture.phase === "recovery" ? capture.sessionId : null;
 
@@ -147,6 +150,17 @@ export function CaptureWorkspace({
       );
     });
   }, [captionEnabled, runExclusive]);
+
+  React.useEffect(() => {
+    if (
+      recordRequest === undefined ||
+      recordRequest <= lastRecordRequestRef.current
+    ) {
+      return;
+    }
+    lastRecordRequestRef.current = recordRequest;
+    if (!activeCapture) void Promise.resolve().then(checkPreflight);
+  }, [activeCapture, checkPreflight, recordRequest]);
 
   const start = React.useCallback(() => {
     if (
@@ -252,6 +266,15 @@ export function CaptureWorkspace({
     setError(null);
     checkPreflight();
   }, [activeCapture, checkPreflight]);
+
+  if (
+    recordRequest !== undefined &&
+    !activeCapture &&
+    !setupOpen &&
+    recoveries.length === 0
+  ) {
+    return null;
+  }
 
   return (
     <aside
