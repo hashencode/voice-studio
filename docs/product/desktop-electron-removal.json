@@ -1,0 +1,247 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "schema": "voice2text-desktop-electron-removal/v1",
+  "unit": "U14",
+  "status": "PASS",
+  "supportScope": {
+    "decisionId": "MACOS_ONLY_SUPPORTED_SCOPE_2026_08_17",
+    "authority": "user-directed",
+    "supportedTargets": [
+      "macos"
+    ],
+    "windows": {
+      "status": "DEFERRED_OUT_OF_CURRENT_SCOPE",
+      "inheritsMacosPass": false,
+      "evidence": null
+    }
+  },
+  "historicalClosure": [
+    {
+      "path": "docs/product/desktop-electron-u12-scope.json",
+      "sha256": "b94ce55dac00ca1944e53d111e52a2c83f276d8033889075a780d949c3be6cf2"
+    },
+    {
+      "path": "docs/product/desktop-electron-evidence.json",
+      "sha256": "eef8d0c88c3f2a1eb96ff9885743ac7a6e2d1703e9b4429a9e45eebabd4faf94"
+    },
+    {
+      "path": "docs/product/desktop-electron-parity-baseline.json",
+      "sha256": "b430173b3300b553b04cfc542f0fa9987ac712116c4ae8734935078d380376ce"
+    }
+  ],
+  "archivedFlutterEvidence": [
+    {
+      "originalPath": "apps/desktop/integration_test/macos_capture_recovery_test.dart",
+      "archivePath": "apps/desktop-electron/tests/fixtures/flutter-reference/source/apps/desktop/integration_test/macos_capture_recovery_test.dart",
+      "sha256": "ea5ae70aff5672f7d8c502a5b2d03bdb1896c13754cd63d7b41767000b1d93d7"
+    },
+    {
+      "originalPath": "apps/desktop/integration_test/macos_workstation_regression_test.dart",
+      "archivePath": "apps/desktop-electron/tests/fixtures/flutter-reference/source/apps/desktop/integration_test/macos_workstation_regression_test.dart",
+      "sha256": "d3c809b5ae1ca563ea3cb5337d7d22f4835ec62b6df96c14f8aed0d23e5cefcd"
+    },
+    {
+      "originalPath": "apps/desktop/lib/features/meetings/data/desktop_meeting_workspace_repository.dart",
+      "archivePath": "apps/desktop-electron/tests/fixtures/flutter-reference/source/apps/desktop/lib/features/meetings/data/desktop_meeting_workspace_repository.dart",
+      "sha256": "16af8197bdb0e6800aa54d11e309630ce3d68ac11836a936f5aae9846b62fa4e"
+    },
+    {
+      "originalPath": "apps/desktop/lib/features/meetings/export/desktop_meeting_export.dart",
+      "archivePath": "apps/desktop-electron/tests/fixtures/flutter-reference/source/apps/desktop/lib/features/meetings/export/desktop_meeting_export.dart",
+      "sha256": "69c9913716cb96138343626546cae2a5f13eb7a578f1086c9b4c2227b25ab2c0"
+    },
+    {
+      "originalPath": "apps/desktop/lib/features/meetings/playback/desktop_meeting_playback.dart",
+      "archivePath": "apps/desktop-electron/tests/fixtures/flutter-reference/source/apps/desktop/lib/features/meetings/playback/desktop_meeting_playback.dart",
+      "sha256": "8decd5e88f58aa69d77298f96fce2699b3609f307d971c091ee4d07ab7055eb3"
+    },
+    {
+      "originalPath": "apps/desktop/lib/features/processing/desktop_processing_repository.dart",
+      "archivePath": "apps/desktop-electron/tests/fixtures/flutter-reference/source/apps/desktop/lib/features/processing/desktop_processing_repository.dart",
+      "sha256": "68dbc69dead42d08974b1d92e3cd473848cef4bcf58dc16b1547eec6caa5ff3e"
+    },
+    {
+      "originalPath": "apps/desktop/test/desktop_meeting_workspace_repository_test.dart",
+      "archivePath": "apps/desktop-electron/tests/fixtures/flutter-reference/source/apps/desktop/test/desktop_meeting_workspace_repository_test.dart",
+      "sha256": "511cd69ec479ada286d553c40c2a39e1bcdfc012289ce8e15b1bc13a69a9f088"
+    },
+    {
+      "originalPath": "apps/desktop/test/desktop_workstation_widget_test.dart",
+      "archivePath": "apps/desktop-electron/tests/fixtures/flutter-reference/source/apps/desktop/test/desktop_workstation_widget_test.dart",
+      "sha256": "4ef121b9f2046508ff113a1feb8b254a084f653ed62fc282abb9a029edf98df7"
+    },
+    {
+      "originalPath": "apps/desktop/test/features/capture/desktop_capture_contract_test.dart",
+      "archivePath": "apps/desktop-electron/tests/fixtures/flutter-reference/source/apps/desktop/test/features/capture/desktop_capture_contract_test.dart",
+      "sha256": "fd251db8a7696afc90f4e472604fc7d3f6a2fd0ba22bdb54be7b9dcc9027e13c"
+    },
+    {
+      "originalPath": "apps/desktop/test/features/capture/desktop_capture_recovery_test.dart",
+      "archivePath": "apps/desktop-electron/tests/fixtures/flutter-reference/source/apps/desktop/test/features/capture/desktop_capture_recovery_test.dart",
+      "sha256": "100eecb07d8c15a66a437601061539665c7e754960e1f05144e6e68b92eb3933"
+    }
+  ],
+  "comparisonBaseRevision": "0fa7082b4f2ed066bedeea775275c00e9e221848",
+  "relocatedAuthorities": [
+    {
+      "originalPath": "apps/desktop/tool/processing_sidecar/README.md",
+      "destinationPath": "benchmark/desktop/processing_sidecar/README.md",
+      "sha256": "d7680bb1c0989b13e06356744261d854ab43569a20407d0c9296e52b8e26d203"
+    },
+    {
+      "originalPath": "apps/desktop/tool/processing_sidecar/launcher.py",
+      "destinationPath": "benchmark/desktop/processing_sidecar/launcher.py",
+      "sha256": "2f98e93d76a2cdef08fef864b999f711f0535887ac94559a095f5dba7832a489"
+    },
+    {
+      "originalPath": "apps/desktop/tool/processing_sidecar/worker.py",
+      "destinationPath": "benchmark/desktop/processing_sidecar/worker.py",
+      "sha256": "36423c92724d7a343b96e26b6c29ae70273322c0254c3e13ef9e7b9c4acae26b"
+    },
+    {
+      "originalPath": "apps/desktop/tool/u8_lan_receiver_smoke.dart",
+      "destinationPath": "packages/companion_protocol/tool/u8_lan_receiver_smoke.dart",
+      "sha256": "19ecdfaa635c954f17fba844df5124620b0062fae43a594c251ad5db56e5b162"
+    },
+    {
+      "originalPath": "apps/desktop/assets/processing/frozen_sensevoice_macos_arm64.json",
+      "destinationPath": "packages/desktop_sherpa_worker/assets/processing/frozen_sensevoice_macos_arm64.json",
+      "sha256": "c2bade93dc7b55e42f1038eb09b81fdd6e84b0e153d1051d5efe131f52346011"
+    },
+    {
+      "originalPath": "apps/desktop/assets/processing/frozen_sherpa_macos_arm64.json",
+      "destinationPath": "packages/desktop_sherpa_worker/assets/processing/frozen_sherpa_macos_arm64.json",
+      "sha256": "46ac629a1e7ce16637214be445a740f0f03edc43b8891421b52ee41347ad6dfe"
+    },
+    {
+      "originalPath": "apps/desktop/tool/desktop_sensevoice_caption_worker.dart",
+      "destinationPath": "packages/desktop_sherpa_worker/bin/desktop_sensevoice_caption_worker.dart",
+      "sha256": "aec27838085b5614491035669532ae705a146a54fccb12b8016679306ff88039"
+    },
+    {
+      "originalPath": "apps/desktop/lib/features/processing/sidecar/sidecar_sandbox.dart",
+      "destinationPath": "packages/desktop_sherpa_worker/lib/src/sidecar_sandbox.dart",
+      "sha256": "40b18c282874bf4164463f90a29f37e52ebcb29dbdbb8037b64b665dc89ed341"
+    },
+    {
+      "originalPath": "apps/desktop/tool/native_process_group_launcher.c",
+      "destinationPath": "packages/desktop_sherpa_worker/native/macos/native_process_group_launcher.c",
+      "sha256": "a30f49bc42820d69b3a5d63103f3599c77c88c49869c66d1af8ef66df0f934ab"
+    },
+    {
+      "originalPath": "apps/desktop/tool/asr_benchmark/candidate_registry.dart",
+      "destinationPath": "packages/desktop_sherpa_worker/tool/asr_benchmark/candidate_registry.dart",
+      "sha256": "7f011db0392cc084fda0322bc3701228492e370342dcb39acf817d6acb446f89"
+    },
+    {
+      "originalPath": "apps/desktop/tool/asr_benchmark/effective_profile.dart",
+      "destinationPath": "packages/desktop_sherpa_worker/tool/asr_benchmark/effective_profile.dart",
+      "sha256": "25fc69b87396b4facb499b6c06de9c669d051429f50cf1fdd3165e021f424c89"
+    },
+    {
+      "originalPath": "apps/desktop/tool/desktop_asr_candidate_worker.dart",
+      "destinationPath": "packages/desktop_sherpa_worker/tool/desktop_asr_candidate_worker.dart",
+      "sha256": "6a3244bb3a58d57289bfe973f6413d1b3d2a47c697ec61ba5517871ced75c6cb"
+    },
+    {
+      "originalPath": "apps/desktop/tool/desktop_sherpa_benchmark.dart",
+      "destinationPath": "packages/desktop_sherpa_worker/tool/desktop_sherpa_benchmark.dart",
+      "sha256": "92ba59a869c9407b5f3478a5aae33c62ac98228cd3390329d5299f8b5fa16a52"
+    },
+    {
+      "originalPath": "apps/desktop/tool/offline_vertical_slice.dart",
+      "destinationPath": "packages/desktop_sherpa_worker/tool/offline_vertical_slice.dart",
+      "sha256": "e78a2f1a394b39f11310b5b993d77616d3b9f67a0d38f508c0e26052f5f04100"
+    },
+    {
+      "originalPath": "apps/desktop/tool/qwen3_official_rtf_diagnostic_worker.dart",
+      "destinationPath": "packages/desktop_sherpa_worker/tool/qwen3_official_rtf_diagnostic_worker.dart",
+      "sha256": "a251e2f0123ac6e80b341fd1bd9ce1f166727d1f1418fbb54736221bacc90eed"
+    }
+  ],
+  "protectedPaths": [
+    {
+      "path": "apps/desktop-electron",
+      "treeSha256": "dcaa9d16080a30a9dc08eee288dffb7036f1484456402e0cd9079baf03604708"
+    },
+    {
+      "path": "packages/companion_protocol",
+      "treeSha256": "af8409a6173b29151411d63615a3c1377452469fe36d4f0d4057f791511ef779"
+    },
+    {
+      "path": "packages/desktop_macos_native",
+      "treeSha256": "d8900524c8da93a6d9759b0f0c25bdb0c0c7f61ce901dbb06bdd0cc3c32cea8e"
+    },
+    {
+      "path": "packages/desktop_sherpa_worker",
+      "treeSha256": "73f8de8dbe7249399942ecb16d539fe3d01cfd7c883b9e37780c72bfadecf448"
+    },
+    {
+      "path": "packages/meeting_core",
+      "treeSha256": "23d2e28b8815f6b0e6ec46cccb2642cca7520b6e8e400d3f0ecb7a676b68e2c0"
+    },
+    {
+      "path": "packages/meeting_storage",
+      "treeSha256": "23b03f3aa4e4b5e402b221543d97d9fc30c8277a8a5862f251441391eecad14b"
+    },
+    {
+      "path": "packages/meeting_workflows",
+      "treeSha256": "8e6b7599873283882ecc0fb8f1c1011f9575ab3fb8e72c2fb51818cf8a3654ce"
+    },
+    {
+      "path": "packages/processing_contracts",
+      "treeSha256": "17a9b82d0ca1de101121a3a1bb876a495a3946ed6810cf24bd0e070392c7e1ae"
+    },
+    {
+      "path": "benchmark/desktop",
+      "treeSha256": "45c6a53a71e89ec2a51c38499dbdea199a0df851b0aff4cc085bca971a0bd00c"
+    },
+    {
+      "path": "apps/desktop-electron/tests/fixtures/flutter-reference",
+      "treeSha256": "1a69d3b607177333789b8c55de08dec4f0e448303130adff054aaf14ea71657c"
+    },
+    {
+      "path": "docs/product/electron-closure-receipts",
+      "treeSha256": "92a999f5bfffc85b456b458006aad98788b28e4b8d79b0fb5f74e456ab0e3e37"
+    }
+  ],
+  "activeConsumers": [
+    "tool/dev_check.sh",
+    "tool/build_cache_guard.py",
+    "tool/check_desktop_benchmark.sh",
+    "tool/check_privacy_contract.sh",
+    "apps/desktop-electron/scripts/build-worker-resources.sh",
+    "apps/desktop-electron/scripts/build-live-caption-resources.sh",
+    "apps/desktop-electron/scripts/materialize-frozen-sherpa-resources.ts",
+    "apps/desktop-electron/scripts/smoke-packaged-processing-macos.ts",
+    "apps/desktop-electron/tests/unit/build_worker_resources_test.ts",
+    "benchmark/desktop/run_macos_sherpa_baseline.sh",
+    "benchmark/desktop/run_offline_vertical_slice.sh",
+    "benchmark/desktop/live_caption/run_live_caption_benchmark.dart",
+    "benchmark/desktop/asr_comparison/build_m4_qwen3_official_rtf_reproduction_report.py",
+    "benchmark/desktop/asr_comparison/run_qwen3_official_rtf_reproduction.py",
+    "benchmark/desktop/asr_comparison/development_matrix.py"
+  ],
+  "flutterDesktop": {
+    "sourceRoot": "apps/desktop",
+    "trackedFilesExpected": 0,
+    "worktreeState": "ABSENT"
+  },
+  "dataLifecycleImpact": {
+    "electronProfile": "UNTOUCHED",
+    "keychain": "UNTOUCHED",
+    "media": "UNTOUCHED",
+    "journals": "UNTOUCHED",
+    "checkpoints": "UNTOUCHED",
+    "receipts": "UNTOUCHED"
+  },
+  "verification": {
+    "macosClosure": "PASS",
+    "rootDevCheck": "PASS",
+    "electronCheck": "PASS",
+    "electronPackage": "PASS",
+    "packageSmoke": "PASS",
+    "removalDiffCheck": "PASS"
+  },
+  "blockers": []
+}

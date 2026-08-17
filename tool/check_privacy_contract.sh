@@ -10,14 +10,8 @@ EXTRACTION_RULES="android/app/src/main/res/xml/data_extraction_rules.xml"
 FILE_PATHS="android/app/src/main/res/xml/file_paths.xml"
 SECRET_STORE="android/app/src/main/kotlin/com/voice2text/app/privacy/MeetingApiSecretStore.kt"
 DEEPSEEK_PROVIDER="lib/features/meeting_intelligence/service/deepseek_meeting_intelligence_provider.dart"
-DESKTOP_SECRET_STORE="apps/desktop/lib/features/secrets/desktop_secret_store.dart"
-DESKTOP_DEEPSEEK_PROVIDER="apps/desktop/lib/features/meeting_intelligence/deepseek_desktop_provider.dart"
-DESKTOP_NATIVE_WORKER="apps/desktop/lib/features/processing/native_sherpa_worker_engine.dart"
-DESKTOP_DISK_ENCRYPTION="apps/desktop/lib/features/security/desktop_disk_encryption.dart"
-DESKTOP_APP="apps/desktop/lib/app/desktop_app.dart"
 COMPANION_ANDROID_STORE="android/app/src/main/kotlin/com/voice2text/app/companion/CompanionCredentialStore.kt"
 COMPANION_ANDROID_PLATFORM="android/app/src/main/kotlin/com/voice2text/app/companion/CompanionPlatformPlugin.kt"
-COMPANION_DESKTOP_STORE="apps/desktop/lib/features/companion/desktop_companion_credential_store.dart"
 COMPANION_CRYPTO="packages/companion_protocol/lib/src/companion_crypto.dart"
 
 fail() {
@@ -54,23 +48,11 @@ require_literal "$SECRET_STORE" '"AndroidKeyStore"'
 require_literal "$SECRET_STORE" '"AES/GCM/NoPadding"'
 require_literal "$SECRET_STORE" 'Context.MODE_PRIVATE'
 require_literal "$DEEPSEEK_PROVIDER" 'https://api.deepseek.com/chat/completions'
-require_literal "$DESKTOP_SECRET_STORE" 'KeychainAccessibility.unlocked_this_device'
-require_literal "$DESKTOP_SECRET_STORE" 'synchronizable: false'
-require_literal "$DESKTOP_SECRET_STORE" 'usesDataProtectionKeychain: true'
-require_literal "$DESKTOP_DEEPSEEK_PROVIDER" 'https://api.deepseek.com/chat/completions'
-require_literal "$DESKTOP_NATIVE_WORKER" "environment: const <String, String>{'LANG': 'C.UTF-8'}"
-require_literal "$DESKTOP_NATIVE_WORKER" 'includeParentEnvironment: false'
-require_literal "$DESKTOP_DISK_ENCRYPTION" "/usr/bin/fdesetup"
-require_literal "$DESKTOP_APP" "FileVault 磁盘加密未启用"
-require_literal "$DESKTOP_APP" "会议数据库和音频没有应用层整库加密"
 require_literal "$COMPANION_ANDROID_STORE" '"AndroidKeyStore"'
 require_literal "$COMPANION_ANDROID_STORE" '"AES/GCM/NoPadding"'
 require_literal "$COMPANION_ANDROID_STORE" 'Context.MODE_PRIVATE'
 require_literal "$COMPANION_ANDROID_PLATFORM" '"_voice2text-media._tcp."'
 require_literal "$COMPANION_ANDROID_PLATFORM" '"LOCAL_NETWORK_PERMISSION_DENIED"'
-require_literal "$COMPANION_DESKTOP_STORE" 'KeychainAccessibility.unlocked_this_device'
-require_literal "$COMPANION_DESKTOP_STORE" 'synchronizable: false'
-require_literal "$COMPANION_DESKTOP_STORE" 'usesDataProtectionKeychain: true'
 require_literal "$COMPANION_CRYPTO" 'Hkdf(hmac: Hmac.sha256(), outputLength: 64)'
 require_literal "$COMPANION_CRYPTO" 'AesGcm.with256bits()'
 require_literal "$COMPANION_CRYPTO" "'REPLAY_REJECTED'"
@@ -92,16 +74,9 @@ if rg -n \
 fi
 
 if rg -q 'sk-[A-Za-z0-9]{20,}' \
-  lib apps/desktop/lib android/app/src/main/kotlin benchmark docs/product; then
+  lib android/app/src/main/kotlin benchmark docs/product \
+  apps/desktop-electron/src packages/desktop_macos_native/Sources; then
   fail "source, product evidence, or benchmark output contains a credential-shaped literal"
-fi
-
-if rg -n -i \
-  '(api[_-]?key|authorization|bearer|secret)' \
-  apps/desktop/lib/features/processing \
-  apps/desktop/lib/features/meeting_intelligence/desktop_meeting_ai_repository.dart \
-  apps/desktop/lib/features/meetings/data >/dev/null; then
-  fail "desktop worker or SQLite persistence boundary contains a credential shape"
 fi
 
 if rg -n \
@@ -118,7 +93,7 @@ if rg -n '\bLog\.(v|d|i|w|e)\(' \
 fi
 
 if rg -n '\b(debugPrint|print)\(' \
-  lib apps/desktop/lib \
+  lib \
   -g '!privacy_safe_log.dart' >/dev/null; then
   fail "Dart production code bypasses PrivacySafeLog"
 fi

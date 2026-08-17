@@ -2,7 +2,7 @@
 
 ## Product boundary
 
-`apps/desktop` is an independent macOS-first Flutter application. It shares stable meeting, storage, workflow, and processing contracts through the root Pub workspace, but it does not import the root mobile application. Windows has no runner until the macOS closure gate passes.
+`apps/desktop-electron` is the independent macOS Electron application. It consumes versioned process contracts and compiled Dart/native workers without importing the mobile Flutter application. The retired Flutter Desktop implementation survives only as inert, hash-bound source evidence. Windows is deferred outside the current supported target set and has no PASS.
 
 The desktop app owns its SQLite database under its own application-support directory. Mobile and desktop never copy or share a live database file. Later device exchange must use versioned media, task, and result manifests.
 
@@ -43,7 +43,7 @@ API and future pairing secrets use macOS Keychain through the secure-storage ada
 
 ## Dependency and support envelope
 
-The root workspace has one lockfile for the mobile app, desktop app, and shared packages. U4 resolves real FFI SQLite, file selection, playback, secure storage, Sherpa runtime, and Goo component dependencies without adding an unsupported override.
+The root Dart workspace has one lockfile for the mobile app and shared Dart packages. Electron owns its independent `package.json` and `bun.lock` under `apps/desktop-electron`; its native helper and worker resources remain outside ASAR and are hash-verified before use.
 
 The workstation launch target is macOS 13.0. Sherpa 1.13.4's packaged
 `libonnxruntime.1.27.0.dylib` still requires macOS 15.5, so it is no longer

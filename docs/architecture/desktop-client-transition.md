@@ -2,23 +2,18 @@
 
 ## Status
 
-Accepted on 2026-08-14. This decision refines the existing
-`MONOREPO_KEEP_ROOT_MOBILE` repository strategy; it does not split the product
-into a second repository.
+Accepted on 2026-08-14 and closed on 2026-08-17. This decision refines the
+existing `MONOREPO_KEEP_ROOT_MOBILE` repository strategy; it does not split the
+product into a second repository.
 
 ## Decision
 
-The repository will temporarily contain two desktop client locations:
-
-- `apps/desktop` remains the current Flutter desktop implementation, behavioral
-  reference, and retained evidence source. It is not a runtime fallback and is
-  not launched by the Electron migration.
-- `apps/desktop-electron` is the replacement Electron desktop client and owns an
-  independent runtime profile.
-
-The existing Flutter directory is not renamed during the transition because
-build scripts, validators, benchmark evidence, and product documentation already
-refer to `apps/desktop`.
+`apps/desktop-electron` is the only supported desktop composition root. The
+Flutter Desktop composition root was retired through U14 after the packaged
+macOS Electron gate passed. Frozen Flutter behavior sources remain inert,
+hash-bound fixtures under
+`apps/desktop-electron/tests/fixtures/flutter-reference/source/`; they are not
+an application, runtime fallback, or shared profile.
 
 ## Boundaries
 
@@ -32,13 +27,12 @@ refer to `apps/desktop`.
 - Existing target-specific model, runtime, benchmark, privacy, cancellation,
   recovery, and artifact-integrity evidence remains authoritative until the
   Electron client produces equivalent evidence for its own packaged artifacts.
-- During migration, `apps/desktop` receives compatibility, security, and
-  reference-blocking fixes. New desktop product work should avoid unnecessary
-  dual implementation unless it is required to keep the reference usable.
+- Flutter reference material is historical evidence only. Active build, test,
+  benchmark, and packaging commands must not depend on the retired source root.
 
 ## Flutter removal gate
 
-`apps/desktop` can be removed only after the Electron client has all of the
+The completed U14 removal gate required the Electron client to have all of the
 following:
 
 1. An approved capability-parity matrix covering the desktop product flows.
@@ -52,7 +46,7 @@ following:
 6. A real-user or release-candidate validation showing that Flutter reference
    source is no longer required for critical-work parity evidence.
 
-Removal is a separate reviewed change. It must delete Flutter-only desktop
+Removal is a separate reviewed change. It deletes Flutter-only desktop
 build wiring and documentation without deleting shared contracts, workers,
 fixtures, benchmarks, or retained historical evidence.
 
@@ -67,10 +61,8 @@ fingerprint, product-flow checks, privacy scan, and accessibility checks.
 
 The active macOS gate remains `DEVELOPMENT_ONLY`; notarization, automatic
 updates, store submission, and a release-candidate device matrix are explicitly
-outside it. Windows begins only after macOS closure and must produce independent
-target evidence. A macOS result never transfers to Windows.
-
-Until both supported targets pass independently, the Flutter removal gate is
-closed. A blocked Electron result preserves `apps/desktop` as reference source
-and does not authorize launching it, opening its runtime profile, sharing its
-database, or using it as a fallback.
+outside it. On 2026-08-17 the user explicitly set the current supported desktop
+target to macOS only. Windows/U13 is `DEFERRED_OUT_OF_CURRENT_SCOPE`: it has no
+PASS, evidence, or inherited macOS result and may be reopened only as an
+independent future target. The scope decision does not authorize launching,
+opening, copying, or cleaning any historical Flutter runtime profile.

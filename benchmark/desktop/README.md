@@ -9,7 +9,7 @@ never inherited by Windows.
 Run the fixed macOS Sherpa baseline:
 
 ```bash
-(cd apps/desktop && flutter build macos --debug)
+(cd apps/desktop-electron && bun run package)
 ./benchmark/desktop/prepare_macos_benchmark_assets.sh
 ./benchmark/desktop/run_macos_sherpa_baseline.sh
 python3 benchmark/desktop/validate_desktop_evidence.py \
@@ -17,8 +17,8 @@ python3 benchmark/desktop/validate_desktop_evidence.py \
   --evidence-root benchmark/desktop/evidence/macos-sherpa-1.13.4
 ```
 
-The command-line runner deliberately loads the thinned and signed Sherpa
-frameworks from the built app. Loading the unthinned universal pub-cache dylib
+The command-line runner deliberately loads the verified Sherpa runtime from
+`apps/desktop-electron/resources/worker/runtime`. Loading the unthinned universal pub-cache dylib
 is rejected as runtime evidence because its code signature does not verify on
 this target.
 

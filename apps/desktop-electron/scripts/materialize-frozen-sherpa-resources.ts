@@ -104,7 +104,7 @@ const runtimeMembers = [
 
 const authorityPath = path.resolve(
   process.argv[2] ??
-    "../desktop/assets/processing/frozen_sherpa_macos_arm64.json",
+    "../../packages/desktop_sherpa_worker/assets/processing/frozen_sherpa_macos_arm64.json",
 );
 const outputRoot = path.resolve(process.argv[3] ?? "resources/worker");
 const rootLockPath = path.resolve(process.argv[4] ?? "../../pubspec.lock");
@@ -113,7 +113,7 @@ const temporaryRoot = process.argv[5]
   : await mkdtemp(path.join(os.tmpdir(), "voice2text-electron-sherpa-"));
 const senseVoiceAuthorityPath = path.resolve(
   process.argv[6] ??
-    "../desktop/assets/processing/frozen_sensevoice_macos_arm64.json",
+    "../../packages/desktop_sherpa_worker/assets/processing/frozen_sensevoice_macos_arm64.json",
 );
 const senseVoiceLockPath = path.resolve(
   process.argv[7] ??

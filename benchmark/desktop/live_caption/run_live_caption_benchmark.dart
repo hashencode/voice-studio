@@ -64,7 +64,7 @@ Future<void> main(List<String> arguments) async {
     await _verify(vad, (contract['vad']! as Map)['sha256']! as String);
     await _verifyRuntime(runtimeRoot, contract['runtime']! as Map);
     final workerPath =
-        '${repositoryRoot.path}/apps/desktop/tool/'
+        '${repositoryRoot.path}/packages/desktop_sherpa_worker/bin/'
         'desktop_sensevoice_caption_worker.dart';
     worker = await Process.start(
       workerExecutable.path,
@@ -81,7 +81,8 @@ Future<void> main(List<String> arguments) async {
         '--vad-sha256=${(contract['vad']! as Map)['sha256']}',
         '--control-json=${jsonEncode(contract['control'])}',
       ],
-      workingDirectory: '${repositoryRoot.path}/apps/desktop',
+      workingDirectory:
+          '${repositoryRoot.path}/packages/desktop_sherpa_worker',
       environment: <String, String>{
         'PATH': Platform.environment['PATH'] ?? '/usr/bin:/bin',
         'LANG': 'en_US.UTF-8',

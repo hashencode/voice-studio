@@ -34,6 +34,16 @@ class ContractBundleTest(unittest.TestCase):
         )
         validate_runtime_characterization(characterization, self.contract)
 
+    def test_runtime_characterization_rejects_retired_test_path(self) -> None:
+        characterization = json.loads(
+            (ROOT / "runtime_lane_characterization.json").read_text()
+        )
+        characterization["characterizationTest"] = (
+            "apps/" + "desktop/test/desktop_asr_candidate_worker_test.dart"
+        )
+        with self.assertRaisesRegex(ContractError, "test binding"):
+            validate_runtime_characterization(characterization, self.contract)
+
     def test_requires_exact_first_round_candidate_set(self) -> None:
         self.candidates["candidates"].pop()
         with self.assertRaisesRegex(ContractError, "first-round candidate set"):

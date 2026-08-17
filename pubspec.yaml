@@ -23,7 +23,6 @@ environment:
 
 workspace:
   - apps/codex_ui_reproduction
-  - apps/desktop
   - packages/companion_protocol
   - packages/desktop_sherpa_worker
   - packages/meeting_core

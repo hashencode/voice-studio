@@ -3,7 +3,7 @@
 ## Context
 
 The repository keeps the Android mobile core at the root while adding a desktop
-meeting workstation under `apps/desktop`. Both products share data contracts and
+meeting workstation under `apps/desktop-electron`. Both products share data contracts and
 workflows without making either application package depend on the other.
 
 ## Boundary pattern
@@ -16,7 +16,7 @@ into workspace packages:
 - `processing_contracts` owns processing job/result contracts.
 - `meeting_workflows` owns revision, export, and recovery behavior.
 - The root app composes Android capture and mobile capabilities.
-- `apps/desktop` composes file import, native workers, desktop playback, review,
+- `apps/desktop-electron` composes file import, native workers, desktop playback, review,
   LAN receive, Keychain, and macOS-specific security truth.
 
 This prevents the desktop app from importing the mobile package and avoids

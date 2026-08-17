@@ -9,6 +9,13 @@
 # packages, and plugins designed to encourage good coding practices.
 include: package:flutter_lints/flutter.yaml
 
+analyzer:
+  exclude:
+    # Byte-for-byte Flutter Desktop reference evidence retained for Electron
+    # parity validation. It is intentionally inert and is not a workspace
+    # package after the U14 retirement.
+    - apps/desktop-electron/tests/fixtures/flutter-reference/source/**
+
 linter:
   # The lint rules applied to this project can be customized in the
   # section below to disable rules from the `package:flutter_lints/flutter.yaml`

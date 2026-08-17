@@ -562,6 +562,106 @@ def _validate_live_source_binding(root: Path, source: dict[str, Any]) -> None:
     _require(not untracked, "untracked relevant source is present")
 
 
+def _validate_retired_flutter_scope(
+    scope: dict[str, Any],
+    *,
+    root: Path,
+    validate_repository: bool,
+) -> dict[str, Any]:
+    try:
+        from tool.validate_electron_desktop_removal import (
+            validate_electron_desktop_removal,
+        )
+    except ModuleNotFoundError:
+        from validate_electron_desktop_removal import (  # type: ignore[no-redef]
+            validate_electron_desktop_removal,
+        )
+
+    _exact_fields(
+        scope,
+        {
+            "$schema",
+            "schema",
+            "developmentPosture",
+            "application",
+            "supportScope",
+            "macosClosure",
+            "removal",
+            "releaseExclusions",
+        },
+        "retired Flutter scope",
+    )
+    _require(
+        scope.get("developmentPosture") == "DEVELOPMENT_ONLY",
+        "DEVELOPMENT_ONLY posture is required",
+    )
+    _require(
+        _mapping(scope.get("application"), "application")
+        == {
+            "compositionRoot": "apps/desktop-electron",
+            "packageManager": "bun",
+            "rendererBuild": "vite",
+            "desktopPackaging": "electron-forge",
+            "rendererStack": "react-typescript-shadcn-tailwind-sidebar-07",
+            "flutterRuntimeFallback": False,
+            "sharedRuntimeDatabase": False,
+            "flutterDesktopLifecycle": "RETIRED",
+        },
+        "application boundary drift",
+    )
+    _require(
+        _mapping(scope.get("supportScope"), "support scope")
+        == {
+            "decisionId": "MACOS_ONLY_SUPPORTED_SCOPE_2026_08_17",
+            "authority": "user-directed",
+            "supportedTargets": ["macos"],
+            "windows": {
+                "status": "DEFERRED_OUT_OF_CURRENT_SCOPE",
+                "inheritsMacosPass": False,
+                "evidence": None,
+            },
+        },
+        "supported target scope is invalid",
+    )
+    closure = _mapping(scope.get("macosClosure"), "macOS closure")
+    _exact_fields(closure, {"status", "historicalEvidence"}, "macOS closure")
+    _require(closure.get("status") == "PASS", "macOS closure is blocked")
+    evidence = _mapping(closure.get("historicalEvidence"), "historical evidence")
+    _exact_fields(evidence, {"path", "sha256"}, "historical evidence")
+    evidence_path = _safe_repository_path(root, evidence.get("path"), "historical evidence")
+    _require(
+        evidence_path == root / "docs/product/desktop-electron-evidence.json"
+        and _sha256(evidence_path) == _sha(evidence.get("sha256"), "historical evidence hash"),
+        "historical macOS evidence hash drift",
+    )
+    removal = _mapping(scope.get("removal"), "removal")
+    _exact_fields(removal, {"status", "manifest"}, "removal")
+    _require(removal.get("status") == "PASS", "Flutter Desktop removal is blocked")
+    binding = _mapping(removal.get("manifest"), "removal manifest binding")
+    _exact_fields(binding, {"path", "sha256"}, "removal manifest binding")
+    removal_path = _safe_repository_path(root, binding.get("path"), "removal manifest")
+    _require(
+        _sha256(removal_path) == _sha(binding.get("sha256"), "removal manifest hash"),
+        "removal manifest hash drift",
+    )
+    _require(
+        _mapping(scope.get("releaseExclusions"), "release exclusions")
+        == {
+            "maximumValidationSessionMinutes": 30,
+            "productionNotarization": False,
+            "automaticUpdates": False,
+            "storeSubmission": False,
+            "releaseCandidateDeviceMatrix": False,
+        },
+        "DEVELOPMENT_ONLY release exclusions drift",
+    )
+    return validate_electron_desktop_removal(
+        removal_path,
+        root=root,
+        validate_repository=validate_repository,
+    )
+
+
 def validate_electron_desktop_scope(
     scope_path: Path = DEFAULT_SCOPE,
     *,
@@ -573,6 +673,12 @@ def validate_electron_desktop_scope(
 ) -> dict[str, Any]:
     root = root.resolve()
     scope = _load(scope_path, "Electron desktop scope")
+    if scope.get("schema") == "voice2text-desktop-electron-scope/v2":
+        return _validate_retired_flutter_scope(
+            scope,
+            root=root,
+            validate_repository=validate_repository,
+        )
     evidence = _load(evidence_path, "Electron desktop evidence")
     _scan_sensitive_evidence(evidence, root=root)
     _exact_fields(scope, _SCOPE_FIELDS, "scope")

@@ -6,7 +6,7 @@ cd "$ROOT"
 
 ASR_MODEL_ROOT="$ROOT/build/desktop_benchmark/sherpa-onnx-streaming-zipformer-zh-14M-2023-02-23"
 SPEAKER_CACHE="$ROOT/build/speaker_diarization"
-RUNTIME_ROOT="$ROOT/apps/desktop/build/macos/Build/Products/Debug/voice2text_desktop.app/Contents/Frameworks"
+RUNTIME_ROOT="$ROOT/apps/desktop-electron/resources/worker/runtime"
 OUTPUT_ROOT="${OUTPUT_ROOT:-$ROOT/benchmark/desktop/evidence/macos-sherpa-1.13.4}"
 CONTRACT_ID="desktop-processing/macos-sherpa-1.13.4-v1"
 PROBES="${1:-asr,functional,resource}"
@@ -26,7 +26,7 @@ if [[ "$PROBES" == "asr,functional,resource" ]]; then
   rm -rf "$OUTPUT_ROOT"
 fi
 mkdir -p "$OUTPUT_ROOT"
-dart run apps/desktop/tool/desktop_sherpa_benchmark.dart \
+(cd packages/desktop_sherpa_worker && dart run tool/desktop_sherpa_benchmark.dart \
   --contract-id "$CONTRACT_ID" \
   --output-root "$OUTPUT_ROOT" \
   --runtime-root "$RUNTIME_ROOT" \
@@ -44,7 +44,7 @@ dart run apps/desktop/tool/desktop_sherpa_benchmark.dart \
   --speaker-resource "$SPEAKER_CACHE/fixtures/speaker-resource-120m.wav" \
   --timeout-seconds "$TIMEOUT_SECONDS" \
   --num-threads 2 \
-  --probes "$PROBES"
+  --probes "$PROBES")
 
 if [[ "$PROBES" == "asr,functional,resource" ]]; then
   python3 benchmark/desktop/validate_desktop_evidence.py \

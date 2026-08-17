@@ -5,8 +5,8 @@ electron_root="$(cd "$(dirname "$0")/.." && pwd)"
 repository_root="$(cd "$electron_root/../.." && pwd)"
 resources_root="$electron_root/resources"
 worker_root="$resources_root/worker"
-sherpa_authority="$repository_root/apps/desktop/assets/processing/frozen_sherpa_macos_arm64.json"
-sensevoice_authority="$repository_root/apps/desktop/assets/processing/frozen_sensevoice_macos_arm64.json"
+sherpa_authority="$repository_root/packages/desktop_sherpa_worker/assets/processing/frozen_sherpa_macos_arm64.json"
+sensevoice_authority="$repository_root/packages/desktop_sherpa_worker/assets/processing/frozen_sensevoice_macos_arm64.json"
 sensevoice_lock="$electron_root/assets/processing/frozen_sensevoice_macos_arm64.lock.json"
 
 bun "$electron_root/scripts/assert-worker-resource-host.ts"
@@ -37,7 +37,7 @@ trap 'exit 143' TERM
 
 cp -R "$worker_root/." "$staging_root/"
 dart compile exe \
-  "$repository_root/apps/desktop/tool/desktop_sensevoice_caption_worker.dart" \
+  "$repository_root/packages/desktop_sherpa_worker/bin/desktop_sensevoice_caption_worker.dart" \
   -o "$staging_root/bin/desktop_sensevoice_caption_worker"
 LC_ALL=C perl -pi -e \
   's{(/T/)[A-Za-z0-9]{6}(/snapshot\.aot)}{$1stable$2}g' \

@@ -22,7 +22,7 @@ class BuildCacheGuardTest(unittest.TestCase):
             },
             {
                 ".": 7.0,
-                "apps/desktop": 1.5,
+                "apps/codex_ui_reproduction": 0.5,
                 "packages/companion_protocol": 0.5,
                 "packages/desktop_sherpa_worker": 0.5,
                 "packages/meeting_core": 0.5,
@@ -297,7 +297,9 @@ class BuildCacheGuardTest(unittest.TestCase):
 
             external = root / "external-build"
             external.mkdir()
-            (root / "apps" / "desktop" / "build").symlink_to(
+            (
+                root / "packages" / "desktop_sherpa_worker" / "build"
+            ).symlink_to(
                 external,
                 target_is_directory=True,
             )
@@ -344,13 +346,13 @@ class BuildCacheGuardTest(unittest.TestCase):
         self.assertLess(guard, script.index('mkdir -p "$LOG_DIR"', start))
         self.assertLess(guard, script.index("flutter_command=(", start))
 
-    def test_dev_check_rebuilds_desktop_before_closure_validation(self):
+    def test_dev_check_validates_removal_before_desktop_foundation(self):
         root = pathlib.Path(__file__).resolve().parent.parent
         script = (root / "tool" / "dev_check.sh").read_text()
 
         self.assertLess(
-            script.index("flutter build macos --debug"),
-            script.index("tool/test_validate_macos_closure.py"),
+            script.index("tool/test_validate_electron_desktop_removal.py"),
+            script.index("./tool/check_desktop_foundation.sh"),
         )
 
 

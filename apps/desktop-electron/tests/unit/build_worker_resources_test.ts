@@ -136,14 +136,14 @@ describe("worker resource publication", () => {
         resolve("scripts/materialize-frozen-sherpa-resources.ts"),
         join(
           repositoryRoot,
-          "apps/desktop/assets/processing/frozen_sherpa_macos_arm64.json",
+          "packages/desktop_sherpa_worker/assets/processing/frozen_sherpa_macos_arm64.json",
         ),
         join(root, "output"),
         join(repositoryRoot, "pubspec.lock"),
         root,
         join(
           repositoryRoot,
-          "apps/desktop/assets/processing/frozen_sensevoice_macos_arm64.json",
+          "packages/desktop_sherpa_worker/assets/processing/frozen_sensevoice_macos_arm64.json",
         ),
         lockPath,
       ],
@@ -175,14 +175,14 @@ describe("worker resource publication", () => {
         resolve("scripts/materialize-frozen-sherpa-resources.ts"),
         join(
           repositoryRoot,
-          "apps/desktop/assets/processing/frozen_sherpa_macos_arm64.json",
+          "packages/desktop_sherpa_worker/assets/processing/frozen_sherpa_macos_arm64.json",
         ),
         join(root, "output"),
         join(repositoryRoot, "pubspec.lock"),
         root,
         join(
           repositoryRoot,
-          "apps/desktop/assets/processing/frozen_sensevoice_macos_arm64.json",
+          "packages/desktop_sherpa_worker/assets/processing/frozen_sensevoice_macos_arm64.json",
         ),
         lockPath,
       ],

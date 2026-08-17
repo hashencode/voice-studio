@@ -69,19 +69,13 @@ publication still belong to one logical processing job.
 - The worker receives only a fixed locale environment, and packet inspection of
   the U8 LAN flow found no fixed plaintext meeting content or reusable credential.
 
-## Reproduction and closure commands
+## Archived reproduction record
 
-```bash
-cd apps/desktop
-flutter test integration_test/macos_workstation_regression_test.dart -d macos
-flutter test test/u9_long_meeting_gate_test.dart --plain-name \
-  'U9 real 120-minute final product pipeline closes under 30 minutes'
-flutter test test/u7_dogfood_gate_test.dart --plain-name \
-  'five-meeting dogfood passes the frozen product threshold'
-cd ../..
-python3 tool/validate_macos_closure.py
-./tool/dev_check.sh --with-build
-```
+The Flutter commands that produced this historical matrix were retired with
+the Flutter Desktop composition root and are intentionally no longer runnable.
+The referenced JSON evidence and archived source fixtures retain their original
+bytes and hashes. Current macOS verification uses `tool/check_electron_desktop.sh`
+and `tool/validate_electron_desktop_scope.py`.
 
 The two long-running product gates are evidence-producing gates and are not
 silently replaced by synthetic results in routine test runs. The closure

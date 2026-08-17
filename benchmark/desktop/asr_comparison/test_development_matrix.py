@@ -5,6 +5,7 @@ import hashlib
 import io
 import json
 import struct
+import sys
 import tempfile
 import unittest
 import wave
@@ -21,6 +22,7 @@ from development_matrix import (
     validate_prepared_fixture_pack,
     validate_runtime_identity,
     validate_target_fingerprint,
+    main,
 )
 
 
@@ -32,6 +34,41 @@ class DevelopmentMatrixTest(unittest.TestCase):
         self.contract = json.loads((ROOT / "macos_contract.json").read_text())
         self.registry = json.loads((ROOT / "candidates.json").read_text())
         self.fixtures = json.loads((ROOT / "fixtures.json").read_text())
+
+    def test_cli_defaults_to_electron_worker_runtime(self) -> None:
+        repository_root = ROOT.parents[2]
+        expected_runtime = (
+            repository_root
+            / "apps/desktop-electron/resources/worker/runtime"
+        ).resolve()
+        with (
+            patch.object(
+                sys,
+                "argv",
+                [
+                    "development_matrix.py",
+                    "--root",
+                    str(repository_root),
+                    "--preflight",
+                ],
+            ),
+            patch(
+                "development_matrix.preflight_development_matrix"
+            ) as preflight,
+            patch("builtins.print"),
+        ):
+            preflight.return_value = {
+                "targetFingerprint": {},
+                "schedule": [],
+                "assets": {},
+                "fixtures": {},
+            }
+            self.assertEqual(main(), 0)
+
+        self.assertEqual(
+            preflight.call_args.kwargs["runtime_root"],
+            expected_runtime,
+        )
 
     def test_current_unfrozen_development_pack_fails_before_scheduling(self) -> None:
         with self.assertRaisesRegex(

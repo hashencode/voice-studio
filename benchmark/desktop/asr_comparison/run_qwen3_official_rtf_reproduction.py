@@ -1264,7 +1264,8 @@ def execute(args: argparse.Namespace) -> dict[str, Any]:
                 diagnostic_tools / "qwen3_official_rtf_diagnostic_worker"
             ),
             "workerSourceSha256": sha256_file(
-                root / "apps/desktop/tool/qwen3_official_rtf_diagnostic_worker.dart"
+                root
+                / "packages/desktop_sherpa_worker/tool/qwen3_official_rtf_diagnostic_worker.dart"
             ),
             "sandboxedLauncherSha256": sha256_file(
                 diagnostic_tools / "sandboxed_candidate_launcher"

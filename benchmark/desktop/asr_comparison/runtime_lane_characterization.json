@@ -54,7 +54,7 @@
       ]
     }
   },
-  "characterizationTest": "apps/desktop/test/desktop_asr_candidate_worker_test.dart",
+  "characterizationTest": "packages/desktop_sherpa_worker/test/desktop_asr_candidate_worker_test.dart",
   "outcome": "SUPPORTED",
   "runtimeUpgradeRequired": false,
   "baselineRerunRequiredOnAnyFutureUpgrade": true,

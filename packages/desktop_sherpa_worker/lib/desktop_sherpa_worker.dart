@@ -20,6 +20,7 @@ export 'package:processing_contracts/processing_contracts.dart'
         validateFrozenQwen3ProductProfile;
 
 export 'src/qwen3_result.dart';
+export 'src/sidecar_sandbox.dart';
 export 'src/sherpa_desktop_processing_engine.dart';
 export 'src/sherpa_runtime_probe.dart';
 export 'src/worker_health_contract.dart';

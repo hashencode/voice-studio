@@ -13,16 +13,15 @@ test -f benchmark/desktop/evidence/macos/funasr-paraformer.json
 test -f benchmark/desktop/evidence/macos/pyannote-community-1.json
 test -f benchmark/desktop/MACOS_ENGINE_SELECTION.md
 test -f packages/desktop_sherpa_worker/lib/src/sherpa_desktop_processing_engine.dart
-test -f apps/desktop/lib/features/processing/sidecar/sidecar_process_client.dart
 test -f packages/processing_contracts/lib/src/sidecar_protocol.dart
-test -f apps/desktop/macos/Runner/Processing/README.md
+test -f packages/desktop_sherpa_worker/lib/src/sidecar_sandbox.dart
 test -x benchmark/desktop/run_macos_sherpa_baseline.sh
 test -x benchmark/desktop/prepare_macos_benchmark_assets.sh
 test -x benchmark/desktop/run_offline_vertical_slice.sh
 test -x benchmark/desktop/run_cancellation_probe.py
 test -x benchmark/desktop/run_funasr_benchmark.py
-test -x apps/desktop/tool/processing_sidecar/launcher.py
-test -x apps/desktop/tool/processing_sidecar/worker.py
+test -x benchmark/desktop/processing_sidecar/launcher.py
+test -x benchmark/desktop/processing_sidecar/worker.py
 
 python3 - <<'PY'
 import json
@@ -60,9 +59,9 @@ python3 benchmark/desktop/validate_macos_engine_selection.py \
 python3 -m py_compile \
   benchmark/desktop/asr_comparison/qwen3_optimization_driver.py \
   benchmark/desktop/run_funasr_benchmark.py \
-  apps/desktop/tool/processing_sidecar/launcher.py \
-  apps/desktop/tool/processing_sidecar/worker.py \
-  apps/desktop/tool/processing_sidecar/contract_fixture.py
+  benchmark/desktop/processing_sidecar/launcher.py \
+  benchmark/desktop/processing_sidecar/worker.py \
+  benchmark/desktop/processing_sidecar/contract_fixture.py
 
 EVIDENCE=benchmark/desktop/evidence/macos-sherpa-1.13.4
 if [[ -f "$EVIDENCE/index.json" ]]; then

@@ -44,6 +44,11 @@ TERMINAL_DISPOSITIONS = {
     "RECOMMEND_REPLACEMENT",
     "RETAINED_BASELINE",
 }
+REPOSITORY_ROOT = Path(__file__).resolve().parents[3]
+CHARACTERIZATION_TEST = (
+    "packages/desktop_sherpa_worker/test/"
+    "desktop_asr_candidate_worker_test.dart"
+)
 
 
 class ContractError(ValueError):
@@ -900,6 +905,15 @@ def validate_runtime_characterization(
         and characterization["runtimeUpgradeRequired"] is False
         and characterization["baselineRerunRequiredOnAnyFutureUpgrade"] is True,
         "runtime lane characterization outcome mismatch",
+    )
+    require(
+        characterization["characterizationTest"] == CHARACTERIZATION_TEST,
+        "runtime characterization test binding mismatch",
+    )
+    characterization_test = REPOSITORY_ROOT / CHARACTERIZATION_TEST
+    require(
+        characterization_test.is_file() and not characterization_test.is_symlink(),
+        "runtime characterization test is missing",
     )
 
 

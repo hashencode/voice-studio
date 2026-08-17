@@ -4,43 +4,20 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$ROOT"
 
-test -f apps/desktop/macos/Runner/SecureLocalImportPlugin.swift
-test -f apps/desktop/macos/Runner/Capture/RecordingMenuBarController.swift
-test ! -d apps/desktop/windows
+test ! -e apps/desktop
+test ! -L apps/desktop
+test -f apps/desktop-electron/package.json
+test -f apps/desktop-electron/src/main/index.ts
+test -f packages/desktop_macos_native/Sources/SecureImport/SecureImporter.swift
+test -f packages/desktop_macos_native/Sources/CaptureCore/CaptureController.swift
 test -f docs/architecture/desktop-runtime-boundaries.md
-
-grep -A4 -q \
-  'applicationShouldTerminateAfterLastWindowClosed.*' \
-  apps/desktop/macos/Runner/AppDelegate.swift
-if ! grep -A4 \
-  'applicationShouldTerminateAfterLastWindowClosed.*' \
-  apps/desktop/macos/Runner/AppDelegate.swift | grep -q 'return false'; then
-  echo "Closing the main window must not terminate an active desktop capture." >&2
-  exit 1
-fi
-
-grep -q '^resolution: workspace$' apps/desktop/pubspec.yaml
-for dependency in \
-  companion_protocol \
-  file_selector \
-  flutter_secure_storage \
-  media_kit \
-  meeting_storage \
-  sqflite_common_ffi
-do
-  grep -q "^  ${dependency}:" apps/desktop/pubspec.yaml
-done
 
 # The workstation shell must remain launchable below the local-processing
 # runtime floor. Sherpa/ONNX belongs only to the isolated worker package.
-if grep -q '^  sherpa_onnx:' apps/desktop/pubspec.yaml; then
-  echo "Desktop shell must not link sherpa_onnx directly." >&2
-  exit 1
-fi
 grep -q '^  sherpa_onnx:' packages/desktop_sherpa_worker/pubspec.yaml
 grep -q '^  - packages/desktop_sherpa_worker$' pubspec.yaml
 
-IMPORT_HOST=apps/desktop/macos/Runner/SecureLocalImportPlugin.swift
+IMPORT_HOST=packages/desktop_macos_native/Sources/SecureImport/SecureImporter.swift
 for primitive in \
   O_NOFOLLOW \
   fstat \
@@ -49,15 +26,21 @@ for primitive in \
   volumeAvailableCapacityForImportantUsage \
   SHA256 \
   fsync \
-  rename \
-  resolvingSymlinksInPath
+  openat \
+  unlinkat \
+  renameatx_np
 do
   grep -q "$primitive" "$IMPORT_HOST"
 done
 
-if rg -n 'class Fake|Fake[A-Za-z]*Engine|fake_[a-z_]*engine' apps/desktop/lib >/dev/null; then
-  echo "Production desktop code must not install fake processing behavior." >&2
+if rg -n 'apps/desktop/' \
+  apps/desktop-electron/scripts \
+  tool/dev_check.sh \
+  tool/check_desktop_benchmark.sh |
+  rg -v 'apps/desktop-electron/tests/fixtures/flutter-reference/source/apps/desktop/' \
+    >/dev/null; then
+  echo "Active desktop tooling must not depend on retired Flutter Desktop." >&2
   exit 1
 fi
 
-echo "Desktop foundation contract passed."
+echo "Electron Desktop foundation contract passed."

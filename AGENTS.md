@@ -25,7 +25,7 @@ Run the normal project checks after relevant changes:
 
 - Before running local Flutter or Gradle builds, tests, benchmarks, or code
   generation, run `python3 tool/build_cache_guard.py`.
-- The guard covers the root app, `apps/desktop`, and every workspace package.
+- The guard covers the root Flutter app and every workspace package.
   It preserves incremental artifacts below the measured 8 GiB repository
   budget and also enforces per-project budgets.
 - If this repository has an active Dart, Flutter, Gradle, or Xcode process,

@@ -4,8 +4,8 @@ set -euo pipefail
 electron_root="$(cd "$(dirname "$0")/.." && pwd)"
 repository_root="$(cd "$electron_root/../.." && pwd)"
 worker_root="$electron_root/resources/worker"
-authority="$repository_root/apps/desktop/assets/processing/frozen_sherpa_macos_arm64.json"
-sensevoice_authority="$repository_root/apps/desktop/assets/processing/frozen_sensevoice_macos_arm64.json"
+authority="$repository_root/packages/desktop_sherpa_worker/assets/processing/frozen_sherpa_macos_arm64.json"
+sensevoice_authority="$repository_root/packages/desktop_sherpa_worker/assets/processing/frozen_sensevoice_macos_arm64.json"
 sensevoice_lock="$electron_root/assets/processing/frozen_sensevoice_macos_arm64.lock.json"
 resources_root="$electron_root/resources"
 
@@ -47,14 +47,14 @@ LC_ALL=C perl -pi -e \
   "$staging_root/bin/desktop_sherpa_worker"
 codesign --force --sign - "$staging_root/bin/desktop_sherpa_worker"
 dart compile exe \
-  "$repository_root/apps/desktop/tool/desktop_sensevoice_caption_worker.dart" \
+  "$repository_root/packages/desktop_sherpa_worker/bin/desktop_sensevoice_caption_worker.dart" \
   -o "$staging_root/bin/desktop_sensevoice_caption_worker"
 LC_ALL=C perl -pi -e \
   's{(/T/)[A-Za-z0-9]{6}(/snapshot\.aot)}{$1stable$2}g' \
   "$staging_root/bin/desktop_sensevoice_caption_worker"
 codesign --force --sign - "$staging_root/bin/desktop_sensevoice_caption_worker"
 clang -O2 \
-  "$repository_root/apps/desktop/tool/native_process_group_launcher.c" \
+  "$repository_root/packages/desktop_sherpa_worker/native/macos/native_process_group_launcher.c" \
   -o "$staging_root/bin/native_process_group_launcher"
 
 cd "$electron_root"

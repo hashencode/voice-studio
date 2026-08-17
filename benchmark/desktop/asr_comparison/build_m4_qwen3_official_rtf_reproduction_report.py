@@ -946,7 +946,8 @@ def validate_bounded(
             f"{group} process-group launcher",
         )
     _verify_hash(
-        repository_root / "apps/desktop/tool/qwen3_official_rtf_diagnostic_worker.dart",
+        repository_root
+        / "packages/desktop_sherpa_worker/tool/qwen3_official_rtf_diagnostic_worker.dart",
         dart["diagnosticWorker"]["workerSourceSha256"],
         "diagnostic worker source",
     )

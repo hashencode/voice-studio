@@ -2,9 +2,10 @@
 
 ## Current decision
 
-macOS Electron closure is **PASS** under the `DEVELOPMENT_ONLY` U12 gate.
-Windows is `READY_FOR_INDEPENDENT_U13`; no macOS result is reused for Windows,
-and U13 must produce its own target-specific package and product-flow evidence.
+macOS Electron closure is **PASS** under the `DEVELOPMENT_ONLY` gate, and U14
+retired the Flutter Desktop composition root. macOS is the only current
+supported desktop target. Windows/U13 is `DEFERRED_OUT_OF_CURRENT_SCOPE`; no
+macOS result is reused for Windows and Windows does not claim PASS.
 
 The packaged macOS application, native helper, workers, runtimes, models,
 resource manifest, dependency lock, source revision, target fingerprint,
@@ -22,12 +23,12 @@ visible focus, dialog containment and restoration, minimum-window operation,
 the packaged application. The temporary VoiceOver and reduced-motion settings
 were restored after the session.
 
-## Next target gate
+## Deferred target
 
-U13 may now begin on Windows hardware or an approved Windows target environment.
-It must repeat install, package, process-tree, native capability, feature,
-accessibility, privacy, and packaged-artifact validation without importing this
-macOS PASS.
+Windows may be reopened later on Windows hardware or an approved Windows target
+environment. It must then repeat install, package, process-tree, native
+capability, feature, accessibility, privacy, and packaged-artifact validation
+without importing this macOS PASS.
 
 ## Bounded accessibility procedure
 
@@ -45,7 +46,8 @@ package hash in a privacy-safe manual receipt. Do not record paths, transcript
 text, audio, credentials, tokens, screenshots with user data, or free-form
 operator notes.
 
-Flutter Desktop remains reference source only. It was not launched, its runtime
-profile was not inspected or migrated, and it is not a runtime fallback or a
+Flutter Desktop source has been retired; selected original source files remain
+only as inert archived fixtures. It was not launched, its runtime profile was
+not inspected, migrated, or cleaned, and it is not a runtime fallback or a
 shared database. Production notarization, automatic updates, store submission,
 and a release-candidate device matrix are outside this development milestone.

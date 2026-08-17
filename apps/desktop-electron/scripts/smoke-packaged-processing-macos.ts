@@ -13,7 +13,7 @@ import type {
 const maximumRunMs = 15 * 60 * 1_000;
 const maximumLogBytes = 64 * 1024;
 const referenceSources = [
-  "apps/desktop/lib/features/processing/desktop_processing_repository.dart",
+  "apps/desktop-electron/tests/fixtures/flutter-reference/source/apps/desktop/lib/features/processing/desktop_processing_repository.dart",
   "packages/desktop_sherpa_worker/bin/desktop_sherpa_worker.dart",
   "packages/desktop_sherpa_worker/lib/src/sherpa_desktop_processing_engine.dart",
 ] as const;

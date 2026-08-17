@@ -290,7 +290,7 @@ speaker identity, or absolute path. It never edits the tracked manifest
 automatically; activation remains an explicit reviewed contract revision.
 
 The benchmark Dart launcher in
-`apps/desktop/tool/asr_benchmark/sandboxed_candidate_launcher.dart` reuses the
+`packages/desktop_sherpa_worker/tool/asr_benchmark/sandboxed_candidate_launcher.dart` reuses the
 desktop sidecar roots/profile and enters the native process-group launcher. It
 fails closed unless active network and user-home probes both produce a
 permission denial; connection refusal is not accepted as proof.

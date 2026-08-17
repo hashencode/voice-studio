@@ -809,9 +809,7 @@ def main() -> int:
     ).resolve()
     runtime_root = (
         args.runtime_root
-        or root
-        / "apps/desktop/build/macos/Build/Products/Debug/"
-        "voice2text_desktop.app/Contents/Frameworks"
+        or root / "apps/desktop-electron/resources/worker/runtime"
     ).resolve()
     output_root = (
         args.output_root or root / "build/desktop_asr_comparison/development/m4"

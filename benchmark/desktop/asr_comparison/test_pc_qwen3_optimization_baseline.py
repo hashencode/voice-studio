@@ -10,8 +10,8 @@ ROOT = Path(__file__).resolve().parent
 BASELINE_PATH = ROOT / "pc_qwen3_optimization_baseline.json"
 PRODUCT_MANIFEST_PATH = (
     ROOT.parents[2]
-    / "apps"
-    / "desktop"
+    / "packages"
+    / "desktop_sherpa_worker"
     / "assets"
     / "processing"
     / "frozen_sherpa_macos_arm64.json"

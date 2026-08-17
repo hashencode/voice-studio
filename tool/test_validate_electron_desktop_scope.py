@@ -8,6 +8,7 @@ import subprocess
 import tempfile
 import unittest
 from pathlib import Path
+from unittest.mock import patch
 
 from tool.validate_electron_desktop_scope import (
     ACCESSIBILITY_CHECK_IDS,
@@ -816,6 +817,92 @@ class ElectronDesktopScopeValidatorTest(unittest.TestCase):
         self._write_documents()
         with self.assertRaisesRegex(ValueError, "Windows"):
             self._validate()
+
+    def test_v2_scope_dispatches_to_verified_removal_manifest(self) -> None:
+        removal = self._write(
+            "docs/product/desktop-electron-removal.json",
+            b'{"schema":"fixture"}\n',
+        )
+        historical = self.root / "docs/product/desktop-electron-evidence.json"
+        scope = {
+            "$schema": "https://json-schema.org/draft/2020-12/schema",
+            "schema": "voice2text-desktop-electron-scope/v2",
+            "developmentPosture": "DEVELOPMENT_ONLY",
+            "application": {
+                "compositionRoot": "apps/desktop-electron",
+                "packageManager": "bun",
+                "rendererBuild": "vite",
+                "desktopPackaging": "electron-forge",
+                "rendererStack": "react-typescript-shadcn-tailwind-sidebar-07",
+                "flutterRuntimeFallback": False,
+                "sharedRuntimeDatabase": False,
+                "flutterDesktopLifecycle": "RETIRED",
+            },
+            "supportScope": {
+                "decisionId": "MACOS_ONLY_SUPPORTED_SCOPE_2026_08_17",
+                "authority": "user-directed",
+                "supportedTargets": ["macos"],
+                "windows": {
+                    "status": "DEFERRED_OUT_OF_CURRENT_SCOPE",
+                    "inheritsMacosPass": False,
+                    "evidence": None,
+                },
+            },
+            "macosClosure": {
+                "status": "PASS",
+                "historicalEvidence": {
+                    "path": historical.relative_to(self.root).as_posix(),
+                    "sha256": _sha256(historical),
+                },
+            },
+            "removal": {
+                "status": "PASS",
+                "manifest": {
+                    "path": removal.relative_to(self.root).as_posix(),
+                    "sha256": _sha256(removal),
+                },
+            },
+            "releaseExclusions": {
+                "maximumValidationSessionMinutes": 30,
+                "productionNotarization": False,
+                "automaticUpdates": False,
+                "storeSubmission": False,
+                "releaseCandidateDeviceMatrix": False,
+            },
+        }
+        self.scope_path.write_text(json.dumps(scope), encoding="utf-8")
+        expected = {
+            "status": "PASS",
+            "unit": "U14",
+            "supportedTargets": ["macos"],
+            "windows": "DEFERRED_OUT_OF_CURRENT_SCOPE",
+        }
+        with patch(
+            "tool.validate_electron_desktop_removal.validate_electron_desktop_removal",
+            return_value=expected,
+        ) as removal_validator:
+            self.assertEqual(
+                validate_electron_desktop_scope(
+                    self.scope_path,
+                    root=self.root,
+                    validate_repository=False,
+                ),
+                expected,
+            )
+        removal_validator.assert_called_once_with(
+            removal.resolve(),
+            root=self.root.resolve(),
+            validate_repository=False,
+        )
+
+        scope["supportScope"]["windows"]["status"] = "PASS"
+        self.scope_path.write_text(json.dumps(scope), encoding="utf-8")
+        with self.assertRaisesRegex(ValueError, "supported target"):
+            validate_electron_desktop_scope(
+                self.scope_path,
+                root=self.root,
+                validate_repository=False,
+            )
         self.scope = self._valid_scope(self.evidence)
         self.scope["targets"]["windows"]["inheritsMacosPass"] = True
         self._write_documents()
