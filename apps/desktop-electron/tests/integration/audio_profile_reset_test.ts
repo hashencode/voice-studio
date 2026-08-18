@@ -396,6 +396,41 @@ describe("U8 Audio profile reset boundary", () => {
     }
   });
 
+  it("accepts the released single-file archive shape when the legacy source is gone", () => {
+    const applicationDataRoot = temporaryRoot();
+    const legacyPath =
+      legacyMeetingDatabasePathForApplicationData(applicationDataRoot);
+    seedMeetingEraDatabase(legacyPath);
+    const archiveDirectory = join(
+      applicationDataRoot,
+      "voice2text-electron",
+      "archive",
+    );
+    mkdirSync(archiveDirectory, { recursive: true });
+    const releasedArchive = join(
+      archiveDirectory,
+      "meetings.sqlite3.meeting-era.20260817T132039977Z.archive",
+    );
+    copyFileSync(legacyPath, releasedArchive);
+    rmSync(legacyPath);
+    appendFileSync(`${legacyPath}-wal`, "orphaned released sidecar");
+
+    const result = initializeAudioProfile(applicationDataRoot);
+
+    expect(result.status).toBe("ready");
+    if (result.status !== "ready") throw new Error(result.message);
+    try {
+      expect(result.archivedLegacyDatabasePath).toBe(releasedArchive);
+      expect(
+        result.database
+          .prepare("SELECT COUNT(*) AS count FROM audio_items")
+          .get(),
+      ).toEqual({ count: 0 });
+    } finally {
+      result.database.close();
+    }
+  });
+
   it("returns a bounded path-free blocked message", () => {
     const applicationDataRoot = temporaryRoot();
     const result = initializeAudioProfile(applicationDataRoot, {

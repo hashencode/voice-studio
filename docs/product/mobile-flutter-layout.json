@@ -54,7 +54,7 @@
       },
       {
         "path": "apps/desktop-electron/src/main/profile/audio_profile.ts",
-        "sha256": "e4b81d4eb73a6bb2c030a9d668f5ecda9ade6ea19628af28198af29312f5a86e"
+        "sha256": "b25fa7432a44d000eb66e2210c5bfc1765ed6d90d173d20446f6fabe1f1d05e3"
       },
       {
         "path": "apps/desktop-electron/src/main/profile/profile_paths.ts",

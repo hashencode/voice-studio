@@ -333,8 +333,12 @@ function publishedLegacyArchivePath(
     ) {
       continue;
     }
-    const candidate = join(archiveDirectory, entry, "meetings.sqlite3");
+    const published = join(archiveDirectory, entry);
     try {
+      const publishedMetadata = lstatSync(published);
+      if (publishedMetadata.isFile()) return published;
+      if (!publishedMetadata.isDirectory()) continue;
+      const candidate = join(published, "meetings.sqlite3");
       if (lstatSync(candidate).isFile()) return candidate;
     } catch (error) {
       if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error;

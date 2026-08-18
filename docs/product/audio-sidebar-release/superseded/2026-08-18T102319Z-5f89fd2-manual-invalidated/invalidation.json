@@ -1,0 +1,16 @@
+{
+  "schema": "voice2text-audio-sidebar-candidate-invalidation/v1",
+  "status": "MANUAL_FAILED",
+  "sourceRevision": "5f89fd27c4a51b168662f75da1af9c5b0e19fc25",
+  "packageManifestSha256": "991de87e2f7b2c50e5020d1f8fc6d44c6da53fa973c23aee4bc710efdfab985c",
+  "candidateReceiptSha256": "b987b9eb3428475bde3baf43a3c62d04e993747ef2c0f3365e6af12c229e38ee",
+  "manualReceiptSha256": "a8d7bfb9849b9820726f067018bae191ceeb242a0d12e9126e0f99821eaad9ee",
+  "invalidatedAt": "2026-08-18T10:23:19Z",
+  "reason": "Computer Use observed that a released single-file Meeting archive was treated as an archive failure, blocking the fresh Audio workspace.",
+  "observed": {
+    "heading": "本机资料库需要修复",
+    "message": "无法归档旧版资料库；请检查存储与权限后重试。",
+    "legacyArchiveShape": "regular file named meetings.sqlite3.meeting-era.<timestamp>.archive",
+    "freshAudioWorkspaceReached": false
+  }
+}
