@@ -19,6 +19,8 @@ import path from "node:path";
 
 import { describe, expect, it } from "vitest";
 
+import { AUDIO_SCHEMA_VERSION } from "../../src/main/storage/audio_database";
+
 const packagedIt =
   process.platform === "darwin" &&
   process.arch === "arm64" &&
@@ -222,7 +224,7 @@ describe("packaged macOS companion transfer", () => {
             receiptSignatureSha256: expect.stringMatching(/^[a-f0-9]{64}$/),
             senderDeleteAllowed: true,
             missingChunkCount: 0,
-            databaseUserVersion: 10,
+            databaseUserVersion: AUDIO_SCHEMA_VERSION,
           }),
         );
 
@@ -261,7 +263,7 @@ describe("packaged macOS companion transfer", () => {
             sourceSha256,
             senderDeleteAllowed: true,
             missingChunkCount: 0,
-            databaseUserVersion: 10,
+            databaseUserVersion: AUDIO_SCHEMA_VERSION,
           }),
         );
         const evidenceText = [
