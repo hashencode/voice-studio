@@ -1,0 +1,41 @@
+{
+  "schema": "voice2text-audio-sidebar-manual-receipt/v1",
+  "status": "PENDING",
+  "sourceRevision": "8e5cd5970d3f6023dad74be72838e295e9dfc23b",
+  "packageManifestSha256": "e4940271a3e4ad1c0dfd29d0ab4ff25338c4bd981fb3becd6765658c1aa8f80b",
+  "targetSha256": "cfd5d83726fe1b3c661fa117ae85dd013076f8927c35e4068a9545774a5f8cb1",
+  "startedAt": null,
+  "finishedAt": null,
+  "elapsedMs": null,
+  "operator": null,
+  "checks": [
+    {
+      "id": "fresh-audio-reset",
+      "status": "PENDING"
+    },
+    {
+      "id": "rail-pane-preferences",
+      "status": "PENDING"
+    },
+    {
+      "id": "narrow-focus-recovery",
+      "status": "PENDING"
+    },
+    {
+      "id": "audio-workflow",
+      "status": "PENDING"
+    },
+    {
+      "id": "companion-workflow",
+      "status": "PENDING"
+    },
+    {
+      "id": "legacy-protocol-rejection",
+      "status": "PENDING"
+    },
+    {
+      "id": "text-motion-semantics",
+      "status": "PENDING"
+    }
+  ]
+}

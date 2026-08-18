@@ -1,0 +1,12 @@
+{
+  "schema": "voice2text-audio-sidebar-candidate-invalidation/v1",
+  "status": "SUPERSEDED_MANUAL_INVALIDATED",
+  "sourceRevision": "8e5cd5970d3f6023dad74be72838e295e9dfc23b",
+  "invalidatedAt": "2026-08-18T06:50:20Z",
+  "reason": "Real packaged-app manual QA found that a failed Companion receiver still exposed the manual invitation action, which surfaced a raw IPC error instead of a truthful unavailable state. Manual QA stopped without recording PASS.",
+  "receipts": {
+    "candidate.json": "ca7485d6d73469d0fb8c9db5976d460eeb030f29769a49b3b43b684362b6e3b4",
+    "manual.json": "78e3ce3f914e10f74f9ee458a8a5ccd7f75057c3d933439ff78cd5bb6f681e43"
+  },
+  "eligibleAsCurrentEvidence": false
+}
