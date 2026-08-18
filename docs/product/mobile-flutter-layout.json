@@ -49,8 +49,8 @@
         "sha256": "d74c0e299a2807b8883521828e2be34d2d1d95f2549aa22ac8e8916cdbc1d13d"
       },
       {
-        "path": "apps/desktop-electron/resources/worker/manifest.json",
-        "sha256": "d8861038b7c76985c4205aa94dd3a65d9da5219ce2f668dd3e8c7041e42afe32"
+        "path": "apps/desktop-electron/assets/processing/frozen_sensevoice_macos_arm64.lock.json",
+        "sha256": "c0d198ba8032c1f6710d9a2a544b6eb1db54140eb5ecb83e30b8028bcf001e87"
       },
       {
         "path": "apps/desktop-electron/src/main/profile/audio_profile.ts",

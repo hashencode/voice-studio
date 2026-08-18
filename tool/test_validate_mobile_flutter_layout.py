@@ -63,6 +63,20 @@ class MobileFlutterLayoutTest(unittest.TestCase):
             with self.assertRaisesRegex(ValueError, "Electron identity file set drift"):
                 validate_mobile_layout(path)
 
+    def test_electron_identity_binds_tracked_inputs_not_generated_worker_output(self) -> None:
+        payload = json.loads(DEFAULT_MANIFEST.read_text(encoding="utf-8"))
+        paths = {
+            entry["path"] for entry in payload["electronIdentity"]["files"]
+        }
+        self.assertIn(
+            "apps/desktop-electron/assets/processing/frozen_sensevoice_macos_arm64.lock.json",
+            paths,
+        )
+        self.assertNotIn(
+            "apps/desktop-electron/resources/worker/manifest.json",
+            paths,
+        )
+
 
 if __name__ == "__main__":
     unittest.main()

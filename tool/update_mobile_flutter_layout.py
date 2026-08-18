@@ -14,7 +14,7 @@ MANIFEST = ROOT / "docs/product/mobile-flutter-layout.json"
 ELECTRON_IDENTITY_PATHS = (
     "apps/desktop-electron/forge.config.ts",
     "apps/desktop-electron/package.json",
-    "apps/desktop-electron/resources/worker/manifest.json",
+    "apps/desktop-electron/assets/processing/frozen_sensevoice_macos_arm64.lock.json",
     "apps/desktop-electron/src/main/profile/audio_profile.ts",
     "apps/desktop-electron/src/main/profile/profile_paths.ts",
     "apps/desktop-electron/src/main/storage/audio_database.ts",
