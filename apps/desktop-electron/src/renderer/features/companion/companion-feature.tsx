@@ -153,12 +153,14 @@ export function useCompanionRouteController({
         }),
       );
     },
-    createInvite: () =>
+    createInvite: () => {
+      if (!snapshot || !canCreatePairingInvite(snapshot)) return;
       void run("invite", () =>
         api.createCompanionPairingInvite({
           idempotencyKey: requestIdentity("companion-invite"),
         }),
-      ),
+      );
+    },
     revoke: (peer) =>
       void run(`revoke:${peer.deviceId}`, () =>
         api.revokeCompanionPeer({
@@ -600,6 +602,7 @@ function PairingPanel({
   onCreateInvite: () => void;
 }) {
   const pairing = pairingStatus(snapshot.pairing.state);
+  const inviteAvailable = canCreatePairingInvite(snapshot);
   const publicPairingArtifact =
     snapshot.pairingInvite && snapshot.identity
       ? JSON.stringify({
@@ -637,12 +640,18 @@ function PairingPanel({
         <Button
           type="button"
           variant="outline"
-          disabled={pending}
+          disabled={pending || !inviteAvailable}
           onClick={onCreateInvite}
         >
           生成手动配对邀请
         </Button>
       </div>
+
+      {!inviteAvailable ? (
+        <p className="mt-3 text-sm text-muted-foreground">
+          接收器可用后才能生成新的配对邀请。
+        </p>
+      ) : null}
 
       {snapshot.pairing.state !== "idle" ? (
         <div
@@ -712,6 +721,15 @@ function PairingPanel({
         </div>
       ) : null}
     </section>
+  );
+}
+
+function canCreatePairingInvite(snapshot: CompanionSnapshot): boolean {
+  return (
+    snapshot.identity !== null &&
+    (snapshot.discovery.state === "ready" ||
+      (snapshot.discovery.state === "permission-denied" &&
+        snapshot.discovery.manualFallbackAvailable))
   );
 }
 

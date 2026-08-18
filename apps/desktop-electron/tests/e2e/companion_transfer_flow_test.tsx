@@ -90,6 +90,37 @@ describe("companion Renderer flow", () => {
     ).toHaveTextContent("Voice2Text Mac");
   });
 
+  it("keeps pairing unavailable when receiver startup fails", async () => {
+    const unavailable: CompanionSnapshot = {
+      ...disabledSnapshot,
+      revision: 3,
+      optIn: true,
+      discovery: {
+        state: "error",
+        manualFallbackAvailable: true,
+        errorCode: "COMPANION_RECEIVER_UNAVAILABLE",
+      },
+    };
+    const { createCompanionPairingInvite } = installApi({
+      initial: unavailable,
+    });
+    const user = userEvent.setup();
+    render(<App />);
+
+    expect(
+      await screen.findByRole("alert", { name: "局域网接收器启动失败" }),
+    ).toHaveTextContent("发送端保留原件");
+    const createInvite = screen.getByRole("button", {
+      name: "生成手动配对邀请",
+    });
+    expect(createInvite).toBeDisabled();
+    expect(
+      screen.getByText("接收器可用后才能生成新的配对邀请。"),
+    ).toBeVisible();
+    await user.click(createInvite);
+    expect(createCompanionPairingInvite).not.toHaveBeenCalled();
+  });
+
   it("keeps permission denial recoverable with manual pairing and peer truth", async () => {
     const denied: CompanionSnapshot = {
       ...disabledSnapshot,
