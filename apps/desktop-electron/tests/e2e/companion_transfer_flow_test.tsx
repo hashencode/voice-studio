@@ -153,7 +153,7 @@ describe("companion Renderer flow", () => {
     const pane = await screen.findByRole("complementary", {
       name: "互联上下文面板",
     });
-    expect(within(pane).getByText("Offline Phone")).toBeVisible();
+    expect(await within(pane).findByText("Offline Phone")).toBeVisible();
     expect(within(pane).queryByText("Revoked Phone")).not.toBeInTheDocument();
     await user.click(
       within(pane).getByRole("button", { name: "添加或配对设备" }),
