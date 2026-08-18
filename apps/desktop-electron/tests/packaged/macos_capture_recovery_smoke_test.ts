@@ -16,6 +16,7 @@ import path from "node:path";
 import { describe, expect, it } from "vitest";
 
 import { MacOSNativeHelperClient } from "../../src/main/features/importing/macos_native_helper_client";
+import { profilePathsForApplicationData } from "../../src/main/profile/profile_paths";
 import { AUDIO_SCHEMA_VERSION } from "../../src/main/storage/audio_database";
 
 const packagedIt =
@@ -69,6 +70,7 @@ describe("packaged macOS capture recovery", () => {
         mkdirSync(privateEvidence, { mode: 0o700 });
         const appData = path.join(privateTmp, "app-data");
         mkdirSync(appData, { mode: 0o700 });
+        const profilePaths = profilePathsForApplicationData(appData);
         const executable = path.join(appRoot, "Contents/MacOS/Voice2Text");
         const initializeReceipt = path.join(
           privateEvidence,
@@ -91,10 +93,7 @@ describe("packaged macOS capture recovery", () => {
           }),
         );
         if (process.env.RUN_PACKAGED_CAPTURE_INITIALIZE_ONLY === "1") return;
-        const captureRoot = path.join(
-          appData,
-          "voice2text-electron/v1/workspaces/capture",
-        );
+        const captureRoot = profilePaths.captureDirectory;
         const sessionId = "session-packaged-123456";
         const sessionRoot = path.join(captureRoot, sessionId);
         const trackRoot = path.join(sessionRoot, "system");
@@ -263,14 +262,7 @@ describe("packaged macOS capture recovery", () => {
         expect(statSync(privateTmp).mode & 0o777).toBe(0o700);
         expect(
           createHash("sha256")
-            .update(
-              readFileSync(
-                path.join(
-                  appData,
-                  "voice2text-electron/v1/database/audios.sqlite3",
-                ),
-              ),
-            )
+            .update(readFileSync(profilePaths.databasePath))
             .digest("hex"),
         ).toMatch(/^[a-f0-9]{64}$/);
         expect(
