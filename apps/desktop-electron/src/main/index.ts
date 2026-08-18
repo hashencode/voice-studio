@@ -244,6 +244,7 @@ let teardownPromise: Promise<void> | null = null;
 let teardownComplete = false;
 let bootstrapPromise: Promise<void> | null = null;
 let processingLoop: Promise<void> | null = null;
+const packagedProgressObservationTimeoutMs = 15 * 60 * 1_000;
 const applicationState = new DesktopApplicationState();
 const operationListeners = new Set<(event: OperationEvent) => void>();
 const captionListeners = new Set<(snapshot: CaptionSnapshot) => void>();
@@ -656,7 +657,7 @@ async function runProcessingSmokeIfRequested(): Promise<void> {
     destinationId: "audio-packaged-smoke",
   });
   const workstationProgress = request.workstationOutputPath
-    ? observePackagedRendererProgress()
+    ? observePackagedRendererProgress(imported.jobId)
     : null;
   if (!imported.inserted || imported.attempt !== 0) {
     throw new Error("packaged processing smoke profile was not independent");
@@ -1384,6 +1385,7 @@ async function runPackagedRendererAssertions(audioId: number): Promise<{
       }
       const telemetry = window.__voice2textPackagedTelemetry;
       telemetry?.unsubscribe?.();
+      telemetry?.domObserver?.disconnect?.();
       const events = telemetry?.events ?? [];
       return {
         searchResultCount: Number(document.querySelector('[aria-label="搜索结果导航"]') !== null),
@@ -1398,9 +1400,14 @@ async function runPackagedRendererAssertions(audioId: number): Promise<{
           telemetry?.section === "audio" &&
           telemetry?.liveRegion === "音频处理进度公告" &&
           JSON.stringify(telemetry?.railLabels) === JSON.stringify(["音频", "互联", "设置"]),
-        importProgressObserved: events.some((event) =>
-          typeof event.progressFraction === "number" && event.progressFraction > 0
-        ),
+        importProgressObserved:
+          telemetry?.importProgressObserved === true &&
+          events.some((event) =>
+            event.jobId === telemetry?.importJobId &&
+            typeof event.progressFraction === "number" &&
+            event.progressFraction > 0 &&
+            event.progressFraction < 1
+          ),
         operationStates: [...new Set(events.map((event) => event.state))].sort()
       };
     })()`,
@@ -1448,25 +1455,62 @@ async function preparePackagedRendererTelemetry(): Promise<void> {
         if (Date.now() >= deadline) throw new Error("Audio processing DOM did not render");
         await new Promise((resolve) => setTimeout(resolve, 25));
       }
-      window.__voice2textPackagedTelemetry = {
+      const telemetry = {
         events,
         unsubscribe,
         section: "audio",
         railLabels,
-        liveRegion: "音频处理进度公告"
+        liveRegion: "音频处理进度公告",
+        domProgressObserved: false,
+        importJobId: null,
+        importProgressObserved: false,
+        domObserver: null
       };
+      const observeDomProgress = () => {
+        if ([...document.querySelectorAll('[aria-label$="处理进度"]')]
+          .some((progress) => Number(progress.value) > 0 && Number(progress.value) < 1)) {
+          telemetry.domProgressObserved = true;
+        }
+      };
+      telemetry.domObserver = new MutationObserver(observeDomProgress);
+      telemetry.domObserver.observe(document.body, {
+        attributes: true,
+        childList: true,
+        subtree: true
+      });
+      observeDomProgress();
+      window.__voice2textPackagedTelemetry = telemetry;
     })()`,
     true,
   );
 }
 
-async function observePackagedRendererProgress(): Promise<boolean> {
+async function observePackagedRendererProgress(
+  jobId: number,
+): Promise<boolean> {
   return (await mainWindow!.webContents.executeJavaScript(
     `(async () => {
-      const deadline = Date.now() + 120000;
+      const jobId = ${jobId};
+      const telemetry = window.__voice2textPackagedTelemetry;
+      if (!telemetry) return false;
+      telemetry.importJobId = jobId;
+      const deadline = Date.now() + ${packagedProgressObservationTimeoutMs};
       while (Date.now() < deadline) {
-        const progress = document.querySelector('[aria-label$="处理进度"]');
-        if (progress && Number(progress.value) > 0) return true;
+        const eventProgressObserved = telemetry.events.some((event) =>
+          event.jobId === jobId &&
+          typeof event.progressFraction === "number" &&
+          event.progressFraction > 0 &&
+          event.progressFraction < 1
+        );
+        if (eventProgressObserved && telemetry.domProgressObserved) {
+          telemetry.importProgressObserved = true;
+          return true;
+        }
+        const terminalObserved = telemetry.events.some((event) =>
+          event.jobId === jobId &&
+          ["completed", "interrupted", "canceled"].includes(event.state)
+        );
+        if (terminalObserved) return false;
         await new Promise((resolve) => setTimeout(resolve, 25));
       }
       return false;
