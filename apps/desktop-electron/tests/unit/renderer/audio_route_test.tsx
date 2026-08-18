@@ -264,6 +264,12 @@ it("chooses the newest processing job id before comparing attempts", async () =>
     await screen.findByRole("button", { name: "取消 音频 A.wav" }),
   ).toBeVisible();
   expect(
+    screen.getByRole("progressbar", { name: "音频 A.wav 处理进度" }),
+  ).toHaveAttribute("data-processing-job-id", "41");
+  expect(
+    screen.getByRole("button", { name: "打开 音频 A.wav" }),
+  ).toHaveAttribute("data-audio-id", "1");
+  expect(
     screen.queryByRole("button", { name: "重试 音频 A.wav" }),
   ).not.toBeInTheDocument();
 });

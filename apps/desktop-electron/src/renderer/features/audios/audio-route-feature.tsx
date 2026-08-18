@@ -440,6 +440,7 @@ export function AudioContextPane({
               <li key={audio.audioId}>
                 <button
                   type="button"
+                  data-audio-id={audio.audioId}
                   aria-label={`打开 ${audio.displayName}`}
                   aria-current={selected ? "true" : undefined}
                   className="w-full rounded-lg border bg-card p-3 text-left outline-none hover:bg-accent focus-visible:ring-2 focus-visible:ring-ring"
@@ -580,6 +581,7 @@ function AudioProcessingDetail({
       </div>
       <progress
         className="mt-4 h-2 w-full"
+        data-processing-job-id={task.id}
         max={1}
         value={task.progressFraction}
         aria-label={`${task.displayName} 处理进度`}

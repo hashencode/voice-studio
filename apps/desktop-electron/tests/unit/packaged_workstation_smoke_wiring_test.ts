@@ -21,16 +21,16 @@ describe("packaged workstation progress evidence wiring", () => {
     expect(imported).toBeGreaterThan(-1);
     expect(prepare).toBeLessThan(imported);
     expect(mainSource).toContain(
-      "observePackagedRendererProgress(imported.jobId)",
+      "observePackagedRendererProgress(imported.jobId, imported.audioId)",
     );
-    expect(mainSource).toContain("new MutationObserver(observeDomProgress)");
-    expect(mainSource).toContain("event.jobId === jobId");
+    expect(mainSource).toContain('`[data-audio-id="${audioId}"]`');
+    expect(mainSource).toContain('`[data-processing-job-id="${jobId}"]`');
   });
 
-  it("keeps the progress observation window aligned with the packaged run budget", () => {
-    expect(mainSource).toContain(
-      "const packagedProgressObservationTimeoutMs = 15 * 60 * 1_000",
-    );
-    expect(mainSource).not.toContain("Date.now() + 120000");
+  it("accepts only a running imported job with its own visible progress node", () => {
+    expect(mainSource).toContain("event.jobId === jobId");
+    expect(mainSource).toContain('event.state === "running"');
+    expect(mainSource).toContain("progress.max === 1");
+    expect(mainSource).toContain("progress.value < 1");
   });
 });
