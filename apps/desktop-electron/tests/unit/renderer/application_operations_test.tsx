@@ -17,7 +17,7 @@ const tasksSnapshot: ApplicationSnapshot = {
   protocolVersion: 2,
   revision: 1,
   navigation: { section: "tasks" },
-  profile: { phase: "ready" },
+  profile: { phase: "ready", legacyDatabaseArchived: false },
   connectivity: "online",
   capability: { processing: "available" },
   library: { phase: "empty" },

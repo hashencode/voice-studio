@@ -29,7 +29,6 @@ type AudioRouteOptions = {
   writable: boolean;
   active?: boolean;
   enabled?: boolean;
-  applicationRevision?: number;
   onRecord: () => void;
   onImport: () => void | Promise<void>;
   onCancel: (jobId: number) => void | Promise<void>;
@@ -47,7 +46,6 @@ export function useAudioRouteController({
   writable,
   active = true,
   enabled = true,
-  applicationRevision = 0,
   onRecord,
   onImport,
   onCancel,
@@ -75,6 +73,24 @@ export function useAudioRouteController({
     promise: Promise<void>;
   } | null>(null);
   const activeRef = React.useRef(active);
+  const taskStructureToken = React.useMemo(
+    () =>
+      tasks
+        .map(
+          (task) => `${task.id}:${task.audioId}:${task.attempt}:${task.state}`,
+        )
+        .sort()
+        .join("|"),
+    [tasks],
+  );
+  const previousTaskStructureRef = React.useRef(taskStructureToken);
+  const tasksByAudioId = React.useMemo(
+    () => groupTasksByAudioId(tasks),
+    [tasks],
+  );
+  const previousCurrentTasksRef = React.useRef(
+    currentTasksByAudioId(tasksByAudioId),
+  );
 
   const setWorkspace = React.useCallback((next: AudioWorkspaceSnapshot) => {
     workspaceRef.current = next;
@@ -89,9 +105,14 @@ export function useAudioRouteController({
         api.controlAudioPlayback(audioId, { action: "close" }),
       ).then(() => undefined);
       closeRef.current = { audioId, promise };
-      void promise.catch(() => {
-        if (closeRef.current?.promise === promise) closeRef.current = null;
-      });
+      void promise.then(
+        () => {
+          if (closeRef.current?.promise === promise) closeRef.current = null;
+        },
+        () => {
+          if (closeRef.current?.promise === promise) closeRef.current = null;
+        },
+      );
       return promise;
     },
     [api],
@@ -142,7 +163,54 @@ export function useAudioRouteController({
   React.useEffect(() => {
     if (!enabled) return;
     void Promise.resolve().then(loadAudios);
-  }, [applicationRevision, enabled, loadAudios]);
+  }, [enabled, loadAudios]);
+
+  React.useEffect(() => {
+    if (!enabled) {
+      previousTaskStructureRef.current = taskStructureToken;
+      return;
+    }
+    if (previousTaskStructureRef.current === taskStructureToken) return;
+    previousTaskStructureRef.current = taskStructureToken;
+    void loadAudios();
+  }, [enabled, loadAudios, taskStructureToken]);
+
+  React.useEffect(() => {
+    const currentTasks = currentTasksByAudioId(tasksByAudioId);
+    const previousTasks = previousCurrentTasksRef.current;
+    previousCurrentTasksRef.current = currentTasks;
+    const selectedAudioId = workspaceRef.current?.summary.audioId;
+    if (!enabled || !selectedAudioId) return;
+    const current = currentTasks.get(selectedAudioId);
+    const previous = previousTasks.get(selectedAudioId);
+    if (
+      current?.state !== "completed" ||
+      !previous ||
+      (previous.id === current.id &&
+        previous.attempt === current.attempt &&
+        previous.state === "completed")
+    ) {
+      return;
+    }
+    const selectionIntent = selectionIntentRef.current;
+    void api
+      .openAudio(selectedAudioId)
+      .then((next) => {
+        if (
+          !next ||
+          selectionIntent !== selectionIntentRef.current ||
+          workspaceRef.current?.summary.audioId !== selectedAudioId
+        ) {
+          return;
+        }
+        setWorkspace(next);
+      })
+      .catch((cause: unknown) => {
+        if (selectionIntent === selectionIntentRef.current) {
+          setTransitionError(errorMessage(cause, "处理完成后无法刷新音频转写"));
+        }
+      });
+  }, [api, enabled, setWorkspace, tasksByAudioId]);
 
   React.useEffect(
     () => () => {
@@ -231,11 +299,6 @@ export function useAudioRouteController({
       audio.displayName.toLocaleLowerCase().includes(normalized),
     );
   }, [audios, query]);
-  const tasksByAudioId = React.useMemo(
-    () => groupTasksByAudioId(tasks),
-    [tasks],
-  );
-
   return {
     api,
     audios,
@@ -609,9 +672,20 @@ function selectCurrentTask(
 ): ProcessingTask | null {
   return tasks
     ? ([...tasks].sort(
-        (left, right) => right.attempt - left.attempt || right.id - left.id,
+        (left, right) => right.id - left.id || right.attempt - left.attempt,
       )[0] ?? null)
     : null;
+}
+
+function currentTasksByAudioId(
+  grouped: ReadonlyMap<number, readonly ProcessingTask[]>,
+): Map<number, ProcessingTask> {
+  const current = new Map<number, ProcessingTask>();
+  for (const [audioId, tasks] of grouped) {
+    const task = selectCurrentTask(tasks);
+    if (task) current.set(audioId, task);
+  }
+  return current;
 }
 
 function processingStateForRow(

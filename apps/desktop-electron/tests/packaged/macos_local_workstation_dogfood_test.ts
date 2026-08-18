@@ -50,7 +50,7 @@ describe.skipIf(process.platform !== "darwin")(
         );
         expect(evidence.rendererDomReady).toBe(true);
         expect(evidence.rendererPreloadDriven).toBe(true);
-        expect(evidence.sidebarTasksDriven).toBe(true);
+        expect(evidence.audioProcessingOwned).toBe(true);
         expect(evidence.importProgressObserved).toBe(true);
         expect(evidence.operationStates).toEqual(
           expect.arrayContaining(["queued", "running"]),

@@ -84,7 +84,7 @@ void main() {
 
         expect(tester.takeException(), isNull);
         expect(find.text('季度评审'), findsOneWidget);
-        expect(find.bySemanticsLabel(RegExp('音频音频播放器')), findsOneWidget);
+        expect(find.bySemanticsLabel(RegExp('音频播放器')), findsOneWidget);
         expect(find.bySemanticsLabel(RegExp('播放')), findsWidgets);
         expect(
           find.bySemanticsLabel(RegExp('当前片段，00:00，.*第一段音频内容')),

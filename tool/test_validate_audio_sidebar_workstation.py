@@ -34,7 +34,7 @@ class AudioSidebarWorkstationTest(unittest.TestCase):
         finally:
             path.unlink()
 
-    def test_repository_contract_is_current_and_pending(self) -> None:
+    def test_repository_contract_is_current(self) -> None:
         MODULE.validate()
 
     def test_fourth_rail_destination_is_rejected(self) -> None:
@@ -47,9 +47,15 @@ class AudioSidebarWorkstationTest(unittest.TestCase):
 
     def test_pending_candidate_cannot_reuse_historical_receipt(self) -> None:
         manifest = copy.deepcopy(self.manifest)
-        manifest["releaseCandidate"]["automatedReceipt"] = (
+        manifest["status"] = "DEVELOPMENT_COMPLETE_RELEASE_VALIDATION_PENDING"
+        candidate = manifest["releaseCandidate"]
+        candidate["status"] = "PENDING_U6_STABLE_CANDIDATE"
+        candidate["sourceRevision"] = None
+        candidate["packageManifestSha256"] = None
+        candidate["automatedReceipt"] = (
             "docs/product/desktop-electron-evidence.json"
         )
+        candidate["manualReceipt"] = None
         with self.assertRaisesRegex(MODULE.AudioSidebarValidationError, "must not bind"):
             self._validate_manifest(manifest)
 

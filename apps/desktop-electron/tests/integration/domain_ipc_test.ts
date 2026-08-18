@@ -378,7 +378,7 @@ function applicationSnapshot() {
     protocolVersion: 2 as const,
     revision: 1,
     navigation: { section: "library" as const },
-    profile: { phase: "ready" as const },
+    profile: { phase: "ready" as const, legacyDatabaseArchived: false },
     connectivity: "online" as const,
     capability: { processing: "available" as const },
     library: { phase: "empty" as const },

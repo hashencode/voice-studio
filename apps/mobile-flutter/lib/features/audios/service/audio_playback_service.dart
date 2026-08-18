@@ -146,7 +146,7 @@ class AudioPlaybackService extends ChangeNotifier {
         position: Duration.zero,
         duration: Duration.zero,
         speed: 1,
-        error: '无法加载音频音频',
+        error: '无法加载音频',
       );
       notifyListeners();
     }

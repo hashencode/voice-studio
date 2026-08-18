@@ -18,7 +18,7 @@ export class BrowserWindowPlaybackPort implements MainPlaybackPort {
   ) {}
 
   async open(mediaPath: string): Promise<void> {
-    if (!existsSync(mediaPath)) throw new Error("audio audio file is missing");
+    if (!existsSync(mediaPath)) throw new Error("audio file is missing");
     const window = await this.requireWindow();
     const source = JSON.stringify(pathToFileURL(mediaPath).href);
     try {
@@ -102,8 +102,7 @@ export class BrowserWindowPlaybackPort implements MainPlaybackPort {
 
   private async execute(script: string): Promise<void> {
     const window = this.window;
-    if (!window || window.isDestroyed())
-      throw new Error("audio audio is not open");
+    if (!window || window.isDestroyed()) throw new Error("audio is not open");
     await window.webContents.executeJavaScript(script, true);
   }
 }

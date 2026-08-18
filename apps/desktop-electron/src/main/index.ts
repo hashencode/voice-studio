@@ -1211,7 +1211,7 @@ async function runPackagedWorkstationSmoke(input: {
     rendererBoundary: "typed-preload-opaque-identifiers-only",
     rendererDomReady: rendererReview.domReady,
     rendererPreloadDriven: true,
-    sidebarTasksDriven: rendererEvidence.sidebarTasksDriven,
+    audioProcessingOwned: rendererEvidence.audioProcessingOwned,
     importProgressObserved:
       input.initialProgressObserved && rendererEvidence.importProgressObserved,
     operationStates: rendererEvidence.operationStates,
@@ -1243,9 +1243,23 @@ async function runPackagedRendererReview(audioId: number): Promise<{
       };
       const buttonWithText = (text) => [...document.querySelectorAll("button")]
         .find((button) => button.textContent?.trim().includes(text));
-      buttonWithText("会议库")?.click();
+      const rail = await waitFor(
+        () => document.querySelector('[aria-label="工作站主导航"]'),
+        "workstation rail"
+      );
+      const railLabels = [...rail.querySelectorAll("button")]
+        .map((button) => button.getAttribute("aria-label"));
+      if (JSON.stringify(railLabels) !== JSON.stringify(["音频", "互联", "设置"])) {
+        throw new Error("Audio workstation rail is not canonical");
+      }
+      rail.querySelector('[aria-label="音频"]').click();
+      document.querySelector('[aria-label="打开音频上下文面板"]')?.click();
+      const summary = (await window.voice2text.listAudios())
+        .find((candidate) => candidate.audioId === ${audioId});
+      if (!summary) throw new Error("smoke Audio summary unavailable");
       const audio = await waitFor(
-        () => document.querySelector('[data-audio-id="${audioId}"]'),
+        () => [...document.querySelectorAll("button")]
+          .find((button) => button.getAttribute("aria-label") === "打开 " + summary.displayName),
         "audio card"
       );
       audio.click();
@@ -1291,7 +1305,7 @@ async function runPackagedRendererAssertions(audioId: number): Promise<{
     pathRedacted: true;
   };
   exported: Array<{ format: string; fileName: string; bytes: number }>;
-  sidebarTasksDriven: boolean;
+  audioProcessingOwned: boolean;
   importProgressObserved: boolean;
   operationStates: string[];
 }> {
@@ -1309,14 +1323,28 @@ async function runPackagedRendererAssertions(audioId: number): Promise<{
       };
       const buttonWithText = (text) => [...document.querySelectorAll("button")]
         .find((button) => button.textContent?.trim().includes(text));
-      buttonWithText("会议库")?.click();
+      const rail = await waitFor(
+        () => document.querySelector('[aria-label="工作站主导航"]'),
+        "workstation rail after retry"
+      );
+      const railLabels = [...rail.querySelectorAll("button")]
+        .map((button) => button.getAttribute("aria-label"));
+      if (JSON.stringify(railLabels) !== JSON.stringify(["音频", "互联", "设置"])) {
+        throw new Error("Audio workstation rail is not canonical");
+      }
+      rail.querySelector('[aria-label="音频"]').click();
+      document.querySelector('[aria-label="打开音频上下文面板"]')?.click();
+      const summary = (await api.listAudios())
+        .find((candidate) => candidate.audioId === ${audioId});
+      if (!summary) throw new Error("smoke Audio summary unavailable after retry");
       const audio = await waitFor(
-        () => document.querySelector('[data-audio-id="${audioId}"]'),
+        () => [...document.querySelectorAll("button")]
+          .find((button) => button.getAttribute("aria-label") === "打开 " + summary.displayName),
         "audio card after retry"
       );
       audio.click();
       const searchInput = await waitFor(
-        () => document.querySelector('[aria-label="搜索会议转写"]'),
+        () => document.querySelector('[aria-label="搜索音频转写"]'),
         "transcript search"
       );
       Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")
@@ -1328,17 +1356,17 @@ async function runPackagedRendererAssertions(audioId: number): Promise<{
         "search result navigation"
       );
       const play = await waitFor(
-        () => document.querySelector('[aria-label="播放会议音频"]'),
+        () => document.querySelector('[aria-label="播放音频"]'),
         "play button"
       );
       play.click();
       const pause = await waitFor(
-        () => document.querySelector('[aria-label="暂停会议音频"]'),
+        () => document.querySelector('[aria-label="暂停音频"]'),
         "pause button"
       );
       pause.click();
       await waitFor(
-        () => document.querySelector('[aria-label="播放会议音频"]'),
+        () => document.querySelector('[aria-label="播放音频"]'),
         "paused playback"
       );
       document.querySelector('[aria-label="导出 TXT"]').click();
@@ -1366,7 +1394,10 @@ async function runPackagedRendererAssertions(audioId: number): Promise<{
           pathRedacted: JSON.stringify(sped).includes("/private/") === false
         },
         exported,
-        sidebarTasksDriven: telemetry?.section === "tasks",
+        audioProcessingOwned:
+          telemetry?.section === "audio" &&
+          telemetry?.liveRegion === "音频处理进度公告" &&
+          JSON.stringify(telemetry?.railLabels) === JSON.stringify(["音频", "互联", "设置"]),
         importProgressObserved: events.some((event) =>
           typeof event.progressFraction === "number" && event.progressFraction > 0
         ),
@@ -1383,7 +1414,7 @@ async function runPackagedRendererAssertions(audioId: number): Promise<{
       pathRedacted: true;
     };
     exported: Array<{ format: string; fileName: string; bytes: number }>;
-    sidebarTasksDriven: boolean;
+    audioProcessingOwned: boolean;
     importProgressObserved: boolean;
     operationStates: string[];
   };
@@ -1404,17 +1435,25 @@ async function preparePackagedRendererTelemetry(): Promise<void> {
           progressFraction: event.progressFraction
         });
       });
-      const taskButton = [...document.querySelectorAll("button")]
-        .find((button) => button.textContent?.trim().includes("转写任务"));
-      if (!taskButton) throw new Error("tasks sidebar control unavailable");
-      taskButton.click();
+      const rail = document.querySelector('[aria-label="工作站主导航"]');
+      if (!rail) throw new Error("Audio workstation rail unavailable");
+      const railLabels = [...rail.querySelectorAll("button")]
+        .map((button) => button.getAttribute("aria-label"));
+      if (JSON.stringify(railLabels) !== JSON.stringify(["音频", "互联", "设置"])) {
+        throw new Error("Audio workstation rail is not canonical");
+      }
+      rail.querySelector('[aria-label="音频"]').click();
       const deadline = Date.now() + 15000;
-      while (!document.querySelector('[aria-label="任务进度公告"]')) {
-        if (Date.now() >= deadline) throw new Error("tasks DOM did not render");
+      while (!document.querySelector('[aria-label="音频处理进度公告"]')) {
+        if (Date.now() >= deadline) throw new Error("Audio processing DOM did not render");
         await new Promise((resolve) => setTimeout(resolve, 25));
       }
       window.__voice2textPackagedTelemetry = {
-        events, unsubscribe, section: "tasks"
+        events,
+        unsubscribe,
+        section: "audio",
+        railLabels,
+        liveRegion: "音频处理进度公告"
       };
     })()`,
     true,
@@ -1439,10 +1478,9 @@ async function observePackagedRendererProgress(): Promise<boolean> {
 async function clickPackagedTaskAction(action: "重试" | "取消"): Promise<void> {
   await mainWindow!.webContents.executeJavaScript(
     `(async () => {
-      const tasks = [...document.querySelectorAll("button")]
-        .find((button) => button.textContent?.trim().includes("转写任务"));
-      if (!tasks) throw new Error("tasks sidebar control unavailable");
-      tasks.click();
+      const audio = document.querySelector('[aria-label="工作站主导航"] [aria-label="音频"]');
+      if (!audio) throw new Error("Audio rail control unavailable");
+      audio.click();
       const deadline = Date.now() + 30000;
       while (Date.now() < deadline) {
         const button = [...document.querySelectorAll("button")]

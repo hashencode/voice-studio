@@ -3,6 +3,7 @@ import 'dart:io';
 
 import 'package:companion_protocol/companion_protocol.dart';
 import 'package:crypto/crypto.dart';
+import 'package:cryptography/cryptography.dart';
 import 'package:sqflite/sqflite.dart';
 
 import '../../../data/sqlite/app_database.dart';
@@ -51,22 +52,53 @@ class MobileCompanionHistory {
   final CompanionReceipt? receipt;
 }
 
+typedef MobileCompanionPairingRunner =
+    Future<CompanionPeerTrust> Function({
+      required CompanionSocketPairingClient client,
+      required InternetAddress address,
+      required int port,
+    });
+
+Future<CompanionPeerTrust> _runMobileCompanionPairing({
+  required CompanionSocketPairingClient client,
+  required InternetAddress address,
+  required int port,
+}) => client.pair(address: address, port: port);
+
+const _pairingArtifactKeys = <String>{
+  'schema',
+  'pairingId',
+  'targetDeviceId',
+  'targetDeviceName',
+  'targetFingerprint',
+  'targetIdentityPublicKey',
+  'targetEphemeralPublicKey',
+  'host',
+  'port',
+  'expiresAtMs',
+};
+const _pairingMaximumLifetimeMs = 2 * 60 * 1000;
+const _pairingExpiryToleranceMs = 5000;
+
 class MobileCompanionRepository {
   MobileCompanionRepository({
     AppDatabase? database,
     RecordingsRepository? recordingsRepository,
     AudioDeletionCoordinator? deletionCoordinator,
     CompanionPlatformPort platform = const AndroidCompanionPlatform(),
+    MobileCompanionPairingRunner pairingRunner = _runMobileCompanionPairing,
   }) : _database = database ?? AppDatabase.instance,
        _recordingsRepository =
            recordingsRepository ?? RecordingsRepository(database: database),
        _deletionCoordinator = deletionCoordinator ?? AudioDeletionCoordinator(),
-       _platform = platform;
+       _platform = platform,
+       _pairingRunner = pairingRunner;
 
   final AppDatabase _database;
   final RecordingsRepository _recordingsRepository;
   final AudioDeletionCoordinator _deletionCoordinator;
   final CompanionPlatformPort _platform;
+  final MobileCompanionPairingRunner _pairingRunner;
 
   Future<CompanionIdentity> identity() async {
     var seed = await _platform.getCredential('identity.seed.v1');
@@ -86,9 +118,7 @@ class MobileCompanionRepository {
   }) async {
     final Object? decoded;
     try {
-      decoded = jsonDecode(
-        utf8.decode(base64Url.decode(base64Url.normalize(encodedPayload))),
-      );
+      decoded = jsonDecode(encodedPayload);
     } on Object {
       throw const CompanionProtocolException(
         'PAIRING_INVITE_INVALID',
@@ -102,83 +132,181 @@ class MobileCompanionRepository {
       );
     }
     final map = decoded.cast<String, Object?>();
+    if (map.containsKey('sharedCredential') || map.containsKey('shortCode')) {
+      throw const CompanionProtocolException(
+        'PAIRING_INVITE_SECRET_PRESENT',
+        'Pairing invitation must contain public material only.',
+      );
+    }
     if (map['schema'] != companionMediaTransferSchema) {
       throw const CompanionProtocolException(
         'UNSUPPORTED_COMPANION_PROTOCOL',
         'Companion invitation protocol is unsupported.',
       );
     }
-    final expected = <String>{
-      'schema',
-      'type',
-      'pairingId',
-      'shortCode',
-      'desktopDeviceId',
-      'desktopDeviceName',
-      'desktopFingerprint',
-      'sharedCredential',
-      'expiresAtMs',
-    };
-    if (map.keys.toSet().difference(expected).isNotEmpty ||
-        expected.difference(map.keys.toSet()).isNotEmpty ||
-        map['type'] != 'pairingInvite' ||
-        map['shortCode'] != confirmedShortCode) {
+    if (map.keys.toSet().difference(_pairingArtifactKeys).isNotEmpty ||
+        _pairingArtifactKeys.difference(map.keys.toSet()).isNotEmpty) {
       throw const CompanionProtocolException(
-        'PAIRING_CODE_MISMATCH',
-        'Pairing short code does not match.',
+        'PAIRING_INVITE_INVALID',
+        'Pairing invitation fields are invalid.',
       );
     }
-    final expiresAtMs = map['expiresAtMs'] as int? ?? -1;
-    if ((nowMs ?? DateTime.now().millisecondsSinceEpoch) > expiresAtMs) {
+    if (!RegExp(r'^\d{6}$').hasMatch(confirmedShortCode)) {
+      throw const CompanionProtocolException(
+        'PAIRING_CODE_INVALID',
+        'Pairing short code must contain six digits.',
+      );
+    }
+    final acceptedAtMs = nowMs ?? DateTime.now().millisecondsSinceEpoch;
+    final expiresAtMs = _requiredInteger(map['expiresAtMs'], 'expiry');
+    if (expiresAtMs <= acceptedAtMs ||
+        expiresAtMs - acceptedAtMs >
+            _pairingMaximumLifetimeMs + _pairingExpiryToleranceMs) {
       throw const CompanionProtocolException(
         'PAIRING_EXPIRED',
         'Pairing invitation has expired.',
       );
     }
-    final deviceId = map['desktopDeviceId'] as String? ?? '';
-    final displayName = map['desktopDeviceName'] as String? ?? '';
-    final fingerprint = map['desktopFingerprint'] as String? ?? '';
-    final pairingId = map['pairingId'] as String? ?? '';
-    final List<int> credential;
-    try {
-      credential = base64Decode(map['sharedCredential'] as String? ?? '');
-    } on FormatException {
+    final deviceId = _requiredIdentifier(map['targetDeviceId'], 'device');
+    final displayName = _requiredDisplayName(map['targetDeviceName']);
+    final fingerprint = _requiredFingerprint(map['targetFingerprint']);
+    final pairingId = _requiredIdentifier(map['pairingId'], 'pairing');
+    final hostValue = map['host'];
+    if (hostValue is! String) {
       throw const CompanionProtocolException(
         'PAIRING_INVITE_INVALID',
-        'Pairing invitation credential is invalid.',
+        'Pairing invitation endpoint is invalid.',
       );
     }
-    CompanionPeerTrust(
-      peerDeviceId: deviceId,
-      peerFingerprint: fingerprint,
-      sharedCredential: credential,
-      pairedAtMs: nowMs ?? DateTime.now().millisecondsSinceEpoch,
-    );
-    await _platform.putCredential('peer.$deviceId.credential.v1', credential);
-    final database = await _database.database;
-    final pairedAtMs = nowMs ?? DateTime.now().millisecondsSinceEpoch;
+    final host = hostValue;
+    final address = InternetAddress.tryParse(host);
+    final port = _requiredInteger(map['port'], 'port');
+    if (address == null || port < 1 || port > 65535) {
+      throw const CompanionProtocolException(
+        'PAIRING_INVITE_INVALID',
+        'Pairing invitation endpoint is invalid.',
+      );
+    }
+    final List<int> identityPublicKey;
+    final List<int> ephemeralPublicKey;
     try {
-      await database.insert('companion_peers', <String, Object?>{
-        'device_id': deviceId,
-        'display_name': displayName,
-        'identity_fingerprint': fingerprint,
-        'pending_pairing_id': pairingId,
-        'trust_state': 'active',
-        'paired_at_ms': pairedAtMs,
-        'last_seen_at_ms': null,
-        'revoked_at_ms': null,
-      }, conflictAlgorithm: ConflictAlgorithm.replace);
-    } catch (_) {
-      await _platform.deleteCredential('peer.$deviceId.credential.v1');
+      identityPublicKey = _decodeCanonicalKey(map['targetIdentityPublicKey']);
+      ephemeralPublicKey = _decodeCanonicalKey(map['targetEphemeralPublicKey']);
+    } on CompanionProtocolException {
       rethrow;
+    } on Object {
+      throw const CompanionProtocolException(
+        'PAIRING_INVITE_INVALID',
+        'Pairing invitation public keys are invalid.',
+      );
+    }
+    if (companionFingerprint(identityPublicKey) != fingerprint) {
+      throw const CompanionProtocolException(
+        'PAIRING_INVITE_INVALID',
+        'Pairing invitation identity does not match its fingerprint.',
+      );
+    }
+    final localIdentity = await identity();
+    var pendingPersisted = false;
+    final client = CompanionSocketPairingClient(
+      deviceId:
+          'mobile-${localIdentity.fingerprint.toLowerCase().substring(0, 20)}',
+      deviceName: 'Voice2Text Android',
+      identity: localIdentity,
+      pairingId: pairingId,
+      shortCode: confirmedShortCode,
+      targetDeviceId: deviceId,
+      targetFingerprint: fingerprint,
+      targetIdentityPublicKey: SimplePublicKey(
+        identityPublicKey,
+        type: KeyPairType.ed25519,
+      ),
+      targetEphemeralPublicKey: SimplePublicKey(
+        ephemeralPublicKey,
+        type: KeyPairType.x25519,
+      ),
+      expiresAtMs: expiresAtMs,
+      clockMs: () => nowMs ?? DateTime.now().millisecondsSinceEpoch,
+      persistPendingTrust: (trust) async {
+        _requireMatchingTrust(trust, deviceId, fingerprint);
+        await _persistPendingTrust(
+          trust: trust,
+          identityPublicKey: identityPublicKey,
+          displayName: displayName,
+          pairingId: pairingId,
+        );
+        pendingPersisted = true;
+      },
+    );
+    final trust = await _pairingRunner(
+      client: client,
+      address: address,
+      port: port,
+    );
+    _requireMatchingTrust(trust, deviceId, fingerprint);
+    if (!pendingPersisted) {
+      throw const CompanionProtocolException(
+        'PAIRING_TRUST_NOT_PERSISTED',
+        'Pairing trust was not durably prepared before confirmation.',
+      );
+    }
+    final database = await _database.database;
+    final updated = await database.update(
+      'companion_peers',
+      <String, Object?>{'trust_state': 'active'},
+      where: 'device_id = ? AND pending_pairing_id = ? AND trust_state = ?',
+      whereArgs: <Object>[deviceId, pairingId, 'repair_required'],
+    );
+    if (updated != 1) {
+      throw const CompanionProtocolException(
+        'PAIRING_TRUST_NOT_PERSISTED',
+        'Pairing trust could not be activated.',
+      );
     }
     return MobileCompanionPeer(
       deviceId: deviceId,
       displayName: displayName,
       fingerprint: fingerprint,
-      pairedAtMs: pairedAtMs,
+      pairedAtMs: trust.pairedAtMs,
       pendingPairingId: pairingId,
     );
+  }
+
+  Future<void> _persistPendingTrust({
+    required CompanionPeerTrust trust,
+    required List<int> identityPublicKey,
+    required String displayName,
+    required String pairingId,
+  }) async {
+    final credentialKey = 'peer.${trust.peerDeviceId}.credential.v1';
+    final identityKey = 'peer.${trust.peerDeviceId}.identity-public-key.v1';
+    try {
+      await _platform.putCredential(credentialKey, trust.sharedCredential);
+      await _platform.putCredential(identityKey, identityPublicKey);
+      final database = await _database.database;
+      await database.insert('companion_peers', <String, Object?>{
+        'device_id': trust.peerDeviceId,
+        'display_name': displayName,
+        'identity_fingerprint': trust.peerFingerprint,
+        'pending_pairing_id': pairingId,
+        'trust_state': 'repair_required',
+        'paired_at_ms': trust.pairedAtMs,
+        'last_seen_at_ms': null,
+        'revoked_at_ms': null,
+      }, conflictAlgorithm: ConflictAlgorithm.replace);
+    } catch (_) {
+      await _deleteCredentialBestEffort(credentialKey);
+      await _deleteCredentialBestEffort(identityKey);
+      rethrow;
+    }
+  }
+
+  Future<void> _deleteCredentialBestEffort(String key) async {
+    try {
+      await _platform.deleteCredential(key);
+    } on Object {
+      // Preserve the original persistence failure.
+    }
   }
 
   Future<List<MobileCompanionPeer>> listPeers() async {
@@ -289,10 +417,16 @@ class MobileCompanionRepository {
     final credential = await _platform.getCredential(
       'peer.${peer.deviceId}.credential.v1',
     );
-    if (credential == null) {
+    final targetIdentityBytes = await _platform.getCredential(
+      'peer.${peer.deviceId}.identity-public-key.v1',
+    );
+    if (credential == null ||
+        targetIdentityBytes == null ||
+        targetIdentityBytes.length != 32 ||
+        companionFingerprint(targetIdentityBytes) != peer.fingerprint) {
       throw const CompanionProtocolException(
         'PAIRING_REPAIR_REQUIRED',
-        'Paired credential is unavailable.',
+        'Paired trust material is unavailable.',
       );
     }
     final localIdentity = await identity();
@@ -307,6 +441,10 @@ class MobileCompanionRepository {
             targetFingerprint: peer.fingerprint,
             sharedCredential: credential,
             pairingId: peer.pendingPairingId,
+            targetIdentityPublicKey: SimplePublicKey(
+              targetIdentityBytes,
+              type: KeyPairType.ed25519,
+            ),
           ).sendFile(
             address: InternetAddress(desktop.host),
             port: desktop.port,
@@ -456,6 +594,83 @@ class MobileCompanionRepository {
       );
     });
     await _platform.deleteCredential('peer.$deviceId.credential.v1');
+    await _platform.deleteCredential('peer.$deviceId.identity-public-key.v1');
+  }
+}
+
+String _requiredIdentifier(Object? value, String kind) {
+  if (value is! String ||
+      !RegExp(r'^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$').hasMatch(value)) {
+    throw CompanionProtocolException(
+      'PAIRING_INVITE_INVALID',
+      'Pairing invitation $kind identifier is invalid.',
+    );
+  }
+  return value;
+}
+
+String _requiredDisplayName(Object? value) {
+  if (value is! String ||
+      value != value.trim() ||
+      value.isEmpty ||
+      value.length > 256) {
+    throw const CompanionProtocolException(
+      'PAIRING_INVITE_INVALID',
+      'Pairing invitation device name is invalid.',
+    );
+  }
+  return value;
+}
+
+String _requiredFingerprint(Object? value) {
+  if (value is! String || !RegExp(r'^[A-Z2-7]{20,64}$').hasMatch(value)) {
+    throw const CompanionProtocolException(
+      'PAIRING_INVITE_INVALID',
+      'Pairing invitation fingerprint is invalid.',
+    );
+  }
+  return value;
+}
+
+int _requiredInteger(Object? value, String kind) {
+  if (value is! int) {
+    throw CompanionProtocolException(
+      'PAIRING_INVITE_INVALID',
+      'Pairing invitation $kind is invalid.',
+    );
+  }
+  return value;
+}
+
+List<int> _decodeCanonicalKey(Object? value) {
+  if (value is! String || value.isEmpty) {
+    throw const CompanionProtocolException(
+      'PAIRING_INVITE_INVALID',
+      'Pairing invitation public key is invalid.',
+    );
+  }
+  final decoded = base64Decode(value);
+  if (decoded.length != 32 || base64Encode(decoded) != value) {
+    throw const CompanionProtocolException(
+      'PAIRING_INVITE_INVALID',
+      'Pairing invitation public key is invalid.',
+    );
+  }
+  return decoded;
+}
+
+void _requireMatchingTrust(
+  CompanionPeerTrust trust,
+  String deviceId,
+  String fingerprint,
+) {
+  if (trust.peerDeviceId != deviceId ||
+      trust.peerFingerprint != fingerprint ||
+      trust.sharedCredential.length != 32) {
+    throw const CompanionProtocolException(
+      'PAIRING_TRUST_MISMATCH',
+      'Derived trust does not match the pairing invitation.',
+    );
   }
 }
 

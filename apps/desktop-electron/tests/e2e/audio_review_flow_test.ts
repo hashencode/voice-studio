@@ -221,7 +221,7 @@ function applicationSnapshot(): ApplicationSnapshot {
     protocolVersion: 2,
     revision: 1,
     navigation: { section: "library" },
-    profile: { phase: "ready" },
+    profile: { phase: "ready", legacyDatabaseArchived: false },
     connectivity: "online",
     capability: { processing: "available" },
     library: { phase: "ready", audioCount: 1 },

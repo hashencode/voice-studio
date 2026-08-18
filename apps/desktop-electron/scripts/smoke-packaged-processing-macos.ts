@@ -41,7 +41,7 @@ export interface PackagedWorkstationEvidence {
   rendererBoundary: string;
   rendererDomReady: boolean;
   rendererPreloadDriven: boolean;
-  sidebarTasksDriven: boolean;
+  audioProcessingOwned: boolean;
   importProgressObserved: boolean;
   operationStates: string[];
 }
@@ -180,7 +180,7 @@ async function runPackagedSmoke(captureWorkstation: boolean): Promise<{
           "typed-preload-opaque-identifiers-only" ||
         !workstation.rendererDomReady ||
         !workstation.rendererPreloadDriven ||
-        !workstation.sidebarTasksDriven ||
+        !workstation.audioProcessingOwned ||
         !workstation.importProgressObserved ||
         !["queued", "running"].every((state) =>
           workstation!.operationStates.includes(state),

@@ -14,7 +14,12 @@ export const bootstrapActionSchema = z.enum(["retry", "repair-guidance"]);
 const profileStateSchema = z.discriminatedUnion("phase", [
   z.object({ phase: z.literal("initializing") }).strict(),
   z.object({ phase: z.literal("reconciling") }).strict(),
-  z.object({ phase: z.literal("ready") }).strict(),
+  z
+    .object({
+      phase: z.literal("ready"),
+      legacyDatabaseArchived: z.boolean(),
+    })
+    .strict(),
   z
     .object({
       phase: z.literal("blocked"),

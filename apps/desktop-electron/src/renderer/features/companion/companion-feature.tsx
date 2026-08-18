@@ -606,6 +606,7 @@ function PairingPanel({
           schema: snapshot.pairingInvite.schema,
           pairingId: snapshot.pairingInvite.pairingId,
           targetDeviceId: snapshot.identity.deviceId,
+          targetDeviceName: snapshot.identity.deviceName,
           targetFingerprint: snapshot.identity.fingerprint,
           targetIdentityPublicKey:
             snapshot.pairingInvite.responderIdentityPublicKey,

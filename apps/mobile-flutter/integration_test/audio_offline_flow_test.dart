@@ -128,7 +128,7 @@ void main() {
       expect(find.text('Alpha opening'), findsOneWidget);
       final semantics = tester.ensureSemantics();
       try {
-        expect(find.bySemanticsLabel(RegExp('音频音频播放器')), findsOneWidget);
+        expect(find.bySemanticsLabel(RegExp('音频播放器')), findsOneWidget);
         expect(find.bySemanticsLabel('撤销最近一次转写编辑'), findsOneWidget);
         expect(find.bySemanticsLabel('重做最近一次撤销的转写编辑'), findsOneWidget);
         expect(find.bySemanticsLabel('导出并分享转写'), findsOneWidget);

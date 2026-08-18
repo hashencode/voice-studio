@@ -95,7 +95,7 @@ export function ReconciliationSurface({
   const hasProcessing = items.some((item) => item.kind === "processing");
   return (
     <section role="alert" className="rounded-xl border bg-card p-6 shadow-sm">
-      <h1 className="text-xl font-semibold">启动恢复需要确认</h1>
+      <h2 className="text-xl font-semibold">启动恢复需要确认</h2>
       <p className="mt-2 text-sm text-muted-foreground">
         检测到 {items.length}{" "}
         个中断或可恢复项目。工作台不会自动重试，也不会宣称完成。
@@ -120,6 +120,24 @@ export function ReconciliationSurface({
         其余恢复项目会保持显式待处理状态，不会在后台自动启动。
       </p>
     </section>
+  );
+}
+
+export function ProfileOriginNotice({
+  legacyDatabaseArchived,
+}: {
+  legacyDatabaseArchived: boolean;
+}) {
+  return (
+    <p
+      role="status"
+      aria-label="Audio 资料库来源"
+      className="rounded-lg border bg-muted px-4 py-3 text-sm text-muted-foreground"
+    >
+      {legacyDatabaseArchived
+        ? "已归档旧版资料库；当前使用全新 Audio 资料库。"
+        : "当前使用全新 Audio 资料库；未发现需归档的旧版资料库。"}
+    </p>
   );
 }
 

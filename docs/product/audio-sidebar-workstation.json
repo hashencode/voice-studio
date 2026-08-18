@@ -4,14 +4,26 @@
   "activityNoun": "Audio",
   "navigation": {
     "rail": [
-      { "id": "audio", "label": "音频" },
-      { "id": "companion", "label": "互联" },
-      { "id": "settings", "label": "设置" }
+      {
+        "id": "audio",
+        "label": "音频"
+      },
+      {
+        "id": "companion",
+        "label": "互联"
+      },
+      {
+        "id": "settings",
+        "label": "设置"
+      }
     ],
     "legacyRoutesNormalizeTo": "audio"
   },
   "contextPanes": {
-    "owners": ["audio", "companion"],
+    "owners": [
+      "audio",
+      "companion"
+    ],
     "preferencesAreIndependent": true,
     "resizeWritesPreference": false,
     "narrowPresentation": "non-modal-drawer",

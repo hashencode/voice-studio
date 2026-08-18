@@ -51,7 +51,7 @@ export class AudioPlaybackService {
   ): Promise<AudioPlaybackSnapshot> {
     if (input.action === "open") return await this.open(input.audioId);
     if (!this.state.initialized || this.state.audioId !== input.audioId) {
-      throw new Error("audio audio must be opened before playback actions");
+      throw new Error("audio must be opened before playback actions");
     }
     switch (input.action) {
       case "play":
@@ -91,7 +91,7 @@ export class AudioPlaybackService {
 
   private async open(audioId: number): Promise<AudioPlaybackSnapshot> {
     const media = await this.media.resolvePlayback(audioId);
-    if (!media) throw new Error("audio audio is unavailable");
+    if (!media) throw new Error("audio is unavailable");
     if (this.state.initialized) await this.port.close();
     try {
       await this.port.open(media.mediaPath);

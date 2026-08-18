@@ -15,7 +15,7 @@ const application: ApplicationSnapshot = {
   protocolVersion: 2,
   revision: 12,
   navigation: { section: "companion" },
-  profile: { phase: "ready" },
+  profile: { phase: "ready", legacyDatabaseArchived: false },
   connectivity: "online",
   capability: { processing: "available" },
   library: { phase: "empty" },
@@ -178,6 +178,7 @@ describe("companion Renderer flow", () => {
     ).toBeVisible();
     expect(within(pairing).getByText("192.168.10.24:45678")).toBeVisible();
     expect(pairing).toHaveTextContent('"targetDeviceId":"desktop-01"');
+    expect(pairing).toHaveTextContent('"targetDeviceName":"Voice2Text Mac"');
     expect(pairing).toHaveTextContent('"targetFingerprint"');
     expect(pairing).toHaveTextContent('"targetIdentityPublicKey"');
     expect(pairing).toHaveTextContent('"targetEphemeralPublicKey"');

@@ -59,7 +59,10 @@ export class DesktopApplicationState {
       });
     }
     return this.update({
-      profile: { phase: "ready" },
+      profile: {
+        phase: "ready",
+        legacyDatabaseArchived: result.archivedLegacyDatabasePath !== null,
+      },
       library: { phase: "empty" },
       reconciliation: result.reconciliation.items.map((item) => ({
         kind: item.kind,

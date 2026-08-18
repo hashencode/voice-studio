@@ -1,0 +1,13 @@
+{
+  "schema": "voice2text-audio-sidebar-candidate-invalidation/v1",
+  "status": "SUPERSEDED_REVIEW_INVALIDATED",
+  "sourceRevision": "590a2f088c47b235a56207420fc75ddb6501bf33",
+  "invalidatedAt": "2026-08-18T03:27:02Z",
+  "reason": "Post-candidate review found release automation false-greens and product defects. The preserved receipts describe a completed run but are not current release evidence.",
+  "receipts": {
+    "candidate.json": "3c7b6a1ec9b077aef6ab04e2079aee960f0c426bd732d545e6870e3bd4154eeb",
+    "manual.json": "b7be589557f46bdc7f0bb3a1a7294339942bb9d062ad50e886e804b0212008f0",
+    "final.json": "ff3d755289db6395bf4e100da238df095aa52ff8a8c1b4ab7442a07fd2e418ba"
+  },
+  "eligibleAsCurrentEvidence": false
+}

@@ -71,7 +71,10 @@ void main() {
     await tester.pumpWidget(const Voice2TextApp());
     await tester.pumpAndSettle();
 
-    expect(find.text('音频'), findsOneWidget);
+    expect(
+      find.descendant(of: find.byType(GooTabs), matching: find.text('音频')),
+      findsOneWidget,
+    );
     expect(find.text('实时'), findsNothing);
     expect(find.text('全部音频'), findsOneWidget);
     expect(find.byTooltip('搜索'), findsNothing);
@@ -205,7 +208,9 @@ void main() {
     await tester.pumpAndSettle();
     expect(selectionClickCount(platformCalls), 1);
 
-    await tester.tap(find.text('音频音频'));
+    await tester.tap(
+      find.descendant(of: find.byType(GooTabs), matching: find.text('音频')),
+    );
     await tester.pumpAndSettle();
 
     expect(selectionClickCount(platformCalls), 1);

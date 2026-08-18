@@ -262,7 +262,7 @@ def main() -> int:
     except (AudioSidebarValidationError, OSError, ValueError) as error:
         print(f"Audio sidebar workstation validation failed: {error}", file=sys.stderr)
         return 1
-    print("Audio sidebar workstation validation passed (U6 release validation pending).")
+    print("Audio sidebar workstation validation passed.")
     return 0
 
 

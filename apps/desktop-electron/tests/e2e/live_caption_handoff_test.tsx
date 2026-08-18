@@ -15,7 +15,7 @@ const application: ApplicationSnapshot = {
   protocolVersion: 2,
   revision: 12,
   navigation: { section: "library" },
-  profile: { phase: "ready" },
+  profile: { phase: "ready", legacyDatabaseArchived: false },
   connectivity: "online",
   capability: { processing: "available" },
   library: { phase: "empty" },

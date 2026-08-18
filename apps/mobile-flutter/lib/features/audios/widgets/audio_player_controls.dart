@@ -33,7 +33,7 @@ class AudioPlayerControls extends StatelessWidget {
     final value = snapshot.position.inMilliseconds.clamp(0, max).toDouble();
     return Semantics(
       container: true,
-      label: '音频音频播放器',
+      label: '音频播放器',
       child: GooList(
         style: GooListStyle.grouped,
         children: <Widget>[

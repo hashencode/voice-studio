@@ -18,7 +18,7 @@ const readySnapshot: ApplicationSnapshot = {
   protocolVersion: 2,
   revision: 4,
   navigation: { section: "library" },
-  profile: { phase: "ready" },
+  profile: { phase: "ready", legacyDatabaseArchived: false },
   connectivity: "online",
   capability: { processing: "available" },
   library: { phase: "empty" },
@@ -131,6 +131,9 @@ describe("application shell", () => {
       await screen.findByRole("heading", { name: "音频", level: 1 }),
     ).toBeVisible();
     expect(await screen.findByText("还没有音频")).toBeVisible();
+    expect(
+      screen.getByRole("status", { name: "Audio 资料库来源" }),
+    ).toHaveTextContent("未发现需归档的旧版资料库");
 
     const navigation = screen.getByRole("navigation", { name: "工作站主导航" });
     const audio = within(navigation).getByRole("button", { name: "音频" });
@@ -391,6 +394,7 @@ describe("application shell", () => {
     expect(
       screen.getByRole("heading", { name: "音频", level: 1 }),
     ).toBeVisible();
+    expect(screen.getAllByRole("heading", { level: 1 })).toHaveLength(1);
 
     const reviewTasks = screen.getByRole("button", {
       name: "查看相关音频并选择重试",
@@ -405,5 +409,22 @@ describe("application shell", () => {
       await screen.findByRole("button", { name: "重试 中断的周会.wav" }),
     ).toBeEnabled();
     expect(api.retryProcessing).not.toHaveBeenCalled();
+  });
+
+  it("states that legacy data was archived without exposing a path", async () => {
+    const applicationDataRoot = "/private/secret/application-data";
+    installApi({
+      ...readySnapshot,
+      profile: { phase: "ready", legacyDatabaseArchived: true },
+      capture: { phase: "idle" },
+    });
+    render(<App />);
+
+    const origin = await screen.findByRole("status", {
+      name: "Audio 资料库来源",
+    });
+    expect(origin).toHaveTextContent("已归档旧版资料库");
+    expect(origin).toHaveTextContent("全新 Audio 资料库");
+    expect(origin).not.toHaveTextContent(applicationDataRoot);
   });
 });

@@ -1,11 +1,14 @@
 import {
   closeSync,
+  copyFileSync,
   existsSync,
   fsyncSync,
   lstatSync,
   mkdirSync,
   openSync,
+  readdirSync,
   renameSync,
+  rmdirSync,
   statfsSync,
   unlinkSync,
   writeSync,
@@ -88,7 +91,7 @@ export function initializeAudioProfile(
     archivedLegacyDatabasePath = archiveLegacyMeetingDatabase(
       applicationDataRoot,
       now(),
-      options.archiveLegacyDatabase ?? renameSync,
+      options.archiveLegacyDatabase ?? copyFileSync,
     );
   } catch (error) {
     return blocked("legacy_archive_failed", error);
@@ -238,17 +241,102 @@ function archiveLegacyMeetingDatabase(
     "archive",
   );
   mkdirSync(archiveDirectory, { recursive: true, mode: 0o700 });
-  const destination = join(
-    archiveDirectory,
-    `meetings.sqlite3.meeting-era.${archiveTimestamp(nowMs)}.archive`,
-  );
-  if (existsSync(destination)) {
+  const archiveBundleName = `meetings.sqlite3.meeting-era.${archiveTimestamp(nowMs)}.archive`;
+  const destinationDirectory = join(archiveDirectory, archiveBundleName);
+  if (existsSync(destinationDirectory)) {
     throw new Error("Meeting-era archive destination already exists");
   }
-  archive(legacyPath, destination);
-  syncDirectory(dirname(legacyPath));
-  syncDirectory(archiveDirectory);
-  return destination;
+  const stagingDirectory = join(
+    archiveDirectory,
+    `.${archiveBundleName}.staging-${process.pid}-${randomUUID()}`,
+  );
+  const members = legacyDatabaseMembers(legacyPath);
+  mkdirSync(stagingDirectory, { mode: 0o700 });
+  try {
+    for (const source of members) {
+      archive(
+        source,
+        join(stagingDirectory, source.slice(dirname(source).length + 1)),
+      );
+    }
+    syncDirectory(stagingDirectory);
+    renameSync(stagingDirectory, destinationDirectory);
+    for (const source of members) {
+      if (existsSync(source)) unlinkSync(source);
+    }
+    syncDirectory(dirname(legacyPath));
+    syncDirectory(archiveDirectory);
+    return join(destinationDirectory, "meetings.sqlite3");
+  } catch (error) {
+    try {
+      restoreLegacyDatabaseMembers({
+        legacyDirectory: dirname(legacyPath),
+        members,
+        stagingDirectory,
+        destinationDirectory,
+      });
+    } catch (restoreError) {
+      throw new AggregateError(
+        [error, restoreError],
+        "Meeting-era archive failed and could not be restored",
+      );
+    }
+    throw error;
+  }
+}
+
+function legacyDatabaseMembers(legacyPath: string): string[] {
+  const members = [
+    legacyPath,
+    `${legacyPath}-wal`,
+    `${legacyPath}-shm`,
+    `${legacyPath}-journal`,
+  ];
+  return members.filter((path) => {
+    try {
+      if (!lstatSync(path).isFile()) {
+        throw new Error("Meeting-era SQLite member is not a regular file");
+      }
+      return true;
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code === "ENOENT") return false;
+      throw error;
+    }
+  });
+}
+
+function restoreLegacyDatabaseMembers(options: {
+  legacyDirectory: string;
+  members: readonly string[];
+  stagingDirectory: string;
+  destinationDirectory: string;
+}): void {
+  if (existsSync(options.destinationDirectory)) {
+    if (existsSync(options.stagingDirectory)) {
+      throw new Error("Meeting-era archive has two rollback sources");
+    }
+    renameSync(options.destinationDirectory, options.stagingDirectory);
+  }
+  for (const source of [...options.members].reverse()) {
+    const staged = join(
+      options.stagingDirectory,
+      source.slice(options.legacyDirectory.length + 1),
+    );
+    if (!existsSync(staged)) continue;
+    if (existsSync(source)) {
+      unlinkSync(staged);
+    } else {
+      renameSync(staged, source);
+    }
+  }
+  if (existsSync(options.stagingDirectory)) {
+    if (readdirSync(options.stagingDirectory).length > 0) {
+      throw new Error("Meeting-era archive rollback left unknown members");
+    }
+    rmdirSync(options.stagingDirectory);
+  }
+  syncDirectory(options.legacyDirectory);
+  syncDirectory(dirname(options.destinationDirectory));
 }
 
 function archiveTimestamp(nowMs: number): string {

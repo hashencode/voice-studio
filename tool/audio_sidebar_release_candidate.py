@@ -28,6 +28,7 @@ FINAL_RECEIPT = RELEASE_ROOT / "final.json"
 MANUAL_DEFINITION = ROOT / "docs/product/audio-sidebar-manual-checks.json"
 PRODUCT_MANIFEST = ROOT / "docs/product/audio-sidebar-workstation.json"
 INPUT_PATHS = (
+    "apps/mobile-flutter",
     "apps/desktop-electron",
     "packages/audio_core",
     "packages/audio_storage",
@@ -36,6 +37,9 @@ INPUT_PATHS = (
     "packages/desktop_macos_native",
     "packages/desktop_sherpa_worker",
     "packages/processing_contracts",
+    "docs/product/audio-sidebar-manual-checks.json",
+    "tool/audio_sidebar_release_candidate.py",
+    "tool/validate_audio_sidebar_workstation.py",
 )
 PREPARE_COMMANDS = (
     (
@@ -47,13 +51,121 @@ PREPARE_COMMANDS = (
     ("package-once", ("bun", "run", "package"), ELECTRON_ROOT),
     ("package-bootstrap", ("bun", "run", "smoke:package"), ELECTRON_ROOT),
     (
-        "packaged-product-matrix",
-        ("bunx", "vitest", "run", "tests/packaged"),
+        "packaged-bootstrap-test",
+        (
+            "/usr/bin/env",
+            "RUN_PACKAGED_SMOKE=1",
+            "bunx",
+            "vitest",
+            "run",
+            "tests/packaged/macos_bootstrap_smoke_test.ts",
+        ),
+        ELECTRON_ROOT,
+    ),
+    (
+        "packaged-processing-test",
+        (
+            "/usr/bin/env",
+            "RUN_PACKAGED_PROCESSING=1",
+            "RUN_DIRECT_PACKAGED_PROCESSING=1",
+            "bunx",
+            "vitest",
+            "run",
+            "tests/packaged/macos_processing_smoke_test.ts",
+        ),
+        ELECTRON_ROOT,
+    ),
+    (
+        "packaged-workstation-test",
+        (
+            "/usr/bin/env",
+            "RUN_PACKAGED_WORKSTATION=1",
+            "bunx",
+            "vitest",
+            "run",
+            "tests/packaged/macos_local_workstation_dogfood_test.ts",
+        ),
+        ELECTRON_ROOT,
+    ),
+    (
+        "packaged-companion-test",
+        (
+            "/usr/bin/env",
+            "RUN_PACKAGED_COMPANION_SMOKE=1",
+            "bunx",
+            "vitest",
+            "run",
+            "tests/packaged/macos_companion_smoke_test.ts",
+        ),
+        ELECTRON_ROOT,
+    ),
+    (
+        "packaged-capture-test",
+        (
+            "/usr/bin/env",
+            "RUN_PACKAGED_CAPTURE_INITIALIZE_ONLY=0",
+            "RUN_PACKAGED_CAPTURE_SMOKE=1",
+            "bunx",
+            "vitest",
+            "run",
+            "tests/packaged/macos_capture_recovery_smoke_test.ts",
+        ),
+        ELECTRON_ROOT,
+    ),
+    (
+        "packaged-live-caption-test",
+        (
+            "/usr/bin/env",
+            "RUN_PACKAGED_LIVE_CAPTION=1",
+            "bunx",
+            "vitest",
+            "run",
+            "tests/packaged/macos_live_caption_worker_smoke_test.ts",
+        ),
+        ELECTRON_ROOT,
+    ),
+    (
+        "packaged-caption-formal-test",
+        (
+            "/usr/bin/env",
+            "RUN_PACKAGED_CAPTION_FORMAL=1",
+            "bunx",
+            "vitest",
+            "run",
+            "tests/packaged/macos_caption_formal_smoke_test.ts",
+        ),
+        ELECTRON_ROOT,
+    ),
+    (
+        "packaged-ai-boundary-test",
+        (
+            "/usr/bin/env",
+            "RUN_PACKAGED_AI_BOUNDARY=1",
+            "bunx",
+            "vitest",
+            "run",
+            "tests/packaged/macos_ai_boundary_smoke_test.ts",
+        ),
+        ELECTRON_ROOT,
+    ),
+    (
+        "packaged-native-security-test",
+        (
+            "/usr/bin/env",
+            "RUN_PACKAGED_NATIVE_SECURITY_SMOKE=1",
+            "bunx",
+            "vitest",
+            "run",
+            "tests/packaged/macos_native_security_helper_smoke_test.ts",
+        ),
         ELECTRON_ROOT,
     ),
 )
 SHA256 = re.compile(r"^[a-f0-9]{64}$")
 REVISION = re.compile(r"^[a-f0-9]{40}$")
+UTC_TIMESTAMP = re.compile(
+    r"^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{1,6})?Z$"
+)
 
 
 class CandidateError(RuntimeError):
@@ -169,6 +281,17 @@ def _timestamp() -> str:
     return datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")
 
 
+def _parse_utc_timestamp(value: Any, label: str) -> datetime:
+    _require(
+        isinstance(value, str) and bool(UTC_TIMESTAMP.fullmatch(value)),
+        f"{label} is invalid",
+    )
+    try:
+        return datetime.fromisoformat(value[:-1] + "+00:00")
+    except ValueError as error:
+        raise CandidateError(f"{label} is invalid") from error
+
+
 def _write_json(path: pathlib.Path, value: Any) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     temporary = path.with_suffix(f"{path.suffix}.tmp")
@@ -182,12 +305,78 @@ def _run_command(command: Sequence[str], cwd: pathlib.Path) -> None:
     subprocess.run(command, cwd=cwd, check=True)
 
 
+def _pending_manual_receipt(candidate: dict[str, Any]) -> dict[str, Any]:
+    definition = _load(MANUAL_DEFINITION, "manual definition")
+    package = candidate.get("package")
+    target = candidate.get("target")
+    _require(
+        isinstance(package, dict) and isinstance(target, dict),
+        "candidate identity is incomplete",
+    )
+    return {
+        "schema": "voice2text-audio-sidebar-manual-receipt/v1",
+        "status": "PENDING",
+        "sourceRevision": candidate["sourceRevision"],
+        "packageManifestSha256": package["manifestSha256"],
+        "targetSha256": target["sha256"],
+        "startedAt": None,
+        "finishedAt": None,
+        "elapsedMs": None,
+        "operator": None,
+        "checks": [
+            {"id": item["id"], "status": "PENDING"}
+            for item in definition["checks"]
+        ],
+    }
+
+
+def _validate_candidate_receipt(candidate: dict[str, Any]) -> None:
+    _require(
+        candidate.get("schema") == "voice2text-audio-sidebar-candidate/v1",
+        "candidate receipt schema drifted",
+    )
+    _require(
+        candidate.get("status") == "AUTOMATED_PASS_MANUAL_PENDING",
+        "automated candidate is not ready",
+    )
+    target = candidate.get("target")
+    _require(
+        isinstance(target, dict)
+        and bool(SHA256.fullmatch(str(target.get("sha256")))),
+        "candidate target identity is invalid",
+    )
+    verify_candidate_identity(candidate)
+
+
+def _recover_prepared_candidate() -> dict[str, Any]:
+    candidate = _load(CANDIDATE_RECEIPT, "candidate receipt")
+    _validate_candidate_receipt(candidate)
+    expected_manual = _pending_manual_receipt(candidate)
+    if MANUAL_RECEIPT.exists():
+        manual = _load(MANUAL_RECEIPT, "manual receipt")
+        if manual.get("status") == "PASS":
+            validate_manual(candidate, manual)
+        else:
+            _require(
+                manual == expected_manual,
+                "manual receipt conflicts with prepared candidate",
+            )
+    else:
+        _write_json(MANUAL_RECEIPT, expected_manual)
+    return candidate
+
+
 def prepare(
     *,
     runner: Callable[[Sequence[str], pathlib.Path], None] = _run_command,
 ) -> dict[str, Any]:
-    _require(not CANDIDATE_RECEIPT.exists(), "candidate was already prepared")
     _require(not FINAL_RECEIPT.exists(), "candidate was already finalized")
+    if CANDIDATE_RECEIPT.exists():
+        return _recover_prepared_candidate()
+    _require(
+        not MANUAL_RECEIPT.exists(),
+        "manual receipt exists without a candidate receipt",
+    )
     source_revision, input_sha = committed_candidate_identity()
     started = _timestamp()
     commands: list[dict[str, Any]] = []
@@ -224,22 +413,7 @@ def prepare(
         },
         "automated": commands,
     }
-    definition = json.loads(MANUAL_DEFINITION.read_text(encoding="utf-8"))
-    manual = {
-        "schema": "voice2text-audio-sidebar-manual-receipt/v1",
-        "status": "PENDING",
-        "sourceRevision": source_revision,
-        "packageManifestSha256": package_sha,
-        "targetSha256": receipt["target"]["sha256"],
-        "startedAt": None,
-        "finishedAt": None,
-        "elapsedMs": None,
-        "operator": None,
-        "checks": [
-            {"id": item["id"], "status": "PENDING"}
-            for item in definition["checks"]
-        ],
-    }
+    manual = _pending_manual_receipt(receipt)
     _write_json(CANDIDATE_RECEIPT, receipt)
     _write_json(MANUAL_RECEIPT, manual)
     return receipt
@@ -264,14 +438,17 @@ def validate_manual(candidate: dict[str, Any], manual: dict[str, Any]) -> None:
     _require(manual.get("packageManifestSha256") == package.get("manifestSha256"), "manual package identity drifted")
     _require(manual.get("targetSha256") == target.get("sha256"), "manual target identity drifted")
     _require(isinstance(manual.get("operator"), str) and manual["operator"], "manual operator is missing")
-    _require(isinstance(manual.get("startedAt"), str), "manual start time is missing")
-    _require(isinstance(manual.get("finishedAt"), str), "manual finish time is missing")
+    started_at = _parse_utc_timestamp(manual.get("startedAt"), "manual start time")
+    finished_at = _parse_utc_timestamp(manual.get("finishedAt"), "manual finish time")
     elapsed = manual.get("elapsedMs")
     _require(
-        isinstance(elapsed, int)
+        type(elapsed) is int
         and 0 < elapsed <= int(definition["maximumSessionMinutes"]) * 60_000,
         "manual elapsed time is invalid",
     )
+    _require(finished_at >= started_at, "manual finish time precedes start time")
+    measured_elapsed = round((finished_at - started_at).total_seconds() * 1000)
+    _require(measured_elapsed == elapsed, "manual elapsed time does not match timestamps")
     checks = manual.get("checks")
     _require(isinstance(checks, list), "manual checks are missing")
     _require(
@@ -300,15 +477,11 @@ def verify_candidate_identity(candidate: dict[str, Any]) -> None:
     _require(package_tree_sha256(PACKAGE_PATH) == expected, "candidate package changed")
 
 
-def finalize() -> dict[str, Any]:
-    _require(not FINAL_RECEIPT.exists(), "candidate was already finalized")
-    candidate = _load(CANDIDATE_RECEIPT, "candidate receipt")
-    _require(candidate.get("status") == "AUTOMATED_PASS_MANUAL_PENDING", "automated candidate is not ready")
-    manual = _load(MANUAL_RECEIPT, "manual receipt")
-    verify_candidate_identity(candidate)
-    validate_manual(candidate, manual)
+def _expected_final_receipt(
+    candidate: dict[str, Any], finalized_at: str
+) -> dict[str, Any]:
     package = candidate["package"]
-    final = {
+    return {
         "schema": "voice2text-audio-sidebar-final/v1",
         "status": "PASS",
         "sourceRevision": candidate["sourceRevision"],
@@ -317,21 +490,59 @@ def finalize() -> dict[str, Any]:
         "targetSha256": candidate["target"]["sha256"],
         "candidateReceiptSha256": _sha256_file(CANDIDATE_RECEIPT),
         "manualReceiptSha256": _sha256_file(MANUAL_RECEIPT),
-        "finalizedAt": _timestamp(),
+        "finalizedAt": finalized_at,
         "rebuildPerformed": False,
     }
-    _write_json(FINAL_RECEIPT, final)
-    product = _load(PRODUCT_MANIFEST, "Audio/sidebar product manifest")
-    product["status"] = "RELEASE_VALIDATED"
-    product["releaseCandidate"] = {
+
+
+def _recover_final_receipt(candidate: dict[str, Any]) -> dict[str, Any]:
+    final = _load(FINAL_RECEIPT, "final receipt")
+    finalized_at = final.get("finalizedAt")
+    _parse_utc_timestamp(finalized_at, "finalized time")
+    expected = _expected_final_receipt(candidate, str(finalized_at))
+    _require(final == expected, "final receipt conflicts with candidate identity")
+    return final
+
+
+def _release_projection(candidate: dict[str, Any]) -> dict[str, Any]:
+    return {
         "status": "PASS",
         "sourceRevision": candidate["sourceRevision"],
-        "packageManifestSha256": package["manifestSha256"],
+        "packageManifestSha256": candidate["package"]["manifestSha256"],
         "automatedReceipt": CANDIDATE_RECEIPT.relative_to(ROOT).as_posix(),
         "manualReceipt": MANUAL_RECEIPT.relative_to(ROOT).as_posix(),
         "finalizeRebuilds": False,
     }
+
+
+def _project_final_product(candidate: dict[str, Any]) -> None:
+    product = _load(PRODUCT_MANIFEST, "Audio/sidebar product manifest")
+    expected = _release_projection(candidate)
+    existing = product.get("releaseCandidate")
+    if product.get("status") == "RELEASE_VALIDATED" or (
+        isinstance(existing, dict) and existing.get("status") == "PASS"
+    ):
+        _require(
+            product.get("status") == "RELEASE_VALIDATED" and existing == expected,
+            "product projection conflicts with candidate identity",
+        )
+        return
+    product["status"] = "RELEASE_VALIDATED"
+    product["releaseCandidate"] = expected
     _write_json(PRODUCT_MANIFEST, product)
+
+
+def finalize() -> dict[str, Any]:
+    candidate = _load(CANDIDATE_RECEIPT, "candidate receipt")
+    _validate_candidate_receipt(candidate)
+    manual = _load(MANUAL_RECEIPT, "manual receipt")
+    validate_manual(candidate, manual)
+    if FINAL_RECEIPT.exists():
+        final = _recover_final_receipt(candidate)
+    else:
+        final = _expected_final_receipt(candidate, _timestamp())
+        _write_json(FINAL_RECEIPT, final)
+    _project_final_product(candidate)
     return final
 
 

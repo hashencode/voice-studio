@@ -24,6 +24,7 @@ import {
   LoadingShell,
   OfflineBanner,
   ProfileBlocker,
+  ProfileOriginNotice,
   ReconciliationSurface,
   ShellLoadError,
 } from "@/features/shell/shell-surfaces";
@@ -62,7 +63,6 @@ export default function App() {
       snapshot.capability.processing === "available",
     active: current === "audio",
     enabled: snapshot !== null,
-    applicationRevision: snapshot?.revision ?? 0,
     onRecord: () => setRecordRequest((value) => value + 1),
     onImport: importAudio,
     onCancel: cancelProcessing,
@@ -243,6 +243,9 @@ function ShellContent({
   }
   return (
     <div className="space-y-4">
+      <ProfileOriginNotice
+        legacyDatabaseArchived={snapshot.profile.legacyDatabaseArchived}
+      />
       {recovery}
       {section}
     </div>

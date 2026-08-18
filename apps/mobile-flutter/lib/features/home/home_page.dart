@@ -87,7 +87,7 @@ class _HomePageState extends State<HomePage> {
 
   List<_HomeTabSpec> get _tabs => <_HomeTabSpec>[
     const _HomeTabSpec(id: _allTab, label: '全部音频'),
-    const _HomeTabSpec(id: _audioTab, label: '音频音频'),
+    const _HomeTabSpec(id: _audioTab, label: '音频'),
     ..._folders.map(
       (FolderEntity folder) =>
           _HomeTabSpec(id: folder.name, label: folder.name),
@@ -1429,7 +1429,7 @@ class _MoveGroupPanel extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final List<_HomeTabSpec> targets = <_HomeTabSpec>[
-      const _HomeTabSpec(id: _audioTab, label: '音频音频'),
+      const _HomeTabSpec(id: _audioTab, label: '音频'),
       ...folders.map((String name) => _HomeTabSpec(id: name, label: name)),
     ];
 

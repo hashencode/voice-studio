@@ -111,7 +111,7 @@ const restored: ApplicationSnapshot = {
   protocolVersion: 2,
   revision: 8,
   navigation: { section: "companion" },
-  profile: { phase: "ready" },
+  profile: { phase: "ready", legacyDatabaseArchived: false },
   connectivity: "online",
   capability: { processing: "available" },
   library: { phase: "empty" },

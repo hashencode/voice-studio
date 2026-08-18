@@ -1,0 +1,77 @@
+{
+  "schema": "voice2text-audio-sidebar-candidate/v1",
+  "status": "AUTOMATED_PASS_MANUAL_PENDING",
+  "sourceRevision": "590a2f088c47b235a56207420fc75ddb6501bf33",
+  "candidateInputsSha256": "1bcd45f37cc1abe250f851c5ed438edfbb23faf4c674ae4673e5ac62eff216c1",
+  "preparedAt": "2026-08-18T02:07:08.673209Z",
+  "automatedFinishedAt": "2026-08-18T02:12:41.843862Z",
+  "target": {
+    "operatingSystem": "macos",
+    "operatingSystemVersion": "15.7.5",
+    "architecture": "arm64",
+    "cpuModel": "Apple M2",
+    "logicalCpuCount": 8,
+    "memoryBytes": 17179869184,
+    "sha256": "cfd5d83726fe1b3c661fa117ae85dd013076f8927c35e4068a9545774a5f8cb1"
+  },
+  "package": {
+    "path": "apps/desktop-electron/out/Voice2Text-darwin-arm64/Voice2Text.app",
+    "manifestAlgorithm": "sorted-path-mode-content-sha256/v1",
+    "manifestSha256": "7ea8e19cca8a9e3a377fde69985edeb389ec3529295f9e970d0c37ac49c55ab2",
+    "executableSha256": "263f9ea50c945924870c4d5f6d123296aa8f608d05ff222cb4046c79f16e54df",
+    "workerManifestSha256": "d8861038b7c76985c4205aa94dd3a65d9da5219ce2f668dd3e8c7041e42afe32"
+  },
+  "automated": [
+    {
+      "id": "build-cache-guard",
+      "command": [
+        "python3",
+        "tool/build_cache_guard.py",
+        "--wait-for-idle"
+      ],
+      "status": "PASS",
+      "elapsedMs": 114
+    },
+    {
+      "id": "electron-check",
+      "command": [
+        "bun",
+        "run",
+        "check"
+      ],
+      "status": "PASS",
+      "elapsedMs": 16010
+    },
+    {
+      "id": "package-once",
+      "command": [
+        "bun",
+        "run",
+        "package"
+      ],
+      "status": "PASS",
+      "elapsedMs": 305077
+    },
+    {
+      "id": "package-bootstrap",
+      "command": [
+        "bun",
+        "run",
+        "smoke:package"
+      ],
+      "status": "PASS",
+      "elapsedMs": 9728
+    },
+    {
+      "id": "packaged-product-matrix",
+      "command": [
+        "bunx",
+        "vitest",
+        "run",
+        "tests/packaged"
+      ],
+      "status": "PASS",
+      "elapsedMs": 1297
+    }
+  ]
+}

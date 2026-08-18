@@ -191,15 +191,98 @@ it("fences rapid B/C intents so only C renders after A closes", async () => {
   expect(desktop.controlAudioPlayback).toHaveBeenCalledTimes(1);
 });
 
-it("clears a selected Audio only after its playback closes when reconciliation removes it", async () => {
-  const listAudios = vi
+it("closes A again after a successful close is followed by a failed B open", async () => {
+  let failB = true;
+  const desktop = api({
+    openAudio: vi.fn(async (audioId) => {
+      if (audioId === 2 && failB) {
+        failB = false;
+        throw new Error("无法打开 B");
+      }
+      return workspace([audioA, audioB, audioC][audioId - 1]!);
+    }),
+  });
+  renderRoute(desktop);
+  const user = userEvent.setup();
+
+  await user.click(await screen.findByRole("button", { name: /打开 音频 A/ }));
+  await screen.findByRole("heading", { name: "音频 A.wav" });
+  await user.click(screen.getByRole("button", { name: /打开 音频 B/ }));
+  expect(await screen.findByRole("alert")).toHaveTextContent("无法打开 B");
+  await user.click(screen.getByRole("button", { name: /打开 音频 B/ }));
+
+  expect(
+    await screen.findByRole("heading", { name: "音频 B.wav" }),
+  ).toBeVisible();
+  expect(desktop.controlAudioPlayback).toHaveBeenCalledTimes(2);
+  expect(desktop.controlAudioPlayback).toHaveBeenNthCalledWith(1, 1, {
+    action: "close",
+  });
+  expect(desktop.controlAudioPlayback).toHaveBeenNthCalledWith(2, 1, {
+    action: "close",
+  });
+});
+
+it("chooses the newest processing job id before comparing attempts", async () => {
+  const olderHighAttempt: ProcessingTask = {
+    id: 40,
+    audioId: 1,
+    displayName: audioA.displayName,
+    state: "failed",
+    phase: "asr",
+    progressFraction: 0.4,
+    attempt: 9,
+    errorCode: "OLD_FAILURE",
+  };
+  const newerLowAttempt: ProcessingTask = {
+    ...olderHighAttempt,
+    id: 41,
+    state: "running",
+    progressFraction: 0.7,
+    attempt: 1,
+    errorCode: null,
+  };
+  render(
+    <AudioRouteFeature
+      api={api()}
+      tasks={[olderHighAttempt, newerLowAttempt]}
+      pendingJobActions={new Map()}
+      writable
+      paneOpen
+      onOpenPane={vi.fn()}
+      onRecord={vi.fn()}
+      onImport={vi.fn()}
+      onCancel={vi.fn()}
+      onRetry={vi.fn()}
+    />,
+  );
+
+  await userEvent
+    .setup()
+    .click(await screen.findByRole("button", { name: /打开 音频 A/ }));
+  expect(
+    await screen.findByRole("button", { name: "取消 音频 A.wav" }),
+  ).toBeVisible();
+  expect(
+    screen.queryByRole("button", { name: "重试 音频 A.wav" }),
+  ).not.toBeInTheDocument();
+});
+
+it("reopens the still-selected Audio exactly once when its current task completes", async () => {
+  const running = processingTask("running", 51);
+  const completed = { ...running, state: "completed" as const };
+  const refreshed = workspace({
+    ...audioA,
+    segmentCount: 2,
+  });
+  refreshed.segments[0]!.text = "完成后的转写";
+  refreshed.segments[0]!.machineText = "完成后的转写";
+  const openAudio = vi
     .fn()
-    .mockResolvedValueOnce([audioA])
-    .mockResolvedValueOnce([]);
-  const desktop = api({ listAudios });
+    .mockResolvedValueOnce(workspace(audioA))
+    .mockResolvedValueOnce(refreshed);
   const props = {
-    api: desktop,
-    tasks: [] as ProcessingTask[],
+    api: api({ openAudio }),
     pendingJobActions: new Map<number, never>(),
     writable: true,
     paneOpen: true,
@@ -209,16 +292,80 @@ it("clears a selected Audio only after its playback closes when reconciliation r
     onCancel: vi.fn(),
     onRetry: vi.fn(),
   };
-  const view = render(<AudioRouteFeature {...props} applicationRevision={1} />);
+  const view = render(<AudioRouteFeature {...props} tasks={[running]} />);
 
   await userEvent
     .setup()
     .click(await screen.findByRole("button", { name: /打开 音频 A/ }));
-  expect(
-    await screen.findByRole("heading", { name: "音频 A.wav" }),
-  ).toBeVisible();
+  await screen.findByRole("heading", { name: "音频 A.wav" });
+  view.rerender(<AudioRouteFeature {...props} tasks={[completed]} />);
 
-  view.rerender(<AudioRouteFeature {...props} applicationRevision={2} />);
+  await waitFor(() => expect(openAudio).toHaveBeenCalledTimes(2));
+  expect(screen.getByText("完成后的转写")).toBeVisible();
+  view.rerender(<AudioRouteFeature {...props} tasks={[completed]} />);
+  await waitFor(() => expect(openAudio).toHaveBeenCalledTimes(2));
+});
+
+it("refreshes the list for structural task changes but not progress-only updates", async () => {
+  const listAudios = vi
+    .fn()
+    .mockResolvedValueOnce([audioA])
+    .mockResolvedValueOnce([audioA]);
+  const desktop = api({ listAudios });
+  const running = processingTask("running", 61);
+  const props = {
+    api: desktop,
+    pendingJobActions: new Map<number, never>(),
+    writable: true,
+    paneOpen: true,
+    onOpenPane: vi.fn(),
+    onRecord: vi.fn(),
+    onImport: vi.fn(),
+    onCancel: vi.fn(),
+    onRetry: vi.fn(),
+  };
+  const view = render(<AudioRouteFeature {...props} tasks={[]} />);
+
+  await screen.findByRole("button", { name: /打开 音频 A/ });
+  expect(listAudios).toHaveBeenCalledTimes(1);
+  view.rerender(<AudioRouteFeature {...props} tasks={[running]} />);
+  await waitFor(() => expect(listAudios).toHaveBeenCalledTimes(2));
+  view.rerender(
+    <AudioRouteFeature
+      {...props}
+      tasks={[{ ...running, progressFraction: 0.9 }]}
+    />,
+  );
+  await waitFor(() => expect(listAudios).toHaveBeenCalledTimes(2));
+});
+
+it("clears a selected Audio only after its playback closes when a structural refresh removes it", async () => {
+  const listAudios = vi
+    .fn()
+    .mockResolvedValueOnce([audioA])
+    .mockResolvedValueOnce([]);
+  const desktop = api({ listAudios });
+  const props = {
+    api: desktop,
+    pendingJobActions: new Map<number, never>(),
+    writable: true,
+    paneOpen: true,
+    onOpenPane: vi.fn(),
+    onRecord: vi.fn(),
+    onImport: vi.fn(),
+    onCancel: vi.fn(),
+    onRetry: vi.fn(),
+  };
+  const view = render(<AudioRouteFeature {...props} tasks={[]} />);
+
+  await userEvent
+    .setup()
+    .click(await screen.findByRole("button", { name: /打开 音频 A/ }));
+  await screen.findByRole("heading", { name: "音频 A.wav" });
+
+  view.rerender(
+    <AudioRouteFeature {...props} tasks={[processingTask("queued", 71)]} />,
+  );
 
   await waitFor(() =>
     expect(desktop.controlAudioPlayback).toHaveBeenCalledWith(1, {
@@ -232,6 +379,22 @@ it("clears a selected Audio only after its playback closes when reconciliation r
     screen.queryByRole("heading", { name: "音频 A.wav" }),
   ).not.toBeInTheDocument();
 });
+
+function processingTask(
+  state: ProcessingTask["state"],
+  id: number,
+): ProcessingTask {
+  return {
+    id,
+    audioId: audioA.audioId,
+    displayName: audioA.displayName,
+    state,
+    phase: "asr",
+    progressFraction: state === "completed" ? 1 : 0.2,
+    attempt: 1,
+    errorCode: null,
+  };
+}
 
 function renderRoute(desktop: Voice2TextDesktopApi) {
   return render(
