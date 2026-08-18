@@ -146,6 +146,7 @@ public enum ProviderSecretMutationState: String, Codable, Equatable, Sendable {
 
 public final class ProviderSecretStore: @unchecked Sendable {
   public static let service = "com.voice2text.desktop.audio-ai"
+  private static let legacyService = "com.voice2text.desktop.meeting-ai"
   private let backend: KeychainBackend
 
   public init(backend: KeychainBackend = SystemKeychainBackend()) {
@@ -156,15 +157,9 @@ public final class ProviderSecretStore: @unchecked Sendable {
     let account = try account(providerId: providerId)
     switch backend.read(service: Self.service, account: account) {
     case .value(let data):
-      guard
-        !data.isEmpty,
-        data.count <= 4_096,
-        let secret = String(data: data, encoding: .utf8),
-        !secret.isEmpty
-      else { return .corrupt }
-      return .available(secret)
+      return decode(data)
     case .missing:
-      return .missing
+      return try migrateLegacySecret(account: account)
     case .denied:
       return .denied
     case .unavailable:
@@ -178,6 +173,59 @@ public final class ProviderSecretStore: @unchecked Sendable {
         "Keychain read failed"
       )
     }
+  }
+
+  private func migrateLegacySecret(account: String) throws -> ProviderSecretRead {
+    switch backend.read(service: Self.legacyService, account: account) {
+    case .value(let data):
+      let result = decode(data)
+      guard case .available(let secret) = result else { return result }
+      switch backend.replace(
+        service: Self.service,
+        account: account,
+        value: Data(secret.utf8),
+        accessibility: .whenUnlockedThisDeviceOnly,
+        synchronizable: false,
+        usesDataProtectionKeychain: true
+      ) {
+      case .stored:
+        break
+      case .denied:
+        throw NativeSecurityFailure("KEYCHAIN_ACCESS_DENIED", "Keychain access was denied")
+      case .unavailable:
+        throw NativeSecurityFailure("KEYCHAIN_UNAVAILABLE", "Keychain is unavailable")
+      case .failure:
+        throw NativeSecurityFailure("KEYCHAIN_OPERATION_FAILED", "Keychain write failed")
+      }
+      switch backend.delete(service: Self.legacyService, account: account) {
+      case .deleted, .missing:
+        return .available(secret)
+      case .denied:
+        throw NativeSecurityFailure("KEYCHAIN_ACCESS_DENIED", "Keychain access was denied")
+      case .unavailable:
+        throw NativeSecurityFailure("KEYCHAIN_UNAVAILABLE", "Keychain is unavailable")
+      case .failure:
+        throw NativeSecurityFailure("KEYCHAIN_OPERATION_FAILED", "Keychain delete failed")
+      }
+    case .missing:
+      return .missing
+    case .denied:
+      return .denied
+    case .unavailable:
+      throw NativeSecurityFailure("KEYCHAIN_UNAVAILABLE", "Keychain is unavailable")
+    case .failure:
+      throw NativeSecurityFailure("KEYCHAIN_OPERATION_FAILED", "Keychain read failed")
+    }
+  }
+
+  private func decode(_ data: Data) -> ProviderSecretRead {
+    guard
+      !data.isEmpty,
+      data.count <= 4_096,
+      let secret = String(data: data, encoding: .utf8),
+      !secret.isEmpty
+    else { return .corrupt }
+    return .available(secret)
   }
 
   public func replace(

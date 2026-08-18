@@ -106,6 +106,29 @@ def validate_envelope(envelope: dict[str, Any]) -> dict[str, Any]:
         "metadata exceeds limit",
     )
     reject_secret_fields(envelope)
+    payload = envelope["payload"]
+    if envelope["type"] == "manifest":
+        validate_manifest(payload)
+    elif envelope["type"] == "chunk":
+        require(
+            set(payload)
+            == {"transferId", "index", "offset", "plaintextBytes", "sha256"},
+            "chunk fields must be exact",
+        )
+        require(
+            IDENTIFIER.fullmatch(payload["transferId"]) is not None,
+            "invalid chunk transferId",
+        )
+        require(
+            isinstance(payload["index"], int)
+            and 0 <= payload["index"] < 65536
+            and isinstance(payload["offset"], int)
+            and payload["offset"] >= 0
+            and isinstance(payload["plaintextBytes"], int)
+            and 1 <= payload["plaintextBytes"] <= 1024**2
+            and SHA256.fullmatch(payload["sha256"]) is not None,
+            "invalid chunk payload",
+        )
     return envelope
 
 

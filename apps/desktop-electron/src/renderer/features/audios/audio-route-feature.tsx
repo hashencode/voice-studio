@@ -93,6 +93,14 @@ export function useAudioRouteController({
   );
 
   const setWorkspace = React.useCallback((next: AudioWorkspaceSnapshot) => {
+    const current = workspaceRef.current;
+    if (
+      !current ||
+      current.summary.audioId !== next.summary.audioId ||
+      next.revision < current.revision
+    ) {
+      return;
+    }
     workspaceRef.current = next;
     setWorkspaceState(next);
   }, []);

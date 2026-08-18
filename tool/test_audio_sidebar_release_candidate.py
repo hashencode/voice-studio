@@ -32,6 +32,19 @@ class AudioSidebarReleaseCandidateTest(unittest.TestCase):
         self.final_receipt = self.release / "final.json"
         self.manual_definition = self.root / "manual-checks.json"
         self.product_manifest = self.root / "workstation.json"
+        self.product_manifest.write_text(
+            json.dumps(
+                {
+                    "schema": "voice2text-audio-sidebar-workstation/v1",
+                    "status": "DEVELOPMENT_COMPLETE_RELEASE_VALIDATION_PENDING",
+                    "releaseCandidate": {
+                        "status": "PENDING_U6_STABLE_CANDIDATE"
+                    },
+                    "contract": {"value": "stable"},
+                }
+            ),
+            encoding="utf-8",
+        )
         executable = self.package / "Contents/MacOS/Voice2Text"
         worker = self.package / "Contents/Resources/worker/manifest.json"
         executable.parent.mkdir(parents=True)
@@ -83,7 +96,40 @@ class AudioSidebarReleaseCandidateTest(unittest.TestCase):
         stack.enter_context(
             patch.object(MODULE, "PRODUCT_MANIFEST", self.product_manifest)
         )
+        stack.enter_context(
+            patch.object(
+                MODULE, "_validate_product_manifest", return_value=None, create=True
+            )
+        )
+        stack.enter_context(
+            patch.object(
+                MODULE,
+                "_product_contract_sha256",
+                return_value="4" * 64,
+                create=True,
+            )
+        )
         return stack
+
+    def _prepared_candidate(self) -> dict[str, object]:
+        candidate = copy.deepcopy(self.candidate)
+        candidate.update(
+            {
+                "schema": "voice2text-audio-sidebar-candidate/v1",
+                "status": "AUTOMATED_PASS_MANUAL_PENDING",
+                "productContractSha256": "4" * 64,
+                "automated": [
+                    {
+                        "id": identifier,
+                        "command": list(command),
+                        "status": "PASS",
+                        "elapsedMs": 0,
+                    }
+                    for identifier, command, _cwd in MODULE.PREPARE_COMMANDS
+                ],
+            }
+        )
+        return candidate
 
     def tearDown(self) -> None:
         self.temporary.cleanup()
@@ -169,6 +215,14 @@ class AudioSidebarReleaseCandidateTest(unittest.TestCase):
         self.assertIn(
             "tool/validate_audio_sidebar_workstation.py", MODULE.INPUT_PATHS
         )
+        for path in (
+            "docs/contracts/companion-audio-transfer-v2.schema.json",
+            "docs/architecture/audio-activity-source-boundary.json",
+            "tool/validate_companion_audio_transfer_contract.py",
+            "tool/test_validate_companion_audio_transfer_contract.py",
+        ):
+            with self.subTest(path=path):
+                self.assertIn(path, MODULE.INPUT_PATHS)
 
     def test_packaged_matrix_explicitly_enables_every_opt_in_file(self) -> None:
         packaged = {
@@ -256,6 +310,140 @@ class AudioSidebarReleaseCandidateTest(unittest.TestCase):
             },
         )
 
+    def test_candidate_automated_results_exactly_match_prepare_commands(self) -> None:
+        candidate = self._prepared_candidate()
+        with patch.object(
+            MODULE, "verify_candidate_identity"
+        ), patch.object(
+            MODULE,
+            "_product_contract_sha256",
+            return_value="4" * 64,
+            create=True,
+        ):
+            MODULE._validate_candidate_receipt(candidate)
+            candidate["automated"] = candidate["automated"][:-1]
+            with self.assertRaisesRegex(MODULE.CandidateError, "automated"):
+                MODULE._validate_candidate_receipt(candidate)
+
+    def test_candidate_automated_elapsed_is_non_negative_plain_integer(self) -> None:
+        for invalid in (-1, True):
+            with self.subTest(invalid=invalid):
+                candidate = self._prepared_candidate()
+                candidate["automated"][0]["elapsedMs"] = invalid
+                with patch.object(
+                    MODULE, "verify_candidate_identity"
+                ), patch.object(
+                    MODULE,
+                    "_product_contract_sha256",
+                    return_value="4" * 64,
+                    create=True,
+                ):
+                    with self.assertRaisesRegex(
+                        MODULE.CandidateError, "elapsed"
+                    ):
+                        MODULE._validate_candidate_receipt(candidate)
+
+    def test_prepare_validates_product_before_commands_and_binds_contract(self) -> None:
+        events: list[str] = []
+        with self._patch_release_paths(), patch.object(
+            MODULE,
+            "committed_candidate_identity",
+            return_value=("1" * 40, "2" * 64),
+        ), patch.object(
+            MODULE,
+            "target_fingerprint",
+            return_value={"sha256": "3" * 64},
+        ), patch.object(
+            MODULE,
+            "_validate_product_manifest",
+            side_effect=lambda: events.append("validate"),
+            create=True,
+        ), patch.object(
+            MODULE,
+            "_product_contract_sha256",
+            return_value="4" * 64,
+            create=True,
+        ):
+            receipt = MODULE.prepare(
+                runner=lambda _command, _cwd: events.append("command")
+            )
+
+        self.assertEqual(events[0], "validate")
+        self.assertEqual(receipt["productContractSha256"], "4" * 64)
+
+    def test_product_contract_digest_excludes_only_mutable_projection(self) -> None:
+        with patch.object(MODULE, "PRODUCT_MANIFEST", self.product_manifest):
+            original = MODULE._product_contract_sha256()
+            product = json.loads(self.product_manifest.read_text(encoding="utf-8"))
+            product["status"] = "RELEASE_VALIDATED"
+            product["releaseCandidate"] = {"status": "PASS"}
+            self.product_manifest.write_text(json.dumps(product), encoding="utf-8")
+            self.assertEqual(MODULE._product_contract_sha256(), original)
+
+            product["contract"]["value"] = "drifted"
+            self.product_manifest.write_text(json.dumps(product), encoding="utf-8")
+            self.assertNotEqual(MODULE._product_contract_sha256(), original)
+
+    def test_prepare_recovery_rejects_drifted_automated_matrix(self) -> None:
+        candidate = self._prepared_candidate()
+        candidate["automated"][0]["command"] = ["unexpected"]
+        self.candidate_receipt.parent.mkdir(parents=True)
+        self.candidate_receipt.write_text(json.dumps(candidate), encoding="utf-8")
+        with self._patch_release_paths(), patch.object(
+            MODULE,
+            "committed_candidate_identity",
+            return_value=("1" * 40, "2" * 64),
+        ), patch.object(
+            MODULE,
+            "_product_contract_sha256",
+            return_value="4" * 64,
+            create=True,
+        ):
+            with self.assertRaisesRegex(MODULE.CandidateError, "automated"):
+                MODULE.prepare(
+                    runner=lambda _command, _cwd: self.fail("commands ran")
+                )
+
+    def test_finalize_checks_product_digest_and_revalidates_projection(self) -> None:
+        candidate = self._prepared_candidate()
+        self.candidate_receipt.parent.mkdir(parents=True)
+        self.candidate_receipt.write_text(json.dumps(candidate), encoding="utf-8")
+        self.manual_receipt.write_text(json.dumps(self.manual), encoding="utf-8")
+        with self._patch_release_paths(), patch.object(
+            MODULE,
+            "committed_candidate_identity",
+            return_value=("1" * 40, "2" * 64),
+        ), patch.object(
+            MODULE,
+            "_product_contract_sha256",
+            return_value="5" * 64,
+            create=True,
+        ):
+            with self.assertRaisesRegex(MODULE.CandidateError, "product contract"):
+                MODULE.finalize()
+
+        validations: list[str] = []
+        with self._patch_release_paths(), patch.object(
+            MODULE,
+            "committed_candidate_identity",
+            return_value=("1" * 40, "2" * 64),
+        ), patch.object(
+            MODULE,
+            "_product_contract_sha256",
+            return_value="4" * 64,
+            create=True,
+        ), patch.object(
+            MODULE,
+            "_validate_product_manifest",
+            side_effect=lambda: validations.append("validated"),
+            create=True,
+        ), patch.object(
+            MODULE, "_timestamp", return_value="2026-08-17T12:11:00Z"
+        ):
+            MODULE.finalize()
+
+        self.assertEqual(validations, ["validated", "validated"])
+
     def test_prepare_recovers_missing_manual_without_rerunning_commands(self) -> None:
         commands: list[tuple[str, ...]] = []
         original_write = MODULE._write_json
@@ -305,7 +493,7 @@ class AudioSidebarReleaseCandidateTest(unittest.TestCase):
                 MODULE.verify_candidate_identity(self.candidate)
 
     def test_prepare_rejects_conflicting_existing_candidate_without_rerun(self) -> None:
-        candidate = copy.deepcopy(self.candidate)
+        candidate = self._prepared_candidate()
         candidate["schema"] = "voice2text-audio-sidebar-candidate/v1"
         candidate["status"] = "AUTOMATED_PASS_MANUAL_PENDING"
         candidate["candidateInputsSha256"] = "9" * 64
@@ -322,7 +510,7 @@ class AudioSidebarReleaseCandidateTest(unittest.TestCase):
                 )
 
     def test_finalize_recovers_product_projection_without_rewriting_final(self) -> None:
-        candidate = copy.deepcopy(self.candidate)
+        candidate = self._prepared_candidate()
         candidate["schema"] = "voice2text-audio-sidebar-candidate/v1"
         candidate["status"] = "AUTOMATED_PASS_MANUAL_PENDING"
         candidate["target"] = {"sha256": "3" * 64}
@@ -369,7 +557,7 @@ class AudioSidebarReleaseCandidateTest(unittest.TestCase):
         self.assertEqual(product["releaseCandidate"]["sourceRevision"], "1" * 40)
 
     def test_finalize_rejects_conflicting_existing_final(self) -> None:
-        candidate = copy.deepcopy(self.candidate)
+        candidate = self._prepared_candidate()
         candidate["schema"] = "voice2text-audio-sidebar-candidate/v1"
         candidate["status"] = "AUTOMATED_PASS_MANUAL_PENDING"
         self.candidate_receipt.parent.mkdir(parents=True)
@@ -407,7 +595,7 @@ class AudioSidebarReleaseCandidateTest(unittest.TestCase):
                 MODULE.finalize()
 
     def test_finalize_rejects_conflicting_product_projection(self) -> None:
-        candidate = copy.deepcopy(self.candidate)
+        candidate = self._prepared_candidate()
         candidate["schema"] = "voice2text-audio-sidebar-candidate/v1"
         candidate["status"] = "AUTOMATED_PASS_MANUAL_PENDING"
         self.candidate_receipt.parent.mkdir(parents=True)

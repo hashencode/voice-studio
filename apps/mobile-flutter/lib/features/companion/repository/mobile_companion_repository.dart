@@ -250,19 +250,12 @@ class MobileCompanionRepository {
         'Pairing trust was not durably prepared before confirmation.',
       );
     }
-    final database = await _database.database;
-    final updated = await database.update(
-      'companion_peers',
-      <String, Object?>{'trust_state': 'active'},
-      where: 'device_id = ? AND pending_pairing_id = ? AND trust_state = ?',
-      whereArgs: <Object>[deviceId, pairingId, 'repair_required'],
+    await _promotePendingTrust(
+      trust: trust,
+      identityPublicKey: identityPublicKey,
+      displayName: displayName,
+      pairingId: pairingId,
     );
-    if (updated != 1) {
-      throw const CompanionProtocolException(
-        'PAIRING_TRUST_NOT_PERSISTED',
-        'Pairing trust could not be activated.',
-      );
-    }
     return MobileCompanionPeer(
       deviceId: deviceId,
       displayName: displayName,
@@ -278,12 +271,27 @@ class MobileCompanionRepository {
     required String displayName,
     required String pairingId,
   }) async {
-    final credentialKey = 'peer.${trust.peerDeviceId}.credential.v1';
-    final identityKey = 'peer.${trust.peerDeviceId}.identity-public-key.v1';
+    final credentialKey = _pendingCredentialKey(trust.peerDeviceId, pairingId);
+    final identityKey = _pendingIdentityKey(trust.peerDeviceId, pairingId);
     try {
       await _platform.putCredential(credentialKey, trust.sharedCredential);
       await _platform.putCredential(identityKey, identityPublicKey);
       final database = await _database.database;
+      final existing = await database.query(
+        'companion_peers',
+        where: 'device_id = ?',
+        whereArgs: <Object>[trust.peerDeviceId],
+        limit: 1,
+      );
+      if (existing.isNotEmpty && existing.single['trust_state'] == 'active') {
+        await database.update(
+          'companion_peers',
+          <String, Object?>{'pending_pairing_id': pairingId},
+          where: 'device_id = ? AND trust_state = ?',
+          whereArgs: <Object>[trust.peerDeviceId, 'active'],
+        );
+        return;
+      }
       await database.insert('companion_peers', <String, Object?>{
         'device_id': trust.peerDeviceId,
         'display_name': displayName,
@@ -301,11 +309,75 @@ class MobileCompanionRepository {
     }
   }
 
+  Future<void> _promotePendingTrust({
+    required CompanionPeerTrust trust,
+    required List<int> identityPublicKey,
+    required String displayName,
+    required String pairingId,
+  }) async {
+    final credentialKey = 'peer.${trust.peerDeviceId}.credential.v1';
+    final identityKey = 'peer.${trust.peerDeviceId}.identity-public-key.v1';
+    final pendingCredentialKey = _pendingCredentialKey(
+      trust.peerDeviceId,
+      pairingId,
+    );
+    final pendingIdentityKey = _pendingIdentityKey(
+      trust.peerDeviceId,
+      pairingId,
+    );
+    final previousCredential = await _platform.getCredential(credentialKey);
+    final previousIdentity = await _platform.getCredential(identityKey);
+    try {
+      await _platform.putCredential(credentialKey, trust.sharedCredential);
+      await _platform.putCredential(identityKey, identityPublicKey);
+      final database = await _database.database;
+      await database.transaction((transaction) async {
+        await transaction.insert('companion_peers', <String, Object?>{
+          'device_id': trust.peerDeviceId,
+          'display_name': displayName,
+          'identity_fingerprint': trust.peerFingerprint,
+          'pending_pairing_id': pairingId,
+          'trust_state': 'active',
+          'paired_at_ms': trust.pairedAtMs,
+          'last_seen_at_ms': null,
+          'revoked_at_ms': null,
+        }, conflictAlgorithm: ConflictAlgorithm.replace);
+      });
+    } catch (_) {
+      await _restoreCredentialBestEffort(credentialKey, previousCredential);
+      await _restoreCredentialBestEffort(identityKey, previousIdentity);
+      rethrow;
+    }
+    await _deleteCredentialBestEffort(pendingCredentialKey);
+    await _deleteCredentialBestEffort(pendingIdentityKey);
+  }
+
+  String _pendingCredentialKey(String deviceId, String pairingId) =>
+      'peer.$deviceId.pairing.$pairingId.credential.v1';
+
+  String _pendingIdentityKey(String deviceId, String pairingId) =>
+      'peer.$deviceId.pairing.$pairingId.identity-public-key.v1';
+
   Future<void> _deleteCredentialBestEffort(String key) async {
     try {
       await _platform.deleteCredential(key);
     } on Object {
       // Preserve the original persistence failure.
+    }
+  }
+
+  Future<void> _restoreCredentialBestEffort(
+    String key,
+    List<int>? previousValue,
+  ) async {
+    if (previousValue == null) {
+      await _deleteCredentialBestEffort(key);
+      return;
+    }
+    try {
+      await _platform.putCredential(key, previousValue);
+    } on Object {
+      // Preserve the original promotion failure.
     }
   }
 
@@ -572,6 +644,16 @@ class MobileCompanionRepository {
 
   Future<void> unpair(String deviceId) async {
     final database = await _database.database;
+    final peers = await database.query(
+      'companion_peers',
+      columns: <String>['pending_pairing_id'],
+      where: 'device_id = ?',
+      whereArgs: <Object>[deviceId],
+      limit: 1,
+    );
+    final pendingPairingId = peers.isEmpty
+        ? null
+        : peers.single['pending_pairing_id'] as String?;
     await database.transaction((transaction) async {
       await transaction.update(
         'companion_transfers',
@@ -595,6 +677,14 @@ class MobileCompanionRepository {
     });
     await _platform.deleteCredential('peer.$deviceId.credential.v1');
     await _platform.deleteCredential('peer.$deviceId.identity-public-key.v1');
+    if (pendingPairingId != null) {
+      await _deleteCredentialBestEffort(
+        _pendingCredentialKey(deviceId, pendingPairingId),
+      );
+      await _deleteCredentialBestEffort(
+        _pendingIdentityKey(deviceId, pendingPairingId),
+      );
+    }
   }
 }
 

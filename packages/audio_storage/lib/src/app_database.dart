@@ -1,11 +1,14 @@
+import 'dart:convert';
 import 'dart:io';
 
+import 'package:crypto/crypto.dart';
 import 'package:path/path.dart' as p;
 import 'package:sqflite/sqflite.dart';
 
 import 'audio_storage_contract.dart';
 
 class AppDatabase {
+  static const _retiredArchiveMarkerName = '.retired-source-pending.json';
   static final AppDatabase instance = AppDatabase();
 
   AppDatabase({
@@ -69,6 +72,7 @@ class AppDatabase {
       p.join(databasePath, AudioStorageContract.archiveDirectoryName),
     );
     await archiveRoot.create(recursive: true);
+    if (await _discardVerifiedRetiredSource(retiredPath, archiveRoot)) return;
 
     final timestamp = DateTime.now().toUtc().microsecondsSinceEpoch;
     var suffix = 0;
@@ -93,16 +97,31 @@ class AppDatabase {
       File('$retiredPath-shm'),
       File('$retiredPath-journal'),
     ];
+    final copied = <Map<String, Object?>>[];
     await stagingDirectory.create();
     try {
       for (final artifact in artifacts) {
         if (await artifact.exists()) {
-          await artifact.copy(
+          final destination = File(
             p.join(stagingDirectory.path, p.basename(artifact.path)),
           );
+          await artifact.copy(destination.path);
+          await _flushFile(destination);
+          final fingerprint = await _fingerprint(destination);
+          if (!await _matchesFingerprint(artifact, fingerprint)) {
+            throw FileSystemException(
+              'Retired database archive verification failed',
+              artifact.path,
+            );
+          }
+          copied.add(<String, Object?>{
+            'name': p.basename(artifact.path),
+            ...fingerprint,
+          });
         }
       }
       await stagingDirectory.rename(archiveDirectory.path);
+      await _writeArchiveMarker(archiveRoot, archiveDirectory, copied);
     } catch (_) {
       try {
         if (await stagingDirectory.exists()) {
@@ -113,11 +132,141 @@ class AppDatabase {
       }
       rethrow;
     }
+  }
 
-    for (final sidecar in artifacts.skip(1)) {
-      if (await sidecar.exists()) await sidecar.delete();
+  static Future<bool> _discardVerifiedRetiredSource(
+    String retiredPath,
+    Directory archiveRoot,
+  ) async {
+    final marker = File(p.join(archiveRoot.path, _retiredArchiveMarkerName));
+    if (!await marker.exists()) return false;
+    final decoded = jsonDecode(await marker.readAsString());
+    if (decoded is! Map<String, Object?>) {
+      throw const FormatException('Retired database archive marker is invalid');
     }
-    await retiredDatabase.delete();
+    final archiveName = decoded['archiveName'];
+    final copied = decoded['files'];
+    if (archiveName is! String ||
+        !RegExp(r'^\d+(?:-\d+)?$').hasMatch(archiveName) ||
+        copied is! List ||
+        copied.isEmpty ||
+        copied.length > 4) {
+      throw const FormatException('Retired database archive marker is invalid');
+    }
+    const databaseName = AudioStorageContract.retiredDatabaseFileName;
+    const allowedNames = <String>{
+      databaseName,
+      '$databaseName-wal',
+      '$databaseName-shm',
+      '$databaseName-journal',
+    };
+    final names = <String>{};
+    final verifiedSources = <MapEntry<File, String>>[];
+    for (final value in copied) {
+      if (value is! Map<String, Object?> ||
+          value['name'] is! String ||
+          value['sizeBytes'] is! int ||
+          (value['sizeBytes'] as int) < 0 ||
+          value['sha256'] is! String ||
+          !RegExp(r'^[0-9a-f]{64}$').hasMatch(value['sha256'] as String)) {
+        throw const FormatException(
+          'Retired database archive marker is invalid',
+        );
+      }
+      final name = value['name'] as String;
+      if (!allowedNames.contains(name) || !names.add(name)) {
+        throw const FormatException(
+          'Retired database archive marker is invalid',
+        );
+      }
+      final source = File('$retiredPath${_retiredSuffix(name)}');
+      final archived = File(p.join(archiveRoot.path, archiveName, name));
+      final expected = <String, Object>{
+        'sizeBytes': value['sizeBytes'] as int,
+        'sha256': value['sha256'] as String,
+      };
+      if (!await _matchesFingerprint(archived, expected) ||
+          (await source.exists() &&
+              !await _matchesFingerprint(source, expected))) {
+        throw FileSystemException(
+          'Retired database archive verification failed',
+          source.path,
+        );
+      }
+      if (await source.exists()) verifiedSources.add(MapEntry(source, name));
+    }
+    if (!names.contains(databaseName)) {
+      throw const FormatException('Retired database archive marker is invalid');
+    }
+    verifiedSources.sort((left, right) {
+      final leftIsDatabase = _retiredSuffix(left.value).isEmpty;
+      final rightIsDatabase = _retiredSuffix(right.value).isEmpty;
+      if (leftIsDatabase == rightIsDatabase) return 0;
+      return leftIsDatabase ? 1 : -1;
+    });
+    for (final source in verifiedSources) {
+      await source.key.delete();
+    }
+    await marker.delete();
+    return true;
+  }
+
+  static String _retiredSuffix(String name) {
+    const databaseName = AudioStorageContract.retiredDatabaseFileName;
+    if (!name.startsWith(databaseName)) {
+      throw const FormatException('Retired database archive marker is invalid');
+    }
+    return name.substring(databaseName.length);
+  }
+
+  static Future<void> _writeArchiveMarker(
+    Directory archiveRoot,
+    Directory archiveDirectory,
+    List<Map<String, Object?>> copied,
+  ) async {
+    final marker = File(p.join(archiveRoot.path, _retiredArchiveMarkerName));
+    final temporary = File('${marker.path}.tmp');
+    await temporary.writeAsString(
+      jsonEncode(<String, Object?>{
+        'archiveName': p.basename(archiveDirectory.path),
+        'files': copied,
+      }),
+      flush: true,
+    );
+    await temporary.rename(marker.path);
+  }
+
+  static Future<void> _flushFile(File file) async {
+    final handle = await file.open(mode: FileMode.append);
+    try {
+      await handle.flush();
+    } finally {
+      await handle.close();
+    }
+  }
+
+  static Future<Map<String, Object>> _fingerprint(File file) async {
+    final stat = await file.stat();
+    if (stat.type != FileSystemEntityType.file) {
+      throw FileSystemException(
+        'Expected a regular retired database file',
+        file.path,
+      );
+    }
+    final digest = await sha256.bind(file.openRead()).first;
+    return <String, Object>{
+      'sizeBytes': stat.size,
+      'sha256': digest.toString(),
+    };
+  }
+
+  static Future<bool> _matchesFingerprint(
+    File file,
+    Map<String, Object> expected,
+  ) async {
+    final actual = await _fingerprint(file);
+    return actual['sizeBytes'] == expected['sizeBytes'] &&
+        actual['sha256'] == expected['sha256'];
   }
 
   static Future<void> createCurrentSchema(Database db) async {

@@ -15,6 +15,48 @@ struct NativeSecurityTests {
     #expect(backend.lastAccount == "provider.deepseek.api-key")
   }
 
+  @Test("a missing Audio service migrates the released provider secret once")
+  func migratesLegacyProviderSecret() throws {
+    let account = "provider.deepseek.api-key"
+    let backend = MigratingKeychainBackend(values: [
+      "com.voice2text.desktop.meeting-ai|\(account)": Data("legacy-secret".utf8)
+    ])
+    let store = ProviderSecretStore(backend: backend)
+
+    #expect(try store.read(providerId: "deepseek") == .available("legacy-secret"))
+    #expect(backend.values["com.voice2text.desktop.audio-ai|\(account)"] == Data("legacy-secret".utf8))
+    #expect(backend.values["com.voice2text.desktop.meeting-ai|\(account)"] == nil)
+    #expect(backend.operations == [
+      "read:com.voice2text.desktop.audio-ai|\(account)",
+      "read:com.voice2text.desktop.meeting-ai|\(account)",
+      "replace:com.voice2text.desktop.audio-ai|\(account)",
+      "delete:com.voice2text.desktop.meeting-ai|\(account)",
+    ])
+  }
+
+  @Test("a failed Audio service migration retains the released provider secret")
+  func preservesLegacyProviderSecretWhenMigrationWriteFails() {
+    let account = "provider.deepseek.api-key"
+    let legacyKey = "com.voice2text.desktop.meeting-ai|\(account)"
+    let audioKey = "com.voice2text.desktop.audio-ai|\(account)"
+    let backend = MigratingKeychainBackend(
+      values: [legacyKey: Data("legacy-secret".utf8)],
+      replaceResult: .denied
+    )
+    let store = ProviderSecretStore(backend: backend)
+
+    #expect(throws: NativeSecurityFailure.self) {
+      _ = try store.read(providerId: "deepseek")
+    }
+    #expect(backend.values[legacyKey] == Data("legacy-secret".utf8))
+    #expect(backend.values[audioKey] == nil)
+    #expect(backend.operations == [
+      "read:com.voice2text.desktop.audio-ai|\(account)",
+      "read:com.voice2text.desktop.meeting-ai|\(account)",
+      "replace:com.voice2text.desktop.audio-ai|\(account)",
+    ])
+  }
+
   @Test("missing denied and corrupt Keychain reads remain distinct")
   func unavailableStates() throws {
     #expect(
@@ -248,6 +290,54 @@ struct NativeSecurityTests {
       ).run(arguments: ["10"])
     }
     #expect(startedAt.duration(to: .now) < .seconds(2))
+  }
+}
+
+private final class MigratingKeychainBackend: KeychainBackend {
+  var values: [String: Data]
+  var operations: [String] = []
+  var replaceResult: KeychainReplaceResult
+  var deleteResult: KeychainDeleteResult
+
+  init(
+    values: [String: Data],
+    replaceResult: KeychainReplaceResult = .stored,
+    deleteResult: KeychainDeleteResult = .deleted
+  ) {
+    self.values = values
+    self.replaceResult = replaceResult
+    self.deleteResult = deleteResult
+  }
+
+  func read(service: String, account: String) -> KeychainReadResult {
+    let key = "\(service)|\(account)"
+    operations.append("read:\(key)")
+    return values[key].map(KeychainReadResult.value) ?? .missing
+  }
+
+  func replace(
+    service: String,
+    account: String,
+    value: Data,
+    accessibility: KeychainAccessibility,
+    synchronizable: Bool,
+    usesDataProtectionKeychain: Bool
+  ) -> KeychainReplaceResult {
+    let key = "\(service)|\(account)"
+    operations.append("replace:\(key)")
+    if case .stored = replaceResult {
+      values[key] = value
+    }
+    return replaceResult
+  }
+
+  func delete(service: String, account: String) -> KeychainDeleteResult {
+    let key = "\(service)|\(account)"
+    operations.append("delete:\(key)")
+    if case .deleted = deleteResult {
+      values.removeValue(forKey: key)
+    }
+    return deleteResult
   }
 }
 

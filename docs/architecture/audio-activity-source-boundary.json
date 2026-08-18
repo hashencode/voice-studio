@@ -69,6 +69,14 @@
     {
       "path": "packages/desktop_sherpa_worker/tool/desktop_sherpa_benchmark.dart",
       "reason": "frozen benchmark fixture identifier bound by prior evidence"
+    },
+    {
+      "path": "packages/desktop_macos_native/Sources/NativeSecurity/NativeSecurity.swift",
+      "reason": "private released Keychain service is read once only to migrate provider secrets into the Audio service"
+    },
+    {
+      "path": "packages/desktop_macos_native/Tests/NativeSecurityTests/NativeSecurityTests.swift",
+      "reason": "migration fixture verifies the private released Keychain service is retired only after Audio-service persistence"
     }
   ],
   "protocol": {

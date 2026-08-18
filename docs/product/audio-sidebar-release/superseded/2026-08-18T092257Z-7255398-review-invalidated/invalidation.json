@@ -1,0 +1,13 @@
+{
+  "schema": "voice2text-audio-sidebar-candidate-invalidation/v1",
+  "status": "SUPERSEDED_REVIEW_INVALIDATED",
+  "sourceRevision": "72553980fbc17127a3b46d566bd6efcd04e6821d",
+  "invalidatedAt": "2026-08-18T09:22:57Z",
+  "reason": "Final code review found release-gate false-green paths and product defects after the completed manual run. The preserved receipts describe that run but are not current release evidence.",
+  "receipts": {
+    "candidate.json": "6cd89dfaaa4480d405a90c79c56d8b99e962dd85799c324520ba72bfae881e82",
+    "manual.json": "29516db6af661c403c7586d27303e6066c350fe38e3f2bef21f5ead1b75ea3da",
+    "final.json": "a4489dee77fd11efb6ed8cc4bf66959c3f7030ae607c817d9e1fca4e98651a0c"
+  },
+  "eligibleAsCurrentEvidence": false
+}

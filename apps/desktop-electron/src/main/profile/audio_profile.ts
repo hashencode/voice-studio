@@ -6,6 +6,7 @@ import {
   lstatSync,
   mkdirSync,
   openSync,
+  readSync,
   readdirSync,
   renameSync,
   rmdirSync,
@@ -13,7 +14,7 @@ import {
   unlinkSync,
   writeSync,
 } from "node:fs";
-import { randomUUID } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
 import { dirname, join, resolve } from "node:path";
 import type { DatabaseSync } from "node:sqlite";
 
@@ -54,6 +55,7 @@ export interface AudioProfileInitializationOptions {
   freeSpaceProbe?: (path: string) => bigint;
   now?: () => number;
   archiveLegacyDatabase?: (source: string, destination: string) => void;
+  removeLegacyDatabaseMember?: (path: string) => void;
 }
 
 export type AudioProfileInitializationResult =
@@ -92,6 +94,7 @@ export function initializeAudioProfile(
       applicationDataRoot,
       now(),
       options.archiveLegacyDatabase ?? copyFileSync,
+      options.removeLegacyDatabaseMember ?? unlinkSync,
     );
   } catch (error) {
     return blocked("legacy_archive_failed", error);
@@ -219,6 +222,7 @@ function archiveLegacyMeetingDatabase(
   applicationDataRoot: string,
   nowMs: number,
   archive: (source: string, destination: string) => void,
+  remove: (path: string) => void,
 ): string | null {
   const legacyPath =
     legacyMeetingDatabasePathForApplicationData(applicationDataRoot);
@@ -231,9 +235,12 @@ function archiveLegacyMeetingDatabase(
     // A missing legacy tree (including an ancestor that is not a directory)
     // means there is no legacy database to archive. Active-profile setup below
     // remains responsible for classifying collisions in its own path.
-    if (code === "ENOENT" || code === "ENOTDIR") return null;
+    if (code === "ENOENT" || code === "ENOTDIR") {
+      return publishedLegacyArchivePath(applicationDataRoot);
+    }
     throw error;
   }
+  assertLegacyDatabaseAncestorsAreDirectories(applicationDataRoot);
 
   const archiveDirectory = join(
     resolve(applicationDataRoot),
@@ -254,15 +261,17 @@ function archiveLegacyMeetingDatabase(
   mkdirSync(stagingDirectory, { mode: 0o700 });
   try {
     for (const source of members) {
-      archive(
+      copyVerifiedArchiveMember(
         source,
         join(stagingDirectory, source.slice(dirname(source).length + 1)),
+        archive,
       );
     }
     syncDirectory(stagingDirectory);
     renameSync(stagingDirectory, destinationDirectory);
+    syncDirectory(archiveDirectory);
     for (const source of members) {
-      if (existsSync(source)) unlinkSync(source);
+      if (existsSync(source)) remove(source);
     }
     syncDirectory(dirname(legacyPath));
     syncDirectory(archiveDirectory);
@@ -282,6 +291,105 @@ function archiveLegacyMeetingDatabase(
       );
     }
     throw error;
+  }
+}
+
+function assertLegacyDatabaseAncestorsAreDirectories(
+  applicationDataRoot: string,
+): void {
+  const root = resolve(applicationDataRoot);
+  const ancestors = [
+    join(root, "voice2text-electron"),
+    join(root, "voice2text-electron", "v1"),
+    join(root, "voice2text-electron", "v1", "database"),
+  ];
+  for (const ancestor of ancestors) {
+    const metadata = lstatSync(ancestor);
+    if (metadata.isSymbolicLink() || !metadata.isDirectory()) {
+      throw new Error("Meeting-era database ancestor is not a directory");
+    }
+  }
+}
+
+function publishedLegacyArchivePath(
+  applicationDataRoot: string,
+): string | null {
+  const archiveDirectory = join(
+    resolve(applicationDataRoot),
+    "voice2text-electron",
+    "archive",
+  );
+  let entries: string[];
+  try {
+    entries = readdirSync(archiveDirectory).sort().reverse();
+  } catch (error) {
+    const code = (error as NodeJS.ErrnoException).code;
+    if (code === "ENOENT" || code === "ENOTDIR") return null;
+    throw error;
+  }
+  for (const entry of entries) {
+    if (
+      !/^meetings\.sqlite3\.meeting-era\.\d{8}T\d{9}Z\.archive$/.test(entry)
+    ) {
+      continue;
+    }
+    const candidate = join(archiveDirectory, entry, "meetings.sqlite3");
+    try {
+      if (lstatSync(candidate).isFile()) return candidate;
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error;
+    }
+  }
+  return null;
+}
+
+function copyVerifiedArchiveMember(
+  source: string,
+  destination: string,
+  archive: (source: string, destination: string) => void,
+): void {
+  const sourceFingerprint = fileFingerprint(source);
+  archive(source, destination);
+  fsyncFile(destination);
+  const stagedFingerprint = fileFingerprint(destination);
+  if (
+    stagedFingerprint.size !== sourceFingerprint.size ||
+    stagedFingerprint.sha256 !== sourceFingerprint.sha256
+  ) {
+    throw new Error("Meeting-era archive copy did not match its source");
+  }
+}
+
+function fileFingerprint(path: string): { size: number; sha256: string } {
+  const metadata = lstatSync(path);
+  if (!metadata.isFile()) {
+    throw new Error("Meeting-era SQLite member is not a regular file");
+  }
+  const descriptor = openSync(path, "r");
+  try {
+    const digest = createHash("sha256");
+    const buffer = Buffer.allocUnsafe(64 * 1024);
+    let position = 0;
+    while (position < metadata.size) {
+      const count = readSync(descriptor, buffer, 0, buffer.length, position);
+      if (count === 0) {
+        throw new Error("Meeting-era SQLite member changed while archiving");
+      }
+      digest.update(buffer.subarray(0, count));
+      position += count;
+    }
+    return { size: metadata.size, sha256: digest.digest("hex") };
+  } finally {
+    closeSync(descriptor);
+  }
+}
+
+function fsyncFile(path: string): void {
+  const descriptor = openSync(path, "r");
+  try {
+    fsyncSync(descriptor);
+  } finally {
+    closeSync(descriptor);
   }
 }
 
@@ -407,10 +515,31 @@ function blocked(
   >["code"],
   error: unknown,
 ): AudioProfileInitializationResult {
+  void error;
   return {
     status: "blocked",
     code,
-    message: error instanceof Error ? error.message : String(error),
+    message: blockedMessage(code),
     repairable: true,
   };
+}
+
+function blockedMessage(
+  code: Extract<
+    AudioProfileInitializationResult,
+    { status: "blocked" }
+  >["code"],
+): string {
+  switch (code) {
+    case "legacy_archive_failed":
+      return "无法归档旧版资料库；请检查存储与权限后重试。";
+    case "insufficient_space":
+      return "可用存储空间不足；请释放空间后重试。";
+    case "path_escape":
+      return "本机资料库路径不可用；请检查资料库目录后重试。";
+    case "schema_invalid":
+      return "本机 Audio 资料库不可用；请修复资料库后重试。";
+    case "filesystem_unavailable":
+      return "无法初始化本机 Audio 资料库；请检查存储与权限后重试。";
+  }
 }

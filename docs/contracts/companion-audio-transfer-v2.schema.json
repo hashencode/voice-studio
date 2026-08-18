@@ -3,9 +3,16 @@
   "$id": "https://voice2text.example/contracts/companion-audio-transfer-v2.schema.json",
   "title": "Companion Audio Transfer Protocol v2",
   "type": "object",
-  "required": ["schema", "type", "messageId", "sessionId", "counter", "payload"],
+  "required": [
+    "schema",
+    "type",
+    "messageId",
+    "sessionId",
+    "counter",
+    "payload"
+  ],
   "properties": {
-    "schema": {"const": "companion-audio-transfer/v2"},
+    "schema": { "const": "companion-audio-transfer/v2" },
     "type": {
       "enum": [
         "discovery",
@@ -19,19 +26,202 @@
         "error"
       ]
     },
-    "messageId": {"$ref": "#/$defs/identifier"},
-    "sessionId": {"$ref": "#/$defs/identifier"},
-    "counter": {"type": "integer", "minimum": 0},
-    "payload": {"type": "object", "maxProperties": 32}
+    "messageId": { "$ref": "#/$defs/identifier" },
+    "sessionId": { "$ref": "#/$defs/identifier" },
+    "counter": { "type": "integer", "minimum": 0 },
+    "payload": { "type": "object", "maxProperties": 32 }
   },
   "additionalProperties": false,
+  "allOf": [
+    {
+      "if": { "properties": { "type": { "const": "discovery" } } },
+      "then": { "properties": { "payload": { "$ref": "#/$defs/discovery" } } }
+    },
+    {
+      "if": { "properties": { "type": { "const": "pairingTranscript" } } },
+      "then": {
+        "properties": { "payload": { "$ref": "#/$defs/pairingTranscript" } }
+      }
+    },
+    {
+      "if": { "properties": { "type": { "const": "capability" } } },
+      "then": { "properties": { "payload": { "$ref": "#/$defs/capability" } } }
+    },
+    {
+      "if": { "properties": { "type": { "const": "manifest" } } },
+      "then": { "properties": { "payload": { "$ref": "#/$defs/manifest" } } }
+    },
+    {
+      "if": { "properties": { "type": { "const": "chunk" } } },
+      "then": { "properties": { "payload": { "$ref": "#/$defs/chunk" } } }
+    },
+    {
+      "if": { "properties": { "type": { "const": "checkpoint" } } },
+      "then": { "properties": { "payload": { "$ref": "#/$defs/checkpoint" } } }
+    },
+    {
+      "if": { "properties": { "type": { "const": "receipt" } } },
+      "then": {
+        "properties": { "payload": { "$ref": "#/$defs/receiptPayload" } }
+      }
+    },
+    {
+      "if": { "properties": { "type": { "const": "cancel" } } },
+      "then": { "properties": { "payload": { "$ref": "#/$defs/cancel" } } }
+    },
+    {
+      "if": { "properties": { "type": { "const": "error" } } },
+      "then": { "properties": { "payload": { "$ref": "#/$defs/error" } } }
+    }
+  ],
   "$defs": {
     "identifier": {
       "type": "string",
       "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$"
     },
-    "sha256": {"type": "string", "pattern": "^[a-f0-9]{64}$"},
-    "fingerprint": {"type": "string", "pattern": "^[A-Z2-7]{20,64}$"},
+    "sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+    "fingerprint": { "type": "string", "pattern": "^[A-Z2-7]{20,64}$" },
+    "base64": { "type": "string", "minLength": 16, "maxLength": 512 },
+    "discovery": {
+      "type": "object",
+      "required": [
+        "deviceId",
+        "deviceName",
+        "port",
+        "identityFingerprint",
+        "capabilities"
+      ],
+      "properties": {
+        "deviceId": { "$ref": "#/$defs/identifier" },
+        "deviceName": { "type": "string", "minLength": 1, "maxLength": 80 },
+        "port": { "type": "integer", "minimum": 1, "maximum": 65535 },
+        "identityFingerprint": { "$ref": "#/$defs/fingerprint" },
+        "capabilities": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 8,
+          "uniqueItems": true,
+          "items": { "$ref": "#/$defs/identifier" }
+        }
+      },
+      "additionalProperties": false
+    },
+    "pairingTranscriptValue": {
+      "type": "object",
+      "required": [
+        "schema",
+        "pairingId",
+        "initiatorDeviceId",
+        "initiatorFingerprint",
+        "initiatorEphemeralPublicKey",
+        "responderDeviceId",
+        "responderFingerprint",
+        "responderEphemeralPublicKey",
+        "shortCodeHash",
+        "expiresAtMs",
+        "capabilities"
+      ],
+      "properties": {
+        "schema": { "const": "companion-audio-transfer/v2" },
+        "pairingId": { "$ref": "#/$defs/identifier" },
+        "initiatorDeviceId": { "$ref": "#/$defs/identifier" },
+        "initiatorFingerprint": { "$ref": "#/$defs/fingerprint" },
+        "initiatorEphemeralPublicKey": { "$ref": "#/$defs/base64" },
+        "responderDeviceId": { "$ref": "#/$defs/identifier" },
+        "responderFingerprint": { "$ref": "#/$defs/fingerprint" },
+        "responderEphemeralPublicKey": { "$ref": "#/$defs/base64" },
+        "shortCodeHash": { "$ref": "#/$defs/sha256" },
+        "expiresAtMs": { "type": "integer", "minimum": 0 },
+        "capabilities": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 8,
+          "uniqueItems": true,
+          "items": { "$ref": "#/$defs/identifier" }
+        }
+      },
+      "additionalProperties": false
+    },
+    "pairingTranscript": {
+      "oneOf": [
+        {
+          "type": "object",
+          "required": [
+            "transcript",
+            "shortCode",
+            "initiatorIdentityPublicKey",
+            "initiatorSignature"
+          ],
+          "properties": {
+            "transcript": { "$ref": "#/$defs/pairingTranscriptValue" },
+            "shortCode": { "type": "string", "pattern": "^[0-9]{6}$" },
+            "initiatorIdentityPublicKey": { "$ref": "#/$defs/base64" },
+            "initiatorSignature": { "$ref": "#/$defs/base64" }
+          },
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "required": [
+            "transcript",
+            "responderIdentityPublicKey",
+            "responderSignature",
+            "verified"
+          ],
+          "properties": {
+            "transcript": { "$ref": "#/$defs/pairingTranscriptValue" },
+            "responderIdentityPublicKey": { "$ref": "#/$defs/base64" },
+            "responderSignature": { "$ref": "#/$defs/base64" },
+            "verified": { "const": true }
+          },
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "required": ["commit", "transcriptHash"],
+          "properties": {
+            "commit": { "const": true },
+            "transcriptHash": { "$ref": "#/$defs/sha256" }
+          },
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "required": ["paired", "transcriptHash"],
+          "properties": {
+            "paired": { "const": true },
+            "transcriptHash": { "$ref": "#/$defs/sha256" }
+          },
+          "additionalProperties": false
+        }
+      ]
+    },
+    "capability": {
+      "type": "object",
+      "required": [
+        "capability",
+        "maxChunkBytes",
+        "maxSourceBytes",
+        "resume",
+        "receipts"
+      ],
+      "properties": {
+        "capability": { "const": "audio-transfer/v2" },
+        "maxChunkBytes": {
+          "type": "integer",
+          "minimum": 4096,
+          "maximum": 1048576
+        },
+        "maxSourceBytes": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 4294967296
+        },
+        "resume": { "type": "boolean" },
+        "receipts": { "type": "boolean" }
+      },
+      "additionalProperties": false
+    },
     "manifest": {
       "type": "object",
       "required": [
@@ -46,16 +236,16 @@
         "createdAtMs"
       ],
       "properties": {
-        "schema": {"const": "companion-audio-transfer/v2"},
-        "transferId": {"$ref": "#/$defs/identifier"},
-        "sourceAssetId": {"$ref": "#/$defs/identifier"},
-        "displayName": {"type": "string", "minLength": 1, "maxLength": 160},
+        "schema": { "const": "companion-audio-transfer/v2" },
+        "transferId": { "$ref": "#/$defs/identifier" },
+        "sourceAssetId": { "$ref": "#/$defs/identifier" },
+        "displayName": { "type": "string", "minLength": 1, "maxLength": 160 },
         "sizeBytes": {
           "type": "integer",
           "minimum": 1,
           "maximum": 4294967296
         },
-        "wholeFileSha256": {"$ref": "#/$defs/sha256"},
+        "wholeFileSha256": { "$ref": "#/$defs/sha256" },
         "chunkBytes": {
           "type": "integer",
           "minimum": 4096,
@@ -66,29 +256,23 @@
           "minimum": 1,
           "maximum": 65536
         },
-        "createdAtMs": {"type": "integer", "minimum": 0}
+        "createdAtMs": { "type": "integer", "minimum": 0 }
       },
       "additionalProperties": false
     },
     "chunk": {
       "type": "object",
-      "required": [
-        "transferId",
-        "index",
-        "offset",
-        "plaintextBytes",
-        "sha256"
-      ],
+      "required": ["transferId", "index", "offset", "plaintextBytes", "sha256"],
       "properties": {
-        "transferId": {"$ref": "#/$defs/identifier"},
-        "index": {"type": "integer", "minimum": 0, "maximum": 65535},
-        "offset": {"type": "integer", "minimum": 0, "maximum": 4294967295},
+        "transferId": { "$ref": "#/$defs/identifier" },
+        "index": { "type": "integer", "minimum": 0, "maximum": 65535 },
+        "offset": { "type": "integer", "minimum": 0, "maximum": 4294967295 },
         "plaintextBytes": {
           "type": "integer",
           "minimum": 1,
           "maximum": 1048576
         },
-        "sha256": {"$ref": "#/$defs/sha256"}
+        "sha256": { "$ref": "#/$defs/sha256" }
       },
       "additionalProperties": false
     },
@@ -101,15 +285,15 @@
         "updatedAtMs"
       ],
       "properties": {
-        "transferId": {"$ref": "#/$defs/identifier"},
-        "wholeFileSha256": {"$ref": "#/$defs/sha256"},
+        "transferId": { "$ref": "#/$defs/identifier" },
+        "wholeFileSha256": { "$ref": "#/$defs/sha256" },
         "missingChunks": {
           "type": "array",
           "maxItems": 65536,
           "uniqueItems": true,
-          "items": {"type": "integer", "minimum": 0, "maximum": 65535}
+          "items": { "type": "integer", "minimum": 0, "maximum": 65535 }
         },
-        "updatedAtMs": {"type": "integer", "minimum": 0}
+        "updatedAtMs": { "type": "integer", "minimum": 0 }
       },
       "additionalProperties": false
     },
@@ -128,20 +312,58 @@
         "signature"
       ],
       "properties": {
-        "schema": {"const": "companion-audio-transfer/v2"},
-        "receiptId": {"$ref": "#/$defs/identifier"},
-        "transferId": {"$ref": "#/$defs/identifier"},
-        "wholeFileSha256": {"$ref": "#/$defs/sha256"},
+        "schema": { "const": "companion-audio-transfer/v2" },
+        "receiptId": { "$ref": "#/$defs/identifier" },
+        "transferId": { "$ref": "#/$defs/identifier" },
+        "wholeFileSha256": { "$ref": "#/$defs/sha256" },
         "sizeBytes": {
           "type": "integer",
           "minimum": 1,
           "maximum": 4294967296
         },
-        "desktopDeviceId": {"$ref": "#/$defs/identifier"},
-        "desktopDeviceName": {"type": "string", "minLength": 1, "maxLength": 80},
-        "desktopRecordingId": {"type": "integer", "minimum": 1},
-        "committedAtMs": {"type": "integer", "minimum": 0},
-        "signature": {"type": "string", "minLength": 16, "maxLength": 256}
+        "desktopDeviceId": { "$ref": "#/$defs/identifier" },
+        "desktopDeviceName": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 80
+        },
+        "desktopRecordingId": { "type": "integer", "minimum": 1 },
+        "committedAtMs": { "type": "integer", "minimum": 0 },
+        "signature": { "type": "string", "minLength": 16, "maxLength": 256 }
+      },
+      "additionalProperties": false
+    },
+    "receiptRequest": {
+      "type": "object",
+      "required": ["request", "transferId", "wholeFileSha256"],
+      "properties": {
+        "request": { "const": true },
+        "transferId": { "$ref": "#/$defs/identifier" },
+        "wholeFileSha256": { "$ref": "#/$defs/sha256" }
+      },
+      "additionalProperties": false
+    },
+    "receiptPayload": {
+      "oneOf": [
+        { "$ref": "#/$defs/receipt" },
+        { "$ref": "#/$defs/receiptRequest" }
+      ]
+    },
+    "cancel": {
+      "type": "object",
+      "required": ["reason"],
+      "properties": {
+        "transferId": { "$ref": "#/$defs/identifier" },
+        "reason": { "enum": ["user"] }
+      },
+      "additionalProperties": false
+    },
+    "error": {
+      "type": "object",
+      "required": ["code", "message"],
+      "properties": {
+        "code": { "$ref": "#/$defs/identifier" },
+        "message": { "type": "string", "minLength": 1, "maxLength": 512 }
       },
       "additionalProperties": false
     }

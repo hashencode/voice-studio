@@ -274,10 +274,125 @@ void main() {
     final row = (await database.query('companion_peers')).single;
     expect(row['trust_state'], 'repair_required');
     expect(row['pending_pairing_id'], 'pairing-1');
-    expect(platform.values['peer.desktop-1.credential.v1'], isNotNull);
-    expect(platform.values['peer.desktop-1.identity-public-key.v1'], isNotNull);
+    expect(
+      platform.values['peer.desktop-1.pairing.pairing-1.credential.v1'],
+      isNotNull,
+    );
+    expect(
+      platform
+          .values['peer.desktop-1.pairing.pairing-1.identity-public-key.v1'],
+      isNotNull,
+    );
     expect(await subject.listPeers(), isEmpty);
   });
+
+  test(
+    're-pair lost acknowledgement preserves existing active trust',
+    () async {
+      final artifact = await _artifact();
+      const canonicalCredentialKey = 'peer.desktop-1.credential.v1';
+      const canonicalIdentityKey = 'peer.desktop-1.identity-public-key.v1';
+      final previousCredential = List<int>.filled(32, 4);
+      final previousIdentity = List<int>.filled(32, 5);
+      platform.values[canonicalCredentialKey] = previousCredential;
+      platform.values[canonicalIdentityKey] = previousIdentity;
+      await database.insert('companion_peers', <String, Object?>{
+        'device_id': 'desktop-1',
+        'display_name': 'Existing Studio Mac',
+        'identity_fingerprint': 'A'.padRight(20, 'A'),
+        'pending_pairing_id': null,
+        'trust_state': 'active',
+        'paired_at_ms': 1,
+        'last_seen_at_ms': null,
+        'revoked_at_ms': null,
+      });
+      final subject = repository(({
+        required client,
+        required address,
+        required port,
+      }) async {
+        await client.persistPendingTrust(_trustFor(client));
+        throw const CompanionProtocolException(
+          'PAIRING_CONFIRMATION_UNKNOWN',
+          'confirmation lost',
+        );
+      });
+
+      await expectLater(
+        subject.acceptPairingInvite(
+          encodedPayload: artifact.rawJson,
+          confirmedShortCode: '123456',
+          nowMs: 1000,
+        ),
+        throwsA(isA<CompanionProtocolException>()),
+      );
+
+      expect(platform.values[canonicalCredentialKey], previousCredential);
+      expect(platform.values[canonicalIdentityKey], previousIdentity);
+      expect(await subject.listPeers(), hasLength(1));
+      final row = (await database.query('companion_peers')).single;
+      expect(row['trust_state'], 'active');
+      expect(row['pending_pairing_id'], 'pairing-1');
+      expect(
+        platform.values['peer.desktop-1.pairing.pairing-1.credential.v1'],
+        List<int>.filled(32, 9),
+      );
+      expect(
+        platform
+            .values['peer.desktop-1.pairing.pairing-1.identity-public-key.v1'],
+        artifact.identityPublicKey,
+      );
+    },
+  );
+
+  test(
+    'promotion write failure restores existing active trust and credentials',
+    () async {
+      final artifact = await _artifact();
+      const canonicalCredentialKey = 'peer.desktop-1.credential.v1';
+      const canonicalIdentityKey = 'peer.desktop-1.identity-public-key.v1';
+      final previousCredential = List<int>.filled(32, 4);
+      final previousIdentity = List<int>.filled(32, 5);
+      platform.values[canonicalCredentialKey] = previousCredential;
+      platform.values[canonicalIdentityKey] = previousIdentity;
+      platform.failPutForKey = canonicalIdentityKey;
+      await database.insert('companion_peers', <String, Object?>{
+        'device_id': 'desktop-1',
+        'display_name': 'Existing Studio Mac',
+        'identity_fingerprint': 'A'.padRight(20, 'A'),
+        'pending_pairing_id': null,
+        'trust_state': 'active',
+        'paired_at_ms': 1,
+        'last_seen_at_ms': null,
+        'revoked_at_ms': null,
+      });
+      final subject = repository(({
+        required client,
+        required address,
+        required port,
+      }) async {
+        final trust = _trustFor(client);
+        await client.persistPendingTrust(trust);
+        return trust;
+      });
+
+      await expectLater(
+        subject.acceptPairingInvite(
+          encodedPayload: artifact.rawJson,
+          confirmedShortCode: '123456',
+          nowMs: 1000,
+        ),
+        throwsA(isA<StateError>()),
+      );
+
+      expect(platform.values[canonicalCredentialKey], previousCredential);
+      expect(platform.values[canonicalIdentityKey], previousIdentity);
+      final row = (await database.query('companion_peers')).single;
+      expect(row['display_name'], 'Existing Studio Mac');
+      expect(row['trust_state'], 'active');
+      expect(row['pending_pairing_id'], 'pairing-1');
+    },
+  );
 
   test(
     'failure before verified transcript does not persist peer trust',
@@ -341,6 +456,15 @@ void main() {
 
     expect(platform.values['peer.desktop-1.credential.v1'], isNull);
     expect(platform.values['peer.desktop-1.identity-public-key.v1'], isNull);
+    expect(
+      platform.values['peer.desktop-1.pairing.pairing-1.credential.v1'],
+      isNull,
+    );
+    expect(
+      platform
+          .values['peer.desktop-1.pairing.pairing-1.identity-public-key.v1'],
+      isNull,
+    );
     expect(await database.query('recordings'), hasLength(1));
     expect(
       (await database.query('companion_peers')).single['trust_state'],
@@ -396,6 +520,7 @@ class _PairingArtifact {
 
 class _MemoryCompanionPlatform implements CompanionPlatformPort {
   final Map<String, List<int>> values = <String, List<int>>{};
+  String? failPutForKey;
 
   @override
   Future<void> deleteAllCredentials() async => values.clear();
@@ -412,6 +537,9 @@ class _MemoryCompanionPlatform implements CompanionPlatformPort {
 
   @override
   Future<void> putCredential(String key, List<int> value) async {
+    if (key == failPutForKey) {
+      throw StateError('credential write failed for $key');
+    }
     values[key] = List<int>.from(value);
   }
 

@@ -1,12 +1,14 @@
 from __future__ import annotations
 
 import copy
+import json
 import unittest
 
 from tool.validate_companion_audio_transfer_contract import (
     ContractError,
     LEGACY_PROTOCOL,
     PROTOCOL,
+    SCHEMA_PATH,
     sample_manifest,
     validate_envelope,
     validate_manifest,
@@ -58,6 +60,29 @@ class CompanionAudioTransferContractTest(unittest.TestCase):
         }
         with self.assertRaisesRegex(ContractError, "schema"):
             validate_envelope(envelope)
+
+    def test_public_schema_binds_every_message_type_to_a_payload(self) -> None:
+        schema = json.loads(
+            SCHEMA_PATH.read_text(encoding="utf-8")
+        )
+        branches = schema.get("allOf")
+        self.assertIsInstance(branches, list)
+        bound_types = {
+            branch["if"]["properties"]["type"]["const"]
+            for branch in branches
+        }
+        self.assertEqual(bound_types, set(schema["properties"]["type"]["enum"]))
+
+        malformed_chunk = {
+            "schema": PROTOCOL,
+            "type": "chunk",
+            "messageId": "message-1",
+            "sessionId": "session-1",
+            "counter": 0,
+            "payload": {},
+        }
+        with self.assertRaisesRegex(ContractError, "chunk fields"):
+            validate_envelope(malformed_chunk)
 
     def test_v1_is_rejected_before_payload_validation(self) -> None:
         envelope = {

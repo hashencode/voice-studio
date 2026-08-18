@@ -10,6 +10,7 @@ resolution: workspace
 
 dependencies:
   audio_core: any
+  crypto: ^3.0.7
   flutter:
     sdk: flutter
   path: ^1.9.1

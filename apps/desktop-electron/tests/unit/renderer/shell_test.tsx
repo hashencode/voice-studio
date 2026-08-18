@@ -270,6 +270,37 @@ describe("application shell", () => {
     expect(api.requestBootstrapAction).toHaveBeenCalledWith("repair-guidance");
   });
 
+  it("loads Audio only after a blocked profile becomes ready", async () => {
+    const blocked: ApplicationSnapshot = {
+      ...readySnapshot,
+      profile: {
+        phase: "blocked",
+        code: "insufficient_space",
+        message: "可用空间不足",
+        repairable: true,
+      },
+      capture: { phase: "idle" },
+    };
+    const ready: ApplicationSnapshot = {
+      ...readySnapshot,
+      revision: blocked.revision + 1,
+      capture: { phase: "idle" },
+    };
+    const listAudios = vi.fn(async () => []);
+    const requestBootstrapAction = vi.fn(async () => ready);
+    installApi(blocked, { listAudios, requestBootstrapAction });
+    render(<App />);
+
+    expect(await screen.findByRole("alert")).toHaveTextContent("可用空间不足");
+    expect(listAudios).not.toHaveBeenCalled();
+    await userEvent
+      .setup()
+      .click(screen.getByRole("button", { name: "重试初始化" }));
+
+    expect(await screen.findByText("还没有音频")).toBeVisible();
+    expect(listAudios).toHaveBeenCalledTimes(1);
+  });
+
   it("renders route-local Audio loading and recoverable error states", async () => {
     const pending = new Promise<never>(() => undefined);
     const first = installApi(

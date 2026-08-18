@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'dart:io';
 
 import 'package:audio_storage/audio_storage.dart';
@@ -70,9 +71,9 @@ void main() {
       addTearDown(audio.close);
 
       expect(await audio.query('recordings'), isEmpty);
-      expect(await File(retiredPath).exists(), isFalse);
+      expect(await File(retiredPath).exists(), isTrue);
       for (final suffix in sidecarContents.keys) {
-        expect(await File('$retiredPath$suffix').exists(), isFalse);
+        expect(await File('$retiredPath$suffix').exists(), isTrue);
       }
 
       final archiveRoot = Directory(
@@ -90,16 +91,49 @@ void main() {
       for (final entry in sidecarContents.entries) {
         final archivedSidecar = File('$archivedRetiredPath${entry.key}');
         expect(await archivedSidecar.readAsBytes(), entry.value);
-        await archivedSidecar.delete();
       }
-      final archived = await databaseFactoryFfi.openDatabase(
-        archivedRetiredPath,
-        options: OpenDatabaseOptions(readOnly: true),
+      final marker =
+          jsonDecode(
+                await File(
+                  '${archiveRoot.path}/.retired-source-pending.json',
+                ).readAsString(),
+              )
+              as Map<String, Object?>;
+      final archivedFiles = (marker['files']! as List)
+          .cast<Map<String, Object?>>();
+      expect(
+        archivedFiles.singleWhere(
+          (entry) =>
+              entry['name'] ==
+              '${AudioStorageContract.retiredDatabaseFileName}-wal',
+        )['sha256'],
+        '039058c6f2c0cb492c533b0a4d14ef77cc0f78abccced5287d84a1a2011cfb81',
       );
-      addTearDown(archived.close);
-      expect(await archived.query('retired_records'), <Map<String, Object?>>[
-        <String, Object?>{'value': 'retired-only'},
-      ]);
+      final archivedWal = File('$archivedRetiredPath-wal');
+      await archivedWal.writeAsBytes(<int>[99]);
+      final failedRetryOwner = AppDatabase(
+        factory: databaseFactoryFfi,
+        databasePathProvider: () async => root.path,
+      );
+      await expectLater(
+        failedRetryOwner.database,
+        throwsA(isA<FileSystemException>()),
+      );
+      expect(await File(retiredPath).exists(), isTrue);
+      for (final suffix in sidecarContents.keys) {
+        expect(await File('$retiredPath$suffix').exists(), isTrue);
+      }
+      await archivedWal.writeAsBytes(sidecarContents['-wal']!);
+      final retryOwner = AppDatabase(
+        factory: databaseFactoryFfi,
+        databasePathProvider: () async => root.path,
+      );
+      final retry = await retryOwner.database;
+      await retry.close();
+      expect(await File(retiredPath).exists(), isFalse);
+      for (final suffix in sidecarContents.keys) {
+        expect(await File('$retiredPath$suffix').exists(), isFalse);
+      }
     },
   );
 

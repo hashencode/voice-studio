@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 
-import { render, screen, waitFor, within } from "@testing-library/react";
+import { act, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { expect, it, vi } from "vitest";
 
@@ -343,6 +343,55 @@ it("refreshes the list for structural task changes but not progress-only updates
     />,
   );
   await waitFor(() => expect(listAudios).toHaveBeenCalledTimes(2));
+});
+
+it("recovers a failed Audio list through the visible retry action", async () => {
+  const listAudios = vi
+    .fn()
+    .mockRejectedValueOnce(new Error("列表暂时不可用"))
+    .mockResolvedValueOnce([audioA]);
+  renderRoute(api({ listAudios }));
+
+  const alert = await screen.findByRole("alert");
+  expect(alert).toHaveTextContent("列表暂时不可用");
+  const retry = within(alert).getByRole("button", { name: "重新载入" });
+  expect(retry).toBeEnabled();
+  await userEvent.setup().click(retry);
+
+  expect(
+    await screen.findByRole("button", { name: /打开 音频 A/ }),
+  ).toBeVisible();
+  expect(listAudios).toHaveBeenCalledTimes(2);
+  expect(screen.queryByText("列表暂时不可用")).not.toBeInTheDocument();
+});
+
+it("ignores an Audio mutation response after a newer selection", async () => {
+  const undoA = deferred<AudioWorkspaceSnapshot>();
+  const desktop = api({
+    openAudio: vi.fn(async (audioId) => ({
+      ...workspace([audioA, audioB, audioC][audioId - 1]!),
+      canUndo: audioId === audioA.audioId,
+    })),
+    undoAudioEdit: vi.fn(() => undoA.promise),
+  });
+  renderRoute(desktop);
+  const user = userEvent.setup();
+
+  await user.click(await screen.findByRole("button", { name: /打开 音频 A/ }));
+  await user.click(screen.getByRole("button", { name: "撤销" }));
+  await user.click(screen.getByRole("button", { name: /打开 音频 B/ }));
+  expect(
+    await screen.findByRole("heading", { name: "音频 B.wav" }),
+  ).toBeVisible();
+
+  await act(async () => {
+    undoA.resolve({ ...workspace(audioA), revision: 2 });
+    await undoA.promise;
+  });
+  expect(
+    screen.queryByRole("heading", { name: "音频 A.wav" }),
+  ).not.toBeInTheDocument();
+  expect(screen.getByRole("heading", { name: "音频 B.wav" })).toBeVisible();
 });
 
 it("clears a selected Audio only after its playback closes when a structural refresh removes it", async () => {

@@ -1,4 +1,6 @@
 import {
+  appendFileSync,
+  copyFileSync,
   existsSync,
   mkdirSync,
   mkdtempSync,
@@ -6,6 +8,7 @@ import {
   readdirSync,
   renameSync,
   rmSync,
+  symlinkSync,
 } from "node:fs";
 import { spawnSync } from "node:child_process";
 import { tmpdir } from "node:os";
@@ -69,6 +72,12 @@ function seedMeetingEraDatabaseWithUncheckpointedWal(path: string): void {
   );
   expect(child.status, child.stderr).toBe(0);
   expect(existsSync(`${path}-wal`)).toBe(true);
+}
+
+function legacyBundle(path: string): string[] {
+  return [path, `${path}-wal`, `${path}-shm`, `${path}-journal`].filter(
+    existsSync,
+  );
 }
 
 describe("U8 Audio profile reset boundary", () => {
@@ -232,6 +241,179 @@ describe("U8 Audio profile reset boundary", () => {
           )
         : [],
     ).toEqual([]);
+  });
+
+  it.each(["voice2text-electron", "v1", "database"])(
+    "blocks before copying when legacy %s is a symlink ancestor",
+    (ancestor) => {
+      const applicationDataRoot = temporaryRoot();
+      const externalFixture = temporaryRoot();
+      const legacyPath =
+        legacyMeetingDatabasePathForApplicationData(applicationDataRoot);
+      const externalLegacyPath = join(
+        externalFixture,
+        "voice2text-electron",
+        "v1",
+        "database",
+        "meetings.sqlite3",
+      );
+      seedMeetingEraDatabase(externalLegacyPath);
+
+      const ancestorIndex = ["voice2text-electron", "v1", "database"].indexOf(
+        ancestor,
+      );
+      const linkedPath = join(
+        applicationDataRoot,
+        ...["voice2text-electron", "v1", "database"].slice(
+          0,
+          ancestorIndex + 1,
+        ),
+      );
+      const externalTarget = join(
+        externalFixture,
+        ...["voice2text-electron", "v1", "database"].slice(
+          0,
+          ancestorIndex + 1,
+        ),
+      );
+      mkdirSync(dirname(linkedPath), { recursive: true });
+      symlinkSync(externalTarget, linkedPath, "dir");
+      const before = readFileSync(externalLegacyPath);
+      let copyCalls = 0;
+
+      const result = initializeAudioProfile(applicationDataRoot, {
+        archiveLegacyDatabase: () => {
+          copyCalls += 1;
+        },
+      });
+
+      expect(result).toEqual(
+        expect.objectContaining({
+          status: "blocked",
+          code: "legacy_archive_failed",
+        }),
+      );
+      expect(copyCalls).toBe(0);
+      expect(readFileSync(externalLegacyPath)).toEqual(before);
+      expect(existsSync(legacyPath)).toBe(true);
+    },
+  );
+
+  it("rejects a staged member whose copy does not match its source", () => {
+    const applicationDataRoot = temporaryRoot();
+    const legacyPath =
+      legacyMeetingDatabasePathForApplicationData(applicationDataRoot);
+    seedMeetingEraDatabase(legacyPath);
+    const before = readFileSync(legacyPath);
+
+    const result = initializeAudioProfile(applicationDataRoot, {
+      archiveLegacyDatabase: (source, destination) => {
+        copyFileSync(source, destination);
+        appendFileSync(destination, "corrupted-after-copy");
+      },
+    });
+
+    expect(result).toEqual(
+      expect.objectContaining({
+        status: "blocked",
+        code: "legacy_archive_failed",
+      }),
+    );
+    expect(readFileSync(legacyPath)).toEqual(before);
+    expect(
+      existsSync(join(applicationDataRoot, "voice2text-electron", "archive"))
+        ? readdirSync(
+            join(applicationDataRoot, "voice2text-electron", "archive"),
+          )
+        : [],
+    ).toEqual([]);
+  });
+
+  it("rolls back a published bundle when source removal fails", () => {
+    const applicationDataRoot = temporaryRoot();
+    const legacyPath =
+      legacyMeetingDatabasePathForApplicationData(applicationDataRoot);
+    seedMeetingEraDatabaseWithUncheckpointedWal(legacyPath);
+    const members = legacyBundle(legacyPath);
+    const before = new Map(members.map((path) => [path, readFileSync(path)]));
+    let removals = 0;
+
+    const result = initializeAudioProfile(applicationDataRoot, {
+      removeLegacyDatabaseMember: (path) => {
+        removals += 1;
+        if (removals === 2) throw new Error(`cannot remove ${path}`);
+        rmSync(path);
+      },
+    });
+
+    expect(result).toEqual(
+      expect.objectContaining({
+        status: "blocked",
+        code: "legacy_archive_failed",
+      }),
+    );
+    for (const member of members) {
+      expect(readFileSync(member)).toEqual(before.get(member));
+    }
+    expect(
+      readdirSync(join(applicationDataRoot, "voice2text-electron", "archive")),
+    ).toEqual([]);
+  });
+
+  it("reports the previously published archive after a free-space retry", () => {
+    const applicationDataRoot = temporaryRoot();
+    const legacyPath =
+      legacyMeetingDatabasePathForApplicationData(applicationDataRoot);
+    seedMeetingEraDatabase(legacyPath);
+    const now = () => Date.UTC(2026, 7, 17, 8, 9, 10, 11);
+
+    const blocked = initializeAudioProfile(applicationDataRoot, {
+      now,
+      minimumFreeBytes: 1n,
+      freeSpaceProbe: () => 0n,
+    });
+    expect(blocked).toEqual(
+      expect.objectContaining({
+        status: "blocked",
+        code: "insufficient_space",
+      }),
+    );
+    expect(existsSync(legacyPath)).toBe(false);
+
+    const retried = initializeAudioProfile(applicationDataRoot, {
+      now,
+      minimumFreeBytes: 1n,
+      freeSpaceProbe: () => 1n,
+    });
+    expect(retried.status).toBe("ready");
+    if (retried.status !== "ready") throw new Error(retried.message);
+    try {
+      expect(retried.archivedLegacyDatabasePath).toMatch(
+        /meetings\.sqlite3\.meeting-era\.20260817T080910011Z\.archive\/meetings\.sqlite3$/,
+      );
+    } finally {
+      retried.database.close();
+    }
+  });
+
+  it("returns a bounded path-free blocked message", () => {
+    const applicationDataRoot = temporaryRoot();
+    const result = initializeAudioProfile(applicationDataRoot, {
+      freeSpaceProbe: () => {
+        throw new Error(`filesystem failure at ${applicationDataRoot}`);
+      },
+    });
+
+    expect(result).toEqual(
+      expect.objectContaining({
+        status: "blocked",
+        code: "filesystem_unavailable",
+        message: "无法初始化本机 Audio 资料库；请检查存储与权限后重试。",
+      }),
+    );
+    if (result.status !== "blocked")
+      throw new Error("expected blocked profile");
+    expect(result.message).not.toContain(applicationDataRoot);
   });
 
   it("projects only a non-sensitive archive fact into the ready application snapshot", () => {

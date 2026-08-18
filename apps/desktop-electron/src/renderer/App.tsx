@@ -62,7 +62,7 @@ export default function App() {
       snapshot?.profile.phase === "ready" &&
       snapshot.capability.processing === "available",
     active: current === "audio",
-    enabled: snapshot !== null,
+    enabled: snapshot?.profile.phase === "ready",
     onRecord: () => setRecordRequest((value) => value + 1),
     onImport: importAudio,
     onCancel: cancelProcessing,

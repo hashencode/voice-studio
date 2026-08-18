@@ -37,8 +37,12 @@ INPUT_PATHS = (
     "packages/desktop_macos_native",
     "packages/desktop_sherpa_worker",
     "packages/processing_contracts",
+    "docs/contracts/companion-audio-transfer-v2.schema.json",
+    "docs/architecture/audio-activity-source-boundary.json",
     "docs/product/audio-sidebar-manual-checks.json",
     "tool/audio_sidebar_release_candidate.py",
+    "tool/validate_companion_audio_transfer_contract.py",
+    "tool/test_validate_companion_audio_transfer_contract.py",
     "tool/validate_audio_sidebar_workstation.py",
 )
 PREPARE_COMMANDS = (
@@ -305,6 +309,24 @@ def _run_command(command: Sequence[str], cwd: pathlib.Path) -> None:
     subprocess.run(command, cwd=cwd, check=True)
 
 
+def _validate_product_manifest() -> None:
+    subprocess.run(
+        (sys.executable, str(ROOT / "tool/validate_audio_sidebar_workstation.py")),
+        cwd=ROOT,
+        check=True,
+    )
+
+
+def _product_contract_sha256() -> str:
+    product = _load(PRODUCT_MANIFEST, "Audio/sidebar product manifest")
+    contract = {
+        key: value
+        for key, value in product.items()
+        if key not in {"status", "releaseCandidate"}
+    }
+    return hashlib.sha256(_canonical(contract)).hexdigest()
+
+
 def _pending_manual_receipt(candidate: dict[str, Any]) -> dict[str, Any]:
     definition = _load(MANUAL_DEFINITION, "manual definition")
     package = candidate.get("package")
@@ -339,6 +361,44 @@ def _validate_candidate_receipt(candidate: dict[str, Any]) -> None:
         candidate.get("status") == "AUTOMATED_PASS_MANUAL_PENDING",
         "automated candidate is not ready",
     )
+    automated = candidate.get("automated")
+    _require(
+        isinstance(automated, list)
+        and len(automated) == len(PREPARE_COMMANDS),
+        "candidate automated results do not match prepare commands",
+    )
+    for result, (identifier, command, _cwd) in zip(
+        automated, PREPARE_COMMANDS, strict=True
+    ):
+        _require(
+            isinstance(result, dict)
+            and set(result) == {"id", "command", "status", "elapsedMs"},
+            "candidate automated result fields drifted",
+        )
+        _require(
+            result.get("id") == identifier
+            and result.get("command") == list(command),
+            "candidate automated commands drifted",
+        )
+        _require(
+            result.get("status") == "PASS",
+            "candidate automated result is not PASS",
+        )
+        elapsed = result.get("elapsedMs")
+        _require(
+            type(elapsed) is int and elapsed >= 0,
+            "candidate automated elapsed time is invalid",
+        )
+    product_contract_sha = candidate.get("productContractSha256")
+    _require(
+        isinstance(product_contract_sha, str)
+        and bool(SHA256.fullmatch(product_contract_sha)),
+        "candidate product contract hash is invalid",
+    )
+    _require(
+        product_contract_sha == _product_contract_sha256(),
+        "candidate product contract changed",
+    )
     target = candidate.get("target")
     _require(
         isinstance(target, dict)
@@ -371,6 +431,7 @@ def prepare(
     runner: Callable[[Sequence[str], pathlib.Path], None] = _run_command,
 ) -> dict[str, Any]:
     _require(not FINAL_RECEIPT.exists(), "candidate was already finalized")
+    _validate_product_manifest()
     if CANDIDATE_RECEIPT.exists():
         return _recover_prepared_candidate()
     _require(
@@ -378,6 +439,7 @@ def prepare(
         "manual receipt exists without a candidate receipt",
     )
     source_revision, input_sha = committed_candidate_identity()
+    product_contract_sha = _product_contract_sha256()
     started = _timestamp()
     commands: list[dict[str, Any]] = []
     for identifier, command, cwd in PREPARE_COMMANDS:
@@ -401,6 +463,7 @@ def prepare(
         "status": "AUTOMATED_PASS_MANUAL_PENDING",
         "sourceRevision": source_revision,
         "candidateInputsSha256": input_sha,
+        "productContractSha256": product_contract_sha,
         "preparedAt": started,
         "automatedFinishedAt": _timestamp(),
         "target": target_fingerprint(),
@@ -414,6 +477,7 @@ def prepare(
         "automated": commands,
     }
     manual = _pending_manual_receipt(receipt)
+    _validate_candidate_receipt(receipt)
     _write_json(CANDIDATE_RECEIPT, receipt)
     _write_json(MANUAL_RECEIPT, manual)
     return receipt
@@ -486,6 +550,7 @@ def _expected_final_receipt(
         "status": "PASS",
         "sourceRevision": candidate["sourceRevision"],
         "candidateInputsSha256": candidate["candidateInputsSha256"],
+        "productContractSha256": candidate["productContractSha256"],
         "packageManifestSha256": package["manifestSha256"],
         "targetSha256": candidate["target"]["sha256"],
         "candidateReceiptSha256": _sha256_file(CANDIDATE_RECEIPT),
@@ -533,6 +598,7 @@ def _project_final_product(candidate: dict[str, Any]) -> None:
 
 
 def finalize() -> dict[str, Any]:
+    _validate_product_manifest()
     candidate = _load(CANDIDATE_RECEIPT, "candidate receipt")
     _validate_candidate_receipt(candidate)
     manual = _load(MANUAL_RECEIPT, "manual receipt")
@@ -543,6 +609,7 @@ def finalize() -> dict[str, Any]:
         final = _expected_final_receipt(candidate, _timestamp())
         _write_json(FINAL_RECEIPT, final)
     _project_final_product(candidate)
+    _validate_product_manifest()
     return final
 
 
