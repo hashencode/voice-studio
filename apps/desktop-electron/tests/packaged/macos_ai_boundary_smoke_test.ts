@@ -13,6 +13,8 @@ import path from "node:path";
 
 import { describe, expect, it } from "vitest";
 
+import { AUDIO_SCHEMA_VERSION } from "../../src/main/storage/audio_database";
+
 const packagedIt =
   process.platform === "darwin" &&
   process.arch === "arm64" &&
@@ -75,7 +77,7 @@ describe("packaged macOS AI security boundary", () => {
             networkRequestCount: 0,
             before: { consents: 0, jobs: 0, notes: 0 },
             after: { consents: 0, jobs: 0, notes: 0 },
-            databaseUserVersion: 10,
+            databaseUserVersion: AUDIO_SCHEMA_VERSION,
             deviceSecurity: {
               kind: "device-security",
               fileVaultState: expect.stringMatching(
