@@ -1,0 +1,12 @@
+{
+  "schema": "voice2text-audio-sidebar-supersession/v1",
+  "status": "SUPERSEDED_BEFORE_MANUAL",
+  "archivedAt": "2026-08-18T02:06:20Z",
+  "sourceRevision": "3d12ba36c8ac488fe1bceb07823da4d84508b4c6",
+  "invalidatedByRevision": "f3ba5dd",
+  "reason": "The packaged candidate rejected the canonical #/audio route at the IPC trust boundary. The candidate never completed manual acceptance or finalize.",
+  "originalReceiptSha256": {
+    "candidate.json": "87c6bc57585e1b30b2915e4e77e52331aaaa2245a43d929cfbeb772ae1a3a1be",
+    "manual.json": "62fd044cbed7430a2b19e27a317166e32827a8de85e8bf9c33d99a7aab459ee8"
+  }
+}
