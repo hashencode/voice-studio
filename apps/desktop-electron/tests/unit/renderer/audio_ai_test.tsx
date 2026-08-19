@@ -112,11 +112,11 @@ describe("per-generation audio AI consent", () => {
     let dialog = await screen.findByRole("dialog", {
       name: "本次音频云端处理同意",
     });
-    await user.click(
-      within(dialog).getByRole("checkbox", {
-        name: "我同意仅针对本次音频发送音频标题与上述转写文本",
-      }),
-    );
+    const consent = within(dialog).getByRole("checkbox", {
+      name: "我同意仅针对本次音频发送音频标题与上述转写文本",
+    });
+    expect(consent).toHaveAttribute("data-slot", "checkbox");
+    await user.click(consent);
     await user.click(
       within(dialog).getByRole("button", { name: "同意并生成草稿" }),
     );

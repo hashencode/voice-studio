@@ -137,16 +137,24 @@ it("supports keyboard open, search, edit, playback, speaker and export with sema
   const row = screen.getByRole("listitem", { name: /00:00 说话人 1/ });
   await user.click(within(row).getByRole("button", { name: "编辑片段 1" }));
   const editor = within(row).getByRole("textbox", { name: "片段 1 文本" });
+  expect(editor).toHaveAttribute("data-slot", "textarea");
   await user.clear(editor);
   await user.type(editor, "修订：确认下周发布。");
   await user.keyboard("{Control>}{Enter}{/Control}");
   await waitFor(() => expect(desktop.editAudioSegment).toHaveBeenCalled());
 
   await user.click(screen.getByRole("button", { name: "播放音频" }));
-  await user.selectOptions(
-    screen.getByRole("combobox", { name: "播放速度" }),
-    "1.5",
-  );
+  const position = screen.getByRole("slider", { name: "播放位置 00:00" });
+  expect(position).toHaveAttribute("aria-valuemin", "0");
+  expect(position).toHaveAttribute("aria-valuemax", "6000");
+  expect(position).toHaveAttribute("aria-valuenow", "0");
+  position.focus();
+  await user.keyboard("{ArrowRight}");
+  expect(desktop.controlAudioPlayback).toHaveBeenCalledWith(4, {
+    action: "seek",
+    positionMs: 1,
+  });
+  await selectRadixOption(user, "播放速度", "1.5×");
   await user.click(screen.getByRole("button", { name: "导出 TXT" }));
   expect(desktop.controlAudioPlayback).toHaveBeenCalledWith(4, {
     action: "play",
@@ -169,10 +177,7 @@ it("supports keyboard open, search, edit, playback, speaker and export with sema
     expect.objectContaining({ speakerId: 7, name: "主持人" }),
   );
 
-  await user.selectOptions(
-    screen.getByRole("combobox", { name: "片段 2 说话人" }),
-    "speaker:7",
-  );
+  await selectRadixOption(user, "片段 2 说话人", "说话人 1");
   expect(desktop.assignAudioSpeaker).toHaveBeenCalledWith(
     expect.objectContaining({ segmentId: 12, state: "assigned", speakerId: 7 }),
   );
@@ -418,8 +423,17 @@ it("resets the merge source after a speaker is merged", async () => {
   await waitFor(() =>
     expect(desktop.mergeAudioSpeakers).toHaveBeenCalledTimes(1),
   );
-  expect(screen.getByRole("combobox", { name: "合并来源说话人" })).toHaveValue(
-    "9",
-  );
+  expect(
+    screen.getByRole("combobox", { name: "合并来源说话人" }),
+  ).toHaveTextContent("说话人 3");
   expect(screen.getByRole("button", { name: "合并说话人" })).toBeEnabled();
 });
+
+async function selectRadixOption(
+  user: ReturnType<typeof userEvent.setup>,
+  label: string,
+  option: string,
+) {
+  await user.click(screen.getByRole("combobox", { name: label }));
+  await user.click(await screen.findByRole("option", { name: option }));
+}

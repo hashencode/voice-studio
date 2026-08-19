@@ -57,9 +57,13 @@ describe("AI settings security boundary", () => {
 
     await user.click(screen.getByRole("button", { name: "配置提供商" }));
     const dialog = screen.getByRole("dialog", { name: "配置音频智能提供商" });
-    await user.selectOptions(
-      within(dialog).getByRole("combobox", { name: "音频智能提供商" }),
-      "openai-compatible",
+    const provider = within(dialog).getByRole("combobox", {
+      name: "音频智能提供商",
+    });
+    expect(provider).toHaveAttribute("data-slot", "select-trigger");
+    await user.click(provider);
+    await user.click(
+      await screen.findByRole("option", { name: "OpenAI-compatible" }),
     );
     await user.clear(within(dialog).getByRole("textbox", { name: "模型 ID" }));
     await user.type(

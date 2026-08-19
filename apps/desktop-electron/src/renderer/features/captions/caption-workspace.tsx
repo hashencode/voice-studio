@@ -10,6 +10,7 @@ import {
 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
+import { Progress } from "@/components/ui/progress";
 import type {
   CaptionFormalRetryRequest,
   CaptionSnapshot,
@@ -151,7 +152,7 @@ export function CaptionWorkspace({
       role="region"
       aria-label="实时字幕与转写"
       aria-busy={retryPending}
-      className="space-y-3 rounded-lg border bg-muted/20 p-3"
+      className="space-y-3 border-y py-3"
     >
       <span
         data-testid="caption-live-announcement"
@@ -261,15 +262,16 @@ function DraftTranscript({
       {draft.backlogBytes > 0 ? (
         <div className="space-y-1">
           <div className="flex justify-between gap-3 text-xs">
-            <span className="font-medium">实时草稿积压</span>
+            <span id="caption-backlog-label" className="font-medium">
+              实时草稿积压
+            </span>
             <span>{draft.backlogBytes.toLocaleString("en-US")} 字节</span>
           </div>
-          <progress
-            aria-label="实时草稿积压"
+          <Progress
+            aria-labelledby="caption-backlog-label"
             aria-valuetext={`字幕处理积压 ${draft.backlogBytes.toLocaleString("en-US")} 字节`}
             max={CAPTION_BACKLOG_LIMIT_BYTES}
             value={Math.min(draft.backlogBytes, CAPTION_BACKLOG_LIMIT_BYTES)}
-            className="h-2 w-full"
           />
         </div>
       ) : null}

@@ -4,6 +4,14 @@ import { Dialog as DialogPrimitive } from "radix-ui";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import type {
   AiSettingsSnapshot,
   Voice2TextDesktopApi,
@@ -111,8 +119,8 @@ export function AiSettingsFeature({
         </div>
       ) : null}
 
-      <div className="grid gap-4 lg:grid-cols-2">
-        <section className="rounded-xl border bg-card p-5">
+      <div className="grid border-y lg:grid-cols-2 lg:divide-x">
+        <section className="py-5 lg:pr-5">
           <div className="flex items-start gap-3">
             <ShieldCheck className="mt-0.5 size-5" aria-hidden="true" />
             <div className="min-w-0">
@@ -129,7 +137,7 @@ export function AiSettingsFeature({
           </p>
         </section>
 
-        <section className="rounded-xl border bg-card p-5">
+        <section className="border-t py-5 lg:border-t-0 lg:pl-5">
           <div className="flex items-start gap-3">
             <KeyRound className="mt-0.5 size-5" aria-hidden="true" />
             <div className="min-w-0 flex-1">
@@ -217,23 +225,32 @@ function ProviderDialog({
         <DialogPrimitive.Description className="text-sm text-muted-foreground">
           选择只作用于后续任务；运行中的任务保留原提供商和模型快照。
         </DialogPrimitive.Description>
-        <label className="mt-4 block text-sm font-medium">
-          音频智能提供商
-          <select
-            aria-label="音频智能提供商"
-            className="mt-2 h-9 w-full rounded-md border bg-background px-3 text-sm"
+        <div className="mt-4 space-y-2">
+          <Label htmlFor="ai-provider">音频智能提供商</Label>
+          <Select
             value={providerId}
-            onChange={(event) => {
-              const next = event.target.value as ProviderId;
+            onValueChange={(value) => {
+              const next = value as ProviderId;
               setProviderId(next);
               setModelId(providerDefaults[next].modelId);
               setEndpoint(providerDefaults[next].endpoint);
             }}
           >
-            <option value="deepseek">DeepSeek</option>
-            <option value="openai-compatible">OpenAI-compatible</option>
-          </select>
-        </label>
+            <SelectTrigger
+              id="ai-provider"
+              className="w-full"
+              aria-label="音频智能提供商"
+            >
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="deepseek">DeepSeek</SelectItem>
+              <SelectItem value="openai-compatible">
+                OpenAI-compatible
+              </SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
         <label className="mt-4 block text-sm font-medium">
           模型 ID
           <Input
@@ -418,7 +435,7 @@ function FileVaultStatus({ settings }: { settings: AiSettingsSnapshot }) {
     },
   }[settings.deviceSecurity.fileVaultState];
   return (
-    <section className="rounded-xl border bg-card p-5">
+    <section className="border-y py-5">
       <div className="flex items-start gap-3">
         <LockKeyhole className="mt-0.5 size-5" aria-hidden="true" />
         <div>

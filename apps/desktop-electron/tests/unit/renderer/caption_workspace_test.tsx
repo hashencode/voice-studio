@@ -359,6 +359,15 @@ describe("caption workspace", () => {
     expect(
       screen.getByRole("progressbar", { name: "实时草稿积压" }),
     ).toHaveAttribute("aria-valuetext", expect.stringContaining("积压"));
+    expect(
+      screen.getByRole("progressbar", { name: "实时草稿积压" }),
+    ).toHaveAttribute("data-slot", "progress");
+    expect(
+      screen.getByRole("progressbar", { name: "实时草稿积压" }),
+    ).toHaveAttribute("aria-valuenow", "700000");
+    expect(
+      screen.getByRole("progressbar", { name: "实时草稿积压" }),
+    ).toHaveAttribute("aria-valuemax", "960000");
     expect(screen.getByText(/700,000 字节/)).toBeVisible();
   });
 

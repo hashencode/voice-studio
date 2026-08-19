@@ -54,3 +54,10 @@ Object.defineProperty(globalThis, "ResizeObserver", {
   configurable: true,
   value: TestResizeObserver,
 });
+
+if (typeof HTMLElement !== "undefined") {
+  HTMLElement.prototype.hasPointerCapture ??= () => false;
+  HTMLElement.prototype.setPointerCapture ??= () => undefined;
+  HTMLElement.prototype.releasePointerCapture ??= () => undefined;
+  HTMLElement.prototype.scrollIntoView ??= () => undefined;
+}

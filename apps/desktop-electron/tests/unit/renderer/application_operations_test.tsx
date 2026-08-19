@@ -238,7 +238,7 @@ describe("renderer processing operation races", () => {
       .click(await screen.findByRole("button", { name: /打开 项目周会/ }));
     expect(
       await screen.findByRole("progressbar", { name: "项目周会.wav 处理进度" }),
-    ).toHaveValue(0.1);
+    ).toHaveValue(10);
 
     const progress: OperationEvent = {
       protocolVersion: 2,
@@ -253,7 +253,7 @@ describe("renderer processing operation races", () => {
 
     expect(
       screen.getByRole("progressbar", { name: "项目周会.wav 处理进度" }),
-    ).toHaveValue(0.6);
+    ).toHaveValue(60);
     expect(api.listProcessingTasks).toHaveBeenCalledTimes(1);
   });
 
@@ -419,6 +419,6 @@ describe("renderer processing operation races", () => {
     expect(screen.getByText("正在处理", { selector: "span" })).toBeVisible();
     expect(
       screen.getByRole("progressbar", { name: "项目周会.wav 处理进度" }),
-    ).toHaveValue(0.2);
+    ).toHaveValue(20);
   });
 });

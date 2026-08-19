@@ -3,6 +3,8 @@ import { BrainCircuit, LoaderCircle, RotateCcw } from "lucide-react";
 import { Dialog as DialogPrimitive } from "radix-ui";
 
 import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Label } from "@/components/ui/label";
 import type {
   AudioAiConsentPreview,
   AudioAiSnapshot,
@@ -143,7 +145,7 @@ export function AudioAiFeature({
   return (
     <section
       aria-labelledby="audio-ai-title"
-      className="rounded-xl border bg-card p-4"
+      className="border-t pt-4 first:border-t-0 first:pt-0"
     >
       <div className="flex items-start gap-3">
         <BrainCircuit className="mt-0.5 size-5" aria-hidden="true" />
@@ -305,15 +307,17 @@ function ConsentDialog({
                   </dd>
                 </div>
               </dl>
-              <label className="mt-4 flex items-start gap-3 rounded-lg border p-3 text-sm">
-                <input
-                  type="checkbox"
-                  className="mt-0.5 size-4"
+              <div className="mt-4 flex items-start gap-3 rounded-lg border p-3">
+                <Checkbox
+                  id="audio-ai-consent"
+                  className="mt-0.5"
                   checked={checked}
-                  onChange={(event) => onCheckedChange(event.target.checked)}
+                  onCheckedChange={(value) => onCheckedChange(value === true)}
                 />
-                <span>我同意仅针对本次音频发送音频标题与上述转写文本</span>
-              </label>
+                <Label htmlFor="audio-ai-consent" className="leading-5">
+                  我同意仅针对本次音频发送音频标题与上述转写文本
+                </Label>
+              </div>
               <div className="mt-6 flex justify-end gap-2">
                 <DialogPrimitive.Close asChild>
                   <Button type="button" variant="outline" disabled={pending}>
@@ -347,7 +351,7 @@ function AudioAiNote({ snapshot }: { snapshot: AudioAiSnapshot }) {
         {snapshot.note.items.map((item) => (
           <li
             key={item.insightId}
-            className="rounded-lg border px-3 py-3 text-sm"
+            className="border-t py-3 text-sm first:border-t-0"
           >
             <p className="font-medium">{item.body}</p>
             <p className="mt-1 text-xs text-muted-foreground">

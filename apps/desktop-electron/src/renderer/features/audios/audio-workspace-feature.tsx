@@ -3,6 +3,16 @@ import { Download, Pause, Play, Redo2, Search, Undo2 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { Slider } from "@/components/ui/slider";
+import { Textarea } from "@/components/ui/textarea";
 import { AudioAiFeature } from "@/features/audio-ai/audio-ai-feature";
 import type {
   AudioExportFormat,
@@ -748,6 +758,8 @@ function SegmentRow({
   const [editing, setEditing] = React.useState(false);
   const [text, setText] = React.useState(segment.text);
   const index = segment.sequenceId + 1;
+  const editorId = `segment-${segment.id}-text`;
+  const speakerId = `segment-${segment.id}-speaker`;
   const save = () => {
     if (text.trim().length === 0 || pending) return;
     onEdit(segment, text.trim());
@@ -779,9 +791,13 @@ function SegmentRow({
       </div>
       {editing ? (
         <div className="mt-2 flex gap-2">
-          <textarea
+          <Label htmlFor={editorId} className="sr-only">
+            片段 {index} 文本
+          </Label>
+          <Textarea
+            id={editorId}
             aria-label={`片段 ${index} 文本`}
-            className="min-h-20 flex-1 resize-none rounded-md border bg-background px-3 py-2 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            className="min-h-20 flex-1 resize-none"
             value={text}
             onChange={(event) => setText(event.target.value)}
             onKeyDown={(event) => {
@@ -802,35 +818,43 @@ function SegmentRow({
       ) : (
         <p className="mt-2 line-clamp-3 text-sm leading-6">{segment.text}</p>
       )}
-      <label className="mt-2 flex items-center gap-2 text-xs text-muted-foreground">
-        <span>说话人</span>
-        <select
-          aria-label={`片段 ${index} 说话人`}
-          className="rounded-md border bg-background px-2 py-1 text-foreground"
-          disabled={pending}
+      <div className="mt-2 flex items-center gap-2">
+        <Label htmlFor={speakerId} className="text-xs text-muted-foreground">
+          说话人
+        </Label>
+        <Select
           value={
             segment.speakerState === "assigned"
               ? `speaker:${segment.speakerId}`
               : segment.speakerState
           }
-          onChange={(event) => {
-            const value = event.target.value;
+          disabled={pending}
+          onValueChange={(value) => {
             if (value.startsWith("speaker:"))
               onAssign(segment, "assigned", Number(value.slice(8)));
             else onAssign(segment, value as "overlap" | "unknown", null);
           }}
         >
-          <option value="unknown">未知说话人</option>
-          <option value="overlap">多人重叠</option>
-          {speakers
-            .filter((speaker) => speaker.mergedIntoSpeakerId === null)
-            .map((speaker) => (
-              <option key={speaker.id} value={`speaker:${speaker.id}`}>
-                {speaker.displayName}
-              </option>
-            ))}
-        </select>
-      </label>
+          <SelectTrigger
+            id={speakerId}
+            size="sm"
+            aria-label={`片段 ${index} 说话人`}
+          >
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="unknown">未知说话人</SelectItem>
+            <SelectItem value="overlap">多人重叠</SelectItem>
+            {speakers
+              .filter((speaker) => speaker.mergedIntoSpeakerId === null)
+              .map((speaker) => (
+                <SelectItem key={speaker.id} value={`speaker:${speaker.id}`}>
+                  {speaker.displayName}
+                </SelectItem>
+              ))}
+          </SelectContent>
+        </Select>
+      </div>
     </li>
   );
 }
@@ -852,7 +876,7 @@ function PlaybackPanel({
   return (
     <section
       aria-labelledby="playback-title"
-      className="space-y-3 rounded-xl border bg-card p-4"
+      className="space-y-3 border-t pt-4 first:border-t-0 first:pt-0"
     >
       <h2 id="playback-title" className="font-semibold">
         音频播放
@@ -867,39 +891,56 @@ function PlaybackPanel({
         {playing ? <Pause aria-hidden="true" /> : <Play aria-hidden="true" />}
         {playing ? "暂停" : "播放"}
       </Button>
-      <label className="block text-xs text-muted-foreground">
-        播放位置 {clock(playback?.positionMs ?? 0)}
-        <input
-          aria-label="音频播放位置"
-          className="mt-2 w-full"
-          type="range"
+      <div className="space-y-2">
+        <Label
+          id="audio-playback-position-label"
+          className="text-xs text-muted-foreground"
+        >
+          播放位置 {clock(playback?.positionMs ?? 0)}
+        </Label>
+        <Slider
+          aria-labelledby="audio-playback-position-label"
+          aria-valuetext={clock(playback?.positionMs ?? 0)}
           min={0}
           max={Math.max(1, playback?.durationMs ?? durationMs)}
-          value={playback?.positionMs ?? 0}
+          step={1}
+          value={[playback?.positionMs ?? 0]}
           disabled={pending}
-          onChange={(event) =>
-            onAction({ action: "seek", positionMs: Number(event.target.value) })
+          onValueChange={(value) =>
+            onAction({ action: "seek", positionMs: value[0] ?? 0 })
           }
         />
-      </label>
-      <label className="flex items-center justify-between gap-3 text-xs text-muted-foreground">
-        <span>播放速度</span>
-        <select
-          aria-label="播放速度"
-          className="rounded-md border bg-background px-2 py-1 text-foreground"
-          value={playback?.speed ?? 1}
+      </div>
+      <div className="flex items-center justify-between gap-3">
+        <Label
+          htmlFor="audio-playback-speed"
+          className="text-xs text-muted-foreground"
+        >
+          播放速度
+        </Label>
+        <Select
+          value={String(playback?.speed ?? 1)}
           disabled={pending}
-          onChange={(event) =>
-            onAction({ action: "speed", speed: Number(event.target.value) })
+          onValueChange={(value) =>
+            onAction({ action: "speed", speed: Number(value) })
           }
         >
-          {[0.5, 0.75, 1, 1.25, 1.5, 2].map((speed) => (
-            <option key={speed} value={speed}>
-              {speed}×
-            </option>
-          ))}
-        </select>
-      </label>
+          <SelectTrigger
+            id="audio-playback-speed"
+            size="sm"
+            aria-label="播放速度"
+          >
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            {[0.5, 0.75, 1, 1.25, 1.5, 2].map((speed) => (
+              <SelectItem key={speed} value={String(speed)}>
+                {speed}×
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </div>
     </section>
   );
 }
@@ -931,7 +972,7 @@ function SpeakerPanel({
   return (
     <section
       aria-labelledby="speakers-title"
-      className="space-y-3 rounded-xl border bg-card p-4"
+      className="space-y-3 border-t pt-4 first:border-t-0 first:pt-0"
     >
       <h2 id="speakers-title" className="font-semibold">
         说话人
@@ -976,36 +1017,60 @@ function SpeakerPanel({
       ))}
       {active.length > 1 ? (
         <div className="space-y-2 border-t pt-3">
-          <label className="block text-xs text-muted-foreground">
-            保留说话人
-            <select
-              aria-label="合并目标说话人"
-              className="mt-1 w-full rounded-md border bg-background px-2 py-1 text-foreground"
-              value={target}
-              onChange={(event) => setTarget(Number(event.target.value))}
+          <div className="space-y-1.5">
+            <Label
+              htmlFor="speaker-merge-target"
+              className="text-xs text-muted-foreground"
             >
-              {active.map((speaker) => (
-                <option key={speaker.id} value={speaker.id}>
-                  {speaker.displayName}
-                </option>
-              ))}
-            </select>
-          </label>
-          <label className="block text-xs text-muted-foreground">
-            合并来源
-            <select
-              aria-label="合并来源说话人"
-              className="mt-1 w-full rounded-md border bg-background px-2 py-1 text-foreground"
-              value={source}
-              onChange={(event) => setSource(Number(event.target.value))}
+              保留说话人
+            </Label>
+            <Select
+              value={String(target)}
+              onValueChange={(value) => setTarget(Number(value))}
             >
-              {active.map((speaker) => (
-                <option key={speaker.id} value={speaker.id}>
-                  {speaker.displayName}
-                </option>
-              ))}
-            </select>
-          </label>
+              <SelectTrigger
+                id="speaker-merge-target"
+                className="w-full"
+                aria-label="合并目标说话人"
+              >
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {active.map((speaker) => (
+                  <SelectItem key={speaker.id} value={String(speaker.id)}>
+                    {speaker.displayName}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="space-y-1.5">
+            <Label
+              htmlFor="speaker-merge-source"
+              className="text-xs text-muted-foreground"
+            >
+              合并来源
+            </Label>
+            <Select
+              value={String(source)}
+              onValueChange={(value) => setSource(Number(value))}
+            >
+              <SelectTrigger
+                id="speaker-merge-source"
+                className="w-full"
+                aria-label="合并来源说话人"
+              >
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {active.map((speaker) => (
+                  <SelectItem key={speaker.id} value={String(speaker.id)}>
+                    {speaker.displayName}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
           <Button
             type="button"
             variant="outline"
@@ -1043,7 +1108,7 @@ function ExportPanel({
   return (
     <section
       aria-labelledby="export-title"
-      className="rounded-xl border bg-card p-4"
+      className="border-t pt-4 first:border-t-0 first:pt-0"
     >
       <h2 id="export-title" className="font-semibold">
         导出

@@ -116,9 +116,7 @@ describe("capture workspace", () => {
       screen.queryByRole("button", { name: "开始录制" }),
     ).not.toBeInTheDocument();
 
-    await user.click(
-      screen.getByRole("checkbox", { name: /同时生成本机字幕/ }),
-    );
+    await user.click(screen.getByRole("switch", { name: /同时生成本机字幕/ }));
     expect(
       screen.queryByRole("button", { name: "开始录制" }),
     ).not.toBeInTheDocument();
@@ -160,6 +158,16 @@ describe("capture workspace", () => {
     render(<CaptureWorkspace capture={idle} applicationRevision={1} />);
 
     await user.click(screen.getByRole("button", { name: "检查并设置录制" }));
+    const workspace = screen.getByRole("complementary", { name: "录制工作区" });
+    expect(workspace).toHaveAttribute("data-slot", "card");
+    expect(workspace).toHaveClass(
+      "right-4",
+      "bottom-4",
+      "w-96",
+      "max-h-[calc(100svh-2rem)]",
+      "overflow-auto",
+      "z-30",
+    );
     const start = await screen.findByRole("button", { name: "开始录制" });
     fireEvent.click(start);
     fireEvent.click(start);
@@ -173,6 +181,31 @@ describe("capture workspace", () => {
     expect(
       await screen.findByRole("status", { name: "录制状态" }),
     ).toHaveTextContent("正在录制");
+  });
+
+  it("starts with the selected microphone from the shared Select control", async () => {
+    const startCapture = vi.fn(async () => recording);
+    installCaptureApi({
+      preflightCapture: vi.fn(async () => ({
+        ...readyPreflight,
+        microphones: [
+          ...readyPreflight.microphones,
+          { id: "mic-usb", name: "USB 麦克风", isDefault: false },
+        ],
+      })),
+      startCapture,
+    });
+    const user = userEvent.setup();
+    render(<CaptureWorkspace capture={idle} applicationRevision={1} />);
+
+    await user.click(screen.getByRole("button", { name: "检查并设置录制" }));
+    await user.click(screen.getByRole("combobox", { name: "麦克风" }));
+    await user.click(await screen.findByRole("option", { name: "USB 麦克风" }));
+    await user.click(screen.getByRole("button", { name: "开始录制" }));
+
+    expect(startCapture).toHaveBeenCalledWith(
+      expect.objectContaining({ microphoneDeviceId: "mic-usb" }),
+    );
   });
 
   it("guards repeated stop and announces the completed terminal state", async () => {

@@ -11,7 +11,17 @@ import {
 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
+import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { Switch } from "@/components/ui/switch";
 import { CaptionWorkspace } from "@/features/captions/caption-workspace";
 import type {
   ApplicationSnapshot,
@@ -277,11 +287,11 @@ export function CaptureWorkspace({
   }
 
   return (
-    <aside
+    <Card
       role="complementary"
       aria-label="录制工作区"
       aria-busy={busy}
-      className="fixed right-5 bottom-5 z-30 max-h-[calc(100vh-2.5rem)] w-[min(26rem,calc(100vw-2.5rem))] overflow-auto rounded-xl border bg-card p-4 shadow-lg"
+      className="fixed right-4 bottom-4 z-30 block max-h-[calc(100svh-2rem)] w-96 max-w-[calc(100vw-2rem)] overflow-auto p-4 shadow-lg"
     >
       <p
         role="status"
@@ -289,7 +299,7 @@ export function CaptureWorkspace({
         aria-live="polite"
         className={
           busy
-            ? "mb-3 rounded-lg border bg-muted/40 px-3 py-2 text-sm font-medium"
+            ? "mb-3 border-b bg-muted/40 pb-3 text-sm font-medium"
             : "sr-only"
         }
       >
@@ -300,7 +310,7 @@ export function CaptureWorkspace({
           ref={errorRef}
           role="alert"
           tabIndex={-1}
-          className="mb-3 rounded-lg border border-destructive/40 bg-destructive/5 p-3 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring"
+          className="mb-3 border-y border-destructive/40 bg-destructive/5 py-3 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring"
         >
           {error}
         </div>
@@ -344,7 +354,7 @@ export function CaptureWorkspace({
           onMicrophoneChange={setMicrophoneDeviceId}
         />
       )}
-    </aside>
+    </Card>
   );
 }
 
@@ -414,7 +424,7 @@ function CaptureSetup({
           ref={alertRef}
           role="alert"
           tabIndex={-1}
-          className="rounded-lg border border-amber-500/40 bg-amber-500/5 p-3 outline-none focus-visible:ring-2 focus-visible:ring-ring"
+          className="border-y border-amber-500/40 bg-amber-500/5 py-3 outline-none focus-visible:ring-2 focus-visible:ring-ring"
         >
           <div className="flex gap-2">
             <AlertTriangle
@@ -433,7 +443,7 @@ function CaptureSetup({
         </div>
       ) : null}
       {readyToStart ? (
-        <div className="rounded-lg border bg-muted/30 p-3 text-sm">
+        <div className="border-y bg-muted/30 py-3 text-sm">
           <p className="flex items-center gap-2 font-medium">
             <CheckCircle2
               className="size-4 text-emerald-600"
@@ -449,9 +459,7 @@ function CaptureSetup({
         </div>
       ) : null}
       <div className="space-y-1.5">
-        <label htmlFor="capture-title" className="text-sm font-medium">
-          录制名称
-        </label>
+        <Label htmlFor="capture-title">录制名称</Label>
         <Input
           ref={titleRef}
           id="capture-title"
@@ -462,37 +470,48 @@ function CaptureSetup({
         />
       </div>
       <div className="space-y-1.5">
-        <label htmlFor="capture-microphone" className="text-sm font-medium">
-          麦克风
-        </label>
-        <select
-          id="capture-microphone"
-          value={microphoneDeviceId}
+        <Label htmlFor="capture-microphone">麦克风</Label>
+        <Select
+          value={microphoneDeviceId || "no-device"}
           disabled={busy || !preflight?.microphones.length}
-          onChange={(event) => onMicrophoneChange(event.currentTarget.value)}
-          className="h-9 w-full rounded-md border border-input bg-background px-3 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring"
+          onValueChange={(value) => {
+            if (value !== "no-device") onMicrophoneChange(value);
+          }}
         >
-          {preflight?.microphones.length ? null : (
-            <option value="">没有可用设备</option>
-          )}
-          {preflight?.microphones.map((device) => (
-            <option key={device.id} value={device.id}>
-              {device.name}
-              {device.isDefault ? "（默认）" : ""}
-            </option>
-          ))}
-        </select>
+          <SelectTrigger
+            id="capture-microphone"
+            className="w-full"
+            aria-label="麦克风"
+          >
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            {preflight?.microphones.length ? null : (
+              <SelectItem value="no-device" disabled>
+                没有可用设备
+              </SelectItem>
+            )}
+            {preflight?.microphones.map((device) => (
+              <SelectItem key={device.id} value={device.id}>
+                {device.name}
+                {device.isDefault ? "（默认）" : ""}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
       </div>
-      <label className="flex items-start gap-2 text-sm">
-        <input
-          type="checkbox"
+      <div className="flex items-start gap-2">
+        <Switch
+          id="capture-caption-enabled"
           checked={captionEnabled}
           disabled={busy}
-          onChange={(event) => onCaptionChange(event.currentTarget.checked)}
-          className="mt-0.5 size-4"
+          onCheckedChange={onCaptionChange}
+          className="mt-0.5"
         />
-        <span>同时生成本机字幕（模型不可用时可关闭后重新检查）</span>
-      </label>
+        <Label htmlFor="capture-caption-enabled" className="leading-5">
+          同时生成本机字幕（模型不可用时可关闭后重新检查）
+        </Label>
+      </div>
       <div className="flex flex-wrap justify-end gap-2">
         <Button
           type="button"
@@ -649,7 +668,7 @@ function PartialCaptureStatus({ capture }: { capture: CaptureView }) {
   return (
     <div
       role="alert"
-      className="rounded-lg border border-amber-500/40 bg-amber-500/5 p-3 text-sm"
+      className="border-y border-amber-500/40 bg-amber-500/5 py-3 text-sm"
     >
       <p className="font-medium">
         部分录制：{failedTracks.join("，") || "轨道状态异常"}
@@ -689,45 +708,48 @@ function RecoverySurface({
           Renderer 关闭或重新载入不会删除已完成分块。
         </p>
       </div>
-      {items.map((item) => (
-        <div key={item.sessionId} className="rounded-lg border p-3 text-sm">
-          <p className="font-medium">中断的音频录制</p>
-          <p className="mt-1 text-muted-foreground">
-            {formatElapsed(item.captureTimelineMs)} · {item.finalizedChunkCount}{" "}
-            个已完成分块 · {item.gapCount} 个时间缺口
-          </p>
-          <div className="mt-3 flex flex-wrap justify-end gap-2">
-            {!managementOpen ? (
+      <div className="divide-y border-y">
+        {items.map((item) => (
+          <div key={item.sessionId} className="py-3 text-sm">
+            <p className="font-medium">中断的音频录制</p>
+            <p className="mt-1 text-muted-foreground">
+              {formatElapsed(item.captureTimelineMs)} ·{" "}
+              {item.finalizedChunkCount} 个已完成分块 · {item.gapCount}{" "}
+              个时间缺口
+            </p>
+            <div className="mt-3 flex flex-wrap justify-end gap-2">
+              {!managementOpen ? (
+                <Button
+                  type="button"
+                  variant="outline"
+                  disabled={busy}
+                  onClick={onManage}
+                >
+                  管理恢复录制
+                </Button>
+              ) : (
+                <Button
+                  type="button"
+                  variant="destructive"
+                  disabled={busy}
+                  onClick={() => onAction(item, "discard")}
+                >
+                  <Trash2 aria-hidden="true" />
+                  丢弃这段恢复录制
+                </Button>
+              )}
               <Button
                 type="button"
-                variant="outline"
                 disabled={busy}
-                onClick={onManage}
+                onClick={() => onAction(item, "keep")}
               >
-                管理恢复录制
+                <CheckCircle2 aria-hidden="true" />
+                保留并完成恢复
               </Button>
-            ) : (
-              <Button
-                type="button"
-                variant="destructive"
-                disabled={busy}
-                onClick={() => onAction(item, "discard")}
-              >
-                <Trash2 aria-hidden="true" />
-                丢弃这段恢复录制
-              </Button>
-            )}
-            <Button
-              type="button"
-              disabled={busy}
-              onClick={() => onAction(item, "keep")}
-            >
-              <CheckCircle2 aria-hidden="true" />
-              保留并完成恢复
-            </Button>
+            </div>
           </div>
-        </div>
-      ))}
+        ))}
+      </div>
     </section>
   );
 }
