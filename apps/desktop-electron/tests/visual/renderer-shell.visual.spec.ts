@@ -93,6 +93,24 @@ test.describe("sidebar-09 production Renderer", () => {
     });
   });
 
+  test("320x620 keeps the rail and overlay controls reachable", async () => {
+    await withVisualSession("audio-active", 320, 620, async (session) => {
+      const { page } = session;
+      const close = page.getByRole("button", {
+        name: "关闭音频上下文面板",
+      });
+
+      await expect(close).toBeVisible();
+      await assertRuntimeContract(page, 320, 620);
+      await assertOverlayGeometry(page, 320, 620);
+
+      const closeBounds = await close.boundingBox();
+      expect(closeBounds).not.toBeNull();
+      expect(closeBounds!.x).toBeGreaterThanOrEqual(0);
+      expect(closeBounds!.x + closeBounds!.width).toBeLessThanOrEqual(320);
+    });
+  });
+
   test("1240x820 Companion with multiple devices", async () => {
     await withVisualSession("companion-devices", 1240, 820, async (session) => {
       const { page } = session;
@@ -178,15 +196,10 @@ async function launch(scenario: VisualScenario, width: number, height: number) {
       const applyHarnessCss = () => {
         document.documentElement.classList.remove("dark");
         document.documentElement.style.colorScheme = "light";
-        if (
-          !document.querySelector('[data-visual-harness="font-and-motion"]')
-        ) {
+        if (!document.querySelector('[data-visual-harness="motion"]')) {
           const style = document.createElement("style");
-          style.dataset.visualHarness = "font-and-motion";
+          style.dataset.visualHarness = "motion";
           style.textContent = `
-          :root, body {
-            font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "PingFang SC", sans-serif !important;
-          }
           *, *::before, *::after {
             animation: none !important;
             transition: none !important;
@@ -292,12 +305,23 @@ async function assertOverlayGeometry(
   height: number,
 ) {
   const geometry = await shellGeometry(page);
+  const overlayWidth = Math.min(350, width);
   expectRect(geometry.wrapper, { x: 0, y: 0, width, height });
   expectHorizontalRect(geometry.gap, { x: 0, width: 48 });
-  expectRect(geometry.container, { x: 0, y: 0, width: 350, height });
+  expectRect(geometry.container, {
+    x: 0,
+    y: 0,
+    width: overlayWidth,
+    height,
+  });
   expectRect(geometry.rail, { x: 0, y: 0, width: 49, height });
   if (!geometry.pane) throw new Error("Expected an overlay context pane");
-  expectRect(geometry.pane, { x: 49, y: 0, width: 301, height });
+  expectRect(geometry.pane, {
+    x: 49,
+    y: 0,
+    width: overlayWidth - 49,
+    height,
+  });
   expectWithin(geometry.inset.x, 48);
   expectWithin(geometry.inset.width, width - 48);
   expect(geometry.pane!.right).toBeLessThanOrEqual(geometry.inset.right);
@@ -454,6 +478,8 @@ async function screenshot(
     });
     return;
   }
+  await session.page.mouse.move(width - 2, 2);
+  await expect(session.page.getByRole("tooltip")).toHaveCount(0);
   await session.page.evaluate(
     () =>
       new Promise<void>((resolve) => {

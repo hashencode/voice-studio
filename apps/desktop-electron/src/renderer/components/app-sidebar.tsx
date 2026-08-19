@@ -27,8 +27,9 @@ export function AppSidebar({
   return (
     <Sidebar
       collapsible="icon"
+      mobileMode="inline"
       data-presentation={presentation}
-      className="overflow-hidden *:data-[sidebar=sidebar]:flex-row data-[presentation=overlay]:z-20 data-[presentation=overlay]:!w-(--sidebar-width)"
+      className="overflow-hidden *:data-[sidebar=sidebar]:flex-row data-[presentation=overlay]:z-20 data-[presentation=overlay]:!w-[min(var(--sidebar-width),100vw)]"
     >
       <Sidebar
         collapsible="none"

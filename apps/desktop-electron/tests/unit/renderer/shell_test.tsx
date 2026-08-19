@@ -119,6 +119,32 @@ function testAiSettings() {
 }
 
 describe("application shell", () => {
+  it("keeps the inline rail and overlay pane reachable below the shadcn mobile breakpoint", async () => {
+    Object.defineProperty(window, "innerWidth", {
+      configurable: true,
+      value: 320,
+      writable: true,
+    });
+    installApi(readySnapshot);
+
+    render(<App />);
+
+    const navigation = await screen.findByRole("navigation", {
+      name: "工作站主导航",
+    });
+    expect(navigation).toBeVisible();
+    expect(
+      screen.getByRole("complementary", { name: "音频上下文面板" }),
+    ).toHaveAttribute("data-presentation", "overlay");
+
+    const outer = navigation.closest<HTMLElement>(
+      '[data-slot="sidebar-inner"]',
+    )?.parentElement;
+    expect(outer).toHaveAttribute("data-slot", "sidebar-container");
+    expect(outer).toHaveClass("flex");
+    expect(document.querySelector('[data-mobile="true"]')).toBeNull();
+  });
+
   it("uses the official nested sidebar-09 shell geometry and landmarks", async () => {
     const api = installApi(readySnapshot);
     const user = userEvent.setup();

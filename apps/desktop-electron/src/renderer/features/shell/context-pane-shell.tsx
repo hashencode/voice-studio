@@ -27,22 +27,15 @@ export function ContextPaneShell({
 }>) {
   const label = section === "audio" ? "音频" : "互联";
 
-  const close = React.useCallback(
-    (reason: ContextPaneCloseReason) => {
-      onRequestClose(reason);
-    },
-    [onRequestClose],
-  );
-
   React.useEffect(() => {
     const handleEscape = (event: KeyboardEvent) => {
       if (event.key !== "Escape" || event.defaultPrevented) return;
       event.preventDefault();
-      close("escape");
+      onRequestClose("escape");
     };
     window.addEventListener("keydown", handleEscape);
     return () => window.removeEventListener("keydown", handleEscape);
-  }, [close]);
+  }, [onRequestClose]);
 
   return (
     <Sidebar
@@ -63,7 +56,7 @@ export function ContextPaneShell({
             variant="ghost"
             size="icon"
             aria-label={`关闭${label}上下文面板`}
-            onClick={() => close("close-button")}
+            onClick={() => onRequestClose("close-button")}
           >
             <X aria-hidden="true" />
           </Button>

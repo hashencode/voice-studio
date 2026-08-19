@@ -27,9 +27,10 @@ directory and verifies the real worker health handshake.
 
 `bun run test:visual` launches the repository-pinned Electron runtime through a
 test-only Main/Preload harness, exercises the production Renderer entry, checks
-sidebar geometry, and compares five deterministic screenshots. Canonical pixel
-baselines are macOS arm64 only; every host still runs the semantic and 1 px
-geometry assertions. Baseline updates require the environment recorded in
+sidebar geometry, and compares five deterministic screenshots. It also checks
+the 320 px compact shell without adding a host-sensitive pixel baseline.
+Canonical pixel baselines are macOS arm64 only; every host still runs the
+semantic and 1 px geometry assertions. Baseline updates require the environment recorded in
 `tests/visual/goldens/README.md` and a side-by-side review against the pinned
 official `sidebar-09` demo.
 

@@ -228,7 +228,7 @@ describe("sidebar navigation e2e", () => {
     expect(outer).toHaveAttribute("data-state", "collapsed");
     expect(container).toHaveAttribute("data-presentation", "overlay");
     expect(container).toHaveClass(
-      "data-[presentation=overlay]:!w-(--sidebar-width)",
+      "data-[presentation=overlay]:!w-[min(var(--sidebar-width),100vw)]",
     );
     expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
     expect(
