@@ -16,7 +16,11 @@ import {
   type CompanionRouteController,
   useCompanionRouteController,
 } from "@/features/companion/companion-feature";
-import type { RendererShellSection } from "@/features/shell/context-pane-contract";
+import { ContextPaneShell } from "@/features/shell/context-pane-shell";
+import type {
+  ContextPaneCloseReason,
+  RendererShellSection,
+} from "@/features/shell/context-pane-contract";
 import { useContextPaneShell } from "@/features/shell/use-context-pane-shell";
 import {
   CapabilityUnavailable,
@@ -71,6 +75,14 @@ export default function App() {
     api: window.voice2text,
     enabled: snapshot !== null && current === "companion",
   });
+  const persistPaneClose = pane.requestClose;
+  const requestPaneClose = React.useCallback(
+    (reason: ContextPaneCloseReason) => {
+      persistPaneClose(reason);
+      paneTriggerRef.current?.focus();
+    },
+    [persistPaneClose],
+  );
 
   if (loadError) return <ShellLoadError message={loadError} />;
   if (!snapshot) return <LoadingShell />;
@@ -85,16 +97,20 @@ export default function App() {
       <AppSidebar
         current={current}
         onNavigate={navigate}
-        paneSection={pane.paneSection}
-        paneOpen={pane.open}
-        panePresentation={pane.presentation}
-        paneTriggerRef={paneTriggerRef}
-        onRequestPaneClose={pane.requestClose}
+        presentation={pane.open ? pane.presentation : "closed"}
       >
-        {pane.paneSection === "audio" ? (
-          <AudioContextPane controller={audio} />
-        ) : pane.paneSection === "companion" ? (
-          <CompanionContextPane controller={companion} />
+        {pane.paneSection && pane.open ? (
+          <ContextPaneShell
+            section={pane.paneSection}
+            presentation={pane.presentation}
+            onRequestClose={requestPaneClose}
+          >
+            {pane.paneSection === "audio" ? (
+              <AudioContextPane controller={audio} />
+            ) : (
+              <CompanionContextPane controller={companion} />
+            )}
+          </ContextPaneShell>
         ) : null}
       </AppSidebar>
       <SidebarInset>
@@ -122,8 +138,7 @@ export default function App() {
               pane.open &&
               event.target === event.currentTarget
             ) {
-              pane.requestClose("background");
-              paneTriggerRef.current?.focus();
+              requestPaneClose("background");
             }
           }}
         >

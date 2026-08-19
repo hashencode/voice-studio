@@ -2,7 +2,6 @@
 
 import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { createRef } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import App from "../../../src/renderer/App";
@@ -163,7 +162,7 @@ describe("application shell", () => {
     );
     expect(
       within(navigation)
-        .getByTestId("application-mark")
+        .getByLabelText("Voice2Text")
         .closest('[data-slot="sidebar-header"]'),
     ).not.toBeNull();
     expect(
@@ -330,17 +329,12 @@ describe("application shell", () => {
 
   it("does not treat context-pane child controls as dismissal", async () => {
     const onRequestClose = vi.fn();
-    const triggerRef = createRef<HTMLButtonElement>();
     const user = userEvent.setup();
     render(
       <SidebarProvider persistState={false} enableKeyboardShortcut={false}>
-        <button ref={triggerRef} type="button">
-          trigger
-        </button>
         <ContextPaneShell
           section="audio"
           presentation="overlay"
-          triggerRef={triggerRef}
           onRequestClose={onRequestClose}
         >
           <button type="button">选择音频 A</button>

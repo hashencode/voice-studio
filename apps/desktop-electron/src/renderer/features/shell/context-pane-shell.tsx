@@ -16,13 +16,11 @@ import type {
 export function ContextPaneShell({
   section,
   presentation,
-  triggerRef,
   onRequestClose,
   children,
 }: React.PropsWithChildren<{
   section: ContextPaneSection;
   presentation: ContextPanePresentation;
-  triggerRef: React.RefObject<HTMLButtonElement | null>;
   onRequestClose: (reason: ContextPaneCloseReason) => void;
 }>) {
   const label = section === "audio" ? "音频" : "互联";
@@ -30,9 +28,8 @@ export function ContextPaneShell({
   const close = React.useCallback(
     (reason: ContextPaneCloseReason) => {
       onRequestClose(reason);
-      triggerRef.current?.focus();
     },
-    [onRequestClose, triggerRef],
+    [onRequestClose],
   );
 
   React.useEffect(() => {
