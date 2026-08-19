@@ -1267,7 +1267,13 @@ async function runPackagedRendererReview(audioId: number): Promise<{
       const edit = await waitFor(() => buttonWithText("编辑片段 1"), "edit segment");
       edit.click();
       const textarea = await waitFor(
-        () => document.querySelector('[aria-label="片段 1 文本"]'),
+        () => {
+          const label = [...document.querySelectorAll("label")]
+            .find((candidate) => candidate.textContent?.trim() === "片段 1 文本");
+          return label?.control instanceof HTMLTextAreaElement
+            ? label.control
+            : null;
+        },
         "segment editor"
       );
       const reviewedText = "已复核：" + textarea.value;
