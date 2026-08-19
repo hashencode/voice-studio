@@ -5,6 +5,7 @@ import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar";
 import { Button } from "@/components/ui/button";
 import {
   AudioContextPane,
+  AudioContextPaneHeader,
   AudioMainWorkspace,
   type AudioRouteController,
   useAudioRouteController,
@@ -12,6 +13,7 @@ import {
 import { CaptureWorkspace } from "@/features/capture/capture-workspace";
 import {
   CompanionContextPane,
+  CompanionContextPaneHeader,
   CompanionMainWorkspace,
   type CompanionRouteController,
   useCompanionRouteController,
@@ -104,6 +106,13 @@ export default function App() {
             section={pane.paneSection}
             presentation={pane.presentation}
             onRequestClose={requestPaneClose}
+            header={
+              pane.paneSection === "audio" ? (
+                <AudioContextPaneHeader controller={audio} />
+              ) : (
+                <CompanionContextPaneHeader controller={companion} />
+              )
+            }
           >
             {pane.paneSection === "audio" ? (
               <AudioContextPane controller={audio} />

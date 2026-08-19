@@ -12,7 +12,12 @@ import {
 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
+import { Progress } from "@/components/ui/progress";
+import {
+  SidebarGroup,
+  SidebarGroupContent,
+  SidebarInput,
+} from "@/components/ui/sidebar";
 import { AudioDetailWorkspace } from "@/features/audios/audio-workspace-feature";
 import type { PendingJobAction } from "@/features/processing/use-processing-tasks";
 import type {
@@ -344,6 +349,7 @@ export function AudioRouteFeature({
     <div className="contents">
       {paneOpen ? (
         <section role="region" aria-label="音频列表">
+          <AudioContextPaneHeader controller={controller} />
           <AudioContextPane controller={controller} />
         </section>
       ) : null}
@@ -354,14 +360,26 @@ export function AudioRouteFeature({
   );
 }
 
-export function AudioContextPane({
+export function AudioContextPaneHeader({
   controller,
 }: {
   controller: AudioRouteController;
 }) {
   return (
-    <div className="space-y-4">
-      <h2 className="font-semibold">音频列表</h2>
+    <>
+      <div className="relative">
+        <Search
+          aria-hidden="true"
+          className="pointer-events-none absolute top-2 left-2.5 size-4 text-muted-foreground"
+        />
+        <SidebarInput
+          type="search"
+          aria-label="搜索音频"
+          value={controller.query}
+          onChange={(event) => controller.setQuery(event.currentTarget.value)}
+          className="pl-8"
+        />
+      </div>
       <div className="grid grid-cols-2 gap-2">
         <Button
           type="button"
@@ -384,95 +402,101 @@ export function AudioContextPane({
           {controller.importPending ? "正在导入音频" : "导入音频"}
         </Button>
       </div>
-      <div className="relative">
-        <Search
-          aria-hidden="true"
-          className="pointer-events-none absolute top-2.5 left-2.5 size-4 text-muted-foreground"
-        />
-        <Input
-          type="search"
-          aria-label="搜索音频"
-          value={controller.query}
-          onChange={(event) => controller.setQuery(event.currentTarget.value)}
-          className="pl-8"
-        />
-      </div>
-      {controller.importError ? (
-        <p role="alert" className="rounded-lg border px-3 py-2 text-sm">
-          {controller.importError}
-        </p>
-      ) : null}
-      {controller.listError ? (
-        <div role="alert" className="space-y-2 rounded-lg border p-3 text-sm">
-          <p>{controller.listError}</p>
-          <Button
-            type="button"
-            size="sm"
-            variant="outline"
-            onClick={() => void controller.reload()}
+    </>
+  );
+}
+
+export function AudioContextPane({
+  controller,
+}: {
+  controller: AudioRouteController;
+}) {
+  return (
+    <SidebarGroup className="p-0">
+      <SidebarGroupContent>
+        <h3 className="sr-only">音频列表</h3>
+        {controller.importError ? (
+          <p role="alert" className="border-b px-3 py-2 text-sm">
+            {controller.importError}
+          </p>
+        ) : null}
+        {controller.listError ? (
+          <div role="alert" className="space-y-2 border-b p-3 text-sm">
+            <p>{controller.listError}</p>
+            <Button
+              type="button"
+              size="sm"
+              variant="outline"
+              onClick={() => void controller.reload()}
+            >
+              <RotateCcw aria-hidden="true" />
+              重新载入
+            </Button>
+          </div>
+        ) : controller.listPending && controller.audios === null ? (
+          <div
+            role="status"
+            aria-label="正在载入音频列表"
+            className="flex items-center gap-2 px-3 py-4 text-sm"
           >
-            <RotateCcw aria-hidden="true" />
-            重新载入
-          </Button>
-        </div>
-      ) : controller.listPending && controller.audios === null ? (
-        <div
-          role="status"
-          aria-label="正在载入音频列表"
-          className="flex items-center gap-2 text-sm"
-        >
-          <LoaderCircle className="size-4 animate-spin" aria-hidden="true" />
-          正在载入音频列表
-        </div>
-      ) : controller.filteredAudios.length === 0 ? (
-        <div className="rounded-lg border p-4 text-sm">
-          <p className="font-medium">
-            {controller.query.trim() ? "没有匹配的音频" : "还没有音频"}
-          </p>
-          <p className="mt-1 text-muted-foreground">
-            {controller.query.trim()
-              ? "请调整搜索内容。"
-              : "可从上方开始录音或导入音频。"}
-          </p>
-        </div>
-      ) : (
-        <ul aria-label="音频列表" className="space-y-2">
-          {controller.filteredAudios.map((audio) => {
-            const task = selectCurrentTask(
-              controller.tasksByAudioId.get(audio.audioId),
-            );
-            const state = processingStateForRow(audio, task);
-            const selected =
-              controller.workspace?.summary.audioId === audio.audioId;
-            return (
-              <li key={audio.audioId}>
-                <button
-                  type="button"
-                  data-audio-id={audio.audioId}
-                  aria-label={`打开 ${audio.displayName}`}
-                  aria-current={selected ? "true" : undefined}
-                  className="w-full rounded-lg border bg-card p-3 text-left outline-none hover:bg-accent focus-visible:ring-2 focus-visible:ring-ring"
-                  onClick={() => void controller.selectAudio(audio.audioId)}
-                >
-                  <span className="block truncate text-sm font-medium">
-                    {audio.displayName}
-                  </span>
-                  <span className="mt-1 block text-xs text-muted-foreground">
-                    {audio.segmentCount} 个片段
-                  </span>
-                  {state ? (
-                    <span className="mt-2 inline-flex items-center gap-1.5 rounded-full border px-2 py-0.5 text-xs font-medium">
-                      <ProcessingIcon state={state} />
-                      {taskStateLabel(state)}
+            <LoaderCircle className="size-4 animate-spin" aria-hidden="true" />
+            正在载入音频列表
+          </div>
+        ) : controller.filteredAudios.length === 0 ? (
+          <div className="px-3 py-4 text-sm">
+            <p className="font-medium">
+              {controller.query.trim() ? "没有匹配的音频" : "还没有音频"}
+            </p>
+            <p className="mt-1 text-muted-foreground">
+              {controller.query.trim()
+                ? "请调整搜索内容。"
+                : "可从上方开始录音或导入音频。"}
+            </p>
+          </div>
+        ) : (
+          <ul
+            aria-label="音频列表"
+            data-flat-row-list="true"
+            className="divide-y divide-sidebar-border border-y border-sidebar-border"
+          >
+            {controller.filteredAudios.map((audio) => {
+              const task = selectCurrentTask(
+                controller.tasksByAudioId.get(audio.audioId),
+              );
+              const state = processingStateForRow(audio, task);
+              const selected =
+                controller.workspace?.summary.audioId === audio.audioId;
+              return (
+                <li key={audio.audioId}>
+                  <button
+                    type="button"
+                    data-audio-id={audio.audioId}
+                    data-flat-row="true"
+                    aria-label={`打开 ${audio.displayName}`}
+                    aria-current={selected ? "true" : undefined}
+                    className="w-full px-3 py-3 text-left outline-none hover:bg-sidebar-accent focus-visible:ring-2 focus-visible:ring-sidebar-ring aria-current:bg-sidebar-accent"
+                    onClick={() => void controller.selectAudio(audio.audioId)}
+                  >
+                    <span className="block truncate text-sm font-medium">
+                      {audio.displayName}
                     </span>
-                  ) : null}
-                </button>
-              </li>
-            );
-          })}
-        </ul>
-      )}
-    </div>
+                    <span className="mt-1 block text-xs text-muted-foreground">
+                      {audio.segmentCount} 个片段
+                    </span>
+                    {state ? (
+                      <span className="mt-2 inline-flex items-center gap-1.5 rounded-full border px-2 py-0.5 text-xs font-medium">
+                        <ProcessingIcon state={state} />
+                        {taskStateLabel(state)}
+                      </span>
+                    ) : null}
+                  </button>
+                </li>
+              );
+            })}
+          </ul>
+        )}
+      </SidebarGroupContent>
+    </SidebarGroup>
   );
 }
 
@@ -587,12 +611,14 @@ function AudioProcessingDetail({
           </Button>
         ) : null}
       </div>
-      <progress
-        className="mt-4 h-2 w-full"
+      <span id={`audio-progress-${task.id}`} className="sr-only">
+        {task.displayName} 处理进度
+      </span>
+      <Progress
+        className="mt-4"
         data-processing-job-id={task.id}
-        max={1}
-        value={task.progressFraction}
-        aria-label={`${task.displayName} 处理进度`}
+        value={task.progressFraction * 100}
+        aria-labelledby={`audio-progress-${task.id}`}
       />
       <p className="mt-2 text-sm">{Math.round(task.progressFraction * 100)}%</p>
       {task.errorCode ? (

@@ -17,11 +17,13 @@ export function ContextPaneShell({
   section,
   presentation,
   onRequestClose,
+  header,
   children,
 }: React.PropsWithChildren<{
   section: ContextPaneSection;
   presentation: ContextPanePresentation;
   onRequestClose: (reason: ContextPaneCloseReason) => void;
+  header?: React.ReactNode;
 }>) {
   const label = section === "audio" ? "音频" : "互联";
 
@@ -50,19 +52,27 @@ export function ContextPaneShell({
       data-presentation={presentation}
       className="min-w-0 flex-1"
     >
-      <SidebarHeader className="flex min-h-16 flex-row items-center justify-between gap-3 border-b px-4">
-        <h2 className="font-semibold">{label}</h2>
-        <Button
-          type="button"
-          variant="ghost"
-          size="icon"
-          aria-label={`关闭${label}上下文面板`}
-          onClick={() => close("close-button")}
-        >
-          <X aria-hidden="true" />
-        </Button>
+      <SidebarHeader
+        data-context-pane-fixed-header="true"
+        className="shrink-0 gap-2 border-b p-2"
+      >
+        <div className="flex min-h-10 items-center justify-between gap-3 px-2">
+          <h2 className="font-semibold">{label}</h2>
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon"
+            aria-label={`关闭${label}上下文面板`}
+            onClick={() => close("close-button")}
+          >
+            <X aria-hidden="true" />
+          </Button>
+        </div>
+        {header}
       </SidebarHeader>
-      <SidebarContent className="p-4">{children}</SidebarContent>
+      <SidebarContent data-context-pane-scrolling-content="true">
+        {children}
+      </SidebarContent>
     </Sidebar>
   );
 }

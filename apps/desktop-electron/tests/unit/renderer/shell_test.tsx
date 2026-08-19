@@ -186,6 +186,24 @@ describe("application shell", () => {
     });
     expect(pane).toBe(nestedSidebars[1]);
     expect(pane).toHaveAttribute("data-presentation", "docked");
+    const fixedPaneHeader = pane.querySelector<HTMLElement>(
+      "[data-context-pane-fixed-header]",
+    );
+    const scrollingPaneContent = pane.querySelector<HTMLElement>(
+      "[data-context-pane-scrolling-content]",
+    );
+    const headerControls = [
+      within(pane).getByRole("heading", { name: "音频" }),
+      within(pane).getByRole("searchbox", { name: "搜索音频" }),
+      within(pane).getByRole("button", { name: "开始录音" }),
+      within(pane).getByRole("button", { name: "导入音频" }),
+    ];
+    for (const control of headerControls) {
+      expect(fixedPaneHeader).toContainElement(control);
+    }
+    expect(
+      fixedPaneHeader?.compareDocumentPosition(scrollingPaneContent!),
+    ).toBe(Node.DOCUMENT_POSITION_FOLLOWING);
 
     const mains = screen.getAllByRole("main");
     expect(mains).toHaveLength(1);
@@ -336,6 +354,12 @@ describe("application shell", () => {
           section="audio"
           presentation="overlay"
           onRequestClose={onRequestClose}
+          header={
+            <>
+              <input type="search" aria-label="搜索音频" />
+              <button type="button">开始录音</button>
+            </>
+          }
         >
           <button type="button">选择音频 A</button>
         </ContextPaneShell>
@@ -347,6 +371,28 @@ describe("application shell", () => {
     expect(
       screen.getByRole("complementary", { name: "音频上下文面板" }),
     ).toBeVisible();
+    const pane = screen.getByRole("complementary", {
+      name: "音频上下文面板",
+    });
+    const fixedHeader = pane.querySelector("[data-context-pane-fixed-header]");
+    const scrollingContent = pane.querySelector(
+      "[data-context-pane-scrolling-content]",
+    );
+    expect(fixedHeader).toContainElement(
+      screen.getByRole("heading", { name: "音频" }),
+    );
+    expect(fixedHeader).toContainElement(
+      screen.getByRole("searchbox", { name: "搜索音频" }),
+    );
+    expect(fixedHeader).toContainElement(
+      screen.getByRole("button", { name: "开始录音" }),
+    );
+    expect(scrollingContent).toContainElement(
+      screen.getByRole("button", { name: "选择音频 A" }),
+    );
+    expect(fixedHeader?.compareDocumentPosition(scrollingContent!)).toBe(
+      Node.DOCUMENT_POSITION_FOLLOWING,
+    );
   });
 
   it("blocks writable actions while profile repair is required", async () => {

@@ -10,6 +10,8 @@ import {
 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
+import { Progress } from "@/components/ui/progress";
+import { SidebarGroup, SidebarGroupContent } from "@/components/ui/sidebar";
 import type {
   CompanionSnapshot,
   Voice2TextDesktopApi,
@@ -193,57 +195,84 @@ export function CompanionContextPane({
   controller: CompanionRouteController;
 }) {
   if (controller.loading && !controller.snapshot) {
-    return <PaneStatus label="正在读取已信任设备" />;
+    return (
+      <SidebarGroup>
+        <SidebarGroupContent>
+          <PaneStatus label="正在读取已信任设备" />
+        </SidebarGroupContent>
+      </SidebarGroup>
+    );
   }
   if (!controller.snapshot) {
     return (
-      <PaneStatus label={controller.error ?? "无法读取已信任设备"} alert />
+      <SidebarGroup>
+        <SidebarGroupContent>
+          <PaneStatus label={controller.error ?? "无法读取已信任设备"} alert />
+        </SidebarGroupContent>
+      </SidebarGroup>
     );
   }
   return (
-    <div className="space-y-4">
-      <div>
-        <p className="text-sm font-medium">已信任设备</p>
-        <p className="mt-1 text-xs text-muted-foreground">
-          选择只会切换查看内容，不会主动连接设备。
-        </p>
-      </div>
-      {controller.peers.length === 0 ? (
-        <p className="rounded-lg border p-3 text-sm text-muted-foreground">
-          没有已信任设备
-        </p>
-      ) : (
-        <ul className="space-y-2" aria-label="已信任设备列表">
-          {controller.peers.map((peer) => (
-            <li key={peer.deviceId}>
-              <button
-                type="button"
-                className="w-full rounded-lg border p-3 text-left outline-none hover:bg-accent focus-visible:ring-2 focus-visible:ring-ring"
-                aria-pressed={
-                  controller.selectedPeer?.deviceId === peer.deviceId
-                }
-                onClick={() => controller.selectDevice(peer.deviceId)}
-              >
-                <span className="block font-medium">{peer.displayName}</span>
-                <span className="mt-1 block text-xs text-muted-foreground">
-                  {peer.trustState === "credential-missing"
-                    ? "凭据缺失 · 需要重新配对"
-                    : "已信任 · 在线状态未知"}
-                </span>
-              </button>
-            </li>
-          ))}
-        </ul>
-      )}
+    <SidebarGroup className="p-0">
+      <SidebarGroupContent>
+        {controller.peers.length === 0 ? (
+          <p className="px-3 py-4 text-sm text-muted-foreground">
+            没有已信任设备
+          </p>
+        ) : (
+          <ul
+            aria-label="已信任设备列表"
+            data-flat-row-list="true"
+            className="divide-y divide-sidebar-border border-y border-sidebar-border"
+          >
+            {controller.peers.map((peer) => (
+              <li key={peer.deviceId}>
+                <button
+                  type="button"
+                  data-flat-row="true"
+                  className="w-full px-3 py-3 text-left outline-none hover:bg-sidebar-accent focus-visible:ring-2 focus-visible:ring-sidebar-ring aria-pressed:bg-sidebar-accent"
+                  aria-pressed={
+                    controller.selectedPeer?.deviceId === peer.deviceId
+                  }
+                  onClick={() => controller.selectDevice(peer.deviceId)}
+                >
+                  <span className="block font-medium">{peer.displayName}</span>
+                  <span className="mt-1 block text-xs text-muted-foreground">
+                    {peer.trustState === "credential-missing"
+                      ? "凭据缺失 · 需要重新配对"
+                      : "已信任 · 在线状态未知"}
+                  </span>
+                </button>
+              </li>
+            ))}
+          </ul>
+        )}
+      </SidebarGroupContent>
+    </SidebarGroup>
+  );
+}
+
+export function CompanionContextPaneHeader({
+  controller,
+}: {
+  controller: CompanionRouteController;
+}) {
+  return (
+    <>
+      <p className="px-2 text-xs leading-relaxed text-muted-foreground">
+        选择只会切换查看内容，不会主动连接设备。
+      </p>
       <Button
         type="button"
+        size="sm"
         variant="outline"
         className="w-full"
+        disabled={controller.loading || !controller.snapshot}
         onClick={controller.showPairing}
       >
         添加或配对设备
       </Button>
-    </div>
+    </>
   );
 }
 
@@ -822,11 +851,15 @@ function TransferItem({
 
       {transfer.state !== "committed" ? (
         <div className="mt-3">
-          <progress
-            className="h-2 w-full"
-            max={100}
+          <span
+            id={`transfer-progress-${transfer.transferId}`}
+            className="sr-only"
+          >
+            {progressLabel}
+          </span>
+          <Progress
             value={progress}
-            aria-label={progressLabel}
+            aria-labelledby={`transfer-progress-${transfer.transferId}`}
           />
           <p className="mt-1 text-xs text-muted-foreground">{progressLabel}</p>
         </div>

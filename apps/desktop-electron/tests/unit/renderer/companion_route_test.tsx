@@ -75,6 +75,23 @@ describe("Companion route composition", () => {
     expect(
       await within(pane).findByRole("button", { name: /Alpha Phone/ }),
     ).toBeVisible();
+    const helper = within(pane).getByText(
+      "选择只会切换查看内容，不会主动连接设备。",
+    );
+    const pairingAction = within(pane).getByRole("button", {
+      name: "添加或配对设备",
+    });
+    expect(helper).toBeVisible();
+    expect(pairingAction).toBeVisible();
+    expect(helper.closest("[data-context-pane-fixed-header]")).not.toBeNull();
+    expect(
+      pairingAction.closest("[data-context-pane-fixed-header]"),
+    ).not.toBeNull();
+    const list = within(pane).getByRole("list", { name: "已信任设备列表" });
+    expect(list).toHaveAttribute("data-flat-row-list", "true");
+    const alphaRow = within(list).getByRole("button", { name: /Alpha Phone/ });
+    expect(alphaRow).toHaveAttribute("data-flat-row", "true");
+    expect(alphaRow).not.toHaveClass("rounded-lg", "border");
     expect(
       within(pane).getByRole("button", { name: /Beta Phone/ }),
     ).toHaveTextContent("凭据缺失");
@@ -89,6 +106,11 @@ describe("Companion route composition", () => {
       screen.getByRole("heading", { name: "Alpha Phone", level: 2 }),
     ).toBeVisible();
     expect(screen.getByText("Alpha.wav")).toBeVisible();
+    expect(
+      screen.getByRole("progressbar", {
+        name: "Alpha.wav 接收进度：40%，还缺 3 个待验证分块",
+      }),
+    ).toBeVisible();
     expect(screen.queryByText("Beta.wav")).not.toBeInTheDocument();
     expect(connectCompanionPeer).not.toHaveBeenCalled();
 

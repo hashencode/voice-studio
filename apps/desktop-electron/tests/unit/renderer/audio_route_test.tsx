@@ -44,11 +44,11 @@ it("owns create/import in the pane and keeps the no-selection main minimal", asy
     />,
   );
 
-  expect(
-    await screen.findByRole("heading", { name: "音频列表" }),
-  ).toBeVisible();
   const pane = screen.getByRole("region", { name: "音频列表" });
   const main = screen.getByRole("region", { name: "音频工作区" });
+  expect(
+    await within(pane).findByRole("searchbox", { name: "搜索音频" }),
+  ).toBeVisible();
   await userEvent
     .setup()
     .click(within(pane).getByRole("button", { name: "开始录音" }));
@@ -62,6 +62,12 @@ it("owns create/import in the pane and keeps the no-selection main minimal", asy
   ).toBeVisible();
   expect(main).not.toHaveTextContent("开始录音");
   expect(main).not.toHaveTextContent("导入音频");
+
+  const list = within(pane).getByRole("list", { name: "音频列表" });
+  expect(list).toHaveAttribute("data-flat-row-list", "true");
+  const row = within(list).getByRole("button", { name: /打开 音频 A/ });
+  expect(row).toHaveAttribute("data-flat-row", "true");
+  expect(row).not.toHaveClass("rounded-lg", "border", "bg-card");
 });
 
 it("filters Audio summaries and projects every non-completed processing state", async () => {
