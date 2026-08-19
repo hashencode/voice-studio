@@ -94,6 +94,7 @@ export default function App() {
       open={pane.open && pane.presentation === "docked"}
       persistState={false}
       enableKeyboardShortcut={false}
+      className="h-svh overflow-hidden"
       style={{ "--sidebar-width": "350px" } as React.CSSProperties}
     >
       <AppSidebar
@@ -122,7 +123,7 @@ export default function App() {
           </ContextPaneShell>
         ) : null}
       </AppSidebar>
-      <SidebarInset>
+      <SidebarInset className="min-h-0 min-w-0 overflow-hidden">
         <header className="sticky top-0 z-10 flex min-h-16 shrink-0 flex-wrap items-center gap-3 border-b bg-background px-4 py-2">
           {pane.paneSection ? (
             <ContextPaneTrigger
@@ -140,7 +141,7 @@ export default function App() {
         <div
           id="main-content"
           data-context-pane-background="true"
-          className="flex-1 overflow-auto p-4 sm:p-6"
+          className="min-h-0 flex-1 overflow-auto p-4 sm:p-6"
           onPointerDown={(event) => {
             if (
               pane.presentation === "overlay" &&
