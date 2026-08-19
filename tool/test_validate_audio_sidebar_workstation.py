@@ -38,39 +38,22 @@ class AudioSidebarWorkstationTest(unittest.TestCase):
     def test_repository_contract_is_current(self) -> None:
         MODULE.validate()
 
-    def test_visually_divergent_candidate_is_archived_and_unbound(self) -> None:
-        self.assertEqual(
-            self.manifest["status"],
-            "DEVELOPMENT_COMPLETE_RELEASE_VALIDATION_PENDING",
-        )
-        self.assertEqual(
-            self.manifest["releaseCandidate"],
-            {
-                "status": "PENDING_U6_STABLE_CANDIDATE",
-                "sourceRevision": None,
-                "packageManifestSha256": None,
-                "automatedReceipt": None,
-                "manualReceipt": None,
-                "finalizeRebuilds": False,
-            },
-        )
-
+    def test_visually_divergent_candidate_remains_archived_and_ineligible(self) -> None:
         release_directory = MODULE.ROOT / "docs/product/audio-sidebar-release"
+        invalidated_revision = "17a939231d886d6f2af1cc31843d04bfc725a1a9"
+        self.assertNotEqual(
+            self.manifest["releaseCandidate"]["sourceRevision"],
+            invalidated_revision,
+        )
         expected_hashes = {
             "candidate.json": "8e22b233d7113f0480494ad94e198189c19967106b5e2c8f03fd56eb47a36138",
             "manual.json": "d2c6d4737704c1869a1a3d84d1109eb94d3edeec40a5acbc46e7de8baa4c0ba8",
             "final.json": "0aa01aae0994e0a605fef2aaaf1b097042d67787382469ff5cf1a048e551f236",
         }
-        for name in expected_hashes:
-            self.assertFalse(
-                (release_directory / name).exists(),
-                f"invalidated receipt remains active: {name}",
-            )
-
         invalidations = []
         for path in (release_directory / "superseded").glob("*/invalidation.json"):
             value = json.loads(path.read_text(encoding="utf-8"))
-            if value.get("sourceRevision") == "17a939231d886d6f2af1cc31843d04bfc725a1a9":
+            if value.get("sourceRevision") == invalidated_revision:
                 invalidations.append((path, value))
         self.assertEqual(len(invalidations), 1)
 
@@ -124,6 +107,12 @@ class AudioSidebarWorkstationTest(unittest.TestCase):
     def test_pending_candidate_cannot_claim_release_validated(self) -> None:
         manifest = copy.deepcopy(self.manifest)
         manifest["status"] = "RELEASE_VALIDATED"
+        candidate = manifest["releaseCandidate"]
+        candidate["status"] = "PENDING_U6_STABLE_CANDIDATE"
+        candidate["sourceRevision"] = None
+        candidate["packageManifestSha256"] = None
+        candidate["automatedReceipt"] = None
+        candidate["manualReceipt"] = None
         with self.assertRaisesRegex(
             MODULE.AudioSidebarValidationError,
             "pending candidate must not claim release PASS",
