@@ -611,14 +611,12 @@ function AudioProcessingDetail({
           </Button>
         ) : null}
       </div>
-      <span id={`audio-progress-${task.id}`} className="sr-only">
-        {task.displayName} 处理进度
-      </span>
       <Progress
         className="mt-4"
         data-processing-job-id={task.id}
-        value={task.progressFraction * 100}
-        aria-labelledby={`audio-progress-${task.id}`}
+        max={1}
+        value={task.progressFraction}
+        aria-label={`${task.displayName} 处理进度`}
       />
       <p className="mt-2 text-sm">{Math.round(task.progressFraction * 100)}%</p>
       {task.errorCode ? (

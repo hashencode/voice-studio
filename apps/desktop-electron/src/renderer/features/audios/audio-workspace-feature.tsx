@@ -796,7 +796,6 @@ function SegmentRow({
           </Label>
           <Textarea
             id={editorId}
-            aria-label={`片段 ${index} 文本`}
             className="min-h-20 flex-1 resize-none"
             value={text}
             onChange={(event) => setText(event.target.value)}
@@ -925,11 +924,7 @@ function PlaybackPanel({
             onAction({ action: "speed", speed: Number(value) })
           }
         >
-          <SelectTrigger
-            id="audio-playback-speed"
-            size="sm"
-            aria-label="播放速度"
-          >
+          <SelectTrigger id="audio-playback-speed" size="sm">
             <SelectValue />
           </SelectTrigger>
           <SelectContent>

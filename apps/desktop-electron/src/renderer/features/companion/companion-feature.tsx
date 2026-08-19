@@ -851,16 +851,7 @@ function TransferItem({
 
       {transfer.state !== "committed" ? (
         <div className="mt-3">
-          <span
-            id={`transfer-progress-${transfer.transferId}`}
-            className="sr-only"
-          >
-            {progressLabel}
-          </span>
-          <Progress
-            value={progress}
-            aria-labelledby={`transfer-progress-${transfer.transferId}`}
-          />
+          <Progress value={progress} aria-label={progressLabel} />
           <p className="mt-1 text-xs text-muted-foreground">{progressLabel}</p>
         </div>
       ) : null}

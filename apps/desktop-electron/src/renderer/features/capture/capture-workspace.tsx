@@ -291,7 +291,7 @@ export function CaptureWorkspace({
       role="complementary"
       aria-label="录制工作区"
       aria-busy={busy}
-      className="fixed right-4 bottom-4 z-30 block max-h-[calc(100svh-2rem)] w-96 max-w-[calc(100vw-2rem)] overflow-auto p-4 shadow-lg"
+      className="fixed right-4 bottom-4 z-30 max-h-[calc(100svh-2rem)] w-96 max-w-[calc(100vw-2rem)] gap-0 overflow-auto p-4 shadow-lg"
     >
       <p
         role="status"
@@ -472,25 +472,14 @@ function CaptureSetup({
       <div className="space-y-1.5">
         <Label htmlFor="capture-microphone">麦克风</Label>
         <Select
-          value={microphoneDeviceId || "no-device"}
+          value={microphoneDeviceId || undefined}
           disabled={busy || !preflight?.microphones.length}
-          onValueChange={(value) => {
-            if (value !== "no-device") onMicrophoneChange(value);
-          }}
+          onValueChange={onMicrophoneChange}
         >
-          <SelectTrigger
-            id="capture-microphone"
-            className="w-full"
-            aria-label="麦克风"
-          >
-            <SelectValue />
+          <SelectTrigger id="capture-microphone" className="w-full">
+            <SelectValue placeholder="没有可用设备" />
           </SelectTrigger>
           <SelectContent>
-            {preflight?.microphones.length ? null : (
-              <SelectItem value="no-device" disabled>
-                没有可用设备
-              </SelectItem>
-            )}
             {preflight?.microphones.map((device) => (
               <SelectItem key={device.id} value={device.id}>
                 {device.name}

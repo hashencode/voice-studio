@@ -236,11 +236,7 @@ function ProviderDialog({
               setEndpoint(providerDefaults[next].endpoint);
             }}
           >
-            <SelectTrigger
-              id="ai-provider"
-              className="w-full"
-              aria-label="音频智能提供商"
-            >
+            <SelectTrigger id="ai-provider" className="w-full">
               <SelectValue />
             </SelectTrigger>
             <SelectContent>

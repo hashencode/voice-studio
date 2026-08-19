@@ -68,7 +68,7 @@ it("renders the selected Audio task with the single applicable cancel action", a
 
   expect(
     screen.getByRole("progressbar", { name: "项目音频.wav 处理进度" }),
-  ).toHaveValue(42);
+  ).toHaveValue(0.42);
   const button = screen.getByRole("button", { name: "取消 项目音频.wav" });
   expect(screen.getAllByText("取消", { selector: "button" })).toHaveLength(1);
   button.focus();
