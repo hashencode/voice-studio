@@ -17,19 +17,19 @@ if [[ -L "$worker_root" ]] || [[ -e "$worker_root" && ! -d "$worker_root" ]]; th
   exit 1
 fi
 staging_root="$(mktemp -d "$resources_root/.worker-staging.XXXXXX")"
-download_root="$(mktemp -d "/tmp/voice2text-electron-sherpa.XXXXXX")"
+materialization_root="$(mktemp -d "/tmp/voice2text-electron-sherpa.XXXXXX")"
 cleanup() {
   if [[ -n "${staging_root:-}" && -d "$staging_root" && ! -L "$staging_root" ]]; then
     rm -rf -- "$staging_root"
   fi
-  if [[ -n "${download_root:-}" && -d "$download_root" && ! -L "$download_root" ]]; then
-    download_real="$(realpath "$download_root")"
-    case "$download_real" in
+  if [[ -n "${materialization_root:-}" && -d "$materialization_root" && ! -L "$materialization_root" ]]; then
+    materialization_real="$(realpath "$materialization_root")"
+    case "$materialization_real" in
       /private/tmp/voice2text-electron-sherpa.*|/tmp/voice2text-electron-sherpa.*)
-        rm -rf -- "$download_root"
+        rm -rf -- "$materialization_root"
         ;;
       *)
-        echo "refusing to clean unexpected download root: $download_real" >&2
+        echo "refusing to clean unexpected materialization root: $materialization_real" >&2
         ;;
     esac
   fi
@@ -62,7 +62,7 @@ bun scripts/materialize-frozen-sherpa-resources.ts \
   "$authority" \
   "$staging_root" \
   "$repository_root/pubspec.lock" \
-  "$download_root" \
+  "$materialization_root" \
   "$sensevoice_authority" \
   "$sensevoice_lock"
 for runtime in "$staging_root"/runtime/*.dylib; do

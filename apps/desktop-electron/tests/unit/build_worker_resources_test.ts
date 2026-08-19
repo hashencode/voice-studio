@@ -26,6 +26,44 @@ afterEach(() => {
 });
 
 describe("worker resource publication", () => {
+  it("keeps disposable materialization staging separate from the shared cache", () => {
+    const builder = readFileSync(
+      resolve("scripts/build-worker-resources.sh"),
+      "utf8",
+    );
+    const materializer = readFileSync(
+      resolve("scripts/materialize-frozen-sherpa-resources.ts"),
+      "utf8",
+    );
+
+    expect(builder).toContain('materialization_root="$(mktemp -d');
+    expect(builder).not.toContain("RESOURCE_CACHE_DIR");
+    expect(materializer).toContain("new ResourceDownloadCache()");
+    expect(materializer).not.toContain("freshDownload(");
+  });
+
+  it("exposes guarded UI, code, and release verification lanes", () => {
+    const packageJson = JSON.parse(
+      readFileSync(resolve("package.json"), "utf8"),
+    ) as {
+      scripts: Record<string, string>;
+    };
+    const releaseGuard = readFileSync(
+      resolve("scripts/check-release.sh"),
+      "utf8",
+    );
+
+    expect(packageJson.scripts["check:ui"]).not.toMatch(
+      /resources:|bun run package|audio_sidebar_release_candidate/,
+    );
+    expect(packageJson.scripts["check:code"]).toBe("bun run check");
+    expect(packageJson.scripts["check:release"]).toBe(
+      "bash scripts/check-release.sh",
+    );
+    expect(releaseGuard).toContain("VOICE2TEXT_RELEASE_VALIDATION");
+    expect(releaseGuard).toContain("audio_sidebar_release_candidate.py");
+  });
+
   it("writes a verified live-caption operation into the worker manifest", async () => {
     const root = mkdtempSync(join(tmpdir(), "voice2text-worker-manifest-"));
     roots.push(root);

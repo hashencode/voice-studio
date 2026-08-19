@@ -34,6 +34,8 @@ migrate_working_dir/
 **/build/
 /build/desktop_asr_comparison/
 /coverage/
+/docs/product/audio-sidebar-release/.prepare-state.json
+/docs/product/audio-sidebar-release/.candidate-operation.lock
 
 # Symbolication related
 app.*.symbols

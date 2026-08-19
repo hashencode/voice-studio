@@ -16,16 +16,14 @@ import path from "node:path";
 
 import { sha256FileWithShasum } from "./shasum_file";
 import { assertMacOSArm64ResourceHost } from "./resource_target";
+import { ResourceDownloadCache } from "./resource-download-cache";
+import {
+  resourceDownloadPlan,
+  runtimeArchive,
+  type FrozenDownload,
+} from "./resource-download-plan";
 
 assertMacOSArm64ResourceHost();
-
-interface FrozenDownload {
-  id: string;
-  source: string;
-  sha256: string;
-  bytes: number;
-  kind: "file" | "tar.bz2";
-}
 
 interface FrozenFile {
   relativePath: string;
@@ -89,13 +87,6 @@ interface FrozenSenseVoiceLock {
   archiveMembers: { model: string; tokens: string };
 }
 
-const runtimeArchive = {
-  id: "sherpa-onnx-macos-runtime",
-  package: "sherpa_onnx_macos",
-  version: "1.13.4",
-  source: "https://pub.dev/api/archives/sherpa_onnx_macos-1.13.4.tar.gz",
-  sha256: "55164fa38db3de870dc834b855be6b6b5cc0acb7663d74cea76c3de4e7bd7a47",
-};
 const runtimeMembers = [
   "libonnxruntime.1.27.0.dylib",
   "libsherpa-onnx-c-api.dylib",
@@ -120,6 +111,9 @@ const senseVoiceLockPath = path.resolve(
     "assets/processing/frozen_sensevoice_macos_arm64.lock.json",
 );
 const liveCaptionOnly = process.env.VOICE2TEXT_LIVE_CAPTION_ONLY === "1";
+let cacheForPrune: ResourceDownloadCache | undefined;
+let protectedDigests: Set<string> | undefined;
+let pendingError: unknown;
 
 try {
   const authorityBytes = await readFile(authorityPath);
@@ -140,6 +134,27 @@ try {
   const senseVoiceAuthority = validateSenseVoiceAuthority(
     JSON.parse(senseVoiceAuthorityBytes.toString("utf8")) as unknown,
   );
+  const resourceCache = new ResourceDownloadCache();
+  cacheForPrune = resourceCache;
+  const protectedDownloads = resourceDownloadPlan({
+    authority,
+    senseVoiceAuthority,
+    senseVoiceLock,
+    temporaryRoot,
+    liveCaptionOnly,
+  });
+  protectedDigests = new Set(
+    protectedDownloads.map((download) => download.sha256),
+  );
+  const downloadById = new Map(
+    protectedDownloads.map((download) => [download.id, download]),
+  );
+  const snapshotDownload = async (id: string): Promise<string> => {
+    const download = downloadById.get(id);
+    if (!download) throw new Error(`resource download plan is missing ${id}`);
+    return await resourceCache.snapshot(download);
+  };
+  await resourceCache.assertWorkingSet(protectedDownloads);
   await mkdir(path.join(outputRoot, "models"), {
     recursive: true,
     mode: 0o700,
@@ -153,9 +168,7 @@ try {
   const memberReceipts: Array<Record<string, unknown>> = [];
   if (!liveCaptionOnly) {
     for (const download of authority.downloads) {
-      const downloadPath = path.join(temporaryRoot, `${download.id}.download`);
-      await freshDownload(download.source, downloadPath);
-      await assertFileIdentity(downloadPath, download.bytes, download.sha256);
+      const downloadPath = await snapshotDownload(download.id);
       sourceReceipts.push({
         id: download.id,
         source: download.source,
@@ -210,16 +223,9 @@ try {
           sha256: member.sha256,
         });
       }
-      await rm(downloadPath, { force: true });
     }
 
-    const runtimeDownloadPath = path.join(temporaryRoot, "runtime.tar.gz");
-    await freshDownload(runtimeArchive.source, runtimeDownloadPath);
-    const runtimeArchiveIdentity =
-      await sha256FileWithShasum(runtimeDownloadPath);
-    if (runtimeArchiveIdentity !== runtimeArchive.sha256) {
-      throw new Error("fresh Sherpa runtime archive hash mismatch");
-    }
+    const runtimeDownloadPath = await snapshotDownload(runtimeArchive.id);
     sourceReceipts.push({
       id: runtimeArchive.id,
       source: runtimeArchive.source,
@@ -261,6 +267,7 @@ try {
     temporaryRoot,
     sourceReceipts,
     memberReceipts,
+    snapshotDownload,
   });
 
   if (!liveCaptionOnly) {
@@ -310,9 +317,25 @@ try {
     )}\n`,
     { mode: 0o600 },
   );
+} catch (error) {
+  pendingError = error;
 } finally {
-  await rm(temporaryRoot, { force: true, recursive: true });
+  if (cacheForPrune && protectedDigests) {
+    try {
+      await cacheForPrune.prune(protectedDigests);
+    } catch (error) {
+      if (pendingError === undefined) pendingError = error;
+      else console.warn(`resource cache pruning also failed: ${String(error)}`);
+    }
+  }
+  try {
+    await rm(temporaryRoot, { force: true, recursive: true });
+  } catch (error) {
+    if (pendingError === undefined) pendingError = error;
+    else console.warn(`resource staging cleanup also failed: ${String(error)}`);
+  }
 }
+if (pendingError !== undefined) throw pendingError;
 
 async function materializeSenseVoice(input: {
   authority: FrozenSenseVoiceAuthority;
@@ -321,15 +344,11 @@ async function materializeSenseVoice(input: {
   temporaryRoot: string;
   sourceReceipts: Array<Record<string, unknown>>;
   memberReceipts: Array<Record<string, unknown>>;
+  snapshotDownload: (id: string) => Promise<string>;
 }): Promise<void> {
-  const { authority, lock, outputRoot, temporaryRoot } = input;
-  const archivePath = path.join(temporaryRoot, "sensevoice-model.download");
-  await freshDownload(authority.model.source, archivePath);
-  await assertFileIdentity(
-    archivePath,
-    lock.archiveBytes,
-    authority.model.archiveSha256,
-  );
+  const { authority, lock, outputRoot, temporaryRoot, snapshotDownload } =
+    input;
+  const archivePath = await snapshotDownload("sensevoice-model-archive");
   input.sourceReceipts.push({
     id: "sensevoice-model-archive",
     source: authority.model.source,
@@ -372,8 +391,7 @@ async function materializeSenseVoice(input: {
     });
   }
 
-  const vadDownload = path.join(temporaryRoot, "sensevoice-vad.download");
-  await freshDownload(authority.vad.source, vadDownload);
+  const vadDownload = await snapshotDownload("sensevoice-silero-vad");
   await assertFileIdentity(vadDownload, lock.vadBytes, authority.vad.sha256);
   const vadDestination = containedOutput(
     outputRoot,
@@ -591,25 +609,6 @@ async function validatedSuppliedTemporaryRoot(value: string): Promise<string> {
     throw new Error("supplied Sherpa temporary root is invalid");
   }
   return candidate;
-}
-
-async function freshDownload(
-  source: string,
-  destination: string,
-): Promise<void> {
-  await run(
-    "curl",
-    [
-      "--fail",
-      "--location",
-      "--show-error",
-      "--progress-bar",
-      "--output",
-      destination,
-      source,
-    ],
-    "inherit",
-  );
 }
 
 async function extractMembers(

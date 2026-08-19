@@ -4,17 +4,22 @@
 from __future__ import annotations
 
 import argparse
+import fcntl
 import hashlib
 import json
 import os
 import pathlib
 import platform
 import re
+import shutil
 import stat
 import subprocess
 import sys
 import time
+import uuid
+from contextlib import contextmanager
 from datetime import datetime, timezone
+from functools import wraps
 from typing import Any, Callable, Sequence
 
 
@@ -25,9 +30,11 @@ RELEASE_ROOT = ROOT / "docs/product/audio-sidebar-release"
 CANDIDATE_RECEIPT = RELEASE_ROOT / "candidate.json"
 MANUAL_RECEIPT = RELEASE_ROOT / "manual.json"
 FINAL_RECEIPT = RELEASE_ROOT / "final.json"
+PREPARE_STATE = RELEASE_ROOT / ".prepare-state.json"
 MANUAL_DEFINITION = ROOT / "docs/product/audio-sidebar-manual-checks.json"
 PRODUCT_MANIFEST = ROOT / "docs/product/audio-sidebar-workstation.json"
 INPUT_PATHS = (
+    "pubspec.lock",
     "apps/mobile-flutter",
     "apps/desktop-electron",
     "packages/audio_core",
@@ -282,6 +289,76 @@ def target_fingerprint() -> dict[str, Any]:
     return {**target, "sha256": hashlib.sha256(_canonical(target)).hexdigest()}
 
 
+def _tool_output(command: Sequence[str]) -> str:
+    result = subprocess.run(
+        command,
+        cwd=ROOT,
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+    return (result.stdout + result.stderr).strip()
+
+
+def execution_environment_fingerprint() -> dict[str, Any]:
+    tools: dict[str, dict[str, str]] = {}
+    for name, version_command in (
+        ("bun", ("bun", "--version")),
+        ("dart", ("dart", "--version")),
+        ("flutter", ("flutter", "--version", "--machine")),
+        ("xcodebuild", ("xcodebuild", "-version")),
+        ("clang", ("clang", "--version")),
+        ("swift", ("swift", "--version")),
+    ):
+        executable = shutil.which(name)
+        _require(executable is not None, f"required release tool is missing: {name}")
+        tools[name] = {
+            "path": str(pathlib.Path(executable).resolve()),
+            "version": _tool_output(version_command),
+        }
+    environment_names = (
+        "CODE_SIGNING_ALLOWED",
+        "DEVELOPMENT_TEAM",
+        "EXPANDED_CODE_SIGN_IDENTITY",
+        "RUN_PACKAGED_NATIVE_SECURITY_KEYCHAIN_MUTATION",
+        "VOICE2TEXT_DART_EXECUTABLE",
+        "VOICE2TEXT_FORCE_FRESH_RESOURCE_DOWNLOAD",
+        "VOICE2TEXT_MACOS_SIGN_IDENTITY",
+        "VOICE2TEXT_RESOURCE_CACHE_DIR",
+        "VOICE2TEXT_RESOURCE_CACHE_LIMIT_GIB",
+    )
+    fingerprint: dict[str, Any] = {
+        "tools": tools,
+        "environment": {
+            name: os.environ.get(name) for name in environment_names
+        },
+    }
+    return {
+        **fingerprint,
+        "sha256": hashlib.sha256(_canonical(fingerprint)).hexdigest(),
+    }
+
+
+def _resource_acquisition_mode() -> str:
+    return (
+        "force-fresh"
+        if os.environ.get("VOICE2TEXT_FORCE_FRESH_RESOURCE_DOWNLOAD") == "1"
+        else "cache-allowed"
+    )
+
+
+def _command_matrix_sha256() -> str:
+    matrix = [
+        {
+            "id": identifier,
+            "command": list(command),
+            "cwd": str(cwd.resolve()),
+        }
+        for identifier, command, cwd in PREPARE_COMMANDS
+    ]
+    return hashlib.sha256(_canonical(matrix)).hexdigest()
+
+
 def _timestamp() -> str:
     return datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")
 
@@ -299,11 +376,39 @@ def _parse_utc_timestamp(value: Any, label: str) -> datetime:
 
 def _write_json(path: pathlib.Path, value: Any) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
-    temporary = path.with_suffix(f"{path.suffix}.tmp")
-    temporary.write_text(
-        json.dumps(value, ensure_ascii=False, indent=2) + "\n", encoding="utf-8"
+    temporary = path.with_name(
+        f".{path.name}.{os.getpid()}.{uuid.uuid4().hex}.tmp"
     )
-    temporary.replace(path)
+    try:
+        temporary.write_text(
+            json.dumps(value, ensure_ascii=False, indent=2) + "\n",
+            encoding="utf-8",
+        )
+        temporary.replace(path)
+    finally:
+        temporary.unlink(missing_ok=True)
+
+
+@contextmanager
+def _release_operation_lock():
+    lock_path = PREPARE_STATE.with_name(".candidate-operation.lock")
+    lock_path.parent.mkdir(parents=True, exist_ok=True)
+    with lock_path.open("a+", encoding="utf-8") as handle:
+        os.chmod(lock_path, 0o600)
+        fcntl.flock(handle.fileno(), fcntl.LOCK_EX)
+        try:
+            yield
+        finally:
+            fcntl.flock(handle.fileno(), fcntl.LOCK_UN)
+
+
+def _serialized_release_operation(operation):
+    @wraps(operation)
+    def serialized(*args, **kwargs):
+        with _release_operation_lock():
+            return operation(*args, **kwargs)
+
+    return serialized
 
 
 def _run_command(command: Sequence[str], cwd: pathlib.Path) -> None:
@@ -353,7 +458,9 @@ def _pending_manual_receipt(candidate: dict[str, Any]) -> dict[str, Any]:
     }
 
 
-def _validate_candidate_receipt(candidate: dict[str, Any]) -> None:
+def _validate_candidate_receipt(
+    candidate: dict[str, Any], *, package_already_verified: bool = False
+) -> None:
     _require(
         candidate.get("schema") == "voice2text-audio-sidebar-candidate/v1",
         "candidate receipt schema drifted",
@@ -406,7 +513,7 @@ def _validate_candidate_receipt(candidate: dict[str, Any]) -> None:
         and bool(SHA256.fullmatch(str(target.get("sha256")))),
         "candidate target identity is invalid",
     )
-    verify_candidate_identity(candidate)
+    verify_candidate_identity(candidate, verify_package=not package_already_verified)
 
 
 def _recover_prepared_candidate() -> dict[str, Any]:
@@ -424,9 +531,243 @@ def _recover_prepared_candidate() -> dict[str, Any]:
             )
     else:
         _write_json(MANUAL_RECEIPT, expected_manual)
+    PREPARE_STATE.unlink(missing_ok=True)
     return candidate
 
 
+def _package_identity() -> dict[str, str]:
+    executable = PACKAGE_PATH / "Contents/MacOS/Voice2Text"
+    worker_manifest = PACKAGE_PATH / "Contents/Resources/worker/manifest.json"
+    _require(executable.is_file(), "packaged executable is missing")
+    _require(worker_manifest.is_file(), "packaged worker manifest is missing")
+    return {
+        "path": PACKAGE_PATH.relative_to(ROOT).as_posix(),
+        "manifestAlgorithm": "sorted-path-mode-content-sha256/v1",
+        "manifestSha256": package_tree_sha256(PACKAGE_PATH),
+        "executableSha256": _sha256_file(executable),
+        "workerManifestSha256": _sha256_file(worker_manifest),
+    }
+
+
+def _validate_hashed_payload(value: dict[str, Any], label: str) -> None:
+    recorded = value.get("sha256")
+    _require(
+        isinstance(recorded, str) and bool(SHA256.fullmatch(recorded)),
+        f"{label} hash is invalid",
+    )
+    payload = {key: item for key, item in value.items() if key != "sha256"}
+    _require(
+        hashlib.sha256(_canonical(payload)).hexdigest() == recorded,
+        f"{label} hash does not match its payload",
+    )
+
+
+def _validate_prepare_state(state: dict[str, Any]) -> None:
+    _require(
+        set(state)
+        == {
+            "schema",
+            "status",
+            "sourceRevision",
+            "candidateInputsSha256",
+            "productContractSha256",
+            "target",
+            "acquisitionMode",
+            "executionEnvironment",
+            "commandMatrixSha256",
+            "startedAt",
+            "automated",
+            "package",
+        },
+        "prepare checkpoint fields are invalid",
+    )
+    _require(
+        state.get("schema") == "voice2text-audio-sidebar-prepare-state/v1",
+        "prepare checkpoint schema is invalid",
+    )
+    _require(
+        state.get("status") == "PREPARING",
+        "prepare checkpoint status is invalid",
+    )
+    for field in (
+        "sourceRevision",
+        "candidateInputsSha256",
+        "productContractSha256",
+        "commandMatrixSha256",
+    ):
+        value = state.get(field)
+        pattern = REVISION if field == "sourceRevision" else SHA256
+        _require(
+            isinstance(value, str) and bool(pattern.fullmatch(value)),
+            f"prepare checkpoint {field} is invalid",
+        )
+    _require(
+        state.get("acquisitionMode") in {"cache-allowed", "force-fresh"},
+        "prepare checkpoint acquisition mode is invalid",
+    )
+    target = state.get("target")
+    _require(
+        isinstance(target, dict)
+        and set(target)
+        == {
+            "operatingSystem",
+            "operatingSystemVersion",
+            "architecture",
+            "cpuModel",
+            "logicalCpuCount",
+            "memoryBytes",
+            "sha256",
+        },
+        "prepare checkpoint target is invalid",
+    )
+    _validate_hashed_payload(target, "prepare checkpoint target")
+    environment = state.get("executionEnvironment")
+    _require(
+        isinstance(environment, dict)
+        and set(environment) == {"tools", "environment", "sha256"}
+        and isinstance(environment.get("tools"), dict)
+        and isinstance(environment.get("environment"), dict),
+        "prepare checkpoint executionEnvironment is invalid",
+    )
+    expected_tool_names = {"bun", "dart", "flutter", "xcodebuild", "clang", "swift"}
+    _require(
+        set(environment["tools"]) == expected_tool_names
+        and all(
+            isinstance(tool, dict)
+            and set(tool) == {"path", "version"}
+            and all(isinstance(value, str) and value for value in tool.values())
+            for tool in environment["tools"].values()
+        ),
+        "prepare checkpoint tools are invalid",
+    )
+    _require(
+        set(environment["environment"])
+        == {
+            "CODE_SIGNING_ALLOWED",
+            "DEVELOPMENT_TEAM",
+            "EXPANDED_CODE_SIGN_IDENTITY",
+            "RUN_PACKAGED_NATIVE_SECURITY_KEYCHAIN_MUTATION",
+            "VOICE2TEXT_DART_EXECUTABLE",
+            "VOICE2TEXT_FORCE_FRESH_RESOURCE_DOWNLOAD",
+            "VOICE2TEXT_MACOS_SIGN_IDENTITY",
+            "VOICE2TEXT_RESOURCE_CACHE_DIR",
+            "VOICE2TEXT_RESOURCE_CACHE_LIMIT_GIB",
+        }
+        and all(
+            value is None or isinstance(value, str)
+            for value in environment["environment"].values()
+        ),
+        "prepare checkpoint environment is invalid",
+    )
+    _validate_hashed_payload(
+        environment, "prepare checkpoint executionEnvironment"
+    )
+    _parse_utc_timestamp(state.get("startedAt"), "prepare checkpoint start time")
+    automated = state.get("automated")
+    _require(isinstance(automated, list), "prepare checkpoint results are invalid")
+    _require(
+        len(automated) <= len(PREPARE_COMMANDS),
+        "prepare checkpoint result prefix is too long",
+    )
+    for result, (identifier, command, _cwd) in zip(
+        automated, PREPARE_COMMANDS, strict=False
+    ):
+        _require(
+            isinstance(result, dict)
+            and set(result) == {"id", "command", "status", "elapsedMs"}
+            and result.get("id") == identifier
+            and result.get("command") == list(command)
+            and result.get("status") == "PASS"
+            and type(result.get("elapsedMs")) is int
+            and result["elapsedMs"] >= 0,
+            "prepare checkpoint results are not an exact PASS prefix",
+        )
+    package = state.get("package")
+    package_index = next(
+        (
+            index
+            for index, (identifier, _command, _cwd) in enumerate(PREPARE_COMMANDS)
+            if identifier == "package-once"
+        ),
+        None,
+    )
+    package_has_passed = package_index is not None and len(automated) > package_index
+    _require(
+        package_has_passed == isinstance(package, dict),
+        "prepare checkpoint package binding is inconsistent",
+    )
+    if isinstance(package, dict):
+        _require(
+            set(package)
+            == {
+                "path",
+                "manifestAlgorithm",
+                "manifestSha256",
+                "executableSha256",
+                "workerManifestSha256",
+            }
+            and all(
+                isinstance(package.get(field), str)
+                and bool(SHA256.fullmatch(package[field]))
+                for field in (
+                    "manifestSha256",
+                    "executableSha256",
+                    "workerManifestSha256",
+                )
+            ),
+            "prepare checkpoint package identity is invalid",
+        )
+        _require(
+            package.get("path") == PACKAGE_PATH.relative_to(ROOT).as_posix()
+            and package.get("manifestAlgorithm")
+            == "sorted-path-mode-content-sha256/v1",
+            "prepare checkpoint package metadata is invalid",
+        )
+
+
+def _load_prepare_state() -> dict[str, Any]:
+    try:
+        state = _load(PREPARE_STATE, "prepare checkpoint")
+    except (json.JSONDecodeError, OSError) as error:
+        raise CandidateError("prepare checkpoint is malformed") from error
+    _validate_prepare_state(state)
+    return state
+
+
+def _checkpoint_identity(
+    *,
+    source_revision: str,
+    input_sha: str,
+    product_contract_sha: str,
+    target: dict[str, Any],
+    environment: dict[str, Any],
+) -> dict[str, Any]:
+    return {
+        "sourceRevision": source_revision,
+        "candidateInputsSha256": input_sha,
+        "productContractSha256": product_contract_sha,
+        "target": target,
+        "acquisitionMode": _resource_acquisition_mode(),
+        "executionEnvironment": environment,
+        "commandMatrixSha256": _command_matrix_sha256(),
+    }
+
+
+def _checkpoint_is_current(
+    state: dict[str, Any], identity: dict[str, Any]
+) -> bool:
+    if any(state.get(field) != value for field, value in identity.items()):
+        return False
+    package = state.get("package")
+    if isinstance(package, dict):
+        try:
+            return package == _package_identity()
+        except CandidateError:
+            return False
+    return True
+
+
+@_serialized_release_operation
 def prepare(
     *,
     runner: Callable[[Sequence[str], pathlib.Path], None] = _run_command,
@@ -441,9 +782,34 @@ def prepare(
     )
     source_revision, input_sha = committed_candidate_identity()
     product_contract_sha = _product_contract_sha256()
-    started = _timestamp()
-    commands: list[dict[str, Any]] = []
-    for identifier, command, cwd in PREPARE_COMMANDS:
+    target = target_fingerprint()
+    environment = execution_environment_fingerprint()
+    identity = _checkpoint_identity(
+        source_revision=source_revision,
+        input_sha=input_sha,
+        product_contract_sha=product_contract_sha,
+        target=target,
+        environment=environment,
+    )
+    state: dict[str, Any]
+    if PREPARE_STATE.exists():
+        state = _load_prepare_state()
+        if not _checkpoint_is_current(state, identity):
+            PREPARE_STATE.unlink()
+            state = {}
+    else:
+        state = {}
+    if not state:
+        state = {
+            "schema": "voice2text-audio-sidebar-prepare-state/v1",
+            "status": "PREPARING",
+            **identity,
+            "startedAt": _timestamp(),
+            "automated": [],
+            "package": None,
+        }
+    commands = state["automated"]
+    for identifier, command, cwd in PREPARE_COMMANDS[len(commands) :]:
         command_started = time.monotonic()
         runner(command, cwd)
         commands.append(
@@ -454,33 +820,29 @@ def prepare(
                 "elapsedMs": round((time.monotonic() - command_started) * 1000),
             }
         )
-    executable = PACKAGE_PATH / "Contents/MacOS/Voice2Text"
-    worker_manifest = PACKAGE_PATH / "Contents/Resources/worker/manifest.json"
-    _require(executable.is_file(), "packaged executable is missing")
-    _require(worker_manifest.is_file(), "packaged worker manifest is missing")
-    package_sha = package_tree_sha256(PACKAGE_PATH)
+        if identifier == "package-once":
+            state["package"] = _package_identity()
+        _write_json(PREPARE_STATE, state)
+    package = state.get("package")
+    _require(isinstance(package, dict), "prepared package identity is missing")
+    _require(package == _package_identity(), "prepared package identity changed")
     receipt = {
         "schema": "voice2text-audio-sidebar-candidate/v1",
         "status": "AUTOMATED_PASS_MANUAL_PENDING",
         "sourceRevision": source_revision,
         "candidateInputsSha256": input_sha,
         "productContractSha256": product_contract_sha,
-        "preparedAt": started,
+        "preparedAt": state["startedAt"],
         "automatedFinishedAt": _timestamp(),
-        "target": target_fingerprint(),
-        "package": {
-            "path": PACKAGE_PATH.relative_to(ROOT).as_posix(),
-            "manifestAlgorithm": "sorted-path-mode-content-sha256/v1",
-            "manifestSha256": package_sha,
-            "executableSha256": _sha256_file(executable),
-            "workerManifestSha256": _sha256_file(worker_manifest),
-        },
+        "target": target,
+        "package": package,
         "automated": commands,
     }
     manual = _pending_manual_receipt(receipt)
-    _validate_candidate_receipt(receipt)
+    _validate_candidate_receipt(receipt, package_already_verified=True)
     _write_json(CANDIDATE_RECEIPT, receipt)
     _write_json(MANUAL_RECEIPT, manual)
+    PREPARE_STATE.unlink(missing_ok=True)
     return receipt
 
 
@@ -522,7 +884,9 @@ def validate_manual(candidate: dict[str, Any], manual: dict[str, Any]) -> None:
     )
 
 
-def verify_candidate_identity(candidate: dict[str, Any]) -> None:
+def verify_candidate_identity(
+    candidate: dict[str, Any], *, verify_package: bool = True
+) -> None:
     revision, input_sha = committed_candidate_identity()
     source_revision = candidate.get("sourceRevision")
     _require(
@@ -539,7 +903,8 @@ def verify_candidate_identity(candidate: dict[str, Any]) -> None:
     _require(isinstance(package, dict), "candidate package identity is missing")
     expected = package.get("manifestSha256")
     _require(bool(SHA256.fullmatch(str(expected))), "candidate package hash is invalid")
-    _require(package_tree_sha256(PACKAGE_PATH) == expected, "candidate package changed")
+    if verify_package:
+        _require(package_tree_sha256(PACKAGE_PATH) == expected, "candidate package changed")
 
 
 def _expected_final_receipt(
@@ -598,6 +963,7 @@ def _project_final_product(candidate: dict[str, Any]) -> None:
     _write_json(PRODUCT_MANIFEST, product)
 
 
+@_serialized_release_operation
 def finalize() -> dict[str, Any]:
     _validate_product_manifest()
     candidate = _load(CANDIDATE_RECEIPT, "candidate receipt")

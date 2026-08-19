@@ -22,6 +22,49 @@ SPEC.loader.exec_module(MODULE)
 
 
 class AudioSidebarReleaseCandidateTest(unittest.TestCase):
+    @staticmethod
+    def _hashed(payload: dict[str, object]) -> dict[str, object]:
+        return {
+            **payload,
+            "sha256": MODULE.hashlib.sha256(MODULE._canonical(payload)).hexdigest(),
+        }
+
+    @classmethod
+    def _target_fingerprint(cls) -> dict[str, object]:
+        return cls._hashed(
+            {
+                "operatingSystem": "macos",
+                "operatingSystemVersion": "test",
+                "architecture": "arm64",
+                "cpuModel": "test",
+                "logicalCpuCount": 8,
+                "memoryBytes": 16 * 1024**3,
+            }
+        )
+
+    @classmethod
+    def _environment_fingerprint(cls) -> dict[str, object]:
+        names = (
+            "CODE_SIGNING_ALLOWED",
+            "DEVELOPMENT_TEAM",
+            "EXPANDED_CODE_SIGN_IDENTITY",
+            "RUN_PACKAGED_NATIVE_SECURITY_KEYCHAIN_MUTATION",
+            "VOICE2TEXT_DART_EXECUTABLE",
+            "VOICE2TEXT_FORCE_FRESH_RESOURCE_DOWNLOAD",
+            "VOICE2TEXT_MACOS_SIGN_IDENTITY",
+            "VOICE2TEXT_RESOURCE_CACHE_DIR",
+            "VOICE2TEXT_RESOURCE_CACHE_LIMIT_GIB",
+        )
+        return cls._hashed(
+            {
+                "tools": {
+                    name: {"path": f"/test/{name}", "version": "test"}
+                    for name in ("bun", "dart", "flutter", "xcodebuild", "clang", "swift")
+                },
+                "environment": {name: None for name in names},
+            }
+        )
+
     def setUp(self) -> None:
         self.temporary = tempfile.TemporaryDirectory()
         self.root = pathlib.Path(self.temporary.name)
@@ -30,6 +73,7 @@ class AudioSidebarReleaseCandidateTest(unittest.TestCase):
         self.candidate_receipt = self.release / "candidate.json"
         self.manual_receipt = self.release / "manual.json"
         self.final_receipt = self.release / "final.json"
+        self.prepare_state = self.release / ".prepare-state.json"
         self.manual_definition = self.root / "manual-checks.json"
         self.product_manifest = self.root / "workstation.json"
         self.product_manifest.write_text(
@@ -90,6 +134,7 @@ class AudioSidebarReleaseCandidateTest(unittest.TestCase):
             patch.object(MODULE, "MANUAL_RECEIPT", self.manual_receipt)
         )
         stack.enter_context(patch.object(MODULE, "FINAL_RECEIPT", self.final_receipt))
+        stack.enter_context(patch.object(MODULE, "PREPARE_STATE", self.prepare_state))
         stack.enter_context(
             patch.object(MODULE, "MANUAL_DEFINITION", self.manual_definition)
         )
@@ -107,6 +152,13 @@ class AudioSidebarReleaseCandidateTest(unittest.TestCase):
                 "_product_contract_sha256",
                 return_value="4" * 64,
                 create=True,
+            )
+        )
+        stack.enter_context(
+            patch.object(
+                MODULE,
+                "execution_environment_fingerprint",
+                return_value=self._environment_fingerprint(),
             )
         )
         return stack
@@ -366,7 +418,7 @@ class AudioSidebarReleaseCandidateTest(unittest.TestCase):
         ), patch.object(
             MODULE,
             "target_fingerprint",
-            return_value={"sha256": "3" * 64},
+            return_value=self._target_fingerprint(),
         ), patch.object(
             MODULE,
             "_validate_product_manifest",
@@ -477,7 +529,7 @@ class AudioSidebarReleaseCandidateTest(unittest.TestCase):
         ), patch.object(
             MODULE,
             "target_fingerprint",
-            return_value={"sha256": "3" * 64},
+            return_value=self._target_fingerprint(),
         ), patch.object(MODULE, "_write_json", side_effect=flaky_write):
             with self.assertRaisesRegex(OSError, "manual projection failed"):
                 MODULE.prepare(
@@ -496,6 +548,152 @@ class AudioSidebarReleaseCandidateTest(unittest.TestCase):
             json.loads(self.manual_receipt.read_text(encoding="utf-8"))["status"],
             "PENDING",
         )
+
+    def test_prepare_resumes_after_package_without_packaging_again(self) -> None:
+        commands = (
+            ("before-package", ("before",), self.root),
+            ("package-once", ("package",), self.root),
+            ("packaged-test", ("packaged-test",), self.root),
+        )
+        first: list[str] = []
+        second: list[str] = []
+
+        def fail_after_package(command: object, _cwd: pathlib.Path) -> None:
+            identifier = command[0]
+            first.append(identifier)
+            if identifier == "packaged-test":
+                raise RuntimeError("synthetic late failure")
+
+        with self._patch_release_paths(), patch.object(
+            MODULE, "PREPARE_COMMANDS", commands
+        ), patch.object(
+            MODULE,
+            "committed_candidate_identity",
+            return_value=("1" * 40, "2" * 64),
+        ), patch.object(
+            MODULE,
+            "target_fingerprint",
+            return_value=self._target_fingerprint(),
+        ):
+            with self.assertRaisesRegex(RuntimeError, "late failure"):
+                MODULE.prepare(runner=fail_after_package)
+            receipt = MODULE.prepare(
+                runner=lambda command, _cwd: second.append(command[0])
+            )
+
+        self.assertEqual(first, ["before", "package", "packaged-test"])
+        self.assertEqual(second, ["packaged-test"])
+        self.assertEqual(
+            [item["id"] for item in receipt["automated"]],
+            ["before-package", "package-once", "packaged-test"],
+        )
+        self.assertFalse(self.prepare_state.exists())
+
+    def test_prepare_environment_change_invalidates_checkpoint(self) -> None:
+        commands = (
+            ("before-package", ("before",), self.root),
+            ("package-once", ("package",), self.root),
+        )
+        environment = self._environment_fingerprint()
+        first: list[str] = []
+        second: list[str] = []
+
+        with self._patch_release_paths(), patch.object(
+            MODULE, "PREPARE_COMMANDS", commands
+        ), patch.object(
+            MODULE,
+            "committed_candidate_identity",
+            return_value=("1" * 40, "2" * 64),
+        ), patch.object(
+            MODULE,
+            "target_fingerprint",
+            return_value=self._target_fingerprint(),
+        ), patch.object(
+            MODULE,
+            "execution_environment_fingerprint",
+            side_effect=lambda: environment.copy(),
+        ):
+            with self.assertRaisesRegex(RuntimeError, "stop"):
+                MODULE.prepare(
+                    runner=lambda command, _cwd: (
+                        first.append(command[0]),
+                        (_ for _ in ()).throw(RuntimeError("stop")),
+                    )[1]
+                )
+            environment["sha256"] = "6" * 64
+            MODULE.prepare(
+                runner=lambda command, _cwd: second.append(command[0])
+            )
+
+        self.assertEqual(first, ["before"])
+        self.assertEqual(second, ["before", "package"])
+
+    def test_execution_environment_tracks_release_behavior_switches(self) -> None:
+        names = (
+            "VOICE2TEXT_MACOS_SIGN_IDENTITY",
+            "VOICE2TEXT_DART_EXECUTABLE",
+            "RUN_PACKAGED_NATIVE_SECURITY_KEYCHAIN_MUTATION",
+        )
+        with patch.object(MODULE.shutil, "which", side_effect=lambda name: f"/test/{name}"), patch.object(
+            MODULE, "_tool_output", return_value="test"
+        ), patch.dict(MODULE.os.environ, {}, clear=True):
+            baseline = MODULE.execution_environment_fingerprint()
+            for name in names:
+                with self.subTest(name=name), patch.dict(
+                    MODULE.os.environ, {name: "changed"}, clear=True
+                ):
+                    changed = MODULE.execution_environment_fingerprint()
+                    self.assertNotEqual(changed["sha256"], baseline["sha256"])
+
+    def test_root_pubspec_lock_is_a_candidate_input(self) -> None:
+        self.assertIn("pubspec.lock", MODULE.INPUT_PATHS)
+
+    def test_malformed_nested_checkpoint_fails_closed(self) -> None:
+        commands = (
+            ("before", ("before",), self.root),
+            ("after", ("after",), self.root),
+        )
+        with self._patch_release_paths(), patch.object(
+            MODULE, "PREPARE_COMMANDS", commands
+        ), patch.object(
+            MODULE,
+            "committed_candidate_identity",
+            return_value=("1" * 40, "2" * 64),
+        ), patch.object(
+            MODULE,
+            "target_fingerprint",
+            return_value=self._target_fingerprint(),
+        ):
+            with self.assertRaisesRegex(RuntimeError, "stop"):
+                MODULE.prepare(
+                    runner=lambda command, _cwd: (
+                        None
+                        if command[0] == "before"
+                        else (_ for _ in ()).throw(RuntimeError("stop"))
+                    )
+                )
+            state = json.loads(self.prepare_state.read_text(encoding="utf-8"))
+            state["target"]["architecture"] = "tampered"
+            self.prepare_state.write_text(json.dumps(state), encoding="utf-8")
+            with self.assertRaisesRegex(MODULE.CandidateError, "hash does not match"):
+                MODULE.prepare(runner=lambda _command, _cwd: self.fail("commands ran"))
+
+    def test_malformed_prepare_checkpoint_fails_closed(self) -> None:
+        self.prepare_state.parent.mkdir(parents=True)
+        self.prepare_state.write_text('{"schema":"unexpected"}\n', encoding="utf-8")
+        with self._patch_release_paths(), patch.object(
+            MODULE,
+            "committed_candidate_identity",
+            return_value=("1" * 40, "2" * 64),
+        ), patch.object(
+            MODULE,
+            "target_fingerprint",
+            return_value=self._target_fingerprint(),
+        ):
+            with self.assertRaisesRegex(MODULE.CandidateError, "checkpoint"):
+                MODULE.prepare(
+                    runner=lambda _command, _cwd: self.fail("commands ran")
+                )
 
     def test_changed_candidate_input_tree_is_rejected(self) -> None:
         with patch.object(MODULE, "PACKAGE_PATH", self.package), patch.object(
