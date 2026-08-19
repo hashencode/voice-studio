@@ -27,10 +27,16 @@ describe("packaged workstation progress evidence wiring", () => {
     expect(mainSource).toContain('`[data-processing-job-id="${jobId}"]`');
   });
 
-  it("accepts only a running imported job with its own visible progress node", () => {
+  it("accepts only a running imported job with its own accessible progress node", () => {
     expect(mainSource).toContain("event.jobId === jobId");
     expect(mainSource).toContain('event.state === "running"');
-    expect(mainSource).toContain("progress.max === 1");
-    expect(mainSource).toContain("progress.value < 1");
+    expect(mainSource).toContain(
+      'progress?.getAttribute("role") === "progressbar"',
+    );
+    expect(mainSource).toContain(
+      'Number(progress?.getAttribute("aria-valuemax"))',
+    );
+    expect(mainSource).toContain("progressMax === 1");
+    expect(mainSource).toContain("progressValue < 1");
   });
 });

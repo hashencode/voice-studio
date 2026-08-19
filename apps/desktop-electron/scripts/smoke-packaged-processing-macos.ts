@@ -162,31 +162,55 @@ async function runPackagedSmoke(captureWorkstation: boolean): Promise<{
       workstation = JSON.parse(
         workstationRaw.toString("utf8"),
       ) as PackagedWorkstationEvidence;
-      if (
-        workstation.schemaVersion !== 1 ||
-        workstation.protocol !== "voice2text-u7-packaged-workstation/v1" ||
-        workstation.packaged !== true ||
-        !workstation.manualRevisionSurvivedRetry ||
-        !workstation.productionRetryCompleted ||
-        !workstation.productionCancelCompleted ||
-        workstation.retryTerminal.state !== "completed" ||
-        workstation.retryTerminal.attempt < 2 ||
-        workstation.cancelTerminal.state !== "canceled" ||
-        workstation.cancelTerminal.attempt < 1 ||
-        workstation.searchResultCount < 1 ||
-        workstation.exported.length !== 5 ||
-        workstation.playback.pathRedacted !== true ||
-        workstation.rendererBoundary !==
-          "typed-preload-opaque-identifiers-only" ||
-        !workstation.rendererDomReady ||
-        !workstation.rendererPreloadDriven ||
-        !workstation.audioProcessingOwned ||
-        !workstation.importProgressObserved ||
-        !["queued", "running"].every((state) =>
+      const invalidWorkstationFields = [
+        workstation.schemaVersion === 1 ? null : "schemaVersion",
+        workstation.protocol === "voice2text-u7-packaged-workstation/v1"
+          ? null
+          : "protocol",
+        workstation.packaged === true ? null : "packaged",
+        workstation.manualRevisionSurvivedRetry
+          ? null
+          : "manualRevisionSurvivedRetry",
+        workstation.productionRetryCompleted
+          ? null
+          : "productionRetryCompleted",
+        workstation.productionCancelCompleted
+          ? null
+          : "productionCancelCompleted",
+        workstation.retryTerminal.state === "completed"
+          ? null
+          : "retryTerminal.state",
+        workstation.retryTerminal.attempt >= 2 ? null : "retryTerminal.attempt",
+        workstation.cancelTerminal.state === "canceled"
+          ? null
+          : "cancelTerminal.state",
+        workstation.cancelTerminal.attempt >= 1
+          ? null
+          : "cancelTerminal.attempt",
+        workstation.searchResultCount >= 1 ? null : "searchResultCount",
+        workstation.exported.length === 5 ? null : "exported.length",
+        workstation.playback.pathRedacted === true
+          ? null
+          : "playback.pathRedacted",
+        workstation.rendererBoundary === "typed-preload-opaque-identifiers-only"
+          ? null
+          : "rendererBoundary",
+        workstation.rendererDomReady ? null : "rendererDomReady",
+        workstation.rendererPreloadDriven ? null : "rendererPreloadDriven",
+        workstation.audioProcessingOwned ? null : "audioProcessingOwned",
+        workstation.importProgressObserved ? null : "importProgressObserved",
+        ["queued", "running"].every((state) =>
           workstation!.operationStates.includes(state),
         )
-      ) {
-        throw new Error("packaged workstation evidence is invalid");
+          ? null
+          : "operationStates",
+      ].filter((field): field is string => field !== null);
+      if (invalidWorkstationFields.length > 0) {
+        throw new Error(
+          `packaged workstation evidence is invalid: ${invalidWorkstationFields.join(
+            ", ",
+          )}`,
+        );
       }
     }
     return { processing: receipt, workstation };

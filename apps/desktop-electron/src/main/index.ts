@@ -1498,12 +1498,14 @@ async function observePackagedRendererProgress(
           audio.click();
         }
         const progress = document.querySelector(${JSON.stringify(progressSelector)});
+        const progressMax = Number(progress?.getAttribute("aria-valuemax"));
+        const progressValue = Number(progress?.getAttribute("aria-valuenow"));
         if (
           runningObserved &&
-          progress instanceof HTMLProgressElement &&
-          progress.max === 1 &&
-          progress.value >= 0 &&
-          progress.value < 1
+          progress?.getAttribute("role") === "progressbar" &&
+          progressMax === 1 &&
+          progressValue >= 0 &&
+          progressValue < 1
         ) {
           telemetry.importProgressObserved = true;
           return true;
