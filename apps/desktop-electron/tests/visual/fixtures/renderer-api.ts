@@ -16,8 +16,6 @@ export type VisualScenario =
   | "companion-devices";
 
 export interface VisualRendererFixture {
-  scenario: VisualScenario;
-  nowMs: number;
   application: ApplicationSnapshot;
   audios: AudioSummary[];
   audioWorkspaces: AudioWorkspaceSnapshot[];
@@ -27,7 +25,7 @@ export interface VisualRendererFixture {
   aiSettings: AiSettingsSnapshot;
 }
 
-const NOW_MS = Date.UTC(2026, 7, 19, 3, 20, 0);
+export const VISUAL_NOW_MS = Date.UTC(2026, 7, 19, 3, 20, 0);
 
 export function buildVisualFixture(
   scenario: VisualScenario,
@@ -38,8 +36,6 @@ export function buildVisualFixture(
   const audios = audioFixtures();
 
   return {
-    scenario,
-    nowMs: NOW_MS,
     application: {
       protocolVersion: 2,
       revision: 42,
@@ -113,10 +109,30 @@ export function buildVisualFixture(
 
 function audioFixtures(): AudioSummary[] {
   return [
-    audioSummary(101, "产品设计评审.wav", 48 * 60_000, NOW_MS - 90 * 60_000),
-    audioSummary(102, "移动端同步讨论.m4a", 23 * 60_000, NOW_MS - 86_400_000),
-    audioSummary(103, "周会行动项.wav", 37 * 60_000, NOW_MS - 172_800_000),
-    audioSummary(104, "用户访谈 08-16.mp3", 54 * 60_000, NOW_MS - 259_200_000),
+    audioSummary(
+      101,
+      "产品设计评审.wav",
+      48 * 60_000,
+      VISUAL_NOW_MS - 90 * 60_000,
+    ),
+    audioSummary(
+      102,
+      "移动端同步讨论.m4a",
+      23 * 60_000,
+      VISUAL_NOW_MS - 86_400_000,
+    ),
+    audioSummary(
+      103,
+      "周会行动项.wav",
+      37 * 60_000,
+      VISUAL_NOW_MS - 172_800_000,
+    ),
+    audioSummary(
+      104,
+      "用户访谈 08-16.mp3",
+      54 * 60_000,
+      VISUAL_NOW_MS - 259_200_000,
+    ),
   ];
 }
 
@@ -255,7 +271,7 @@ function companionFixture(): CompanionSnapshot {
         errorCode: null,
         receipt: null,
         senderDeleteAllowed: false,
-        updatedAtMs: NOW_MS - 30_000,
+        updatedAtMs: VISUAL_NOW_MS - 30_000,
       },
     ],
   };
@@ -272,8 +288,8 @@ function peer(
     identityFingerprint: "BCDEFGHIJKLMNOPQRSTUVWXYZ234567A",
     trustState: "active",
     availability,
-    pairedAtMs: NOW_MS - 604_800_000,
-    lastSeenAtMs: availability === "unknown" ? null : NOW_MS - 60_000,
+    pairedAtMs: VISUAL_NOW_MS - 604_800_000,
+    lastSeenAtMs: availability === "unknown" ? null : VISUAL_NOW_MS - 60_000,
   };
 }
 

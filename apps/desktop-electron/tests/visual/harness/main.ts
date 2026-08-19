@@ -2,15 +2,11 @@ import { app, BrowserWindow, screen } from "electron";
 
 const width = Number(process.env.VOICE2TEXT_VISUAL_WIDTH ?? "1240");
 const height = Number(process.env.VOICE2TEXT_VISUAL_HEIGHT ?? "820");
-const rendererUrl = process.env.VOICE2TEXT_VISUAL_RENDERER_URL;
 const preloadPath = process.env.VOICE2TEXT_VISUAL_PRELOAD;
 
-if (!rendererUrl || !preloadPath) {
-  throw new Error(
-    "VOICE2TEXT_VISUAL_RENDERER_URL and VOICE2TEXT_VISUAL_PRELOAD are required",
-  );
+if (!preloadPath) {
+  throw new Error("VOICE2TEXT_VISUAL_PRELOAD is required");
 }
-const requiredRendererUrl = rendererUrl;
 const requiredPreloadPath = preloadPath;
 
 app.commandLine.appendSwitch("lang", "zh-CN");
@@ -38,8 +34,8 @@ async function start() {
     },
   });
 
-  await window.loadURL(requiredRendererUrl);
   window.setContentSize(physicalWidth, physicalHeight);
+  await window.loadURL("about:blank");
   window.show();
 
   window.on("closed", () => app.quit());

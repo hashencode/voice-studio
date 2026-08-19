@@ -6,6 +6,7 @@ import electronExecutable from "electron";
 import {
   buildVisualFixture,
   type VisualScenario,
+  VISUAL_NOW_MS,
 } from "./fixtures/renderer-api";
 
 const harnessMain = path.resolve("tests/visual/.harness-build/main.js");
@@ -18,8 +19,7 @@ const canonicalScreenshots =
 
 test.describe("sidebar-09 production Renderer", () => {
   test("1240x820 Audio open, selected, active capture", async () => {
-    const session = await launch("audio-active", 1240, 820);
-    try {
+    await withVisualSession("audio-active", 1240, 820, async (session) => {
       const { page } = session;
       await expect(
         page.getByRole("heading", { name: "音频", level: 1 }),
@@ -42,14 +42,11 @@ test.describe("sidebar-09 production Renderer", () => {
         1240,
         820,
       );
-    } finally {
-      await session.app.close();
-    }
+    });
   });
 
   test("1240x820 Audio pane closed", async () => {
-    const session = await launch("audio-closed", 1240, 820);
-    try {
+    await withVisualSession("audio-closed", 1240, 820, async (session) => {
       const { page } = session;
       await expect(
         page.getByRole("heading", { name: "音频", level: 1 }),
@@ -62,14 +59,11 @@ test.describe("sidebar-09 production Renderer", () => {
       await assertRuntimeContract(page, 1240, 820);
       await assertRailOnlyGeometry(page, 1240, 820);
       await screenshot(session, "audio-pane-closed.png", 1240, 820);
-    } finally {
-      await session.app.close();
-    }
+    });
   });
 
   test("1240x820 Settings", async () => {
-    const session = await launch("settings", 1240, 820);
-    try {
+    await withVisualSession("settings", 1240, 820, async (session) => {
       const { page } = session;
       await expect(
         page.getByRole("heading", { name: "设置", level: 1 }),
@@ -77,14 +71,11 @@ test.describe("sidebar-09 production Renderer", () => {
       await assertRuntimeContract(page, 1240, 820);
       await assertRailOnlyGeometry(page, 1240, 820);
       await screenshot(session, "settings.png", 1240, 820);
-    } finally {
-      await session.app.close();
-    }
+    });
   });
 
   test("880x620 Audio overlay with capture recovery and internal scroll", async () => {
-    const session = await launch("audio-recovery", 880, 620);
-    try {
+    await withVisualSession("audio-recovery", 880, 620, async (session) => {
       const { page } = session;
       await expect(
         page.getByRole("heading", { name: "音频", level: 1 }),
@@ -99,14 +90,11 @@ test.describe("sidebar-09 production Renderer", () => {
       await assertFlatRows(page, "音频列表");
       await assertCaptureContainment(page, 880, 620, true);
       await screenshot(session, "audio-overlay-capture-recovery.png", 880, 620);
-    } finally {
-      await session.app.close();
-    }
+    });
   });
 
   test("1240x820 Companion with multiple devices", async () => {
-    const session = await launch("companion-devices", 1240, 820);
-    try {
+    await withVisualSession("companion-devices", 1240, 820, async (session) => {
       const { page } = session;
       const pane = page.getByRole("complementary", { name: "互联上下文面板" });
       await expect(
@@ -124,63 +112,78 @@ test.describe("sidebar-09 production Renderer", () => {
       await assertDockedGeometry(page, 1240, 820);
       await assertFlatRows(page, "已信任设备列表");
       await screenshot(session, "companion-multiple-devices.png", 1240, 820);
-    } finally {
-      await session.app.close();
-    }
+    });
   });
 });
 
+async function withVisualSession(
+  scenario: VisualScenario,
+  width: number,
+  height: number,
+  run: (session: Awaited<ReturnType<typeof launch>>) => Promise<void>,
+) {
+  const session = await launch(scenario, width, height);
+  try {
+    await run(session);
+  } finally {
+    await session.app.close();
+  }
+}
+
 async function launch(scenario: VisualScenario, width: number, height: number) {
+  const fixture = buildVisualFixture(scenario);
   const app = await electron.launch({
     executablePath: electronExecutable as unknown as string,
     args: [harnessMain],
     env: {
       ...process.env,
       ELECTRON_DISABLE_SECURITY_WARNINGS: "true",
-      VOICE2TEXT_VISUAL_FIXTURE: JSON.stringify(buildVisualFixture(scenario)),
+      VOICE2TEXT_VISUAL_FIXTURE: JSON.stringify(fixture),
       VOICE2TEXT_VISUAL_HEIGHT: String(height),
       VOICE2TEXT_VISUAL_PRELOAD: harnessPreload,
-      VOICE2TEXT_VISUAL_RENDERER_URL: rendererUrl,
       VOICE2TEXT_VISUAL_WIDTH: String(width),
     },
   });
-  const page = await app.firstWindow();
-  const electronRuntime = await app.evaluate(({ app: electronApp }) => ({
-    electronVersion: process.versions.electron,
-    chromiumVersion: process.versions.chrome,
-    platform: process.platform,
-    arch: process.arch,
-    locale: electronApp.getLocale(),
-  }));
-  expect(electronRuntime).toEqual({
-    electronVersion: "43.4.0",
-    chromiumVersion: "150.0.7871.224",
-    platform: process.platform,
-    arch: process.arch,
-    locale: "zh-CN",
-  });
-  const nativeScaleFactor = await app.evaluate(
-    ({ screen }) => screen.getPrimaryDisplay().scaleFactor,
-  );
-  const cdp = await page.context().newCDPSession(page);
-  await cdp.send("Emulation.setDeviceMetricsOverride", {
-    width: Math.round(width / nativeScaleFactor),
-    height: Math.round(height / nativeScaleFactor),
-    screenWidth: Math.round(width / nativeScaleFactor),
-    screenHeight: Math.round(height / nativeScaleFactor),
-    deviceScaleFactor: nativeScaleFactor,
-    mobile: false,
-  });
-  await page.addInitScript((epochMs: number) => {
-    Date.now = () => epochMs;
-    localStorage.clear();
-    const applyHarnessCss = () => {
-      document.documentElement.classList.remove("dark");
-      document.documentElement.style.colorScheme = "light";
-      if (!document.querySelector('[data-visual-harness="font-and-motion"]')) {
-        const style = document.createElement("style");
-        style.dataset.visualHarness = "font-and-motion";
-        style.textContent = `
+  try {
+    const page = await app.firstWindow();
+    const electronRuntime = await app.evaluate(({ app: electronApp }) => ({
+      electronVersion: process.versions.electron,
+      chromiumVersion: process.versions.chrome,
+      platform: process.platform,
+      arch: process.arch,
+      locale: electronApp.getLocale(),
+    }));
+    expect(electronRuntime).toEqual({
+      electronVersion: "43.4.0",
+      chromiumVersion: "150.0.7871.224",
+      platform: process.platform,
+      arch: process.arch,
+      locale: "zh-CN",
+    });
+    const nativeScaleFactor = await app.evaluate(
+      ({ screen }) => screen.getPrimaryDisplay().scaleFactor,
+    );
+    const cdp = await page.context().newCDPSession(page);
+    await cdp.send("Emulation.setDeviceMetricsOverride", {
+      width: Math.round(width / nativeScaleFactor),
+      height: Math.round(height / nativeScaleFactor),
+      screenWidth: Math.round(width / nativeScaleFactor),
+      screenHeight: Math.round(height / nativeScaleFactor),
+      deviceScaleFactor: nativeScaleFactor,
+      mobile: false,
+    });
+    await page.addInitScript((epochMs: number) => {
+      Date.now = () => epochMs;
+      localStorage.clear();
+      const applyHarnessCss = () => {
+        document.documentElement.classList.remove("dark");
+        document.documentElement.style.colorScheme = "light";
+        if (
+          !document.querySelector('[data-visual-harness="font-and-motion"]')
+        ) {
+          const style = document.createElement("style");
+          style.dataset.visualHarness = "font-and-motion";
+          style.textContent = `
           :root, body {
             font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "PingFang SC", sans-serif !important;
           }
@@ -190,21 +193,29 @@ async function launch(scenario: VisualScenario, width: number, height: number) {
             caret-color: transparent !important;
           }
         `;
-        document.head.append(style);
+          document.head.append(style);
+        }
+      };
+      if (document.readyState === "loading") {
+        document.addEventListener("DOMContentLoaded", applyHarnessCss, {
+          once: true,
+        });
+      } else {
+        applyHarnessCss();
       }
-    };
-    if (document.readyState === "loading") {
-      document.addEventListener("DOMContentLoaded", applyHarnessCss, {
-        once: true,
-      });
-    } else {
-      applyHarnessCss();
-    }
-  }, buildVisualFixture(scenario).nowMs);
-  await page.reload();
-  await page.emulateMedia({ colorScheme: "light", reducedMotion: "reduce" });
-  await page.waitForLoadState("networkidle");
-  return { app, page };
+    }, VISUAL_NOW_MS);
+    await page.emulateMedia({ colorScheme: "light", reducedMotion: "reduce" });
+    await app.evaluate(async ({ BrowserWindow }, url) => {
+      const window = BrowserWindow.getAllWindows()[0];
+      if (!window) throw new Error("Visual BrowserWindow is unavailable");
+      await window.loadURL(url);
+    }, rendererUrl);
+    await page.waitForLoadState("networkidle");
+    return { app, page };
+  } catch (error) {
+    await app.close();
+    throw error;
+  }
 }
 
 async function assertRuntimeContract(
