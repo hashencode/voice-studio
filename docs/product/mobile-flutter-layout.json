@@ -42,11 +42,11 @@
     "files": [
       {
         "path": "apps/desktop-electron/forge.config.ts",
-        "sha256": "3fe85eeadb7208499797d7e8f74880f57c3c537f3c10ac7ba1b25cd6d58308d0"
+        "sha256": "56ec30ca077126a61e905d16255c8c649d850a21061705b5029e788e283861e9"
       },
       {
         "path": "apps/desktop-electron/package.json",
-        "sha256": "d74c0e299a2807b8883521828e2be34d2d1d95f2549aa22ac8e8916cdbc1d13d"
+        "sha256": "9457fa8cc8e714db3cea59ae57c4b698bb9977c7d6320ebe10da6086e2ed878c"
       },
       {
         "path": "apps/desktop-electron/assets/processing/frozen_sensevoice_macos_arm64.lock.json",
