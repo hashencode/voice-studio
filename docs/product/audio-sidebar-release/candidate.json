@@ -1,0 +1,186 @@
+{
+  "schema": "voice2text-audio-sidebar-candidate/v1",
+  "status": "AUTOMATED_PASS_MANUAL_PENDING",
+  "sourceRevision": "17a939231d886d6f2af1cc31843d04bfc725a1a9",
+  "candidateInputsSha256": "fa116de32f72e6d975afcbafbe0c790aa120ec3531eca6ddf19058c8476dfd62",
+  "productContractSha256": "855ed810fd56b7187f162f62d9f06460e0732ce82293622cc9da92b5c3bf58b6",
+  "preparedAt": "2026-08-18T10:25:16.860430Z",
+  "automatedFinishedAt": "2026-08-18T10:51:40.233633Z",
+  "target": {
+    "operatingSystem": "macos",
+    "operatingSystemVersion": "15.7.5",
+    "architecture": "arm64",
+    "cpuModel": "Apple M2",
+    "logicalCpuCount": 8,
+    "memoryBytes": 17179869184,
+    "sha256": "cfd5d83726fe1b3c661fa117ae85dd013076f8927c35e4068a9545774a5f8cb1"
+  },
+  "package": {
+    "path": "apps/desktop-electron/out/Voice2Text-darwin-arm64/Voice2Text.app",
+    "manifestAlgorithm": "sorted-path-mode-content-sha256/v1",
+    "manifestSha256": "a7fe3737ca96937d6911938c2d60c85014f559d4f083f301f982b51a701cf0a3",
+    "executableSha256": "cd27dd966ed763a5e4e8badc8b51a5304ea84d699dec70d706ff922b3b89e955",
+    "workerManifestSha256": "2fe297e050fa9cf1d13ce5d0d9ebb65c1b431b5df3314fe23f77b8fc3e7aa9b4"
+  },
+  "automated": [
+    {
+      "id": "build-cache-guard",
+      "command": [
+        "python3",
+        "tool/build_cache_guard.py",
+        "--wait-for-idle"
+      ],
+      "status": "PASS",
+      "elapsedMs": 112
+    },
+    {
+      "id": "electron-check",
+      "command": [
+        "bun",
+        "run",
+        "check"
+      ],
+      "status": "PASS",
+      "elapsedMs": 15269
+    },
+    {
+      "id": "package-once",
+      "command": [
+        "bun",
+        "run",
+        "package"
+      ],
+      "status": "PASS",
+      "elapsedMs": 471503
+    },
+    {
+      "id": "package-bootstrap",
+      "command": [
+        "bun",
+        "run",
+        "smoke:package"
+      ],
+      "status": "PASS",
+      "elapsedMs": 9506
+    },
+    {
+      "id": "packaged-bootstrap-test",
+      "command": [
+        "/usr/bin/env",
+        "RUN_PACKAGED_SMOKE=1",
+        "bunx",
+        "vitest",
+        "run",
+        "tests/packaged/macos_bootstrap_smoke_test.ts"
+      ],
+      "status": "PASS",
+      "elapsedMs": 4255
+    },
+    {
+      "id": "packaged-processing-test",
+      "command": [
+        "/usr/bin/env",
+        "RUN_PACKAGED_PROCESSING=1",
+        "RUN_DIRECT_PACKAGED_PROCESSING=1",
+        "bunx",
+        "vitest",
+        "run",
+        "tests/packaged/macos_processing_smoke_test.ts"
+      ],
+      "status": "PASS",
+      "elapsedMs": 506566
+    },
+    {
+      "id": "packaged-workstation-test",
+      "command": [
+        "/usr/bin/env",
+        "RUN_PACKAGED_WORKSTATION=1",
+        "bunx",
+        "vitest",
+        "run",
+        "tests/packaged/macos_local_workstation_dogfood_test.ts"
+      ],
+      "status": "PASS",
+      "elapsedMs": 339070
+    },
+    {
+      "id": "packaged-companion-test",
+      "command": [
+        "/usr/bin/env",
+        "RUN_PACKAGED_COMPANION_SMOKE=1",
+        "bunx",
+        "vitest",
+        "run",
+        "tests/packaged/macos_companion_smoke_test.ts"
+      ],
+      "status": "PASS",
+      "elapsedMs": 17585
+    },
+    {
+      "id": "packaged-capture-test",
+      "command": [
+        "/usr/bin/env",
+        "RUN_PACKAGED_CAPTURE_INITIALIZE_ONLY=0",
+        "RUN_PACKAGED_CAPTURE_SMOKE=1",
+        "bunx",
+        "vitest",
+        "run",
+        "tests/packaged/macos_capture_recovery_smoke_test.ts"
+      ],
+      "status": "PASS",
+      "elapsedMs": 12334
+    },
+    {
+      "id": "packaged-live-caption-test",
+      "command": [
+        "/usr/bin/env",
+        "RUN_PACKAGED_LIVE_CAPTION=1",
+        "bunx",
+        "vitest",
+        "run",
+        "tests/packaged/macos_live_caption_worker_smoke_test.ts"
+      ],
+      "status": "PASS",
+      "elapsedMs": 4000
+    },
+    {
+      "id": "packaged-caption-formal-test",
+      "command": [
+        "/usr/bin/env",
+        "RUN_PACKAGED_CAPTION_FORMAL=1",
+        "bunx",
+        "vitest",
+        "run",
+        "tests/packaged/macos_caption_formal_smoke_test.ts"
+      ],
+      "status": "PASS",
+      "elapsedMs": 196778
+    },
+    {
+      "id": "packaged-ai-boundary-test",
+      "command": [
+        "/usr/bin/env",
+        "RUN_PACKAGED_AI_BOUNDARY=1",
+        "bunx",
+        "vitest",
+        "run",
+        "tests/packaged/macos_ai_boundary_smoke_test.ts"
+      ],
+      "status": "PASS",
+      "elapsedMs": 4282
+    },
+    {
+      "id": "packaged-native-security-test",
+      "command": [
+        "/usr/bin/env",
+        "RUN_PACKAGED_NATIVE_SECURITY_SMOKE=1",
+        "bunx",
+        "vitest",
+        "run",
+        "tests/packaged/macos_native_security_helper_smoke_test.ts"
+      ],
+      "status": "PASS",
+      "elapsedMs": 1274
+    }
+  ]
+}
