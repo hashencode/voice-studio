@@ -16,7 +16,6 @@ import {
   type CompanionRouteController,
   useCompanionRouteController,
 } from "@/features/companion/companion-feature";
-import { ContextPaneShell } from "@/features/shell/context-pane-shell";
 import type { RendererShellSection } from "@/features/shell/context-pane-contract";
 import { useContextPaneShell } from "@/features/shell/use-context-pane-shell";
 import {
@@ -77,24 +76,29 @@ export default function App() {
   if (!snapshot) return <LoadingShell />;
 
   return (
-    <SidebarProvider>
-      <AppSidebar current={current} onNavigate={navigate} />
-      {pane.paneSection && pane.open ? (
-        <ContextPaneShell
-          section={pane.paneSection}
-          presentation={pane.presentation}
-          triggerRef={paneTriggerRef}
-          onRequestClose={pane.requestClose}
-        >
-          {pane.paneSection === "audio" ? (
-            <AudioContextPane controller={audio} />
-          ) : (
-            <CompanionContextPane controller={companion} />
-          )}
-        </ContextPaneShell>
-      ) : null}
+    <SidebarProvider
+      open={pane.open && pane.presentation === "docked"}
+      persistState={false}
+      enableKeyboardShortcut={false}
+      style={{ "--sidebar-width": "350px" } as React.CSSProperties}
+    >
+      <AppSidebar
+        current={current}
+        onNavigate={navigate}
+        paneSection={pane.paneSection}
+        paneOpen={pane.open}
+        panePresentation={pane.presentation}
+        paneTriggerRef={paneTriggerRef}
+        onRequestPaneClose={pane.requestClose}
+      >
+        {pane.paneSection === "audio" ? (
+          <AudioContextPane controller={audio} />
+        ) : pane.paneSection === "companion" ? (
+          <CompanionContextPane controller={companion} />
+        ) : null}
+      </AppSidebar>
       <SidebarInset>
-        <header className="flex min-h-16 shrink-0 flex-wrap items-center gap-3 border-b px-4 py-2">
+        <header className="sticky top-0 z-10 flex min-h-16 shrink-0 flex-wrap items-center gap-3 border-b bg-background px-4 py-2">
           {pane.paneSection ? (
             <ContextPaneTrigger
               ref={paneTriggerRef}
@@ -108,7 +112,7 @@ export default function App() {
           </p>
         </header>
         {snapshot.connectivity === "offline" ? <OfflineBanner /> : null}
-        <main
+        <div
           id="main-content"
           data-context-pane-background="true"
           className="flex-1 overflow-auto p-4 sm:p-6"
@@ -133,7 +137,7 @@ export default function App() {
             onOpenAudioPane={pane.openPane}
             onOpenCompanionPane={pane.openPane}
           />
-        </main>
+        </div>
       </SidebarInset>
       <CaptureWorkspace
         capture={snapshot.capture}

@@ -215,7 +215,21 @@ describe("sidebar navigation e2e", () => {
     const pane = await screen.findByRole("complementary", {
       name: "音频上下文面板",
     });
+    const wrapper = document.querySelector<HTMLElement>(
+      '[data-slot="sidebar-wrapper"]',
+    )!;
+    const outer = wrapper.querySelector<HTMLElement>(
+      ':scope > [data-slot="sidebar"]',
+    )!;
+    const container = outer.querySelector<HTMLElement>(
+      ':scope > [data-slot="sidebar-container"]',
+    )!;
     expect(pane).toHaveAttribute("data-presentation", "overlay");
+    expect(outer).toHaveAttribute("data-state", "collapsed");
+    expect(container).toHaveAttribute("data-presentation", "overlay");
+    expect(container).toHaveClass(
+      "data-[presentation=overlay]:!w-(--sidebar-width)",
+    );
     expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
     expect(
       screen.getByRole("navigation", { name: "工作站主导航" }),
@@ -231,11 +245,15 @@ describe("sidebar navigation e2e", () => {
     await waitFor(() =>
       expect(pane).toHaveAttribute("data-presentation", "docked"),
     );
+    expect(outer).toHaveAttribute("data-state", "expanded");
+    expect(container).toHaveAttribute("data-presentation", "docked");
     window.innerWidth = 880;
     window.dispatchEvent(new Event("resize"));
     await waitFor(() =>
       expect(pane).toHaveAttribute("data-presentation", "overlay"),
     );
+    expect(outer).toHaveAttribute("data-state", "collapsed");
+    expect(api.listAudios).toHaveBeenCalledTimes(1);
     expect(writes).not.toHaveBeenCalled();
 
     const settings = screen.getByRole("button", { name: "设置" });

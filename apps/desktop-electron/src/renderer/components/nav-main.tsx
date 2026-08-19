@@ -2,7 +2,10 @@ import * as React from "react";
 import type { LucideIcon } from "lucide-react";
 
 import {
+  SidebarContent,
+  SidebarFooter,
   SidebarGroup,
+  SidebarGroupContent,
   SidebarGroupLabel,
   SidebarMenu,
   SidebarMenuButton,
@@ -32,6 +35,8 @@ export function NavMain({
     0,
     items.findIndex((item) => item.section === (rovingSection ?? current)),
   );
+  const primaryItems = items.filter((item) => item.section !== "settings");
+  const settingsItem = items.find((item) => item.section === "settings");
 
   const handleKeyDown = (
     event: React.KeyboardEvent<HTMLButtonElement>,
@@ -51,35 +56,49 @@ export function NavMain({
     buttons.current[target]?.focus();
   };
 
+  const renderItem = (item: ShellNavigationItem) => {
+    const index = items.indexOf(item);
+    return (
+      <SidebarMenuItem key={item.section}>
+        <SidebarMenuButton
+          ref={(node) => {
+            buttons.current[index] = node;
+          }}
+          type="button"
+          tooltip={{ children: item.title, hidden: false }}
+          isActive={current === item.section}
+          tabIndex={rovingIndex === index ? 0 : -1}
+          aria-current={current === item.section ? "page" : undefined}
+          aria-label={item.title}
+          className="mx-auto size-10 justify-center p-0"
+          onClick={() => {
+            setRovingSection(item.section);
+            onNavigate(item.section);
+          }}
+          onKeyDown={(event) => handleKeyDown(event, index)}
+        >
+          <item.icon aria-hidden="true" />
+          <span className="sr-only">{item.title}</span>
+        </SidebarMenuButton>
+      </SidebarMenuItem>
+    );
+  };
+
   return (
-    <SidebarGroup>
-      <SidebarGroupLabel className="sr-only">工作台</SidebarGroupLabel>
-      <SidebarMenu>
-        {items.map((item, index) => (
-          <SidebarMenuItem key={item.section}>
-            <SidebarMenuButton
-              ref={(node) => {
-                buttons.current[index] = node;
-              }}
-              type="button"
-              tooltip={{ children: item.title, hidden: false }}
-              isActive={current === item.section}
-              tabIndex={rovingIndex === index ? 0 : -1}
-              aria-current={current === item.section ? "page" : undefined}
-              aria-label={item.title}
-              className="mx-auto size-10 justify-center p-0"
-              onClick={() => {
-                setRovingSection(item.section);
-                onNavigate(item.section);
-              }}
-              onKeyDown={(event) => handleKeyDown(event, index)}
-            >
-              <item.icon aria-hidden="true" />
-              <span className="sr-only">{item.title}</span>
-            </SidebarMenuButton>
-          </SidebarMenuItem>
-        ))}
-      </SidebarMenu>
-    </SidebarGroup>
+    <>
+      <SidebarContent>
+        <SidebarGroup>
+          <SidebarGroupLabel className="sr-only">工作台</SidebarGroupLabel>
+          <SidebarGroupContent className="px-1.5 md:px-0">
+            <SidebarMenu>{primaryItems.map(renderItem)}</SidebarMenu>
+          </SidebarGroupContent>
+        </SidebarGroup>
+      </SidebarContent>
+      {settingsItem ? (
+        <SidebarFooter>
+          <SidebarMenu>{renderItem(settingsItem)}</SidebarMenu>
+        </SidebarFooter>
+      ) : null}
+    </>
   );
 }

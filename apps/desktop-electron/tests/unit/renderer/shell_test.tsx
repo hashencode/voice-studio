@@ -6,6 +6,7 @@ import { createRef } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import App from "../../../src/renderer/App";
+import { SidebarProvider } from "../../../src/renderer/components/ui/sidebar";
 import { ContextPaneShell } from "../../../src/renderer/features/shell/context-pane-shell";
 import type {
   ApplicationSnapshot,
@@ -119,6 +120,113 @@ function testAiSettings() {
 }
 
 describe("application shell", () => {
+  it("uses the official nested sidebar-09 shell geometry and landmarks", async () => {
+    const api = installApi(readySnapshot);
+    const user = userEvent.setup();
+    render(<App />);
+
+    await screen.findByRole("heading", { name: "音频", level: 1 });
+
+    const wrapper = document.querySelector<HTMLElement>(
+      '[data-slot="sidebar-wrapper"]',
+    );
+    expect(wrapper).not.toBeNull();
+    expect(wrapper!.style.getPropertyValue("--sidebar-width")).toBe("350px");
+
+    const outer = wrapper!.querySelector<HTMLElement>(
+      ':scope > [data-slot="sidebar"]',
+    );
+    expect(outer).toHaveAttribute("data-state", "expanded");
+    expect(outer).toHaveAttribute("data-collapsible", "");
+
+    const container = outer!.querySelector<HTMLElement>(
+      ':scope > [data-slot="sidebar-container"]',
+    );
+    expect(container).toHaveAttribute("data-presentation", "docked");
+    expect(container).toHaveClass("overflow-hidden");
+
+    const inner = container!.querySelector<HTMLElement>(
+      ':scope > [data-slot="sidebar-inner"]',
+    );
+    const nestedSidebars = inner!.querySelectorAll<HTMLElement>(
+      ':scope > [data-slot="sidebar"]',
+    );
+    expect(nestedSidebars).toHaveLength(2);
+
+    const navigation = screen.getByRole("navigation", {
+      name: "工作站主导航",
+    });
+    expect(navigation).toBe(nestedSidebars[0]);
+    expect(navigation).toHaveClass(
+      "w-[calc(var(--sidebar-width-icon)+1px)]!",
+      "border-r",
+    );
+    expect(
+      within(navigation)
+        .getByTestId("application-mark")
+        .closest('[data-slot="sidebar-header"]'),
+    ).not.toBeNull();
+    expect(
+      within(navigation)
+        .getByRole("button", { name: "设置" })
+        .closest('[data-slot="sidebar-footer"]'),
+    ).not.toBeNull();
+    expect(
+      within(navigation)
+        .getByRole("button", { name: "音频" })
+        .closest('[data-slot="sidebar-content"]'),
+    ).not.toBeNull();
+    expect(
+      within(navigation)
+        .getByRole("button", { name: "互联" })
+        .closest('[data-slot="sidebar-content"]'),
+    ).not.toBeNull();
+
+    const pane = screen.getByRole("complementary", {
+      name: "音频上下文面板",
+    });
+    expect(pane).toBe(nestedSidebars[1]);
+    expect(pane).toHaveAttribute("data-presentation", "docked");
+
+    const mains = screen.getAllByRole("main");
+    expect(mains).toHaveLength(1);
+    expect(mains[0]!).toHaveAttribute("data-slot", "sidebar-inset");
+    expect(document.getElementById("main-content")?.tagName).toBe("DIV");
+    expect(mains[0]!.querySelector("header")).toHaveClass(
+      "sticky",
+      "top-0",
+      "border-b",
+      "bg-background",
+    );
+
+    await user.click(within(navigation).getByRole("button", { name: "设置" }));
+    await waitFor(() => expect(api.navigate).toHaveBeenCalledWith("settings"));
+    expect(outer).toHaveAttribute("data-state", "collapsed");
+    expect(
+      inner!.querySelectorAll(':scope > [data-slot="sidebar"]'),
+    ).toHaveLength(1);
+  });
+
+  it("does not expose the Sidebar cookie or Meta/Ctrl+B state authority", async () => {
+    installApi(readySnapshot);
+    render(<App />);
+    const pane = await screen.findByRole("complementary", {
+      name: "音频上下文面板",
+    });
+    const event = new KeyboardEvent("keydown", {
+      key: "b",
+      ctrlKey: true,
+      bubbles: true,
+      cancelable: true,
+    });
+
+    window.dispatchEvent(event);
+
+    expect(event.defaultPrevented).toBe(false);
+    expect(pane).toBeVisible();
+    expect(document.cookie).not.toContain("sidebar_state=");
+  });
+
   it("restores navigation and keeps capture in an application-owned overlay", async () => {
     const api = installApi(readySnapshot);
     const user = userEvent.setup();
@@ -225,7 +333,7 @@ describe("application shell", () => {
     const triggerRef = createRef<HTMLButtonElement>();
     const user = userEvent.setup();
     render(
-      <>
+      <SidebarProvider persistState={false} enableKeyboardShortcut={false}>
         <button ref={triggerRef} type="button">
           trigger
         </button>
@@ -237,7 +345,7 @@ describe("application shell", () => {
         >
           <button type="button">选择音频 A</button>
         </ContextPaneShell>
-      </>,
+      </SidebarProvider>,
     );
 
     await user.click(screen.getByRole("button", { name: "选择音频 A" }));

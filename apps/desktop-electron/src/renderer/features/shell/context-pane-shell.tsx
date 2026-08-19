@@ -2,12 +2,16 @@ import * as React from "react";
 import { X } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
+import {
+  Sidebar,
+  SidebarContent,
+  SidebarHeader,
+} from "@/components/ui/sidebar";
 import type {
   ContextPaneCloseReason,
   ContextPanePresentation,
   ContextPaneSection,
 } from "@/features/shell/context-pane-contract";
-import { cn } from "@/lib/utils";
 
 export function ContextPaneShell({
   section,
@@ -42,16 +46,14 @@ export function ContextPaneShell({
   }, [close]);
 
   return (
-    <aside
+    <Sidebar
+      collapsible="none"
       role="complementary"
       aria-label={`${label}上下文面板`}
       data-presentation={presentation}
-      className={cn(
-        "flex h-svh w-72 shrink-0 flex-col border-r bg-card",
-        presentation === "overlay" && "fixed inset-y-0 left-16 z-20 shadow-xl",
-      )}
+      className="min-w-0 flex-1"
     >
-      <div className="flex min-h-16 items-center justify-between gap-3 border-b px-4">
+      <SidebarHeader className="flex min-h-16 flex-row items-center justify-between gap-3 border-b px-4">
         <h2 className="font-semibold">{label}</h2>
         <Button
           type="button"
@@ -62,27 +64,8 @@ export function ContextPaneShell({
         >
           <X aria-hidden="true" />
         </Button>
-      </div>
-      <div className="min-h-0 flex-1 overflow-auto p-4">{children}</div>
-    </aside>
-  );
-}
-
-export function ContextPanePlaceholder({
-  section,
-}: {
-  section: ContextPaneSection;
-}) {
-  return (
-    <div className="space-y-2 text-sm">
-      <p className="font-medium">
-        {section === "audio" ? "音频列表" : "已信任设备"}
-      </p>
-      <p className="text-muted-foreground">
-        {section === "audio"
-          ? "音频列表与处理状态将在此显示。"
-          : "设备列表与配对入口将在此显示。"}
-      </p>
-    </div>
+      </SidebarHeader>
+      <SidebarContent className="p-4">{children}</SidebarContent>
+    </Sidebar>
   );
 }
