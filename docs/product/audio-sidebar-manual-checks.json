@@ -7,12 +7,24 @@
       "requirement": "旧开发数据库归档提示真实，fresh Audio 数据库打开且旧内容未加载"
     },
     {
-      "id": "rail-pane-preferences",
-      "requirement": "音频 / 互联 / 设置可由键盘与 VoiceOver 识别，两个 pane 偏好独立且导航/重启恢复"
+      "id": "sidebar09-side-by-side",
+      "requirement": "与固定提交 25be24cca34d06eed29a4779c3f48c4816aa812c 的官方 sidebar-09 demo 并排检查，全高 rail、嵌套第二栏、inset header、密度和 token 语法一致；Voice2Text 业务内容差异已明确"
     },
     {
-      "id": "narrow-focus-recovery",
-      "requirement": "880 px 非模态 drawer 保持 rail、capture、recovery、关闭与目标焦点可达"
+      "id": "desktop-shell-geometry",
+      "requirement": "1240 x 820 下 wrapper、rail 和第二栏占满视口高度，展开侧栏总宽 350 px、rail 内容 48 px 加 1 px 分隔、第二栏 301 px，关闭后主区从 48 px 开始"
+    },
+    {
+      "id": "context-pane-row-treatment",
+      "requirement": "Audio 和 Companion 第二栏使用固定 header、独立滚动内容和全宽扁平分隔行，不出现旧的圆角卡片列表或阴影堆叠"
+    },
+    {
+      "id": "controls-and-focus-states",
+      "requirement": "Select、Slider、Switch、Checkbox、Progress、Textarea 和 Card 的正常、键盘焦点、禁用及错误状态采用 shadcn 语法，pane 关闭后焦点回到对应 trigger"
+    },
+    {
+      "id": "narrow-capture-reachability",
+      "requirement": "880 x 620 非模态 overlay 保持 48 px rail gap，capture/recovery 控制器距右下各 16 px、完全位于视口内且内部可滚动；背景、Escape 和关闭按钮均可关闭并恢复目标焦点"
     },
     {
       "id": "audio-workflow",

@@ -310,6 +310,20 @@ class AudioSidebarReleaseCandidateTest(unittest.TestCase):
             },
         )
 
+    def test_prepare_runs_renderer_visual_gate_before_packaging(self) -> None:
+        commands = {
+            identifier: (tuple(command), cwd)
+            for identifier, command, cwd in MODULE.PREPARE_COMMANDS
+        }
+        self.assertEqual(
+            commands["renderer-visual"],
+            (("bun", "run", "test:visual"), MODULE.ELECTRON_ROOT),
+        )
+        self.assertLess(
+            [item[0] for item in MODULE.PREPARE_COMMANDS].index("renderer-visual"),
+            [item[0] for item in MODULE.PREPARE_COMMANDS].index("package-once"),
+        )
+
     def test_candidate_automated_results_exactly_match_prepare_commands(self) -> None:
         candidate = self._prepared_candidate()
         with patch.object(

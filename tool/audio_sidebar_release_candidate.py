@@ -52,6 +52,7 @@ PREPARE_COMMANDS = (
         ROOT,
     ),
     ("electron-check", ("bun", "run", "check"), ELECTRON_ROOT),
+    ("renderer-visual", ("bun", "run", "test:visual"), ELECTRON_ROOT),
     ("package-once", ("bun", "run", "package"), ELECTRON_ROOT),
     ("package-bootstrap", ("bun", "run", "smoke:package"), ELECTRON_ROOT),
     (
