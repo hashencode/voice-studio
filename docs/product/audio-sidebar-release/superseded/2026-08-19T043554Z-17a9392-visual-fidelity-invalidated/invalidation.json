@@ -1,0 +1,13 @@
+{
+  "schema": "voice2text-audio-sidebar-candidate-invalidation/v1",
+  "status": "SUPERSEDED_VISUAL_FIDELITY_INVALIDATED",
+  "sourceRevision": "17a939231d886d6f2af1cc31843d04bfc725a1a9",
+  "invalidatedAt": "2026-08-19T04:35:54Z",
+  "reason": "The candidate preserved Voice2Text behavior but materially diverged from the pinned official shadcn sidebar-09 composition and visual grammar. Its receipts remain immutable history and are not eligible as current visual-fidelity evidence.",
+  "receipts": {
+    "candidate.json": "8e22b233d7113f0480494ad94e198189c19967106b5e2c8f03fd56eb47a36138",
+    "manual.json": "d2c6d4737704c1869a1a3d84d1109eb94d3edeec40a5acbc46e7de8baa4c0ba8",
+    "final.json": "0aa01aae0994e0a605fef2aaaf1b097042d67787382469ff5cf1a048e551f236"
+  },
+  "eligibleAsCurrentEvidence": false
+}
