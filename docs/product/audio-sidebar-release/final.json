@@ -1,0 +1,13 @@
+{
+  "schema": "voice2text-audio-sidebar-final/v1",
+  "status": "PASS",
+  "sourceRevision": "767cecd395a9b71c08733dea2de6909b47ee386f",
+  "candidateInputsSha256": "fe7703fd35ea8fb9cdfb99d0c6eb64ba4b71864ec1b0a19ab411ccb3f0fd962b",
+  "productContractSha256": "855ed810fd56b7187f162f62d9f06460e0732ce82293622cc9da92b5c3bf58b6",
+  "packageManifestSha256": "8b279e9eef867b28efc7e7a6eb9da9573aeaf3b7d831c436c283c41697e82419",
+  "targetSha256": "cfd5d83726fe1b3c661fa117ae85dd013076f8927c35e4068a9545774a5f8cb1",
+  "candidateReceiptSha256": "01cf1e40943cd5d7d478920f5209aed5bcb3b36072b446bf6431cc9fb66e53de",
+  "manualReceiptSha256": "4df64f6d91d59552be0c1ce9e340149bbc9dc1c307f7ddb982e624d5112a9905",
+  "finalizedAt": "2026-08-19T09:28:03.777609Z",
+  "rebuildPerformed": false
+}
