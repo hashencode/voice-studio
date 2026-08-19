@@ -12,6 +12,7 @@ export default tseslint.config(
       "node_modules/**",
       "out/**",
       "resources/worker/**",
+      "tests/visual/.harness-build/**",
     ],
   },
   js.configs.recommended,

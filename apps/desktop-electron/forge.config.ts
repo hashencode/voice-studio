@@ -11,6 +11,7 @@ const config: ForgeConfig = {
     appBundleId: "com.voice2text.desktop",
     appCategoryType: "public.app-category.productivity",
     asar: true,
+    ignore: [/^\/tests\/visual(?:\/|$)/],
     executableName: "Voice2Text",
     extendInfo: {
       NSMicrophoneUsageDescription:

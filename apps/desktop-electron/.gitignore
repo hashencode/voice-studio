@@ -6,3 +6,5 @@ resources/native/
 resources/worker/
 *.log
 *.tsbuildinfo
+test-results/
+tests/visual/.harness-build/

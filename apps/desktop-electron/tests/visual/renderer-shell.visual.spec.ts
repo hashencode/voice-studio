@@ -1,0 +1,465 @@
+import path from "node:path";
+
+import { _electron as electron, expect, test } from "@playwright/test";
+import electronExecutable from "electron";
+
+import {
+  buildVisualFixture,
+  type VisualScenario,
+} from "./fixtures/renderer-api";
+
+const harnessMain = path.resolve("tests/visual/.harness-build/main.js");
+const harnessPreload = path.resolve("tests/visual/.harness-build/preload.js");
+const rendererUrl = "http://127.0.0.1:4179";
+const expectedFontStack =
+  '-apple-system, "system-ui", "SF Pro Text", "PingFang SC", sans-serif';
+const canonicalScreenshots =
+  process.platform === "darwin" && process.arch === "arm64";
+
+test.describe("sidebar-09 production Renderer", () => {
+  test("1240x820 Audio open, selected, active capture", async () => {
+    const session = await launch("audio-active", 1240, 820);
+    try {
+      const { page } = session;
+      await expect(
+        page.getByRole("heading", { name: "音频", level: 1 }),
+      ).toBeVisible();
+      await page.getByRole("button", { name: /打开 产品设计评审/ }).click();
+      await expect(
+        page.getByRole("heading", { name: "产品设计评审.wav" }),
+      ).toBeVisible();
+      await expect(
+        page.getByRole("status", { name: "录制状态" }),
+      ).toContainText("正在录制");
+
+      await assertRuntimeContract(page, 1240, 820);
+      await assertDockedGeometry(page, 1240, 820);
+      await assertFlatRows(page, "音频列表");
+      await assertCaptureContainment(page, 1240, 820, false);
+      await screenshot(
+        session,
+        "audio-open-selected-active-capture.png",
+        1240,
+        820,
+      );
+    } finally {
+      await session.app.close();
+    }
+  });
+
+  test("1240x820 Audio pane closed", async () => {
+    const session = await launch("audio-closed", 1240, 820);
+    try {
+      const { page } = session;
+      await expect(
+        page.getByRole("heading", { name: "音频", level: 1 }),
+      ).toBeVisible();
+      await page.getByRole("button", { name: "关闭音频上下文面板" }).click();
+      await expect(
+        page.getByRole("complementary", { name: "音频上下文面板" }),
+      ).toHaveCount(0);
+
+      await assertRuntimeContract(page, 1240, 820);
+      await assertRailOnlyGeometry(page, 1240, 820);
+      await screenshot(session, "audio-pane-closed.png", 1240, 820);
+    } finally {
+      await session.app.close();
+    }
+  });
+
+  test("1240x820 Settings", async () => {
+    const session = await launch("settings", 1240, 820);
+    try {
+      const { page } = session;
+      await expect(
+        page.getByRole("heading", { name: "设置", level: 1 }),
+      ).toBeVisible();
+      await assertRuntimeContract(page, 1240, 820);
+      await assertRailOnlyGeometry(page, 1240, 820);
+      await screenshot(session, "settings.png", 1240, 820);
+    } finally {
+      await session.app.close();
+    }
+  });
+
+  test("880x620 Audio overlay with capture recovery and internal scroll", async () => {
+    const session = await launch("audio-recovery", 880, 620);
+    try {
+      const { page } = session;
+      await expect(
+        page.getByRole("heading", { name: "音频", level: 1 }),
+      ).toBeVisible();
+      await expect(
+        page.getByRole("heading", { name: "发现可恢复录制" }),
+      ).toBeVisible();
+      await page.getByRole("button", { name: "管理恢复录制" }).first().click();
+
+      await assertRuntimeContract(page, 880, 620);
+      await assertOverlayGeometry(page, 880, 620);
+      await assertFlatRows(page, "音频列表");
+      await assertCaptureContainment(page, 880, 620, true);
+      await screenshot(session, "audio-overlay-capture-recovery.png", 880, 620);
+    } finally {
+      await session.app.close();
+    }
+  });
+
+  test("1240x820 Companion with multiple devices", async () => {
+    const session = await launch("companion-devices", 1240, 820);
+    try {
+      const { page } = session;
+      const pane = page.getByRole("complementary", { name: "互联上下文面板" });
+      await expect(
+        pane.getByRole("button", { name: /Studio 的 iPhone/ }),
+      ).toBeVisible();
+      await expect(
+        pane.getByRole("button", { name: /外勤录音机/ }),
+      ).toBeVisible();
+      await pane.getByRole("button", { name: /Studio 的 iPhone/ }).click();
+      await expect(
+        page.getByRole("heading", { name: "Studio 的 iPhone", level: 2 }),
+      ).toBeVisible();
+
+      await assertRuntimeContract(page, 1240, 820);
+      await assertDockedGeometry(page, 1240, 820);
+      await assertFlatRows(page, "已信任设备列表");
+      await screenshot(session, "companion-multiple-devices.png", 1240, 820);
+    } finally {
+      await session.app.close();
+    }
+  });
+});
+
+async function launch(scenario: VisualScenario, width: number, height: number) {
+  const app = await electron.launch({
+    executablePath: electronExecutable as unknown as string,
+    args: [harnessMain],
+    env: {
+      ...process.env,
+      ELECTRON_DISABLE_SECURITY_WARNINGS: "true",
+      VOICE2TEXT_VISUAL_FIXTURE: JSON.stringify(buildVisualFixture(scenario)),
+      VOICE2TEXT_VISUAL_HEIGHT: String(height),
+      VOICE2TEXT_VISUAL_PRELOAD: harnessPreload,
+      VOICE2TEXT_VISUAL_RENDERER_URL: rendererUrl,
+      VOICE2TEXT_VISUAL_WIDTH: String(width),
+    },
+  });
+  const page = await app.firstWindow();
+  const electronRuntime = await app.evaluate(({ app: electronApp }) => ({
+    electronVersion: process.versions.electron,
+    chromiumVersion: process.versions.chrome,
+    platform: process.platform,
+    arch: process.arch,
+    locale: electronApp.getLocale(),
+  }));
+  expect(electronRuntime).toEqual({
+    electronVersion: "43.4.0",
+    chromiumVersion: "150.0.7871.224",
+    platform: process.platform,
+    arch: process.arch,
+    locale: "zh-CN",
+  });
+  const nativeScaleFactor = await app.evaluate(
+    ({ screen }) => screen.getPrimaryDisplay().scaleFactor,
+  );
+  const cdp = await page.context().newCDPSession(page);
+  await cdp.send("Emulation.setDeviceMetricsOverride", {
+    width: Math.round(width / nativeScaleFactor),
+    height: Math.round(height / nativeScaleFactor),
+    screenWidth: Math.round(width / nativeScaleFactor),
+    screenHeight: Math.round(height / nativeScaleFactor),
+    deviceScaleFactor: nativeScaleFactor,
+    mobile: false,
+  });
+  await page.addInitScript((epochMs: number) => {
+    Date.now = () => epochMs;
+    localStorage.clear();
+    const applyHarnessCss = () => {
+      document.documentElement.classList.remove("dark");
+      document.documentElement.style.colorScheme = "light";
+      if (!document.querySelector('[data-visual-harness="font-and-motion"]')) {
+        const style = document.createElement("style");
+        style.dataset.visualHarness = "font-and-motion";
+        style.textContent = `
+          :root, body {
+            font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "PingFang SC", sans-serif !important;
+          }
+          *, *::before, *::after {
+            animation: none !important;
+            transition: none !important;
+            caret-color: transparent !important;
+          }
+        `;
+        document.head.append(style);
+      }
+    };
+    if (document.readyState === "loading") {
+      document.addEventListener("DOMContentLoaded", applyHarnessCss, {
+        once: true,
+      });
+    } else {
+      applyHarnessCss();
+    }
+  }, buildVisualFixture(scenario).nowMs);
+  await page.reload();
+  await page.emulateMedia({ colorScheme: "light", reducedMotion: "reduce" });
+  await page.waitForLoadState("networkidle");
+  return { app, page };
+}
+
+async function assertRuntimeContract(
+  page: Awaited<ReturnType<typeof launch>>["page"],
+  width: number,
+  height: number,
+) {
+  const runtime = await page.evaluate(() => ({
+    width: window.innerWidth,
+    height: window.innerHeight,
+    dpr: window.devicePixelRatio,
+    language: navigator.language,
+    colorScheme: getComputedStyle(document.documentElement).colorScheme,
+    reducedMotion: matchMedia("(prefers-reduced-motion: reduce)").matches,
+    fontFamily: getComputedStyle(document.body).fontFamily,
+    frozenNow: Date.now(),
+  }));
+  expect(runtime).toEqual({
+    width,
+    height,
+    dpr: 1,
+    language: "zh-CN",
+    colorScheme: "light",
+    reducedMotion: true,
+    fontFamily: expectedFontStack,
+    frozenNow: Date.UTC(2026, 7, 19, 3, 20, 0),
+  });
+}
+
+async function assertDockedGeometry(
+  page: Awaited<ReturnType<typeof launch>>["page"],
+  width: number,
+  height: number,
+) {
+  const geometry = await shellGeometry(page);
+  expectRect(geometry.wrapper, { x: 0, y: 0, width, height });
+  expectHorizontalRect(geometry.gap, { x: 0, width: 350 });
+  expectRect(geometry.container, { x: 0, y: 0, width: 350, height });
+  expectRect(geometry.rail, { x: 0, y: 0, width: 49, height });
+  expectWithin(geometry.railContentWidth, 48);
+  expectWithin(geometry.railBorderRight, 1);
+  if (!geometry.pane) throw new Error("Expected a docked context pane");
+  expectRect(geometry.pane, { x: 49, y: 0, width: 301, height });
+  expectWithin(geometry.inset.x, 350);
+  expectWithin(geometry.inset.width, width - 350);
+}
+
+async function assertRailOnlyGeometry(
+  page: Awaited<ReturnType<typeof launch>>["page"],
+  width: number,
+  height: number,
+) {
+  await expect
+    .poll(async () => {
+      const geometry = await shellGeometry(page);
+      return Math.abs(geometry.gap.width - 48);
+    })
+    .toBeLessThanOrEqual(1);
+  const geometry = await shellGeometry(page);
+  expectRect(geometry.wrapper, { x: 0, y: 0, width, height });
+  expectHorizontalRect(geometry.gap, { x: 0, width: 48 });
+  expectRect(geometry.container, { x: 0, y: 0, width: 48, height });
+  expectRect(geometry.rail, { x: 0, y: 0, width: 49, height });
+  expectWithin(geometry.railContentWidth, 48);
+  expectWithin(geometry.railBorderRight, 1);
+  expect(geometry.pane).toBeNull();
+  expectWithin(geometry.inset.x, 48);
+  expectWithin(geometry.inset.width, width - 48);
+}
+
+async function assertOverlayGeometry(
+  page: Awaited<ReturnType<typeof launch>>["page"],
+  width: number,
+  height: number,
+) {
+  const geometry = await shellGeometry(page);
+  expectRect(geometry.wrapper, { x: 0, y: 0, width, height });
+  expectHorizontalRect(geometry.gap, { x: 0, width: 48 });
+  expectRect(geometry.container, { x: 0, y: 0, width: 350, height });
+  expectRect(geometry.rail, { x: 0, y: 0, width: 49, height });
+  if (!geometry.pane) throw new Error("Expected an overlay context pane");
+  expectRect(geometry.pane, { x: 49, y: 0, width: 301, height });
+  expectWithin(geometry.inset.x, 48);
+  expectWithin(geometry.inset.width, width - 48);
+  expect(geometry.pane!.right).toBeLessThanOrEqual(geometry.inset.right);
+}
+
+async function assertFlatRows(
+  page: Awaited<ReturnType<typeof launch>>["page"],
+  label: string,
+) {
+  const list = page.getByRole("list", { name: label });
+  await expect(list).toHaveAttribute("data-flat-row-list", "true");
+  const rows = list.locator('[data-flat-row="true"]');
+  expect(await rows.count()).toBeGreaterThan(1);
+  const styles = await rows.evaluateAll((elements) =>
+    elements.map((element) => {
+      const style = getComputedStyle(element);
+      return {
+        borderRadius: style.borderRadius,
+        boxShadow: style.boxShadow,
+      };
+    }),
+  );
+  for (const style of styles) {
+    expect(parseFloat(style.borderRadius) || 0).toBeLessThanOrEqual(1);
+    expect(style.boxShadow).toBe("none");
+  }
+}
+
+async function assertCaptureContainment(
+  page: Awaited<ReturnType<typeof launch>>["page"],
+  width: number,
+  height: number,
+  mustScroll: boolean,
+) {
+  const capture = page.getByRole("complementary", { name: "录制工作区" });
+  const metrics = await capture.evaluate((element) => {
+    const rect = element.getBoundingClientRect();
+    const style = getComputedStyle(element);
+    return {
+      rect: toPlainRect(rect),
+      clientHeight: element.clientHeight,
+      scrollHeight: element.scrollHeight,
+      overflowY: style.overflowY,
+      zIndex: Number(style.zIndex),
+    };
+
+    function toPlainRect(value: DOMRect) {
+      return {
+        x: value.x,
+        y: value.y,
+        width: value.width,
+        height: value.height,
+        right: value.right,
+        bottom: value.bottom,
+      };
+    }
+  });
+  expectWithin(metrics.rect.right, width - 16);
+  expectWithin(metrics.rect.bottom, height - 16);
+  expectWithin(metrics.rect.width, 384);
+  expect(metrics.rect.height).toBeLessThanOrEqual(height - 32 + 1);
+  expect(metrics.rect.x).toBeGreaterThanOrEqual(0);
+  expect(metrics.rect.y).toBeGreaterThanOrEqual(0);
+  expect(metrics.overflowY).toBe("auto");
+  expect(metrics.zIndex).toBe(30);
+  if (mustScroll)
+    expect(metrics.scrollHeight).toBeGreaterThan(metrics.clientHeight);
+}
+
+async function shellGeometry(page: Awaited<ReturnType<typeof launch>>["page"]) {
+  return await page.evaluate(() => {
+    const wrapper = required('[data-slot="sidebar-wrapper"]');
+    const outer = required(':scope > [data-slot="sidebar"]', wrapper);
+    const gap = required(':scope > [data-slot="sidebar-gap"]', outer);
+    const container = required(
+      ':scope > [data-slot="sidebar-container"]',
+      outer,
+    );
+    const inner = required(':scope > [data-slot="sidebar-inner"]', container);
+    const nested = Array.from(
+      inner.querySelectorAll<HTMLElement>(':scope > [data-slot="sidebar"]'),
+    );
+    const rail = nested[0]!;
+    const pane = nested[1] ?? null;
+    const inset = required(':scope > [data-slot="sidebar-inset"]', wrapper);
+    const railStyle = getComputedStyle(rail);
+    return {
+      wrapper: rect(wrapper),
+      gap: rect(gap),
+      container: rect(container),
+      rail: rect(rail),
+      pane: pane ? rect(pane) : null,
+      inset: rect(inset),
+      railContentWidth:
+        rail.getBoundingClientRect().width -
+        parseFloat(railStyle.borderRightWidth),
+      railBorderRight: parseFloat(railStyle.borderRightWidth),
+    };
+
+    function required(selector: string, root: ParentNode = document) {
+      const element = root.querySelector<HTMLElement>(selector);
+      if (!element)
+        throw new Error(`Missing visual geometry target: ${selector}`);
+      return element;
+    }
+
+    function rect(element: Element) {
+      const value = element.getBoundingClientRect();
+      return {
+        x: value.x,
+        y: value.y,
+        width: value.width,
+        height: value.height,
+        right: value.right,
+        bottom: value.bottom,
+      };
+    }
+  });
+}
+
+function expectRect(
+  actual: { x: number; y: number; width: number; height: number },
+  expected: { x: number; y: number; width: number; height: number },
+) {
+  expectWithin(actual.x, expected.x);
+  expectWithin(actual.y, expected.y);
+  expectWithin(actual.width, expected.width);
+  expectWithin(actual.height, expected.height);
+}
+
+function expectHorizontalRect(
+  actual: { x: number; width: number },
+  expected: { x: number; width: number },
+) {
+  expectWithin(actual.x, expected.x);
+  expectWithin(actual.width, expected.width);
+}
+
+function expectWithin(actual: number, expected: number, tolerance = 1) {
+  expect(Math.abs(actual - expected)).toBeLessThanOrEqual(tolerance);
+}
+
+async function screenshot(
+  session: Awaited<ReturnType<typeof launch>>,
+  name: string,
+  width: number,
+  height: number,
+) {
+  if (!canonicalScreenshots) {
+    test.info().annotations.push({
+      type: "screenshot-policy",
+      description:
+        "Canonical Renderer screenshots update only on macOS arm64; geometry still ran.",
+    });
+    return;
+  }
+  await session.page.evaluate(
+    () =>
+      new Promise<void>((resolve) => {
+        requestAnimationFrame(() => requestAnimationFrame(() => resolve()));
+      }),
+  );
+  const png = await session.app.evaluate(
+    async ({ BrowserWindow }, size) => {
+      const window = BrowserWindow.getAllWindows()[0];
+      if (!window) throw new Error("Visual BrowserWindow is unavailable");
+      const image = await window.webContents.capturePage();
+      return image
+        .resize({ width: size.width, height: size.height, quality: "best" })
+        .toPNG()
+        .toString("base64");
+    },
+    { width, height },
+  );
+  expect(Buffer.from(png, "base64")).toMatchSnapshot(name);
+}
