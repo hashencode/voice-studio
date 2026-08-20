@@ -50,10 +50,7 @@ export function ProfileBlocker({
   onAction: (action: BootstrapAction) => void;
 }) {
   return (
-    <section
-      role="alert"
-      className="mx-auto max-w-2xl rounded-xl border bg-card p-6 shadow-sm"
-    >
+    <section role="alert" className="mx-auto max-w-2xl border-y py-6">
       <ShieldAlert className="size-8 text-destructive" aria-hidden="true" />
       <h1 className="mt-4 text-xl font-semibold">本机资料库需要修复</h1>
       <p className="mt-2 text-sm text-muted-foreground">{profile.message}</p>
@@ -85,62 +82,6 @@ export function OfflineBanner() {
   );
 }
 
-export function ReconciliationSurface({
-  items,
-  onNavigateAudio,
-}: {
-  items: ApplicationSnapshot["reconciliation"];
-  onNavigateAudio: () => void;
-}) {
-  const hasProcessing = items.some((item) => item.kind === "processing");
-  return (
-    <section role="alert" className="rounded-xl border bg-card p-6 shadow-sm">
-      <h2 className="text-xl font-semibold">启动恢复需要确认</h2>
-      <p className="mt-2 text-sm text-muted-foreground">
-        检测到 {items.length}{" "}
-        个中断或可恢复项目。工作台不会自动重试，也不会宣称完成。
-      </p>
-      <ul className="mt-4 space-y-2">
-        {items.map((item) => (
-          <li
-            key={`${item.kind}:${item.identity}`}
-            className="rounded-lg bg-muted px-3 py-2 text-sm"
-          >
-            {reconciliationLabel(item.kind)} · {item.identity} ·{" "}
-            {item.state === "repairable" ? "可恢复" : "已中断"}
-          </li>
-        ))}
-      </ul>
-      {hasProcessing ? (
-        <Button className="mt-4" onClick={onNavigateAudio}>
-          查看相关音频并选择重试
-        </Button>
-      ) : null}
-      <p className="mt-4 text-sm text-muted-foreground">
-        其余恢复项目会保持显式待处理状态，不会在后台自动启动。
-      </p>
-    </section>
-  );
-}
-
-export function ProfileOriginNotice({
-  legacyDatabaseArchived,
-}: {
-  legacyDatabaseArchived: boolean;
-}) {
-  return (
-    <p
-      role="status"
-      aria-label="Audio 资料库来源"
-      className="rounded-lg border bg-muted px-4 py-3 text-sm text-muted-foreground"
-    >
-      {legacyDatabaseArchived
-        ? "已归档旧版资料库；当前使用全新 Audio 资料库。"
-        : "当前使用全新 Audio 资料库；未发现需归档的旧版资料库。"}
-    </p>
-  );
-}
-
 export function CapabilityUnavailable({ reason }: { reason: string }) {
   return (
     <section role="alert" className="rounded-xl border bg-card p-6">
@@ -152,16 +93,4 @@ export function CapabilityUnavailable({ reason }: { reason: string }) {
       </p>
     </section>
   );
-}
-
-function reconciliationLabel(
-  kind: ApplicationSnapshot["reconciliation"][number]["kind"],
-): string {
-  return {
-    processing: "处理任务",
-    capture: "录制",
-    staging: "导入",
-    ai: "AI 任务",
-    transfer: "传输",
-  }[kind];
 }

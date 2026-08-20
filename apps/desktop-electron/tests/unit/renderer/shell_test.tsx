@@ -150,7 +150,7 @@ describe("application shell", () => {
     const user = userEvent.setup();
     render(<App />);
 
-    await screen.findByRole("heading", { name: "音频", level: 1 });
+    await screen.findByRole("heading", { name: "请选择音频", level: 1 });
 
     const wrapper = document.querySelector<HTMLElement>(
       '[data-slot="sidebar-wrapper"]',
@@ -207,6 +207,29 @@ describe("application shell", () => {
         .closest('[data-slot="sidebar-content"]'),
     ).not.toBeNull();
 
+    for (const label of ["音频", "互联", "设置"]) {
+      const railAction = within(navigation).getByRole("button", {
+        name: label,
+      });
+      expect(railAction).toHaveAttribute("data-slot", "sidebar-menu-button");
+      expect(railAction).toHaveClass("h-8");
+      expect(railAction).not.toHaveClass("size-10");
+    }
+
+    const insetHeader = document.querySelector<HTMLElement>(
+      '[data-slot="sidebar-inset"] > header',
+    );
+    expect(insetHeader).not.toBeNull();
+    const contextTrigger = within(insetHeader!).getByRole("button", {
+      name: "收起音频上下文面板",
+    });
+    expect(contextTrigger).toHaveAttribute("data-sidebar", "trigger");
+    expect(contextTrigger).toHaveClass("size-7");
+    expect(
+      contextTrigger.querySelector("svg.lucide-panel-left"),
+    ).not.toBeNull();
+    expect(contextTrigger).not.toHaveTextContent(/[‹›]/);
+
     const pane = screen.getByRole("complementary", {
       name: "音频上下文面板",
     });
@@ -244,10 +267,13 @@ describe("application shell", () => {
 
     await user.click(within(navigation).getByRole("button", { name: "设置" }));
     await waitFor(() => expect(api.navigate).toHaveBeenCalledWith("settings"));
-    expect(outer).toHaveAttribute("data-state", "collapsed");
+    expect(outer).toHaveAttribute("data-state", "expanded");
     expect(
       inner!.querySelectorAll(':scope > [data-slot="sidebar"]'),
-    ).toHaveLength(1);
+    ).toHaveLength(2);
+    expect(
+      screen.getByRole("complementary", { name: "设置上下文面板" }),
+    ).toBeVisible();
   });
 
   it("does not expose the Sidebar cookie or Meta/Ctrl+B state authority", async () => {
@@ -270,7 +296,7 @@ describe("application shell", () => {
     expect(document.cookie).not.toContain("sidebar_state=");
   });
 
-  it("restores navigation and keeps capture in an application-owned overlay", async () => {
+  it("restores navigation and keeps privacy-safe capture controls in the global header", async () => {
     const api = installApi(readySnapshot);
     const user = userEvent.setup();
     render(<App />);
@@ -279,12 +305,10 @@ describe("application shell", () => {
       screen.getByRole("status", { name: "正在加载工作台" }),
     ).toBeVisible();
     expect(
-      await screen.findByRole("heading", { name: "音频", level: 1 }),
+      await screen.findByRole("heading", { name: "请选择音频", level: 1 }),
     ).toBeVisible();
     expect(await screen.findByText("还没有音频")).toBeVisible();
-    expect(
-      screen.getByRole("status", { name: "Audio 资料库来源" }),
-    ).toHaveTextContent("未发现需归档的旧版资料库");
+    expect(screen.queryByText(/旧版资料库/)).not.toBeInTheDocument();
 
     const navigation = screen.getByRole("navigation", { name: "工作站主导航" });
     const audio = within(navigation).getByRole("button", { name: "音频" });
@@ -297,17 +321,19 @@ describe("application shell", () => {
       screen.getByRole("complementary", { name: "音频上下文面板" }),
     ).toHaveAttribute("data-presentation", "docked");
 
-    expect(
-      screen.getByRole("complementary", { name: "录制工作区" }),
-    ).toHaveTextContent("产品周会");
+    const captureControl = screen.getByRole("complementary", {
+      name: "录制控制",
+    });
+    expect(captureControl).toHaveTextContent("录制中");
+    expect(captureControl).not.toHaveTextContent("产品周会");
     await user.click(within(navigation).getByRole("button", { name: "设置" }));
     await waitFor(() => expect(api.navigate).toHaveBeenCalledWith("settings"));
     expect(
-      screen.getByRole("complementary", { name: "录制工作区" }),
+      screen.getByRole("complementary", { name: "录制控制" }),
     ).toBeVisible();
   });
 
-  it("keeps independent first-use pane preferences and hides settings without writing", async () => {
+  it("keeps independent first-use pane preferences including settings", async () => {
     const api = installApi(readySnapshot);
     const writes = vi.spyOn(Storage.prototype, "setItem");
     const user = userEvent.setup();
@@ -323,7 +349,9 @@ describe("application shell", () => {
 
     await user.click(within(navigation).getByRole("button", { name: "设置" }));
     await waitFor(() => expect(api.navigate).toHaveBeenCalledWith("settings"));
-    expect(screen.queryByLabelText("上下文面板")).not.toBeInTheDocument();
+    expect(
+      screen.getByRole("complementary", { name: "设置上下文面板" }),
+    ).toBeVisible();
     expect(writes).not.toHaveBeenCalled();
 
     await user.click(within(navigation).getByRole("button", { name: "互联" }));
@@ -524,7 +552,7 @@ describe("application shell", () => {
     );
   });
 
-  it("surfaces reconciliation as explicit recovery without auto-retry", async () => {
+  it("keeps reconciliation out of global activity and does not auto-retry", async () => {
     const api = installApi(
       {
         ...readySnapshot,
@@ -593,20 +621,18 @@ describe("application shell", () => {
     );
     const user = userEvent.setup();
     render(<App />);
-    const recovery = await screen.findByRole("alert");
-    expect(recovery).toHaveTextContent("启动恢复需要确认");
-    expect(recovery).toHaveTextContent("不会自动重试");
     expect(
-      screen.getByRole("heading", { name: "音频", level: 1 }),
+      screen.queryByRole("heading", { name: "启动恢复需要确认" }),
+    ).not.toBeInTheDocument();
+    await user.click(await screen.findByRole("button", { name: "消息" }));
+    expect(screen.getByLabelText("消息中心")).toHaveTextContent("暂无消息");
+    expect(
+      screen.getByRole("heading", { name: "请选择音频", level: 1 }),
     ).toBeVisible();
     expect(screen.getAllByRole("heading", { level: 1 })).toHaveLength(1);
 
-    const reviewTasks = screen.getByRole("button", {
-      name: "查看相关音频并选择重试",
-    });
-    reviewTasks.focus();
-    await user.keyboard("{Enter}");
     expect(api.navigate).not.toHaveBeenCalled();
+    await user.keyboard("{Escape}");
     await user.click(
       await screen.findByRole("button", { name: /打开 中断的音频/ }),
     );
@@ -616,7 +642,137 @@ describe("application shell", () => {
     expect(api.retryProcessing).not.toHaveBeenCalled();
   });
 
-  it("states that legacy data was archived without exposing a path", async () => {
+  it("keeps transfer reconciliation out of global activity", async () => {
+    window.localStorage.setItem(
+      "voice2text.shell.context-panes.v1",
+      JSON.stringify({ audio: "open", companion: "closed", settings: "open" }),
+    );
+    const api = installApi({
+      ...readySnapshot,
+      navigation: { section: "settings" },
+      capture: { phase: "idle" },
+      reconciliation: [
+        {
+          kind: "transfer",
+          identity: "transfer-recovery-1",
+          state: "interrupted",
+          requiresExplicitAction: true,
+        },
+      ],
+    });
+    const user = userEvent.setup();
+    render(<App />);
+
+    await user.click(await screen.findByRole("button", { name: "消息" }));
+    expect(screen.getByLabelText("消息中心")).toHaveTextContent("暂无消息");
+    expect(api.navigate).not.toHaveBeenCalled();
+  });
+
+  it("treats a narrow settings selection as transient pane dismissal", async () => {
+    Object.defineProperty(window, "innerWidth", {
+      configurable: true,
+      value: 880,
+      writable: true,
+    });
+    const api = installApi({
+      ...readySnapshot,
+      navigation: { section: "settings" },
+      capture: { phase: "idle" },
+    });
+    const user = userEvent.setup();
+    render(<App />);
+
+    const navigation = await screen.findByRole("navigation", {
+      name: "工作站主导航",
+    });
+    await user.click(screen.getByRole("button", { name: "音频智能" }));
+    expect(
+      screen.queryByRole("complementary", { name: "设置上下文面板" }),
+    ).not.toBeInTheDocument();
+
+    await user.click(within(navigation).getByRole("button", { name: "音频" }));
+    await waitFor(() => expect(api.navigate).toHaveBeenCalledWith("library"));
+    await user.click(within(navigation).getByRole("button", { name: "设置" }));
+    await waitFor(() => expect(api.navigate).toHaveBeenCalledWith("settings"));
+    expect(
+      await screen.findByRole("complementary", { name: "设置上下文面板" }),
+    ).toBeVisible();
+  });
+
+  it("opens the exact capture recovery from a message and exposes its action", async () => {
+    const targetedRecovery = {
+      sessionId: "session-target-recovery-1234",
+      state: "recoverable" as const,
+      captureMode: "dual_track" as const,
+      captureTimelineMs: 12_000,
+      systemAudioHealthy: true,
+      microphoneHealthy: true,
+      partialCapture: false,
+      finalizedChunkCount: 2,
+      eventCount: 3,
+      gapCount: 0,
+      interruptionReason: null,
+      recordingSha256: null,
+    };
+    const otherRecovery = {
+      ...targetedRecovery,
+      sessionId: "session-other-recovery-12345",
+      captureTimelineMs: 4_000,
+    };
+    const actOnCaptureRecovery = vi.fn(async () => null);
+    installApi(
+      {
+        ...readySnapshot,
+        capture: { phase: "idle" },
+        activity: [
+          {
+            id: "capture:failed:target",
+            kind: "capture_failed",
+            captureSessionId: targetedRecovery.sessionId,
+            createdAt: 100,
+            title: "录制中断，需要处理",
+            severity: "warning",
+            read: false,
+            resolved: false,
+            detailTarget: "capture-details",
+          },
+        ],
+      },
+      {
+        listCaptureRecoveries: vi.fn(async () => [
+          otherRecovery,
+          targetedRecovery,
+        ]),
+        actOnCaptureRecovery,
+      },
+    );
+    const user = userEvent.setup();
+    render(<App />);
+
+    await user.click(
+      await screen.findByRole("button", { name: "消息，1 条未读" }),
+    );
+    await user.click(
+      screen.getByRole("button", { name: /录制中断，需要处理/ }),
+    );
+
+    expect(
+      await screen.findByRole("heading", { name: "录制详情", level: 1 }),
+    ).toBeVisible();
+    expect(screen.getAllByRole("heading", { level: 1 })).toHaveLength(1);
+    expect(screen.getByRole("region", { name: "录制详情" })).toBeVisible();
+    await user.click(
+      screen.getAllByRole("button", { name: "保留并完成恢复" })[0]!,
+    );
+    expect(actOnCaptureRecovery).toHaveBeenCalledWith(
+      expect.objectContaining({
+        sessionId: targetedRecovery.sessionId,
+        action: "keep",
+      }),
+    );
+  });
+
+  it("does not expose profile migration copy in the user interface", async () => {
     const applicationDataRoot = "/private/secret/application-data";
     installApi({
       ...readySnapshot,
@@ -625,11 +781,9 @@ describe("application shell", () => {
     });
     render(<App />);
 
-    const origin = await screen.findByRole("status", {
-      name: "Audio 资料库来源",
-    });
-    expect(origin).toHaveTextContent("已归档旧版资料库");
-    expect(origin).toHaveTextContent("全新 Audio 资料库");
-    expect(origin).not.toHaveTextContent(applicationDataRoot);
+    await screen.findByRole("navigation", { name: "工作站主导航" });
+    expect(screen.queryByText(/已归档旧版资料库/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/全新 Audio 资料库/)).not.toBeInTheDocument();
+    expect(screen.queryByText(applicationDataRoot)).not.toBeInTheDocument();
   });
 });

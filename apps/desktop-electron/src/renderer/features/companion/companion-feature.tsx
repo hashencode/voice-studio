@@ -285,19 +285,7 @@ export function CompanionMainWorkspace({
 }) {
   const { snapshot } = controller;
   return (
-    <section aria-labelledby="companion-title" className="space-y-5">
-      <div>
-        <h1
-          id="companion-title"
-          className="text-2xl font-semibold tracking-tight"
-        >
-          互联
-        </h1>
-        <p className="mt-1 max-w-2xl text-sm text-muted-foreground">
-          管理已信任设备、配对与安全传输记录。选择设备不会建立连接。
-        </p>
-      </div>
-
+    <section aria-label="互联工作区" className="space-y-5">
       {controller.error ? (
         <div
           role="alert"
@@ -324,11 +312,10 @@ export function CompanionMainWorkspace({
           peer={controller.selectedPeer}
         />
       ) : (
-        <section className="grid min-h-72 place-items-center rounded-xl border bg-card p-6 text-center">
+        <section className="grid min-h-72 place-items-center border-y py-6 text-center">
           <div>
             <Smartphone className="mx-auto size-8" aria-hidden="true" />
-            <h2 className="mt-3 text-lg font-semibold">请选择要查看的设备</h2>
-            <p className="mt-2 text-sm text-muted-foreground">
+            <p className="mt-3 text-sm text-muted-foreground">
               多个已信任设备是正常状态；选择仅切换管理视图。
             </p>
             <Button
@@ -372,12 +359,11 @@ function PairingWorkspace({
   if (!snapshot) return null;
   const pending = controller.pendingAction !== null;
   return (
-    <section className="grid min-h-72 place-items-center rounded-xl border bg-card p-5">
+    <section className="grid min-h-72 place-items-center border-y py-5">
       <div className="w-full max-w-3xl space-y-4">
         <div className="text-center">
           <KeyRound className="mx-auto size-8" aria-hidden="true" />
-          <h2 className="mt-3 text-lg font-semibold">配对手机</h2>
-          <p className="mt-2 text-sm text-muted-foreground">
+          <p className="mt-3 text-sm text-muted-foreground">
             启用本机接收后生成邀请，并在两端核对相同的六位短码。
           </p>
           <Button
@@ -437,10 +423,9 @@ function DeviceWorkspace({
   const credentialMissing = peer.trustState === "credential-missing";
   return (
     <div className="space-y-5">
-      <section className="rounded-xl border bg-card p-5">
+      <section className="border-y py-5">
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div className="min-w-0">
-            <h2 className="text-lg font-semibold">{peer.displayName}</h2>
             <p className="mt-1 text-sm text-muted-foreground">
               {credentialMissing
                 ? "配对凭据缺失 · 必须重新配对"
@@ -481,7 +466,7 @@ function DeviceWorkspace({
           title="此设备的传输"
         />
       ) : (
-        <section className="rounded-xl border bg-card p-5">
+        <section className="border-y py-5">
           <h2 className="font-semibold">此设备的传输</h2>
           <p className="mt-2 text-sm text-muted-foreground">
             暂无传输记录。发送端必须保留原件，直到本机返回 durable receipt。
@@ -501,7 +486,6 @@ function HistoryWorkspace({
   return (
     <div className="space-y-4">
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <h2 className="text-lg font-semibold">传输历史</h2>
         <Button
           type="button"
           variant="outline"
@@ -545,7 +529,7 @@ function ReceiverStatus({ snapshot }: { snapshot: CompanionSnapshot }) {
       <section
         role="alert"
         aria-label="局域网权限被拒绝"
-        className="rounded-xl border bg-card p-5"
+        className="border-y py-5"
       >
         <div className="flex items-start gap-3">
           <CircleAlert className="mt-0.5 size-5" aria-hidden="true" />
@@ -568,7 +552,7 @@ function ReceiverStatus({ snapshot }: { snapshot: CompanionSnapshot }) {
       <section
         role="status"
         aria-label="手机接收器已就绪"
-        className="rounded-xl border bg-card p-5"
+        className="border-y py-5"
       >
         <div className="flex items-start gap-3">
           <CheckCircle2 className="mt-0.5 size-5" aria-hidden="true" />
@@ -593,7 +577,7 @@ function ReceiverStatus({ snapshot }: { snapshot: CompanionSnapshot }) {
     <section
       role={isError ? "alert" : "status"}
       aria-label={status.title}
-      className="rounded-xl border bg-card p-5"
+      className="border-y py-5"
     >
       <div className="flex items-start gap-3">
         {discovery.state === "starting" ||
@@ -650,10 +634,7 @@ function PairingPanel({
         })
       : null;
   return (
-    <section
-      aria-labelledby="pairing-title"
-      className="rounded-xl border bg-card p-5"
-    >
+    <section aria-labelledby="pairing-title" className="border-y py-5">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div className="flex items-start gap-3">
           <KeyRound className="mt-0.5 size-5" aria-hidden="true" />
@@ -787,7 +768,7 @@ function TransfersPanel({
         </p>
       </div>
       {transfers.length === 0 ? (
-        <div className="rounded-xl border bg-card p-5 text-sm text-muted-foreground">
+        <div className="border-y py-5 text-sm text-muted-foreground">
           暂无手机传输。发送端会一直保留原件，直到本机返回 durable receipt。
         </div>
       ) : (

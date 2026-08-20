@@ -3,6 +3,7 @@ import { fileURLToPath } from "node:url";
 
 import {
   bootstrapActionRequestSchema,
+  acknowledgeActivityRequestSchema,
   cancelProcessingRequestSchema,
   retryProcessingRequestSchema,
   processingTasksRequestSchema,
@@ -38,6 +39,14 @@ import {
   captureRecoveryActionRequestSchema,
   type CapturePreflight,
   type CaptureSnapshot,
+  floatingCaptureControlRequestSchema,
+  floatingCapturePreferenceRequestSchema,
+  floatingCapturePreferenceSchema,
+  floatingCaptureWindowActionRequestSchema,
+  type FloatingCaptureControlRequest,
+  type FloatingCapturePreference,
+  type FloatingCaptureSnapshot,
+  type FloatingCaptureWindowAction,
   captionSnapshotRequestSchema,
   captionFormalRetryRequestSchema,
   type CaptionFormalRetryRequest,
@@ -135,6 +144,7 @@ export interface DesktopIpcServices {
   applicationSnapshot(): ApplicationSnapshot;
   navigate(section: ShellSection): ApplicationSnapshot;
   requestBootstrapAction(action: BootstrapAction): Promise<ApplicationSnapshot>;
+  acknowledgeActivity?(throughId: string): ApplicationSnapshot;
   onApplicationSnapshot?(
     listener: (snapshot: ApplicationSnapshot) => void,
   ): () => void;
@@ -167,6 +177,20 @@ export interface DesktopIpcServices {
     sessionId: string;
     idempotencyKey: string;
   }): Promise<CaptureSnapshot | null>;
+  floatingCaptureSnapshot?(): FloatingCaptureSnapshot;
+  controlFloatingCapture?(
+    options: FloatingCaptureControlRequest,
+  ): Promise<FloatingCaptureSnapshot>;
+  floatingCaptureWindowAction?(
+    action: FloatingCaptureWindowAction,
+  ): Promise<FloatingCaptureSnapshot>;
+  getFloatingCapturePreference?(): FloatingCapturePreference;
+  setFloatingCapturePreference?(
+    enabled: boolean,
+  ): Promise<FloatingCapturePreference>;
+  onFloatingCaptureSnapshot?(
+    listener: (snapshot: FloatingCaptureSnapshot) => void,
+  ): () => void;
   getCaptionSnapshot(
     options: CaptionSnapshotRequest,
   ): Promise<CaptionSnapshot | null>;
@@ -248,7 +272,7 @@ type RegisteredHandler = {
 
 export class DesktopIpcHandlers {
   constructor(
-    private readonly trust: IpcTrustPolicy,
+    private readonly trust: IpcTrustPolicy | undefined,
     private readonly handlers: ReadonlyMap<string, RegisteredHandler>,
     private readonly maximumPayloadBytes: number,
   ) {}
@@ -262,6 +286,18 @@ export class DesktopIpcHandlers {
     event: IpcInvocationContext,
     payload: unknown,
   ): Promise<unknown> {
+    if (!this.trust) {
+      throw new Error("IPC trust policy is required for invocation");
+    }
+    return await this.invokeWithTrust(channel, event, payload, this.trust);
+  }
+
+  async invokeWithTrust(
+    channel: string,
+    event: IpcInvocationContext,
+    payload: unknown,
+    trust: IpcTrustPolicy,
+  ): Promise<unknown> {
     const handler = this.handlers.get(channel);
     if (!handler) {
       throw new IpcContractError(
@@ -269,7 +305,7 @@ export class DesktopIpcHandlers {
         "IPC channel is not allowlisted",
       );
     }
-    assertTrustedInvocation(event, this.trust);
+    assertTrustedInvocation(event, trust);
     assertPayloadEnvelope(payload, this.maximumPayloadBytes);
     const parsed = handler.schema.safeParse(payload);
     if (!parsed.success) {
@@ -284,7 +320,7 @@ export class DesktopIpcHandlers {
 }
 
 export function createDesktopIpcHandlers(options: {
-  trust: IpcTrustPolicy;
+  trust?: IpcTrustPolicy;
   services: DesktopIpcServices;
   maximumPayloadBytes?: number;
 }): DesktopIpcHandlers {
@@ -428,6 +464,18 @@ export function createDesktopIpcHandlers(options: {
       } as RegisteredHandler,
     ],
     [
+      ipcChannels.applicationActivityAcknowledge,
+      {
+        schema: acknowledgeActivityRequestSchema,
+        invoke: async (payload: { throughId: string }) => {
+          if (!options.services.acknowledgeActivity) {
+            throw new Error("activity acknowledgement is unavailable");
+          }
+          return options.services.acknowledgeActivity(payload.throughId);
+        },
+      } as RegisteredHandler,
+    ],
+    [
       ipcChannels.workerHealth,
       {
         schema: workerHealthRequestSchema,
@@ -501,6 +549,63 @@ export function createDesktopIpcHandlers(options: {
           sessionId: string;
           idempotencyKey: string;
         }) => await options.services.controlCapture(payload),
+      } as RegisteredHandler,
+    ],
+    [
+      ipcChannels.floatingCaptureSnapshotGet,
+      {
+        schema: floatingCapturePreferenceRequestSchema,
+        invoke: async () => requireFloatingSnapshot(options.services),
+      },
+    ],
+    [
+      ipcChannels.floatingCaptureControl,
+      {
+        schema: floatingCaptureControlRequestSchema,
+        invoke: async (payload: FloatingCaptureControlRequest) => {
+          if (!options.services.controlFloatingCapture) {
+            throw new Error("floating capture control is unavailable");
+          }
+          return await options.services.controlFloatingCapture(payload);
+        },
+      } as RegisteredHandler,
+    ],
+    [
+      ipcChannels.floatingCaptureWindowAction,
+      {
+        schema: floatingCaptureWindowActionRequestSchema,
+        invoke: async (payload: { action: FloatingCaptureWindowAction }) => {
+          if (!options.services.floatingCaptureWindowAction) {
+            throw new Error("floating capture window action is unavailable");
+          }
+          return options.services.floatingCaptureWindowAction(payload.action);
+        },
+      } as RegisteredHandler,
+    ],
+    [
+      ipcChannels.floatingCapturePreferenceGet,
+      {
+        schema: floatingCapturePreferenceRequestSchema,
+        invoke: async () => {
+          if (!options.services.getFloatingCapturePreference) {
+            throw new Error("floating capture preference is unavailable");
+          }
+          return options.services.getFloatingCapturePreference();
+        },
+      },
+    ],
+    [
+      ipcChannels.floatingCapturePreferenceSet,
+      {
+        schema: floatingCapturePreferenceSchema,
+        invoke: async (payload: FloatingCapturePreference) => {
+          if (!options.services.setFloatingCapturePreference) {
+            throw new Error("floating capture preference is unavailable");
+          }
+          return await options.services.setFloatingCapturePreference(
+            payload.enabled,
+          );
+        },
       } as RegisteredHandler,
     ],
     [
@@ -663,6 +768,15 @@ export function createDesktopIpcHandlers(options: {
     handlers,
     options.maximumPayloadBytes ?? 64 * 1024,
   );
+}
+
+function requireFloatingSnapshot(
+  services: DesktopIpcServices,
+): FloatingCaptureSnapshot {
+  if (!services.floatingCaptureSnapshot) {
+    throw new Error("floating capture snapshot is unavailable");
+  }
+  return services.floatingCaptureSnapshot();
 }
 
 export function canceledResponse(jobId: number): CancelProcessingResponse {

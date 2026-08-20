@@ -97,7 +97,9 @@ it("shows retry for failed/interrupted and hides completed chrome once transcrip
   expect(
     screen.queryByRole("region", { name: "当前音频处理" }),
   ).not.toBeInTheDocument();
-  expect(screen.getByRole("heading", { name: "项目音频.wav" })).toBeVisible();
+  expect(
+    screen.getByRole("region", { name: "项目音频.wav 工作区" }),
+  ).toBeVisible();
 });
 
 it.each([

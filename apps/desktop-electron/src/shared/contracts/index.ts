@@ -3,6 +3,7 @@ export * from "./captions";
 export * from "./companion";
 export * from "./audio_ai";
 export * from "./capture";
+export * from "./floating_capture";
 export * from "./ipc";
 export * from "./import_processing";
 export * from "./audio_workspace";

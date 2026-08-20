@@ -150,7 +150,7 @@ describe("sidebar navigation e2e", () => {
     ).toHaveFocus();
 
     expect(
-      screen.getByRole("complementary", { name: "录制工作区" }),
+      screen.getByRole("complementary", { name: "录制控制" }),
     ).toBeVisible();
 
     first.unmount();
@@ -160,7 +160,7 @@ describe("sidebar navigation e2e", () => {
       "page",
     );
     expect(
-      screen.getByRole("complementary", { name: "录制工作区" }),
+      screen.getByRole("complementary", { name: "录制控制" }),
     ).toBeVisible();
   });
 
@@ -184,8 +184,8 @@ describe("sidebar navigation e2e", () => {
         screen.getByRole("complementary", { name: "音频上下文面板" }),
       ).toBeVisible();
       expect(
-        screen.getByRole("complementary", { name: "录制工作区" }),
-      ).toHaveTextContent("访谈");
+        screen.getByRole("complementary", { name: "录制控制" }),
+      ).not.toHaveTextContent("访谈");
     },
   );
 
@@ -235,9 +235,13 @@ describe("sidebar navigation e2e", () => {
       screen.getByRole("navigation", { name: "工作站主导航" }),
     ).toBeVisible();
     expect(
-      screen.getByRole("complementary", { name: "录制工作区" }),
+      screen.getByRole("complementary", { name: "录制控制" }),
     ).toBeVisible();
-    expect(screen.getByRole("alert")).toHaveTextContent("启动恢复需要确认");
+    expect(screen.queryByText("启动恢复需要确认")).not.toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "消息" }));
+    expect(screen.getByRole("dialog", { name: "消息中心" })).toHaveTextContent(
+      "暂无消息",
+    );
     expect(writes).not.toHaveBeenCalled();
 
     window.innerWidth = 1280;
@@ -332,12 +336,15 @@ describe("sidebar navigation e2e", () => {
       await screen.findByRole("button", { name: /打开 项目周会/ }),
     );
     expect(
-      await screen.findByRole("heading", { name: "项目周会.wav" }),
+      await screen.findByRole("heading", {
+        name: "项目周会.wav",
+        level: 1,
+      }),
     ).toBeVisible();
 
     await user.click(screen.getByRole("button", { name: "互联" }));
     expect(
-      await screen.findByRole("heading", { name: "互联", level: 1 }),
+      await screen.findByRole("heading", { name: "配对手机", level: 1 }),
     ).toBeVisible();
     await waitFor(() =>
       expect(controlAudioPlayback).toHaveBeenCalledWith(4, {

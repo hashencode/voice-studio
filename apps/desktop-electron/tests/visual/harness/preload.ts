@@ -1,6 +1,10 @@
 import { contextBridge } from "electron";
 
-import type { Voice2TextDesktopApi } from "../../../src/shared/contracts";
+import type {
+  FloatingCaptureSnapshot,
+  Voice2TextDesktopApi,
+  Voice2TextFloatingApi,
+} from "../../../src/shared/contracts";
 import type { VisualRendererFixture } from "../fixtures/renderer-api";
 
 const encodedFixture = process.env.VOICE2TEXT_VISUAL_FIXTURE;
@@ -124,6 +128,12 @@ const api: Voice2TextDesktopApi = {
   onCaptionSnapshot() {
     return () => undefined;
   },
+  async getFloatingCapturePreference() {
+    return { enabled: true };
+  },
+  async setFloatingCapturePreference(enabled) {
+    return { enabled };
+  },
   async getCompanionSnapshot() {
     return structuredClone(fixture.companion);
   },
@@ -175,6 +185,41 @@ const api: Voice2TextDesktopApi = {
 };
 
 contextBridge.exposeInMainWorld("voice2text", Object.freeze(api));
+
+let floatingSnapshot: FloatingCaptureSnapshot = {
+  revision: 9,
+  sessionId: "session-visual-active-0001",
+  phase: "recording" as const,
+  elapsedMs: 72_000,
+  allowedActions: ["pause", "stop"],
+  attention: false,
+};
+const floatingApi: Voice2TextFloatingApi = {
+  async getSnapshot() {
+    return structuredClone(floatingSnapshot);
+  },
+  async control(command) {
+    floatingSnapshot = {
+      ...floatingSnapshot,
+      revision: floatingSnapshot.revision + 1,
+      phase: command.action === "pause" ? "paused" : "recording",
+      allowedActions:
+        command.action === "pause" ? ["resume", "stop"] : ["pause", "stop"],
+    };
+    return structuredClone(floatingSnapshot);
+  },
+  async windowAction() {
+    return structuredClone(floatingSnapshot);
+  },
+  onSnapshot() {
+    return () => undefined;
+  },
+};
+
+contextBridge.exposeInMainWorld(
+  "voice2textFloating",
+  Object.freeze(floatingApi),
+);
 
 function requiredWorkspace(audioId: number) {
   const workspace = workspaceById.get(audioId);

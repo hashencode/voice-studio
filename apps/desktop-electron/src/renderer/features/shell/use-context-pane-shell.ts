@@ -15,6 +15,7 @@ const CONTEXT_PANE_BREAKPOINT = 1024;
 const DEFAULT_PREFERENCES: PanePreferences = {
   audio: "open",
   companion: "open",
+  settings: "open",
 };
 const PERSISTENT_CLOSE_REASONS: ReadonlySet<ContextPaneCloseReason> = new Set([
   "toggle",
@@ -25,10 +26,14 @@ const PERSISTENT_CLOSE_REASONS: ReadonlySet<ContextPaneCloseReason> = new Set([
 
 export function useContextPaneShell(section: RendererShellSection) {
   const [preferences, setPreferences] = React.useState(readPanePreferences);
+  const [transientClosedSection, setTransientClosedSection] =
+    React.useState<ContextPaneSection | null>(null);
   const preferencesRef = React.useRef(preferences);
   const presentation = useContextPanePresentation();
-  const paneSection = section === "settings" ? null : section;
-  const open = paneSection ? preferences[paneSection] === "open" : false;
+  const paneSection = section;
+  const open =
+    preferences[paneSection] === "open" &&
+    transientClosedSection !== paneSection;
 
   const updatePreference = React.useCallback(
     (target: ContextPaneSection, preference: PanePreference) => {
@@ -43,21 +48,33 @@ export function useContextPaneShell(section: RendererShellSection) {
 
   const requestClose = React.useCallback(
     (reason: ContextPaneCloseReason) => {
-      if (!paneSection || !PERSISTENT_CLOSE_REASONS.has(reason)) return;
+      if (reason === "selection") {
+        setTransientClosedSection(paneSection);
+        return;
+      }
+      if (!PERSISTENT_CLOSE_REASONS.has(reason)) return;
+      setTransientClosedSection(null);
       updatePreference(paneSection, "closed");
     },
     [paneSection, updatePreference],
   );
 
   const toggle = React.useCallback(() => {
-    if (!paneSection) return;
+    setTransientClosedSection(null);
     updatePreference(paneSection, open ? "closed" : "open");
   }, [open, paneSection, updatePreference]);
 
-  const openPane = React.useCallback(() => {
-    if (!paneSection) return;
-    updatePreference(paneSection, "open");
-  }, [paneSection, updatePreference]);
+  const openPane = React.useCallback(
+    (target: ContextPaneSection = paneSection) => {
+      if (target === paneSection) setTransientClosedSection(null);
+      updatePreference(target, "open");
+    },
+    [paneSection, updatePreference],
+  );
+
+  const clearTransientClose = React.useCallback(() => {
+    setTransientClosedSection(null);
+  }, []);
 
   return {
     open,
@@ -66,6 +83,7 @@ export function useContextPaneShell(section: RendererShellSection) {
     requestClose,
     toggle,
     openPane,
+    clearTransientClose,
   };
 }
 
@@ -95,6 +113,7 @@ function readPanePreferences(): PanePreferences {
     return {
       audio: value.audio === "closed" ? "closed" : "open",
       companion: value.companion === "closed" ? "closed" : "open",
+      settings: value.settings === "closed" ? "closed" : "open",
     };
   } catch {
     return DEFAULT_PREFERENCES;

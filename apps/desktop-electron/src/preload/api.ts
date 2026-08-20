@@ -1,5 +1,6 @@
 import {
   applicationSnapshotSchema,
+  acknowledgeActivityRequestSchema,
   bootstrapActionSchema,
   cancelProcessingResponseSchema,
   retryProcessingResponseSchema,
@@ -39,6 +40,8 @@ import {
   captureRecoveryActionRequestSchema,
   capturePreflightSchema,
   captureSnapshotSchema,
+  floatingCapturePreferenceRequestSchema,
+  floatingCapturePreferenceSchema,
   captionSnapshotRequestSchema,
   captionFormalRetryRequestSchema,
   captionSnapshotSchema,
@@ -74,6 +77,15 @@ export interface PreloadIpcBridge {
 export function createDesktopApi(
   bridge: PreloadIpcBridge,
 ): Voice2TextDesktopApi {
+  const captureDetailsListeners = new Set<() => void>();
+  let captureDetailsPending = false;
+  bridge.on(ipcChannels.captureDetailsRequestedEvent, () => {
+    if (captureDetailsListeners.size === 0) {
+      captureDetailsPending = true;
+      return;
+    }
+    for (const listener of captureDetailsListeners) listener();
+  });
   return Object.freeze({
     async getCompanionSnapshot() {
       return companionSnapshotSchema.parse(
@@ -242,6 +254,29 @@ export function createDesktopApi(
       );
       return applicationSnapshotSchema.parse(response);
     },
+    async acknowledgeActivity(throughId: string) {
+      const response = await bridge.invoke(
+        ipcChannels.applicationActivityAcknowledge,
+        acknowledgeActivityRequestSchema.parse({ throughId }),
+      );
+      return applicationSnapshotSchema.parse(response);
+    },
+    async getFloatingCapturePreference() {
+      return floatingCapturePreferenceSchema.parse(
+        await bridge.invoke(
+          ipcChannels.floatingCapturePreferenceGet,
+          floatingCapturePreferenceRequestSchema.parse({}),
+        ),
+      );
+    },
+    async setFloatingCapturePreference(enabled: boolean) {
+      return floatingCapturePreferenceSchema.parse(
+        await bridge.invoke(
+          ipcChannels.floatingCapturePreferenceSet,
+          floatingCapturePreferenceSchema.parse({ enabled }),
+        ),
+      );
+    },
     onApplicationSnapshot(listener: (snapshot: ApplicationSnapshot) => void) {
       let subscribed = true;
       const validatedListener = (payload: unknown) => {
@@ -253,6 +288,16 @@ export function createDesktopApi(
         subscribed = false;
         bridge.off(ipcChannels.applicationSnapshotEvent, validatedListener);
       };
+    },
+    onCaptureDetailsRequested(listener: () => void) {
+      captureDetailsListeners.add(listener);
+      if (captureDetailsPending) {
+        captureDetailsPending = false;
+        queueMicrotask(() => {
+          if (captureDetailsListeners.has(listener)) listener();
+        });
+      }
+      return () => captureDetailsListeners.delete(listener);
     },
     async workerHealth() {
       const response = await bridge.invoke(ipcChannels.workerHealth, {

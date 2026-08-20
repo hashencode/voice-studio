@@ -12,6 +12,7 @@ import type {
   ContextPanePresentation,
   ContextPaneSection,
 } from "@/features/shell/context-pane-contract";
+import { SHELL_SECTION_LABELS } from "@/features/shell/context-pane-contract";
 
 export function ContextPaneShell({
   section,
@@ -25,7 +26,7 @@ export function ContextPaneShell({
   onRequestClose: (reason: ContextPaneCloseReason) => void;
   header?: React.ReactNode;
 }>) {
-  const label = section === "audio" ? "音频" : "互联";
+  const label = SHELL_SECTION_LABELS[section];
 
   React.useEffect(() => {
     const handleEscape = (event: KeyboardEvent) => {

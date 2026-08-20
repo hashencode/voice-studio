@@ -70,7 +70,7 @@ export function NavMain({
           tabIndex={rovingIndex === index ? 0 : -1}
           aria-current={current === item.section ? "page" : undefined}
           aria-label={item.title}
-          className="mx-auto size-10 justify-center p-0"
+          className="px-2.5 md:px-2"
           onClick={() => {
             setRovingSection(item.section);
             onNavigate(item.section);

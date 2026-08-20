@@ -90,6 +90,37 @@ class AudioSidebarWorkstationTest(unittest.TestCase):
         with self.assertRaisesRegex(MODULE.AudioSidebarValidationError, "exactly"):
             self._validate_manifest(manifest)
 
+    def test_oversized_capture_surface_candidate_is_archived_and_ineligible(self) -> None:
+        release_directory = MODULE.ROOT / "docs/product/audio-sidebar-release"
+        invalidated_revision = "767cecd395a9b71c08733dea2de6909b47ee386f"
+        candidate = self.manifest["releaseCandidate"]
+        self.assertEqual(candidate["status"], "PENDING_U6_STABLE_CANDIDATE")
+        self.assertIsNone(candidate["sourceRevision"])
+        expected_hashes = {
+            "candidate.json": "01cf1e40943cd5d7d478920f5209aed5bcb3b36072b446bf6431cc9fb66e53de",
+            "manual.json": "4df64f6d91d59552be0c1ce9e340149bbc9dc1c307f7ddb982e624d5112a9905",
+            "final.json": "addadaceca14632c34cc702ff2b822e999c025145bad48c073324f68235e607f",
+        }
+        matches = []
+        for path in (release_directory / "superseded").glob("*/invalidation.json"):
+            value = json.loads(path.read_text(encoding="utf-8"))
+            if value.get("sourceRevision") == invalidated_revision:
+                matches.append((path, value))
+        self.assertEqual(len(matches), 1)
+        invalidation_path, invalidation = matches[0]
+        self.assertEqual(
+            invalidation["status"], "SUPERSEDED_CAPTURE_SURFACE_INVALIDATED"
+        )
+        self.assertFalse(invalidation["eligibleAsCurrentEvidence"])
+        self.assertIn("bottom-right capture card", invalidation["reason"])
+        self.assertIn("card segmentation", invalidation["reason"])
+        self.assertEqual(invalidation["receipts"], expected_hashes)
+        for name, digest in expected_hashes.items():
+            self.assertEqual(
+                hashlib.sha256((invalidation_path.parent / name).read_bytes()).hexdigest(),
+                digest,
+            )
+
     def test_pending_candidate_cannot_reuse_historical_receipt(self) -> None:
         manifest = copy.deepcopy(self.manifest)
         manifest["status"] = "DEVELOPMENT_COMPLETE_RELEASE_VALIDATION_PENDING"

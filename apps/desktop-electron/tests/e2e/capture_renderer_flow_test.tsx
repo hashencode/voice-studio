@@ -108,15 +108,15 @@ describe("capture Renderer flow", () => {
     const user = userEvent.setup();
     render(createElement(App));
 
-    const workspace = await screen.findByRole("complementary", {
-      name: "录制工作区",
+    const controller = await screen.findByRole("complementary", {
+      name: "录制控制",
     });
-    expect(workspace).toHaveTextContent("跨页面访谈");
+    expect(controller).not.toHaveTextContent("跨页面访谈");
     const navigation = screen.getByRole("navigation", { name: "工作站主导航" });
     await user.click(within(navigation).getByRole("button", { name: "设置" }));
     expect(await screen.findByRole("heading", { name: "设置" })).toBeVisible();
-    expect(screen.getByRole("complementary", { name: "录制工作区" })).toBe(
-      workspace,
+    expect(screen.getByRole("complementary", { name: "录制控制" })).toBe(
+      controller,
     );
 
     bridge.publish({
@@ -133,6 +133,7 @@ describe("capture Renderer flow", () => {
         message: "电脑已唤醒，请确认后手动继续录制。",
       },
     });
+    await user.click(screen.getByRole("button", { name: "打开录制详情" }));
     expect(
       await screen.findByRole("status", { name: "录制状态" }),
     ).toHaveTextContent("等待你确认继续录制");
@@ -144,10 +145,16 @@ describe("capture Renderer flow", () => {
   it("restores the capture snapshot and recovery list after Renderer reload", async () => {
     const bridge = installApi();
     const first = render(createElement(App));
+    await userEvent
+      .setup()
+      .click(await screen.findByRole("button", { name: "打开录制详情" }));
     expect(await screen.findByText("跨页面访谈")).toBeVisible();
     first.unmount();
 
     render(createElement(App));
+    await userEvent
+      .setup()
+      .click(await screen.findByRole("button", { name: "打开录制详情" }));
     expect(await screen.findByText("跨页面访谈")).toBeVisible();
     await waitFor(() =>
       expect(bridge.api.getApplicationSnapshot).toHaveBeenCalledTimes(2),

@@ -29,6 +29,7 @@ async function start() {
     webPreferences: {
       contextIsolation: true,
       nodeIntegration: false,
+      partition: `voice2text-visual-${process.pid}`,
       sandbox: false,
       preload: requiredPreloadPath,
     },

@@ -144,18 +144,20 @@ it("keeps A on failed A-to-B transition and keys detail after success", async ()
   const user = userEvent.setup();
 
   await user.click(await screen.findByRole("button", { name: /打开 音频 A/ }));
-  await screen.findByRole("heading", { name: "音频 A.wav" });
+  await screen.findByRole("region", { name: "音频 A.wav 工作区" });
   await user.type(
     screen.getByRole("searchbox", { name: "搜索音频转写" }),
     "A 状态",
   );
   await user.click(screen.getByRole("button", { name: /打开 音频 B/ }));
   expect(await screen.findByRole("alert")).toHaveTextContent("无法关闭 A");
-  expect(screen.getByRole("heading", { name: "音频 A.wav" })).toBeVisible();
+  expect(
+    screen.getByRole("region", { name: "音频 A.wav 工作区" }),
+  ).toBeVisible();
 
   await user.click(screen.getByRole("button", { name: /打开 音频 B/ }));
   expect(
-    await screen.findByRole("heading", { name: "音频 B.wav" }),
+    await screen.findByRole("region", { name: "音频 B.wav 工作区" }),
   ).toBeVisible();
   expect(screen.getByRole("searchbox", { name: "搜索音频转写" })).toHaveValue(
     "",
@@ -180,18 +182,18 @@ it("fences rapid B/C intents so only C renders after A closes", async () => {
   const user = userEvent.setup();
 
   await user.click(await screen.findByRole("button", { name: /打开 音频 A/ }));
-  await screen.findByRole("heading", { name: "音频 A.wav" });
+  await screen.findByRole("region", { name: "音频 A.wav 工作区" });
   await user.click(screen.getByRole("button", { name: /打开 音频 B/ }));
   await user.click(screen.getByRole("button", { name: /打开 音频 C/ }));
   closeA.resolve(playback(1, false));
 
   expect(
-    await screen.findByRole("heading", { name: "音频 C.wav" }),
+    await screen.findByRole("region", { name: "音频 C.wav 工作区" }),
   ).toBeVisible();
   openB.resolve(workspace(audioB));
   await waitFor(() =>
     expect(
-      screen.queryByRole("heading", { name: "音频 B.wav" }),
+      screen.queryByRole("region", { name: "音频 B.wav 工作区" }),
     ).not.toBeInTheDocument(),
   );
   expect(desktop.controlAudioPlayback).toHaveBeenCalledTimes(1);
@@ -212,13 +214,13 @@ it("closes A again after a successful close is followed by a failed B open", asy
   const user = userEvent.setup();
 
   await user.click(await screen.findByRole("button", { name: /打开 音频 A/ }));
-  await screen.findByRole("heading", { name: "音频 A.wav" });
+  await screen.findByRole("region", { name: "音频 A.wav 工作区" });
   await user.click(screen.getByRole("button", { name: /打开 音频 B/ }));
   expect(await screen.findByRole("alert")).toHaveTextContent("无法打开 B");
   await user.click(screen.getByRole("button", { name: /打开 音频 B/ }));
 
   expect(
-    await screen.findByRole("heading", { name: "音频 B.wav" }),
+    await screen.findByRole("region", { name: "音频 B.wav 工作区" }),
   ).toBeVisible();
   expect(desktop.controlAudioPlayback).toHaveBeenCalledTimes(2);
   expect(desktop.controlAudioPlayback).toHaveBeenNthCalledWith(1, 1, {
@@ -309,7 +311,7 @@ it("reopens the still-selected Audio exactly once when its current task complete
   await userEvent
     .setup()
     .click(await screen.findByRole("button", { name: /打开 音频 A/ }));
-  await screen.findByRole("heading", { name: "音频 A.wav" });
+  await screen.findByRole("region", { name: "音频 A.wav 工作区" });
   view.rerender(<AudioRouteFeature {...props} tasks={[completed]} />);
 
   await waitFor(() => expect(openAudio).toHaveBeenCalledTimes(2));
@@ -387,7 +389,7 @@ it("ignores an Audio mutation response after a newer selection", async () => {
   await user.click(screen.getByRole("button", { name: "撤销" }));
   await user.click(screen.getByRole("button", { name: /打开 音频 B/ }));
   expect(
-    await screen.findByRole("heading", { name: "音频 B.wav" }),
+    await screen.findByRole("region", { name: "音频 B.wav 工作区" }),
   ).toBeVisible();
 
   await act(async () => {
@@ -395,9 +397,11 @@ it("ignores an Audio mutation response after a newer selection", async () => {
     await undoA.promise;
   });
   expect(
-    screen.queryByRole("heading", { name: "音频 A.wav" }),
+    screen.queryByRole("region", { name: "音频 A.wav 工作区" }),
   ).not.toBeInTheDocument();
-  expect(screen.getByRole("heading", { name: "音频 B.wav" })).toBeVisible();
+  expect(
+    screen.getByRole("region", { name: "音频 B.wav 工作区" }),
+  ).toBeVisible();
 });
 
 it("clears a selected Audio only after its playback closes when a structural refresh removes it", async () => {
@@ -422,7 +426,7 @@ it("clears a selected Audio only after its playback closes when a structural ref
   await userEvent
     .setup()
     .click(await screen.findByRole("button", { name: /打开 音频 A/ }));
-  await screen.findByRole("heading", { name: "音频 A.wav" });
+  await screen.findByRole("region", { name: "音频 A.wav 工作区" });
 
   view.rerender(
     <AudioRouteFeature {...props} tasks={[processingTask("queued", 71)]} />,
@@ -437,7 +441,7 @@ it("clears a selected Audio only after its playback closes when a structural ref
     await screen.findByRole("button", { name: "打开音频列表" }),
   ).toBeVisible();
   expect(
-    screen.queryByRole("heading", { name: "音频 A.wav" }),
+    screen.queryByRole("region", { name: "音频 A.wav 工作区" }),
   ).not.toBeInTheDocument();
 });
 

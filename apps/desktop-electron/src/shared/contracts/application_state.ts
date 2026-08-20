@@ -94,6 +94,20 @@ const captureStateSchema = z.discriminatedUnion("phase", [
     .strict(),
 ]);
 
+export const activityItemSchema = z
+  .object({
+    id: z.string().min(1).max(260),
+    kind: z.enum(["capture_completed", "capture_partial", "capture_failed"]),
+    captureSessionId: z.string().min(1).max(128),
+    createdAt: z.number().int().nonnegative(),
+    title: z.string().min(1).max(80),
+    severity: z.enum(["info", "warning"]),
+    read: z.boolean(),
+    resolved: z.boolean(),
+    detailTarget: z.literal("capture-details"),
+  })
+  .strict();
+
 export const applicationSnapshotSchema = z
   .object({
     protocolVersion: z.literal(desktopProtocolVersion),
@@ -113,6 +127,7 @@ export const applicationSnapshotSchema = z
     library: libraryStateSchema,
     reconciliation: z.array(reconciliationItemSchema).max(256),
     capture: captureStateSchema,
+    activity: z.array(activityItemSchema).max(20).optional(),
   })
   .strict();
 
@@ -125,7 +140,11 @@ export const navigateRequestSchema = z
 export const bootstrapActionRequestSchema = z
   .object({ action: bootstrapActionSchema })
   .strict();
+export const acknowledgeActivityRequestSchema = z
+  .object({ throughId: z.string().min(1).max(260) })
+  .strict();
 
 export type ShellSection = z.infer<typeof shellSectionSchema>;
 export type BootstrapAction = z.infer<typeof bootstrapActionSchema>;
 export type ApplicationSnapshot = z.infer<typeof applicationSnapshotSchema>;
+export type ActivityItem = z.infer<typeof activityItemSchema>;

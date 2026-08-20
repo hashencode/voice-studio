@@ -35,8 +35,10 @@ const providerDefaults: Record<
 
 export function AiSettingsFeature({
   api = window.voice2text,
+  view = "all",
 }: {
   api?: Voice2TextDesktopApi;
+  view?: "all" | "provider" | "privacy";
 }) {
   const [settings, setSettings] = React.useState<AiSettingsSnapshot | null>(
     null,
@@ -99,14 +101,17 @@ export function AiSettingsFeature({
   }
 
   const providerName = settings.config.displayName;
+  if (view === "privacy") {
+    return <FileVaultStatus settings={settings} />;
+  }
   return (
-    <section aria-labelledby="ai-settings-title" className="space-y-4">
+    <section aria-label="音频智能设置" className="space-y-4">
+      {view === "all" ? (
+        <h2 className="text-lg font-semibold">可选音频智能</h2>
+      ) : null}
       <div className="flex flex-wrap items-start justify-between gap-3">
-        <div>
-          <h2 id="ai-settings-title" className="text-xl font-semibold">
-            可选音频智能
-          </h2>
-          <p className="mt-1 text-sm text-muted-foreground">
+        <div className="max-w-2xl">
+          <p className="text-sm text-muted-foreground">
             本地设置检查不会发送音频数据，也不会创建远程处理同意。
           </p>
         </div>
@@ -179,7 +184,7 @@ export function AiSettingsFeature({
         </section>
       </div>
 
-      <FileVaultStatus settings={settings} />
+      {view === "all" ? <FileVaultStatus settings={settings} /> : null}
     </section>
   );
 }

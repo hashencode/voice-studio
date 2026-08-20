@@ -86,6 +86,27 @@ describe("current shadcn primitives", () => {
     );
   });
 
+  it("lets an official SidebarTrigger control an independent pane", async () => {
+    const onOpenChange = vi.fn();
+    const onPaneToggle = vi.fn();
+    const user = userEvent.setup();
+
+    render(
+      <SidebarProvider open onOpenChange={onOpenChange} persistState={false}>
+        <SidebarTrigger
+          aria-label="切换上下文面板"
+          toggleSidebarOnClick={false}
+          onClick={onPaneToggle}
+        />
+      </SidebarProvider>,
+    );
+
+    await user.click(screen.getByRole("button", { name: "切换上下文面板" }));
+
+    expect(onPaneToggle).toHaveBeenCalledOnce();
+    expect(onOpenChange).not.toHaveBeenCalled();
+  });
+
   it("exposes labels, values, and states for each migrated control", () => {
     render(
       <div>

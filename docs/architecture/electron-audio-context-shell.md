@@ -44,6 +44,36 @@ make either one unreachable. Processing has one app-scoped owner, is projected
 into its owning Audio item, and exposes cancel or retry only for the selected
 item.
 
+## Capture presentation hierarchy
+
+`DesktopCaptureService` and the revisioned `ApplicationSnapshot` remain the
+only capture truth. One application-scoped main-Renderer controller owns setup,
+preflight, recovery, detailed errors, pending commands, and the transient
+capture-detail subview. Opening details replaces the current third-column route
+content without adding a fourth rail destination; choosing another rail item
+closes details without affecting capture.
+
+Active capture is projected into a one-line controller at the global header's
+right edge. It contains only state, elapsed time, Pause/Resume, the two-step
+Stop and Save action, Open Details, and at most one attention indicator. The
+adjacent global activity entry holds at most 20 privacy-safe completion or
+actionable-failure items for the current application session. It is not durable
+history and never contains a recording title, transcript, path, or raw native
+error.
+
+The optional desktop floating controller defaults off and is enabled from
+Settings or capture details. Main coordinates one 320 x 72-112 window near the
+active display's top-right work area when the main window is no longer
+prominent. Closing or pressing Escape suppresses it only for the current
+recording; it never stops capture. The window has its own sandboxed Renderer,
+minimal Preload, dedicated redacted snapshot, and server-side channel allowlist.
+It is visible on normal workspaces but is not promoted above full-screen apps.
+
+In-flow workspace hierarchy uses page canvas, titled sections, separators, flat
+rows, and inline alerts. Shadows are reserved for actual overlays, dialogs,
+popovers, and the desktop floating controller. A remaining card must represent
+an independently actionable object or an explicit semantic boundary.
+
 ## Audio and Companion state
 
 Audio selection keys detail-local state. Playback transitions serialize close
@@ -78,9 +108,10 @@ retired activity terminology.
 entry and a typed test-only Electron harness. It fixes locale, color scheme,
 motion, time, DPR, and viewport, then asserts full-height rail geometry, 350 px
 docked composition, 48 px overlay gap, 301 px context-pane bounds, flat context
-rows, and capture-controller containment. Five canonical macOS arm64 images
-cover Audio open, Audio closed, Settings, 880 px recovery, and multiple
-Companion devices. Snapshot updates are evidence changes, not routine test
+rows, and capture-controller containment. Six canonical macOS arm64 images
+cover Audio open, Audio closed, Settings, 880 px recovery, multiple Companion
+devices, and the privacy-safe floating controller. Snapshot updates are
+evidence changes, not routine test
 maintenance, and require manual comparison with the pinned official demo.
 
 ## Release evidence

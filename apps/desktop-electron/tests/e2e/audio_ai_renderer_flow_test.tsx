@@ -188,8 +188,13 @@ describe("audio AI Renderer e2e", () => {
 
     const navigation = screen.getByRole("navigation", { name: "工作站主导航" });
     await user.click(within(navigation).getByRole("button", { name: "设置" }));
+    await user.click(
+      within(
+        screen.getByRole("complementary", { name: "设置上下文面板" }),
+      ).getByRole("button", { name: "音频智能" }),
+    );
     expect(
-      await screen.findByRole("heading", { name: "可选音频智能" }),
+      await screen.findByRole("heading", { name: "音频智能", level: 1 }),
     ).toBeVisible();
     await waitFor(() => expect(api.getAiSettings).toHaveBeenCalledTimes(1));
     expect(api.generateAudioAi).toHaveBeenCalledTimes(1);

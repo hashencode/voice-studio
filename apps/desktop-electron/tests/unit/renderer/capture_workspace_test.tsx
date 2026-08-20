@@ -155,19 +155,14 @@ describe("capture workspace", () => {
     );
     installCaptureApi({ startCapture });
     const user = userEvent.setup();
-    render(<CaptureWorkspace capture={idle} applicationRevision={1} />);
+    const view = render(
+      <CaptureWorkspace capture={idle} applicationRevision={1} />,
+    );
 
     await user.click(screen.getByRole("button", { name: "检查并设置录制" }));
-    const workspace = screen.getByRole("complementary", { name: "录制工作区" });
-    expect(workspace).toHaveAttribute("data-slot", "card");
-    expect(workspace).toHaveClass(
-      "right-4",
-      "bottom-4",
-      "w-96",
-      "max-h-[calc(100svh-2rem)]",
-      "overflow-auto",
-      "z-30",
-    );
+    const workspace = screen.getByRole("region", { name: "录制详情" });
+    expect(workspace).not.toHaveAttribute("data-slot", "card");
+    expect(workspace).not.toHaveClass("fixed", "shadow-lg");
     const start = await screen.findByRole("button", { name: "开始录制" });
     fireEvent.click(start);
     fireEvent.click(start);
@@ -178,9 +173,56 @@ describe("capture workspace", () => {
     ).toHaveTextContent("正在开始录制");
 
     resolveStart(recording);
+    await waitFor(() =>
+      expect(
+        screen.getByRole("status", { name: "录制操作状态" }),
+      ).toHaveTextContent("录制已经开始"),
+    );
+    view.rerender(
+      <CaptureWorkspace
+        capture={{
+          phase: "recording",
+          sessionId: recording.sessionId,
+          title: "音频录制",
+          elapsedMs: recording.captureTimelineMs,
+        }}
+      />,
+    );
     expect(
       await screen.findByRole("status", { name: "录制状态" }),
     ).toHaveTextContent("正在录制");
+  });
+
+  it("starts setup from the primary record action after completion", async () => {
+    installCaptureApi();
+    const view = render(
+      <CaptureWorkspace
+        capture={{
+          phase: "completed",
+          sessionId: recording.sessionId,
+          title: "已完成录制",
+          elapsedMs: recording.captureTimelineMs,
+        }}
+        recordRequest={0}
+      />,
+    );
+
+    view.rerender(
+      <CaptureWorkspace
+        capture={{
+          phase: "completed",
+          sessionId: recording.sessionId,
+          title: "已完成录制",
+          elapsedMs: recording.captureTimelineMs,
+        }}
+        recordRequest={1}
+      />,
+    );
+
+    expect(
+      await screen.findByRole("heading", { name: "设置音频录制" }),
+    ).toBeVisible();
+    expect(window.voice2text.preflightCapture).toHaveBeenCalledTimes(1);
   });
 
   it("starts with the selected microphone from the shared Select control", async () => {
@@ -222,7 +264,7 @@ describe("capture workspace", () => {
         }),
     );
     installCaptureApi({ controlCapture });
-    render(
+    const view = render(
       <CaptureWorkspace
         applicationRevision={1}
         capture={{
@@ -236,14 +278,28 @@ describe("capture workspace", () => {
 
     const stop = await screen.findByRole("button", { name: "停止并保存" });
     fireEvent.click(stop);
-    fireEvent.click(stop);
+    const confirm = screen.getByRole("button", { name: "确认停止并保存" });
+    expect(confirm).toHaveFocus();
+    fireEvent.click(confirm);
+    fireEvent.click(confirm);
     expect(controlCapture).toHaveBeenCalledTimes(1);
-    expect(stop).toBeDisabled();
+    expect(confirm).toBeDisabled();
     expect(
       screen.getByRole("status", { name: "录制操作状态" }),
     ).toHaveTextContent("正在安全结束录制");
 
     resolveStop(completed);
+    await waitFor(() => expect(confirm).toBeEnabled());
+    view.rerender(
+      <CaptureWorkspace
+        capture={{
+          phase: "completed",
+          sessionId: completed.sessionId,
+          title: "访谈录制",
+          elapsedMs: completed.captureTimelineMs,
+        }}
+      />,
+    );
     expect(
       await screen.findByRole("status", { name: "录制状态" }),
     ).toHaveTextContent("录制已完成");
@@ -265,7 +321,7 @@ describe("capture workspace", () => {
     const controlCapture = vi.fn(async () => paused);
     installCaptureApi({ controlCapture });
     const user = userEvent.setup();
-    render(
+    const view = render(
       <CaptureWorkspace
         applicationRevision={1}
         capture={{
@@ -285,6 +341,16 @@ describe("capture workspace", () => {
         action: "pause",
         sessionId: recording.sessionId,
       }),
+    );
+    view.rerender(
+      <CaptureWorkspace
+        capture={{
+          phase: "paused",
+          sessionId: paused.sessionId,
+          title: "键盘录制",
+          elapsedMs: paused.captureTimelineMs,
+        }}
+      />,
     );
     expect(
       await screen.findByRole("status", { name: "录制状态" }),
@@ -458,10 +524,25 @@ describe("capture workspace", () => {
       actOnCaptureRecovery: vi.fn(async () => kept),
     });
     const user = userEvent.setup();
-    render(<CaptureWorkspace capture={idle} applicationRevision={7} />);
+    const view = render(
+      <CaptureWorkspace capture={idle} applicationRevision={7} />,
+    );
 
     await user.click(
       await screen.findByRole("button", { name: "保留并完成恢复" }),
+    );
+    view.rerender(
+      <CaptureWorkspace
+        capture={{
+          phase: "partial_capture",
+          sessionId: kept.sessionId,
+          title: "恢复的音频录制",
+          elapsedMs: kept.captureTimelineMs,
+          partialCapture: true,
+          systemAudioHealthy: false,
+          microphoneHealthy: false,
+        }}
+      />,
     );
     expect(
       screen.queryByRole("button", { name: "暂停录制" }),
@@ -472,6 +553,31 @@ describe("capture workspace", () => {
     expect(
       screen.getByRole("button", { name: "录制另一个音频" }),
     ).toBeEnabled();
+  });
+
+  it("acknowledges compact attention when details are opened", async () => {
+    installCaptureApi();
+    const compactHost = document.createElement("div");
+    document.body.append(compactHost);
+    const onAttentionDetailsOpened = vi.fn();
+    render(
+      <CaptureWorkspace
+        capture={{
+          phase: "failed",
+          sessionId: recording.sessionId,
+          title: "故障录制",
+          elapsedMs: recording.captureTimelineMs,
+        }}
+        detailOpen={false}
+        compactHost={compactHost}
+        onAttentionDetailsOpened={onAttentionDetailsOpened}
+      />,
+    );
+
+    await userEvent
+      .setup()
+      .click(await screen.findByRole("button", { name: "打开详情" }));
+    expect(onAttentionDetailsOpened).toHaveBeenCalledWith(recording.sessionId);
   });
 
   it("reloads recovery actions when Main capture bootstrap finishes after mount", async () => {

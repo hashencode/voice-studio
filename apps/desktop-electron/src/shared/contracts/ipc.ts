@@ -17,6 +17,12 @@ import type {
 } from "./audio_workspace";
 import type { CapturePreflight, CaptureSnapshot } from "./capture";
 import type {
+  FloatingCaptureControlRequest,
+  FloatingCapturePreference,
+  FloatingCaptureSnapshot,
+  FloatingCaptureWindowAction,
+} from "./floating_capture";
+import type {
   CaptionFormalRetryRequest,
   CaptionSnapshot,
   CaptionSnapshotRequest,
@@ -46,7 +52,9 @@ export const ipcChannels = {
   applicationSnapshot: "desktop.application.snapshot.v1",
   applicationNavigate: "desktop.application.navigate.v1",
   applicationBootstrapAction: "desktop.application.bootstrap-action.v1",
+  applicationActivityAcknowledge: "desktop.application.activity-acknowledge.v1",
   applicationSnapshotEvent: "desktop.application.snapshot-event.v1",
+  captureDetailsRequestedEvent: "desktop.capture.details-requested-event.v1",
   workerHealth: "desktop.worker.health.v1",
   cancelProcessing: "desktop.processing.cancel.v1",
   retryProcessing: "desktop.processing.retry.v1",
@@ -69,6 +77,12 @@ export const ipcChannels = {
   captureControl: "desktop.capture.control.v1",
   captureRecoveryList: "desktop.capture.recovery-list.v1",
   captureRecoveryAction: "desktop.capture.recovery-action.v1",
+  floatingCaptureSnapshotGet: "desktop.floating-capture.snapshot.get.v1",
+  floatingCaptureControl: "desktop.floating-capture.control.v1",
+  floatingCaptureWindowAction: "desktop.floating-capture.window-action.v1",
+  floatingCaptureSnapshotEvent: "desktop.floating-capture.snapshot-event.v1",
+  floatingCapturePreferenceGet: "desktop.floating-capture.preference.get.v1",
+  floatingCapturePreferenceSet: "desktop.floating-capture.preference.set.v1",
   captionSnapshotGet: "desktop.captions.snapshot.get.v1",
   captionFormalRetry: "desktop.captions.formal.retry.v1",
   captionSnapshotEvent: "desktop.captions.snapshot.v1",
@@ -269,11 +283,15 @@ export interface Voice2TextDesktopApi {
   requestBootstrapAction(
     action: import("./application_state").BootstrapAction,
   ): Promise<import("./application_state").ApplicationSnapshot>;
+  acknowledgeActivity?(
+    throughId: string,
+  ): Promise<import("./application_state").ApplicationSnapshot>;
   onApplicationSnapshot(
     listener: (
       snapshot: import("./application_state").ApplicationSnapshot,
     ) => void,
   ): () => void;
+  onCaptureDetailsRequested?(listener: () => void): () => void;
   workerHealth(): Promise<WorkerHealthResponse>;
   cancelProcessing(jobId: number): Promise<CancelProcessingResponse>;
   retryProcessing(
@@ -364,6 +382,10 @@ export interface Voice2TextDesktopApi {
     sessionId: string;
     idempotencyKey: string;
   }): Promise<CaptureSnapshot | null>;
+  getFloatingCapturePreference?(): Promise<FloatingCapturePreference>;
+  setFloatingCapturePreference?(
+    enabled: boolean,
+  ): Promise<FloatingCapturePreference>;
   getCaptionSnapshot(
     options: CaptionSnapshotRequest,
   ): Promise<CaptionSnapshot | null>;
@@ -371,4 +393,15 @@ export interface Voice2TextDesktopApi {
     options: CaptionFormalRetryRequest,
   ): Promise<CaptionSnapshot>;
   onCaptionSnapshot(listener: (snapshot: CaptionSnapshot) => void): () => void;
+}
+
+export interface Voice2TextFloatingApi {
+  getSnapshot(): Promise<FloatingCaptureSnapshot>;
+  control(
+    options: FloatingCaptureControlRequest,
+  ): Promise<FloatingCaptureSnapshot>;
+  windowAction(
+    action: FloatingCaptureWindowAction,
+  ): Promise<FloatingCaptureSnapshot>;
+  onSnapshot(listener: (snapshot: FloatingCaptureSnapshot) => void): () => void;
 }

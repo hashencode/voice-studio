@@ -22,6 +22,27 @@ Qwen3 产品门禁完成前保持 `BLOCKED_BY_MACOS_CLOSURE`。两个平台仍�
 provider v1 继续只表示“转写片段到结构化纪要”；桌面 ASR、原始音频传输和
 本地任务使用新的 capability 与 schema。
 
+2026-08-14 起，桌面客户端进入 Flutter 到 Electron 的迁移准备期。现有
+`apps/desktop` 保留为当前实现、行为参考和回退；`apps/desktop-electron` 仅为
+可跟踪的占位目录，尚未初始化 Electron、Node 依赖或构建配置。两者继续位于
+同一仓库，Electron 通过版本化进程协议复用编译后的 Dart/native worker，而不
+依赖 Flutter 应用源码。只有满足
+`docs/architecture/desktop-client-transition.md` 定义的替换门槛后，才能在单独
+变更中删除 Flutter Desktop。
+
+2026-08-19 的 Electron Audio sidebar 候选已回到
+`DEVELOPMENT_COMPLETE_RELEASE_VALIDATION_PENDING`：已验证的业务行为不变，但
+该候选与固定版本的 shadcn `sidebar-09` 在全高图标栏、嵌套上下文栏和主工作区
+视觉语法上存在显著偏差。原候选的自动、人工和最终 receipt 已按不可变历史归档，
+不得继续作为当前视觉保真证据；新的候选必须在视觉与几何门禁完成后重新绑定。
+
+同日后续的 `767cecd` 候选虽已修正 Sidebar-09 主体，但仍把跨页录制、字幕、
+恢复与诊断堆叠在右下角大卡片中，并保留过多内容卡片分割，因此也已归档为
+`SUPERSEDED_CAPTURE_SURFACE_INVALIDATED`。当前实现改为全局顶栏精简控制、第三栏
+录制详情、会话内全局消息和默认关闭的隐私安全桌面悬浮控制；在新的同源 package
+完成自动与人工验收前，工作站状态保持
+`DEVELOPMENT_COMPLETE_RELEASE_VALIDATION_PENDING`。
+
 ## 平台状态
 
 | 目标 | 状态 | 当前边界 |

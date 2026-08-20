@@ -22,15 +22,15 @@ test.describe("sidebar-09 production Renderer", () => {
     await withVisualSession("audio-active", 1240, 820, async (session) => {
       const { page } = session;
       await expect(
-        page.getByRole("heading", { name: "音频", level: 1 }),
+        page.getByRole("heading", { name: "请选择音频", level: 1 }),
       ).toBeVisible();
       await page.getByRole("button", { name: /打开 产品设计评审/ }).click();
       await expect(
-        page.getByRole("heading", { name: "产品设计评审.wav" }),
+        page.getByRole("heading", { name: "产品设计评审.wav", level: 1 }),
       ).toBeVisible();
       await expect(
-        page.getByRole("status", { name: "录制状态" }),
-      ).toContainText("正在录制");
+        page.getByRole("complementary", { name: "录制控制" }),
+      ).toContainText("录制中");
 
       await assertRuntimeContract(page, 1240, 820);
       await assertDockedGeometry(page, 1240, 820);
@@ -49,7 +49,7 @@ test.describe("sidebar-09 production Renderer", () => {
     await withVisualSession("audio-closed", 1240, 820, async (session) => {
       const { page } = session;
       await expect(
-        page.getByRole("heading", { name: "音频", level: 1 }),
+        page.getByRole("heading", { name: "请选择音频", level: 1 }),
       ).toBeVisible();
       await page.getByRole("button", { name: "关闭音频上下文面板" }).click();
       await expect(
@@ -66,10 +66,10 @@ test.describe("sidebar-09 production Renderer", () => {
     await withVisualSession("settings", 1240, 820, async (session) => {
       const { page } = session;
       await expect(
-        page.getByRole("heading", { name: "设置", level: 1 }),
+        page.getByRole("heading", { name: "通用", level: 1 }),
       ).toBeVisible();
       await assertRuntimeContract(page, 1240, 820);
-      await assertRailOnlyGeometry(page, 1240, 820);
+      await assertDockedGeometry(page, 1240, 820);
       await screenshot(session, "settings.png", 1240, 820);
     });
   });
@@ -78,8 +78,12 @@ test.describe("sidebar-09 production Renderer", () => {
     await withVisualSession("audio-recovery", 880, 620, async (session) => {
       const { page } = session;
       await expect(
-        page.getByRole("heading", { name: "音频", level: 1 }),
+        page.getByRole("heading", { name: "请选择音频", level: 1 }),
       ).toBeVisible();
+      await expect(
+        page.getByRole("complementary", { name: "录制控制" }),
+      ).toContainText("需要处理");
+      await page.getByRole("button", { name: "打开详情" }).click();
       await expect(
         page.getByRole("heading", { name: "发现可恢复录制" }),
       ).toBeVisible();
@@ -123,7 +127,7 @@ test.describe("sidebar-09 production Renderer", () => {
       ).toBeVisible();
       await pane.getByRole("button", { name: /Studio 的 iPhone/ }).click();
       await expect(
-        page.getByRole("heading", { name: "Studio 的 iPhone", level: 2 }),
+        page.getByRole("heading", { name: "Studio 的 iPhone", level: 1 }),
       ).toBeVisible();
 
       await assertRuntimeContract(page, 1240, 820);
@@ -131,6 +135,41 @@ test.describe("sidebar-09 production Renderer", () => {
       await assertFlatRows(page, "已信任设备列表");
       await screenshot(session, "companion-multiple-devices.png", 1240, 820);
     });
+  });
+
+  test("320x96 privacy-safe floating capture control", async () => {
+    const session = await launch(
+      "audio-active",
+      320,
+      96,
+      `${rendererUrl}/floating.html`,
+    );
+    try {
+      const { page } = session;
+      await expect(
+        page.getByRole("main", {
+          name: "Voice2Text 录制悬浮控制",
+        }),
+      ).toBeVisible();
+      await expect(page.getByText("正在录制")).toBeVisible();
+      await expect(page.getByText("01:12")).toBeVisible();
+      await expect(
+        page.getByRole("button", { name: "暂停录制" }),
+      ).toBeVisible();
+      await expect(
+        page.getByRole("button", { name: "停止并保存" }),
+      ).toBeVisible();
+      await page.getByRole("button", { name: "暂停录制" }).click();
+      await expect(page.getByText("录制已暂停")).toBeVisible();
+      await page.getByRole("button", { name: "继续录制" }).click();
+      await expect(page.getByText("正在录制")).toBeVisible();
+      expect(await page.locator("body").innerText()).not.toMatch(
+        /标题|转写|路径/,
+      );
+      await screenshot(session, "floating-capture-recording.png", 320, 96);
+    } finally {
+      await session.app.close();
+    }
   });
 });
 
@@ -148,7 +187,12 @@ async function withVisualSession(
   }
 }
 
-async function launch(scenario: VisualScenario, width: number, height: number) {
+async function launch(
+  scenario: VisualScenario,
+  width: number,
+  height: number,
+  targetUrl = rendererUrl,
+) {
   const fixture = buildVisualFixture(scenario);
   const app = await electron.launch({
     executablePath: electronExecutable as unknown as string,
@@ -177,18 +221,6 @@ async function launch(scenario: VisualScenario, width: number, height: number) {
       platform: process.platform,
       arch: process.arch,
       locale: "zh-CN",
-    });
-    const nativeScaleFactor = await app.evaluate(
-      ({ screen }) => screen.getPrimaryDisplay().scaleFactor,
-    );
-    const cdp = await page.context().newCDPSession(page);
-    await cdp.send("Emulation.setDeviceMetricsOverride", {
-      width: Math.round(width / nativeScaleFactor),
-      height: Math.round(height / nativeScaleFactor),
-      screenWidth: Math.round(width / nativeScaleFactor),
-      screenHeight: Math.round(height / nativeScaleFactor),
-      deviceScaleFactor: nativeScaleFactor,
-      mobile: false,
     });
     await page.addInitScript((epochMs: number) => {
       Date.now = () => epochMs;
@@ -221,9 +253,21 @@ async function launch(scenario: VisualScenario, width: number, height: number) {
     await app.evaluate(async ({ BrowserWindow }, url) => {
       const window = BrowserWindow.getAllWindows()[0];
       if (!window) throw new Error("Visual BrowserWindow is unavailable");
+      window.webContents.setZoomFactor(1);
       await window.loadURL(url);
-    }, rendererUrl);
+    }, targetUrl);
     await page.waitForLoadState("networkidle");
+    await app.evaluate(({ BrowserWindow }) => {
+      const window = BrowserWindow.getAllWindows()[0];
+      if (!window) throw new Error("Visual BrowserWindow is unavailable");
+      window.webContents.setZoomFactor(1);
+    });
+    const nativeDpr = await page.evaluate(() => window.devicePixelRatio);
+    await app.evaluate(({ BrowserWindow }, zoomFactor) => {
+      const window = BrowserWindow.getAllWindows()[0];
+      if (!window) throw new Error("Visual BrowserWindow is unavailable");
+      window.webContents.setZoomFactor(zoomFactor);
+    }, 1 / nativeDpr);
     return { app, page };
   } catch (error) {
     await app.close();
@@ -356,16 +400,19 @@ async function assertCaptureContainment(
   height: number,
   mustScroll: boolean,
 ) {
-  const capture = page.getByRole("complementary", { name: "录制工作区" });
+  const capture = mustScroll
+    ? page.getByRole("region", { name: "录制详情" })
+    : page.getByRole("complementary", { name: "录制控制" });
   const metrics = await capture.evaluate((element) => {
     const rect = element.getBoundingClientRect();
     const style = getComputedStyle(element);
+    const scrollContainer = element.closest<HTMLElement>("#main-content");
     return {
       rect: toPlainRect(rect),
-      clientHeight: element.clientHeight,
-      scrollHeight: element.scrollHeight,
-      overflowY: style.overflowY,
-      zIndex: Number(style.zIndex),
+      position: style.position,
+      boxShadow: style.boxShadow,
+      containerClientHeight: scrollContainer?.clientHeight ?? 0,
+      containerScrollHeight: scrollContainer?.scrollHeight ?? 0,
     };
 
     function toPlainRect(value: DOMRect) {
@@ -379,16 +426,20 @@ async function assertCaptureContainment(
       };
     }
   });
-  expectWithin(metrics.rect.right, width - 16);
-  expectWithin(metrics.rect.bottom, height - 16);
-  expectWithin(metrics.rect.width, 384);
-  expect(metrics.rect.height).toBeLessThanOrEqual(height - 32 + 1);
+  expect(metrics.rect.right).toBeLessThanOrEqual(width);
   expect(metrics.rect.x).toBeGreaterThanOrEqual(0);
   expect(metrics.rect.y).toBeGreaterThanOrEqual(0);
-  expect(metrics.overflowY).toBe("auto");
-  expect(metrics.zIndex).toBe(30);
-  if (mustScroll)
-    expect(metrics.scrollHeight).toBeGreaterThan(metrics.clientHeight);
+  expect(metrics.position).not.toBe("fixed");
+  expect(metrics.boxShadow).toBe("none");
+  if (mustScroll) {
+    expect(metrics.rect.width).toBeLessThanOrEqual(768);
+    expect(metrics.containerScrollHeight).toBeGreaterThan(
+      metrics.containerClientHeight,
+    );
+  } else {
+    expect(metrics.rect.bottom).toBeLessThanOrEqual(height);
+    expect(metrics.rect.height).toBeLessThanOrEqual(48);
+  }
 }
 
 async function shellGeometry(page: Awaited<ReturnType<typeof launch>>["page"]) {

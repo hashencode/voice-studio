@@ -97,13 +97,13 @@ describe("Companion route composition", () => {
     ).toHaveTextContent("凭据缺失");
     expect(within(pane).queryByText("Revoked Phone")).not.toBeInTheDocument();
     expect(
-      screen.getByRole("heading", { name: "互联", level: 1 }),
+      screen.getByRole("heading", { name: "请选择设备", level: 1 }),
     ).toBeVisible();
-    expect(screen.getByText("请选择要查看的设备")).toBeVisible();
+    expect(screen.getByText(/多个已信任设备是正常状态/)).toBeVisible();
 
     await user.click(within(pane).getByRole("button", { name: /Alpha Phone/ }));
     expect(
-      screen.getByRole("heading", { name: "Alpha Phone", level: 2 }),
+      screen.getByRole("heading", { name: "Alpha Phone", level: 1 }),
     ).toBeVisible();
     expect(screen.getByText("Alpha.wav")).toBeVisible();
     expect(
@@ -116,7 +116,7 @@ describe("Companion route composition", () => {
 
     await user.click(within(pane).getByRole("button", { name: /Beta Phone/ }));
     expect(
-      screen.getByRole("heading", { name: "Beta Phone", level: 2 }),
+      screen.getByRole("heading", { name: "Beta Phone", level: 1 }),
     ).toBeVisible();
     expect(screen.getByText("配对凭据缺失 · 必须重新配对")).toBeVisible();
     expect(screen.getByText("Beta.wav")).toBeVisible();
@@ -142,13 +142,13 @@ describe("Companion route composition", () => {
     expect(await within(pane).findByText("没有已信任设备")).toBeVisible();
     expect(within(pane).queryByText("Old Phone")).not.toBeInTheDocument();
     expect(
-      await screen.findByRole("heading", { name: "配对手机", level: 2 }),
+      await screen.findByRole("heading", { name: "配对手机", level: 1 }),
     ).toBeVisible();
     expect(screen.queryByText("历史录音.wav")).not.toBeInTheDocument();
 
     await user.click(screen.getByRole("button", { name: "查看传输历史" }));
     expect(
-      screen.getByRole("heading", { name: "传输历史", level: 2 }),
+      screen.getByRole("heading", { name: "传输历史", level: 1 }),
     ).toBeVisible();
     expect(screen.getByText("历史录音.wav")).toBeVisible();
     expect(screen.getByText("已签收，可由发送端删除原件")).toBeVisible();
@@ -165,7 +165,7 @@ describe("Companion route composition", () => {
     render(<App />);
 
     expect(
-      await screen.findByRole("heading", { name: "Alpha Phone", level: 2 }),
+      await screen.findByRole("heading", { name: "Alpha Phone", level: 1 }),
     ).toBeVisible();
 
     act(() =>
@@ -179,13 +179,13 @@ describe("Companion route composition", () => {
       }),
     );
     expect(
-      screen.getByRole("heading", { name: "Alpha Phone", level: 2 }),
+      screen.getByRole("heading", { name: "Alpha Phone", level: 1 }),
     ).toBeVisible();
 
     const pane = screen.getByRole("complementary", { name: "互联上下文面板" });
     await user.click(within(pane).getByRole("button", { name: /Beta Phone/ }));
     expect(
-      screen.getByRole("heading", { name: "Beta Phone", level: 2 }),
+      screen.getByRole("heading", { name: "Beta Phone", level: 1 }),
     ).toBeVisible();
 
     act(() =>
@@ -199,7 +199,7 @@ describe("Companion route composition", () => {
       }),
     );
     expect(
-      screen.getByRole("heading", { name: "Beta Phone renamed", level: 2 }),
+      screen.getByRole("heading", { name: "Beta Phone renamed", level: 1 }),
     ).toBeVisible();
   });
 });

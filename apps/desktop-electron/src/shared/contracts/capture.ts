@@ -182,3 +182,4 @@ export type CapturePreflight = z.infer<typeof capturePreflightSchema>;
 export type CaptureSnapshot = z.infer<typeof captureSnapshotSchema>;
 export type CaptureStartCommand = z.infer<typeof captureStartCommandSchema>;
 export type CaptureControlCommand = z.infer<typeof captureControlCommandSchema>;
+export type CaptureControlRequest = z.infer<typeof captureControlRequestSchema>;

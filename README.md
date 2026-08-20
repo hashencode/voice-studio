@@ -1,6 +1,7 @@
-# voice2text_flutter
+# Voice2Text
 
-Flutter 版本重构工程（Android 优先）。
+本地优先的语音录制与转写工程。移动端使用 Flutter，PC 端当前使用
+Electron，并仅支持 Apple Silicon macOS。
 
 ## 设计与开发指导
 
@@ -10,6 +11,38 @@ Flutter 版本重构工程（Android 优先）。
 - 开发指导：`../flutter-ui-mobile/DOC.md`
 
 涉及 UI、页面结构、交互状态或组件选型的改动，应优先使用 `package:flutter_ui_mobile/flutter_ui_mobile.dart` 导出的 `Goo*` 组件，并遵循根目录 `AGENTS.md` 的项目级说明。
+
+## 运行应用
+
+先在仓库根目录恢复 Dart/Flutter workspace 依赖：
+
+```bash
+flutter pub get
+```
+
+### 移动端（Android）
+
+连接 Android 真机或启动模拟器后执行：
+
+```bash
+cd apps/mobile-flutter
+flutter devices
+flutter run -d <android-device-id>
+```
+
+### PC 端（Electron，Apple Silicon macOS）
+
+首次运行需要安装 Bun 依赖并生成本机 worker、模型和运行库资源：
+
+```bash
+cd apps/desktop-electron
+bun ci
+bun run resources:worker
+bun run start
+```
+
+后续资源未变化时，只需在 `apps/desktop-electron` 中执行
+`bun run start`。Windows PC 端尚未支持。
 
 ## 常用命令
 
@@ -28,8 +61,8 @@ python3 tool/build_cache_guard.py
 # 真机音频闭环：时间戳播放/编辑/搜索/导出 + 队列恢复/删除重试
 ./tool/run_audio_flow_smoke.sh <android-device-id>
 
-# 单独构建
-flutter build apk --debug
+# 单独构建 Android debug APK
+(cd apps/mobile-flutter && flutter build apk --debug)
 
 # UI 真机开发：启动后监听文件，安静 60 秒后自动 hot reload / rebuild
 ./tool/watch_ui_device.sh 8PXCGQZPEQJNP7U8
@@ -66,18 +99,23 @@ Android debug APK 构建。该流程占用 6.30 GiB，按 25%（至少 0.5 GiB�
 
 ## 目录说明（当前阶段）
 
-- `lib/features/recording/`：录音流程与状态机
-- `lib/features/transcription/`：转写任务列表与重试
-- `lib/features/audios/`：音频播放、时间轴、编辑、搜索与导出工作区
-- `lib/features/audio_intelligence/`：证据、审核、持久任务与 DeepSeek 云端直连
-- `lib/features/records/`：录音记录列表、详情、删除
-- `lib/features/settings/`：模型选择与自动转写配置
-- `lib/data/sqlite/`：本地数据库
-- `lib/app/contracts/`：Dart 侧音频/通道契约
-- `android/app/src/main/kotlin/.../contracts/`：Android 侧契约
+- `apps/mobile-flutter/`：当前 Android 移动端 Flutter 应用
+- `apps/desktop-electron/`：当前 macOS PC 端 Electron 应用
+- `apps/mobile-flutter/lib/features/recording/`：移动端录音流程与状态机
+- `apps/mobile-flutter/lib/features/transcription/`：移动端转写任务列表与重试
+- `apps/mobile-flutter/lib/features/audios/`：音频播放、时间轴、编辑、搜索与导出工作区
+- `apps/mobile-flutter/lib/features/audio_intelligence/`：证据、审核、持久任务与 DeepSeek 云端直连
+- `apps/mobile-flutter/lib/features/records/`：录音记录列表、详情、删除
+- `apps/mobile-flutter/lib/features/settings/`：模型选择与自动转写配置
+- `apps/mobile-flutter/lib/data/sqlite/`：移动端本地数据库
+- `apps/mobile-flutter/lib/app/contracts/`：Dart 侧音频/通道契约
+- `apps/mobile-flutter/android/app/src/main/kotlin/.../contracts/`：Android 侧契约
 - `tool/check_audio_contract.sh`：契约一致性校验
 - `tool/check_privacy_contract.sh`：备份、分享、日志和 AI 网络边界检查
 - `tool/dev_check.sh`：开发自检入口
+
+桌面客户端运行边界和已完成的 Flutter Desktop 替换门槛见
+`docs/architecture/desktop-client-transition.md`。
 
 ## 当前状态
 
@@ -125,7 +163,6 @@ Android debug APK 构建。该流程占用 6.30 GiB，按 25%（至少 0.5 GiB�
 机器权威状态见 `docs/product/s3-productization-scope.json`，说明见
 `docs/product/s3-productization-status.md`。
 
-
 ## Release 配置
 
 1. 生成本地配置：`./tool/init_key_properties.sh`
@@ -133,13 +170,11 @@ Android debug APK 构建。该流程占用 6.30 GiB，按 25%（至少 0.5 GiB�
 3. 安全写入签名密码：`./tool/set_signing_passwords.sh`
 4. 或手动填写 `applicationId` 与 keystore 四项：`storeFile/storePassword/keyAlias/keyPassword`
 5. 执行：`./tool/preflight_release.sh`
-6. 构建 release：`flutter build apk --release`
-
+6. 构建 release：`(cd apps/mobile-flutter && flutter build apk --release)`
 
 ## Beta 发布
 
 - 参考清单：`docs/BETA_RELEASE_CHECKLIST.md`
-
 
 ## Sherpa 接入状态
 

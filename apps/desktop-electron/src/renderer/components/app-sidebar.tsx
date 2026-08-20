@@ -7,11 +7,20 @@ import type {
   ContextPanePresentation,
   RendererShellSection,
 } from "@/features/shell/context-pane-contract";
+import { SHELL_SECTION_LABELS } from "@/features/shell/context-pane-contract";
 
 const navigation: readonly ShellNavigationItem[] = [
-  { section: "audio", title: "音频", icon: AudioLines },
-  { section: "companion", title: "互联", icon: RadioTower },
-  { section: "settings", title: "设置", icon: Settings2 },
+  { section: "audio", title: SHELL_SECTION_LABELS.audio, icon: AudioLines },
+  {
+    section: "companion",
+    title: SHELL_SECTION_LABELS.companion,
+    icon: RadioTower,
+  },
+  {
+    section: "settings",
+    title: SHELL_SECTION_LABELS.settings,
+    icon: Settings2,
+  },
 ];
 
 export function AppSidebar({

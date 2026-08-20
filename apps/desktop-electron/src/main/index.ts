@@ -1,4 +1,5 @@
 import path from "node:path";
+import { pathToFileURL } from "node:url";
 import { readFile, writeFile, rename, rm } from "node:fs/promises";
 import {
   appendFileSync,
@@ -20,12 +21,14 @@ import {
   Menu,
   nativeImage,
   powerMonitor,
+  screen,
   session,
   Tray,
 } from "electron";
 
 import {
   desktopProtocolVersion,
+  ipcChannels,
   type BootstrapAction,
   type ImportAudioResponse,
   type OperationEvent,
@@ -33,15 +36,21 @@ import {
   type CaptionSnapshot,
   type AudioAiSnapshot,
   type CompanionSnapshot,
+  type FloatingCaptureSnapshot,
+  type FloatingCaptureWindowAction,
 } from "../shared/contracts";
 import { DesktopApplicationState } from "./application/application_state";
+import {
+  deriveFloatingCaptureSnapshot,
+  hasSameFloatingCapturePresentation,
+} from "./application/floating_capture_projection";
 import {
   buildProcessingSmokeEvidence,
   parseProcessingSmokeReferenceBindings,
   type ProcessingSmokeReferenceBindings,
 } from "./application/processing_smoke_evidence";
 import { runPrimaryInstance } from "./application/single_instance";
-import { registerDesktopIpc } from "./ipc";
+import { registerAdditionalDesktopIpcWindow, registerDesktopIpc } from "./ipc";
 import { canceledResponse, queuedResponse } from "./ipc/desktop_ipc";
 import { DesktopDomainService } from "./domain/desktop_domain_service";
 import { SecureImportDomainService } from "./domain/importing/secure_import_domain_service";
@@ -210,6 +219,15 @@ let captionFormalSmokeAuthority: {
 
 let mainWindow: BrowserWindow | null = null;
 let unregisterIpc: (() => void) | null = null;
+let floatingCaptureWindow: BrowserWindow | null = null;
+let unregisterFloatingIpc: (() => void) | null = null;
+let floatingCaptureEnabled = false;
+let floatingSuppressedSessionId: string | null = null;
+let floatingLoadFailedSessionId: string | null = null;
+let lastFloatingCapturePresentation: FloatingCaptureSnapshot | null = null;
+let floatingPresentedSessionId: string | null = null;
+let floatingPreferenceMutation: Promise<void> = Promise.resolve();
+let captureControlMutation: Promise<void> = Promise.resolve();
 let workerSupervisor: WorkerHealthSupervisor | null = null;
 let processCoordinator: DurableProcessCoordinator | null = null;
 let profileDatabase: DatabaseSync | null = null;
@@ -250,6 +268,38 @@ const operationListeners = new Set<(event: OperationEvent) => void>();
 const captionListeners = new Set<(snapshot: CaptionSnapshot) => void>();
 const audioAiListeners = new Set<(snapshot: AudioAiSnapshot) => void>();
 const companionListeners = new Set<(snapshot: CompanionSnapshot) => void>();
+const floatingCaptureListeners = new Set<
+  (snapshot: FloatingCaptureSnapshot) => void
+>();
+
+applicationState.subscribe((snapshot) => {
+  const floating = deriveFloatingCaptureSnapshot(snapshot);
+  if (
+    floating.sessionId === null ||
+    floating.sessionId !== floatingSuppressedSessionId
+  ) {
+    floatingSuppressedSessionId = null;
+  }
+  if (
+    floating.sessionId === null ||
+    floating.sessionId !== floatingLoadFailedSessionId
+  ) {
+    floatingLoadFailedSessionId = null;
+  }
+  if (
+    hasSameFloatingCapturePresentation(
+      lastFloatingCapturePresentation,
+      floating,
+    )
+  ) {
+    return;
+  }
+  lastFloatingCapturePresentation = floating;
+  reconcileFloatingCapturePresentation(floating);
+  if (floatingCaptureWindow?.isVisible()) {
+    for (const listener of floatingCaptureListeners) listener(floating);
+  }
+});
 
 function createMainWindow(): BrowserWindow {
   const window = new BrowserWindow({
@@ -270,8 +320,25 @@ function createMainWindow(): BrowserWindow {
     }
   });
   window.once("ready-to-show", () => window.show());
+  window.on("focus", () => floatingCaptureWindow?.hide());
+  window.on("blur", () =>
+    reconcileFloatingCapturePresentation(
+      deriveFloatingCaptureSnapshot(applicationState.snapshot()),
+    ),
+  );
+  window.on("minimize", () =>
+    reconcileFloatingCapturePresentation(
+      deriveFloatingCaptureSnapshot(applicationState.snapshot()),
+    ),
+  );
+  window.on("hide", () =>
+    reconcileFloatingCapturePresentation(
+      deriveFloatingCaptureSnapshot(applicationState.snapshot()),
+    ),
+  );
   window.on("closed", () => {
     if (mainWindow === window) mainWindow = null;
+    if (process.platform !== "darwin" && !teardownComplete) app.quit();
   });
 
   if (MAIN_WINDOW_VITE_DEV_SERVER_URL) {
@@ -280,6 +347,226 @@ function createMainWindow(): BrowserWindow {
     void window.loadFile(
       path.join(__dirname, `../renderer/${MAIN_WINDOW_VITE_NAME}/index.html`),
     );
+  }
+  return window;
+}
+
+function createFloatingCaptureWindow(): BrowserWindow {
+  const window = new BrowserWindow({
+    width: 320,
+    height: 96,
+    minWidth: 320,
+    maxWidth: 320,
+    minHeight: 72,
+    maxHeight: 112,
+    show: false,
+    frame: false,
+    transparent: true,
+    resizable: false,
+    skipTaskbar: true,
+    fullscreenable: false,
+    title: "Voice2Text 录制控制",
+    webPreferences: secureWebPreferences(
+      path.join(__dirname, "floating-preload.js"),
+    ),
+  });
+  window.setAlwaysOnTop(true, "floating");
+  window.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: false });
+  window.webContents.setWindowOpenHandler(() => ({ action: "deny" }));
+  window.webContents.on("will-navigate", (event, targetUrl) => {
+    const currentUrl = window.webContents.getURL();
+    if (currentUrl && !isTrustedNavigation(currentUrl, targetUrl)) {
+      event.preventDefault();
+    }
+  });
+  window.on("close", (event) => {
+    if (teardownStarted) return;
+    event.preventDefault();
+    floatingSuppressedSessionId = deriveFloatingCaptureSnapshot(
+      applicationState.snapshot(),
+    ).sessionId;
+    window.hide();
+  });
+  window.on("closed", () => {
+    unregisterFloatingIpc?.();
+    unregisterFloatingIpc = null;
+    if (floatingCaptureWindow === window) floatingCaptureWindow = null;
+  });
+
+  let loadPromise: Promise<void>;
+  if (FLOATING_CAPTURE_WINDOW_VITE_DEV_SERVER_URL) {
+    const url = FLOATING_CAPTURE_WINDOW_VITE_DEV_SERVER_URL;
+    loadPromise = window.loadURL(url);
+  } else {
+    const filePath = path.join(
+      __dirname,
+      `../renderer/${FLOATING_CAPTURE_WINDOW_VITE_NAME}/floating.html`,
+    );
+    loadPromise = window.loadFile(filePath);
+  }
+  unregisterFloatingIpc = registerFloatingCaptureIpc(window);
+  void loadPromise.catch(() => {
+    console.error("Floating capture controller failed to load");
+    floatingLoadFailedSessionId = deriveFloatingCaptureSnapshot(
+      applicationState.snapshot(),
+    ).sessionId;
+    if (!window.isDestroyed()) window.destroy();
+  });
+  return window;
+}
+
+function registerFloatingCaptureIpc(window: BrowserWindow): () => void {
+  if (FLOATING_CAPTURE_WINDOW_VITE_DEV_SERVER_URL) {
+    return registerAdditionalDesktopIpcWindow(window, {
+      capability: "floating-capture",
+      origins: new Set([
+        new URL(FLOATING_CAPTURE_WINDOW_VITE_DEV_SERVER_URL).origin,
+      ]),
+    });
+  }
+  const filePath = path.join(
+    __dirname,
+    `../renderer/${FLOATING_CAPTURE_WINDOW_VITE_NAME}/floating.html`,
+  );
+  return registerAdditionalDesktopIpcWindow(window, {
+    capability: "floating-capture",
+    fileUrls: new Set([pathToFileURL(filePath).href]),
+  });
+}
+
+function reconcileFloatingCapturePresentation(
+  snapshot: FloatingCaptureSnapshot,
+  forcePosition = false,
+): void {
+  if (!app.isReady()) return;
+  const active = snapshot.phase !== "idle";
+  const mainProminent = Boolean(
+    mainWindow?.isVisible() &&
+    !mainWindow.isMinimized() &&
+    mainWindow.isFocused(),
+  );
+  if (
+    !floatingCaptureEnabled ||
+    !active ||
+    mainProminent ||
+    snapshot.sessionId === floatingSuppressedSessionId
+  ) {
+    if (floatingCaptureWindow?.isVisible()) floatingCaptureWindow.hide();
+    floatingPresentedSessionId = null;
+    return;
+  }
+  if (snapshot.sessionId === floatingLoadFailedSessionId) return;
+  floatingCaptureWindow ??= createFloatingCaptureWindow();
+  const visible = floatingCaptureWindow.isVisible();
+  if (
+    !forcePosition &&
+    visible &&
+    floatingPresentedSessionId === snapshot.sessionId
+  ) {
+    return;
+  }
+  const display = screen.getDisplayNearestPoint(screen.getCursorScreenPoint());
+  const bounds = floatingCaptureWindow.getBounds();
+  const x = display.workArea.x + display.workArea.width - bounds.width - 16;
+  const y = display.workArea.y + 16;
+  if (bounds.x !== x || bounds.y !== y) {
+    floatingCaptureWindow.setPosition(x, y, false);
+  }
+  if (!visible) floatingCaptureWindow.showInactive();
+  floatingPresentedSessionId = snapshot.sessionId;
+}
+
+function setFloatingCapturePreference(enabled: boolean): Promise<{
+  enabled: boolean;
+}> {
+  const operation = floatingPreferenceMutation.then(async () => {
+    const preferencePath = path.join(
+      app.getPath("userData"),
+      "floating-capture-preference.json",
+    );
+    const temporaryPath = `${preferencePath}.tmp-${process.pid}-${randomUUID()}`;
+    try {
+      await writeFile(temporaryPath, `${JSON.stringify({ enabled })}\n`, {
+        mode: 0o600,
+      });
+      await rename(temporaryPath, preferencePath);
+    } catch (error) {
+      await rm(temporaryPath, { force: true }).catch(() => undefined);
+      throw error;
+    }
+    floatingCaptureEnabled = enabled;
+    floatingSuppressedSessionId = null;
+    floatingLoadFailedSessionId = null;
+    if (!enabled) {
+      floatingCaptureWindow?.hide();
+    } else {
+      reconcileFloatingCapturePresentation(
+        deriveFloatingCaptureSnapshot(applicationState.snapshot()),
+      );
+    }
+    return { enabled };
+  });
+  floatingPreferenceMutation = operation.then(
+    () => undefined,
+    () => undefined,
+  );
+  return operation;
+}
+
+function loadFloatingCapturePreference(): void {
+  const preferencePath = path.join(
+    app.getPath("userData"),
+    "floating-capture-preference.json",
+  );
+  try {
+    floatingCaptureEnabled =
+      JSON.parse(readFileSync(preferencePath, "utf8")).enabled === true;
+  } catch {
+    floatingCaptureEnabled = false;
+  }
+}
+
+async function handleFloatingWindowAction(
+  action: FloatingCaptureWindowAction,
+): Promise<FloatingCaptureSnapshot> {
+  const snapshot = deriveFloatingCaptureSnapshot(applicationState.snapshot());
+  if (action === "hide") {
+    floatingSuppressedSessionId = snapshot.sessionId;
+    floatingCaptureWindow?.hide();
+  } else if (action === "turn-off") {
+    await setFloatingCapturePreference(false);
+  } else {
+    floatingCaptureWindow?.hide();
+    showMainWindow({ openCaptureDetails: true });
+  }
+  return snapshot;
+}
+
+function showMainWindow({
+  openCaptureDetails = false,
+}: {
+  openCaptureDetails?: boolean;
+} = {}): BrowserWindow {
+  const created = !mainWindow || mainWindow.isDestroyed();
+  if (created) {
+    mainWindow = createMainWindow();
+    bindDesktopIpc(mainWindow);
+  }
+  const window = mainWindow;
+  if (!window) throw new Error("main window could not be created");
+  const reveal = () => {
+    if (window.isDestroyed()) return;
+    if (window.isMinimized()) window.restore();
+    window.show();
+    window.focus();
+    if (openCaptureDetails) {
+      window.webContents.send(ipcChannels.captureDetailsRequestedEvent);
+    }
+  };
+  if (created || window.webContents.isLoadingMainFrame()) {
+    window.webContents.once("did-finish-load", reveal);
+  } else {
+    reveal();
   }
   return window;
 }
@@ -1376,7 +1663,14 @@ async function runPackagedRendererAssertions(audioId: number): Promise<{
         () => document.querySelector('[aria-label="播放音频"]'),
         "paused playback"
       );
-      document.querySelector('[aria-label="导出 TXT"]').click();
+      Array.from(document.querySelectorAll("button"))
+        .find((button) => button.textContent?.includes("导出"))
+        ?.click();
+      const txtExport = await waitFor(
+        () => document.querySelector('[role="menuitem"]'),
+        "TXT export option"
+      );
+      txtExport.click();
       await waitFor(
         () => document.body.textContent?.includes("已导出 renderer-"),
         "DOM export status"
@@ -1630,6 +1924,21 @@ async function controlCapture(options: {
   sessionId: string;
   idempotencyKey: string;
 }): Promise<CaptureSnapshot> {
+  const operation = captureControlMutation.then(
+    async () => await performCaptureControl(options),
+  );
+  captureControlMutation = operation.then(
+    () => undefined,
+    () => undefined,
+  );
+  return await operation;
+}
+
+async function performCaptureControl(options: {
+  action: "pause" | "resume" | "stop";
+  sessionId: string;
+  idempotencyKey: string;
+}): Promise<CaptureSnapshot> {
   if (!captureService) throw new Error("macOS capture helper is unavailable");
   const result = await captureService.control(options);
   if (options.action === "pause") {
@@ -1781,14 +2090,7 @@ function updateCaptureTray(snapshot: CaptureSnapshot | null): void {
       { type: "separator" },
       {
         label: "打开 Voice2Text",
-        click: () => {
-          if (!mainWindow) {
-            mainWindow = createMainWindow();
-            bindDesktopIpc(mainWindow);
-          }
-          mainWindow.show();
-          mainWindow.focus();
-        },
+        click: () => showMainWindow(),
       },
     ]),
   );
@@ -1933,6 +2235,8 @@ function bindDesktopIpc(window: BrowserWindow): void {
     navigate: (section) => applicationState.navigate(section),
     requestBootstrapAction: async (action) =>
       await requestBootstrapAction(action),
+    acknowledgeActivity: (throughId) =>
+      applicationState.acknowledgeActivity(throughId),
     onApplicationSnapshot: (listener) => applicationState.subscribe(listener),
     onOperationEvent: (listener) => {
       operationListeners.add(listener);
@@ -1989,6 +2293,22 @@ function bindDesktopIpc(window: BrowserWindow): void {
     preflightCapture: async (options) => await preflightCapture(options),
     startCapture: async (options) => await startCapture(options),
     controlCapture: async (options) => await controlCapture(options),
+    floatingCaptureSnapshot: () =>
+      deriveFloatingCaptureSnapshot(applicationState.snapshot()),
+    controlFloatingCapture: async (options) => {
+      await controlCapture(options);
+      return deriveFloatingCaptureSnapshot(applicationState.snapshot());
+    },
+    floatingCaptureWindowAction: (action) => handleFloatingWindowAction(action),
+    getFloatingCapturePreference: () => ({
+      enabled: floatingCaptureEnabled,
+    }),
+    setFloatingCapturePreference: (enabled) =>
+      setFloatingCapturePreference(enabled),
+    onFloatingCaptureSnapshot: (listener) => {
+      floatingCaptureListeners.add(listener);
+      return () => floatingCaptureListeners.delete(listener);
+    },
     listCaptureRecoveries: async () => {
       return listAvailableCaptureRecoveries(captureService);
     },
@@ -2093,6 +2413,10 @@ function bindDesktopIpc(window: BrowserWindow): void {
       return await audioExportService.exportAudio(audioId, format);
     },
   });
+  if (floatingCaptureWindow && !floatingCaptureWindow.isDestroyed()) {
+    unregisterFloatingIpc?.();
+    unregisterFloatingIpc = registerFloatingCaptureIpc(floatingCaptureWindow);
+  }
 }
 
 function requireCompanionService(): CompanionService {
@@ -3330,6 +3654,14 @@ if (isPrimaryInstance) {
     .whenReady()
     .then(async () => {
       configureSessionSecurity();
+      loadFloatingCapturePreference();
+      const reconcileDisplays = () =>
+        reconcileFloatingCapturePresentation(
+          deriveFloatingCaptureSnapshot(applicationState.snapshot()),
+          true,
+        );
+      screen.on("display-removed", reconcileDisplays);
+      screen.on("display-metrics-changed", reconcileDisplays);
       mainWindow = createMainWindow();
       bindDesktopIpc(mainWindow);
       await new Promise<void>((resolve) => setImmediate(resolve));
@@ -3344,17 +3676,12 @@ if (isPrimaryInstance) {
     });
 
   app.on("second-instance", () => {
-    if (!mainWindow) return;
-    if (mainWindow.isMinimized()) mainWindow.restore();
-    mainWindow.focus();
+    showMainWindow();
   });
 
   app.on("activate", () => {
     if (teardownPromise) return;
-    if (BrowserWindow.getAllWindows().length === 0) {
-      mainWindow = createMainWindow();
-      bindDesktopIpc(mainWindow);
-    }
+    showMainWindow();
   });
 
   app.on("window-all-closed", () => {
@@ -3420,6 +3747,8 @@ function reportBootstrapFailure(stage: string, error: unknown): void {
 
 async function teardownOwnedResources(): Promise<void> {
   teardownStarted = true;
+  await floatingPreferenceMutation;
+  await captureControlMutation;
   unregisterIpc?.();
   unregisterIpc = null;
   await processCoordinator?.shutdown();

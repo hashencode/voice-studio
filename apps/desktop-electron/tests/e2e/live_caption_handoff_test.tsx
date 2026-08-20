@@ -114,12 +114,18 @@ describe("live caption and formal handoff Renderer flow", () => {
   it("restores one draft after reload, exposes formal failure, and retries a new attempt", async () => {
     const bridge = installApi();
     const first = render(<App />);
+    await userEvent
+      .setup()
+      .click(await screen.findByRole("button", { name: "打开录制详情" }));
 
     expect(
       await screen.findByRole("region", { name: "实时字幕与转写" }),
     ).toHaveTextContent("这是恢复后的实时草稿。");
     first.unmount();
     render(<App />);
+    await userEvent
+      .setup()
+      .click(await screen.findByRole("button", { name: "打开录制详情" }));
     expect(await screen.findByText("这是恢复后的实时草稿。")).toBeVisible();
     await waitFor(() =>
       expect(bridge.getCaptionSnapshot).toHaveBeenCalledTimes(2),

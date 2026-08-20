@@ -121,7 +121,7 @@ it("supports keyboard open, search, edit, playback, speaker and export with sema
   audio.focus();
   await user.keyboard("{Enter}");
   expect(
-    await screen.findByRole("heading", { name: "项目周会.wav" }),
+    await screen.findByRole("region", { name: "项目周会.wav 工作区" }),
   ).toBeVisible();
 
   await user.type(
@@ -144,7 +144,8 @@ it("supports keyboard open, search, edit, playback, speaker and export with sema
   await waitFor(() => expect(desktop.editAudioSegment).toHaveBeenCalled());
 
   await user.click(screen.getByRole("button", { name: "播放音频" }));
-  const position = screen.getByRole("slider", { name: "播放位置 00:00" });
+  const position = screen.getByRole("slider", { name: "音频播放位置" });
+  expect(position).toHaveAttribute("aria-valuetext", "00:00");
   expect(position).toHaveAttribute("aria-valuemin", "0");
   expect(position).toHaveAttribute("aria-valuemax", "6000");
   expect(position).toHaveAttribute("aria-valuenow", "0");
@@ -155,7 +156,8 @@ it("supports keyboard open, search, edit, playback, speaker and export with sema
     positionMs: 1,
   });
   await selectRadixOption(user, "播放速度", "1.5×");
-  await user.click(screen.getByRole("button", { name: "导出 TXT" }));
+  await user.click(screen.getByRole("button", { name: "导出" }));
+  await user.click(screen.getByRole("menuitem", { name: "TXT" }));
   expect(desktop.controlAudioPlayback).toHaveBeenCalledWith(4, {
     action: "play",
   });
@@ -187,6 +189,30 @@ it("supports keyboard open, search, edit, playback, speaker and export with sema
     name: /打开 项目周会/,
   });
   await waitFor(() => expect(restoredAudio).toHaveFocus());
+});
+
+it("clamps ten-second seek controls to the audio boundaries", async () => {
+  const desktop = api();
+  const user = userEvent.setup();
+  render(<AudioWorkspaceFeature api={desktop} />);
+
+  await user.click(
+    await screen.findByRole("button", { name: /打开 项目周会/ }),
+  );
+  await screen.findByRole("region", { name: "项目周会.wav 工作区" });
+  vi.mocked(desktop.controlAudioPlayback).mockClear();
+
+  await user.click(screen.getByRole("button", { name: "后退 10 秒" }));
+  expect(desktop.controlAudioPlayback).toHaveBeenLastCalledWith(4, {
+    action: "seek",
+    positionMs: 0,
+  });
+
+  await user.click(screen.getByRole("button", { name: "前进 10 秒" }));
+  expect(desktop.controlAudioPlayback).toHaveBeenLastCalledWith(4, {
+    action: "seek",
+    positionMs: 6_000,
+  });
 });
 
 it("shows a recoverable list error and then the explicit empty state", async () => {
@@ -313,7 +339,9 @@ it("closes playback once on workspace back and keeps close failures visible", as
   expect(await screen.findByRole("alert")).toHaveTextContent(
     "无法关闭私有音频",
   );
-  expect(screen.getByRole("heading", { name: "项目周会.wav" })).toBeVisible();
+  expect(
+    screen.getByRole("region", { name: "项目周会.wav 工作区" }),
+  ).toBeVisible();
 
   await user.click(screen.getByRole("button", { name: "返回音频列表" }));
   await screen.findByRole("heading", { name: "音频资料库" });
@@ -343,7 +371,8 @@ it("surfaces a typed export write failure instead of reporting cancellation", as
     await screen.findByRole("button", { name: /打开 项目周会/ }),
   );
 
-  await user.click(screen.getByRole("button", { name: "导出 TXT" }));
+  await user.click(screen.getByRole("button", { name: "导出" }));
+  await user.click(screen.getByRole("menuitem", { name: "TXT" }));
   expect(await screen.findByRole("alert")).toHaveTextContent(
     "所选位置不可写，请选择其他位置",
   );

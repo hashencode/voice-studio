@@ -1,0 +1,13 @@
+{
+  "schema": "voice2text-audio-sidebar-candidate-invalidation/v1",
+  "status": "SUPERSEDED_CAPTURE_SURFACE_INVALIDATED",
+  "sourceRevision": "767cecd395a9b71c08733dea2de6909b47ee386f",
+  "invalidatedAt": "2026-08-19T12:00:00Z",
+  "reason": "The candidate corrected the sidebar-09 shell but still used an oversized bottom-right capture card and excessive in-flow card segmentation. Its receipts remain immutable history and are not eligible as current visual or capture-surface evidence.",
+  "receipts": {
+    "candidate.json": "01cf1e40943cd5d7d478920f5209aed5bcb3b36072b446bf6431cc9fb66e53de",
+    "manual.json": "4df64f6d91d59552be0c1ce9e340149bbc9dc1c307f7ddb982e624d5112a9905",
+    "final.json": "addadaceca14632c34cc702ff2b822e999c025145bad48c073324f68235e607f"
+  },
+  "eligibleAsCurrentEvidence": false
+}

@@ -1,9 +1,26 @@
 import * as React from "react";
-import { Download, Pause, Play, Redo2, Search, Undo2 } from "lucide-react";
+import {
+  ChevronDown,
+  Download,
+  Pause,
+  Play,
+  Redo2,
+  RotateCcw,
+  RotateCw,
+  Search,
+  Undo2,
+} from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import {
   Select,
   SelectContent,
@@ -148,7 +165,7 @@ export function AudioWorkspaceFeature({
             onRetry={() => void loadAudios(libraryQuery)}
           />
         ) : audios?.length === 0 ? (
-          <div className="grid min-h-52 place-items-center rounded-xl border bg-card p-8 text-center">
+          <div className="grid min-h-52 place-items-center border-y py-8 text-center">
             <div>
               <h2 className="text-lg font-semibold">还没有可复核的音频</h2>
               <p className="mt-2 text-sm text-muted-foreground">
@@ -398,75 +415,21 @@ function WorkspaceView({
 
   return (
     <section
-      aria-labelledby="audio-title"
+      aria-label={`${workspace.summary.displayName} 工作区`}
       aria-busy={pending}
       className="space-y-5"
     >
-      <div className="flex flex-wrap items-start justify-between gap-3">
-        <div>
-          {onBack ? (
-            <Button
-              type="button"
-              variant="ghost"
-              size="sm"
-              disabled={pending}
-              onClick={() => void closeAndGoBack()}
-            >
-              返回音频列表
-            </Button>
-          ) : null}
-          <h1
-            id="audio-title"
-            className="mt-2 text-2xl font-semibold tracking-tight"
-          >
-            {workspace.summary.displayName}
-          </h1>
-          <p className="mt-1 text-sm text-muted-foreground">
-            {workspace.summary.segmentCount} 个片段 ·{" "}
-            {generationLabel(workspace.summary.generationKind)}
-          </p>
-        </div>
-        <div className="flex gap-2" role="group" aria-label="编辑历史">
-          <Button
-            type="button"
-            variant="outline"
-            disabled={pending || !workspace.canUndo}
-            onClick={() =>
-              void mutate(
-                () =>
-                  api.undoAudioEdit(
-                    workspace.summary.audioId,
-                    workspace.summary.generationId!,
-                    workspace.revision,
-                  ),
-                "已撤销上次文本修改",
-              )
-            }
-          >
-            <Undo2 aria-hidden="true" />
-            撤销
-          </Button>
-          <Button
-            type="button"
-            variant="outline"
-            disabled={pending || !workspace.canRedo}
-            onClick={() =>
-              void mutate(
-                () =>
-                  api.redoAudioEdit(
-                    workspace.summary.audioId,
-                    workspace.summary.generationId!,
-                    workspace.revision,
-                  ),
-                "已重做文本修改",
-              )
-            }
-          >
-            <Redo2 aria-hidden="true" />
-            重做
-          </Button>
-        </div>
-      </div>
+      {onBack ? (
+        <Button
+          type="button"
+          variant="ghost"
+          size="sm"
+          disabled={pending}
+          onClick={() => void closeAndGoBack()}
+        >
+          返回音频列表
+        </Button>
+      ) : null}
 
       {error ? (
         <RecoveryError
@@ -482,11 +445,41 @@ function WorkspaceView({
         />
       ) : null}
 
+      <AudioCommandDeck
+        playback={playback}
+        workspace={workspace}
+        pending={pending}
+        onAction={(command) => void playbackAction(command)}
+        onUndo={() =>
+          void mutate(
+            () =>
+              api.undoAudioEdit(
+                workspace.summary.audioId,
+                workspace.summary.generationId!,
+                workspace.revision,
+              ),
+            "已撤销上次文本修改",
+          )
+        }
+        onRedo={() =>
+          void mutate(
+            () =>
+              api.redoAudioEdit(
+                workspace.summary.audioId,
+                workspace.summary.generationId!,
+                workspace.revision,
+              ),
+            "已重做文本修改",
+          )
+        }
+        onExport={(format) => void exportAudio(format)}
+      />
+
       <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_18rem]">
         <div className="space-y-4">
           <form
             role="search"
-            className="flex gap-2 rounded-xl border bg-card p-3"
+            className="flex gap-2 border-y py-3"
             onSubmit={(event) => {
               event.preventDefault();
               if (query.trim().length === 0 || operationPendingRef.current)
@@ -537,7 +530,7 @@ function WorkspaceView({
             <div
               role="group"
               aria-label="搜索结果导航"
-              className="flex flex-wrap items-center justify-between gap-2 rounded-xl border bg-card px-3 py-2"
+              className="flex flex-wrap items-center justify-between gap-2 border-y py-2"
             >
               <p className="text-sm text-muted-foreground">
                 搜索结果 {activeSearchIndex + 1} / {searchResults.length}，片段{" "}
@@ -577,7 +570,7 @@ function WorkspaceView({
             </div>
           ) : null}
           {workspace.segments.length === 0 ? (
-            <div className="grid min-h-64 place-items-center rounded-xl border bg-card p-8 text-center">
+            <div className="grid min-h-64 place-items-center border-y py-8 text-center">
               <div>
                 <h2 className="font-semibold">转写尚未就绪</h2>
                 <p className="mt-2 text-sm text-muted-foreground">
@@ -630,12 +623,6 @@ function WorkspaceView({
               generationId={workspace.summary.generationId}
             />
           ) : null}
-          <PlaybackPanel
-            playback={playback}
-            durationMs={workspace.summary.durationMs}
-            pending={pending}
-            onAction={(command) => void playbackAction(command)}
-          />
           <SpeakerPanel
             key={`${workspace.summary.generationId}:${workspace.speakers
               .filter((speaker) => speaker.mergedIntoSpeakerId === null)
@@ -645,10 +632,6 @@ function WorkspaceView({
             workspace={workspace}
             pending={pending}
             mutate={mutate}
-          />
-          <ExportPanel
-            pending={pending}
-            onExport={(format) => void exportAudio(format)}
           />
         </aside>
       </div>
@@ -707,7 +690,7 @@ function VirtualTranscript({
   return (
     <div
       ref={viewportRef}
-      className="h-[34rem] overflow-auto rounded-xl border bg-card"
+      className="h-[34rem] overflow-auto border-y"
       onScroll={(event) => setScrollTop(event.currentTarget.scrollTop)}
       tabIndex={0}
       aria-label="可滚动音频转写"
@@ -858,65 +841,164 @@ function SegmentRow({
   );
 }
 
-function PlaybackPanel({
+function AudioCommandDeck({
   playback,
-  durationMs,
+  workspace,
   pending,
   onAction,
+  onUndo,
+  onRedo,
+  onExport,
 }: {
   playback: AudioPlaybackSnapshot | null;
-  durationMs: number;
+  workspace: Pick<AudioWorkspaceSnapshot, "summary" | "canUndo" | "canRedo">;
   pending: boolean;
   onAction: (
     command: Parameters<Voice2TextDesktopApi["controlAudioPlayback"]>[1],
   ) => void;
+  onUndo: () => void;
+  onRedo: () => void;
+  onExport: (format: AudioExportFormat) => void;
 }) {
   const playing = playback?.playing ?? false;
+  const positionMs = playback?.positionMs ?? 0;
+  const resolvedDurationMs = Math.max(
+    1,
+    playback?.durationMs ?? workspace.summary.durationMs,
+  );
   return (
     <section
-      aria-labelledby="playback-title"
-      className="space-y-3 border-t pt-4 first:border-t-0 first:pt-0"
+      aria-label="音频控制台"
+      className="rounded-xl border bg-card p-4 shadow-sm"
     >
-      <h2 id="playback-title" className="font-semibold">
-        音频播放
-      </h2>
-      <Button
-        type="button"
-        className="w-full"
-        disabled={pending}
-        aria-label={playing ? "暂停音频" : "播放音频"}
-        onClick={() => onAction({ action: playing ? "pause" : "play" })}
-      >
-        {playing ? <Pause aria-hidden="true" /> : <Play aria-hidden="true" />}
-        {playing ? "暂停" : "播放"}
-      </Button>
-      <div className="space-y-2">
-        <Label
-          id="audio-playback-position-label"
-          className="text-xs text-muted-foreground"
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <p className="text-sm text-muted-foreground">
+          {workspace.summary.segmentCount} 个片段 ·{" "}
+          {generationLabel(workspace.summary.generationKind)}
+        </p>
+        <div
+          className="flex flex-wrap items-center gap-1"
+          role="group"
+          aria-label="音频工作区操作"
         >
-          播放位置 {clock(playback?.positionMs ?? 0)}
-        </Label>
-        <Slider
-          aria-labelledby="audio-playback-position-label"
-          aria-valuetext={clock(playback?.positionMs ?? 0)}
-          min={0}
-          max={Math.max(1, playback?.durationMs ?? durationMs)}
-          step={1}
-          value={[playback?.positionMs ?? 0]}
-          disabled={pending}
-          onValueChange={(value) =>
-            onAction({ action: "seek", positionMs: value[0] ?? 0 })
-          }
-        />
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon-sm"
+            disabled={pending || !workspace.canUndo}
+            aria-label="撤销"
+            onClick={onUndo}
+          >
+            <Undo2 aria-hidden="true" />
+          </Button>
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon-sm"
+            disabled={pending || !workspace.canRedo}
+            aria-label="重做"
+            onClick={onRedo}
+          >
+            <Redo2 aria-hidden="true" />
+          </Button>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                disabled={pending}
+              >
+                <Download aria-hidden="true" />
+                导出
+                <ChevronDown aria-hidden="true" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuLabel>选择导出格式</DropdownMenuLabel>
+              {(["txt", "md", "vtt", "srt", "json"] as const).map((format) => (
+                <DropdownMenuItem
+                  key={format}
+                  onSelect={() => onExport(format)}
+                >
+                  {format.toUpperCase()}
+                </DropdownMenuItem>
+              ))}
+            </DropdownMenuContent>
+          </DropdownMenu>
+        </div>
       </div>
-      <div className="flex items-center justify-between gap-3">
-        <Label
-          htmlFor="audio-playback-speed"
-          className="text-xs text-muted-foreground"
+      <div className="mt-4 grid items-center gap-4 md:grid-cols-[auto_minmax(12rem,1fr)_auto]">
+        <div
+          className="flex items-center gap-1"
+          role="group"
+          aria-label="播放控制"
         >
-          播放速度
-        </Label>
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon"
+            disabled={pending}
+            aria-label="后退 10 秒"
+            onClick={() =>
+              onAction({
+                action: "seek",
+                positionMs: Math.max(0, positionMs - 10_000),
+              })
+            }
+          >
+            <RotateCcw aria-hidden="true" />
+          </Button>
+          <Button
+            type="button"
+            size="icon"
+            disabled={pending}
+            aria-label={playing ? "暂停音频" : "播放音频"}
+            onClick={() => onAction({ action: playing ? "pause" : "play" })}
+          >
+            {playing ? (
+              <Pause aria-hidden="true" />
+            ) : (
+              <Play aria-hidden="true" />
+            )}
+          </Button>
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon"
+            disabled={pending}
+            aria-label="前进 10 秒"
+            onClick={() =>
+              onAction({
+                action: "seek",
+                positionMs: Math.min(resolvedDurationMs, positionMs + 10_000),
+              })
+            }
+          >
+            <RotateCw aria-hidden="true" />
+          </Button>
+        </div>
+        <div className="space-y-2">
+          <div
+            className="flex justify-between text-xs text-muted-foreground"
+            aria-hidden="true"
+          >
+            <span>{clock(positionMs)}</span>
+            <span>{clock(resolvedDurationMs)}</span>
+          </div>
+          <Slider
+            aria-label="音频播放位置"
+            aria-valuetext={clock(positionMs)}
+            min={0}
+            max={resolvedDurationMs}
+            step={1}
+            value={[positionMs]}
+            disabled={pending}
+            onValueChange={(value) =>
+              onAction({ action: "seek", positionMs: value[0] ?? 0 })
+            }
+          />
+        </div>
         <Select
           value={String(playback?.speed ?? 1)}
           disabled={pending}
@@ -924,7 +1006,7 @@ function PlaybackPanel({
             onAction({ action: "speed", speed: Number(value) })
           }
         >
-          <SelectTrigger id="audio-playback-speed" size="sm">
+          <SelectTrigger aria-label="播放速度" size="sm">
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
@@ -1093,41 +1175,6 @@ function SpeakerPanel({
   );
 }
 
-function ExportPanel({
-  pending,
-  onExport,
-}: {
-  pending: boolean;
-  onExport: (format: AudioExportFormat) => void;
-}) {
-  return (
-    <section
-      aria-labelledby="export-title"
-      className="border-t pt-4 first:border-t-0 first:pt-0"
-    >
-      <h2 id="export-title" className="font-semibold">
-        导出
-      </h2>
-      <div className="mt-3 grid grid-cols-2 gap-2">
-        {(["txt", "md", "vtt", "srt", "json"] as const).map((format) => (
-          <Button
-            key={format}
-            type="button"
-            variant="outline"
-            size="sm"
-            disabled={pending}
-            aria-label={`导出 ${format.toUpperCase()}`}
-            onClick={() => onExport(format)}
-          >
-            <Download aria-hidden="true" />
-            {format.toUpperCase()}
-          </Button>
-        ))}
-      </div>
-    </section>
-  );
-}
-
 function AudioLoading() {
   return (
     <section
@@ -1157,7 +1204,7 @@ function RecoveryError({
   return (
     <div
       role="alert"
-      className="flex flex-wrap items-center justify-between gap-3 rounded-xl border bg-card p-4"
+      className="flex flex-wrap items-center justify-between gap-3 border-y py-4"
     >
       <div>
         <p className="font-medium">音频工作区暂时不可用</p>

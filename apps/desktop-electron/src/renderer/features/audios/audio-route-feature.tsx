@@ -528,8 +528,7 @@ export function AudioMainWorkspace({
           aria-busy={controller.transitionPending}
         >
           <div>
-            <h1 className="text-2xl font-semibold tracking-tight">音频</h1>
-            <p className="mt-2 text-sm text-muted-foreground">
+            <p className="text-sm text-muted-foreground">
               从音频列表选择要复核的内容。
             </p>
             <Button type="button" className="mt-5" onClick={onOpenPane}>

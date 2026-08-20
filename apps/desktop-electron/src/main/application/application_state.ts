@@ -2,6 +2,7 @@ import {
   applicationSnapshotSchema,
   desktopProtocolVersion,
   type ApplicationSnapshot,
+  type ActivityItem,
   type CaptureSnapshot,
   type ShellSection,
 } from "../../shared/contracts";
@@ -20,6 +21,7 @@ export class DesktopApplicationState {
     library: { phase: "loading" },
     reconciliation: [],
     capture: { phase: "idle" },
+    activity: [],
   });
   private readonly listeners = new Set<SnapshotListener>();
 
@@ -99,6 +101,7 @@ export class DesktopApplicationState {
   ): ApplicationSnapshot {
     if (!capture) return this.update({ capture: { phase: "idle" } });
     const phase = capture.state === "recoverable" ? "recovery" : capture.state;
+    const activity = nextActivity(this.current, capture, phase);
     return this.update({
       capture: {
         phase,
@@ -115,7 +118,23 @@ export class DesktopApplicationState {
           ? captureMessage(capture.interruptionReason)
           : undefined,
       },
+      activity,
     });
+  }
+
+  acknowledgeActivity(throughId: string): ApplicationSnapshot {
+    const currentActivity = this.current.activity ?? [];
+    const throughIndex = currentActivity.findIndex(
+      (item) => item.id === throughId,
+    );
+    if (throughIndex < 0) return this.snapshot();
+    const activity = currentActivity.map((item, index) =>
+      index >= throughIndex && !item.read ? { ...item, read: true } : item,
+    );
+    if (activity.every((item, index) => item === currentActivity[index])) {
+      return this.snapshot();
+    }
+    return this.update({ activity });
   }
 
   private update(
@@ -130,6 +149,46 @@ export class DesktopApplicationState {
     for (const listener of this.listeners) listener(snapshot);
     return snapshot;
   }
+}
+
+function nextActivity(
+  current: ApplicationSnapshot,
+  capture: CaptureSnapshot,
+  phase: Exclude<ApplicationSnapshot["capture"], { phase: "idle" }>["phase"],
+): ActivityItem[] {
+  const currentActivity = current.activity ?? [];
+  const terminal =
+    phase === "completed" ||
+    phase === "failed" ||
+    (phase === "partial_capture" && capture.recordingSha256 !== null);
+  if (!terminal) return currentActivity;
+
+  const kind: ActivityItem["kind"] =
+    phase === "completed"
+      ? "capture_completed"
+      : phase === "partial_capture"
+        ? "capture_partial"
+        : "capture_failed";
+  const id = `${capture.sessionId}:${kind}`;
+  if (currentActivity.some((item) => item.id === id)) return currentActivity;
+  const warning = kind !== "capture_completed";
+  const item: ActivityItem = {
+    id,
+    kind,
+    captureSessionId: capture.sessionId,
+    createdAt: Date.now(),
+    title:
+      kind === "capture_completed"
+        ? "录制已保存"
+        : kind === "capture_partial"
+          ? "部分录制已保存，请检查"
+          : "录制需要处理",
+    severity: warning ? "warning" : "info",
+    read: false,
+    resolved: kind === "capture_completed",
+    detailTarget: "capture-details",
+  };
+  return [item, ...currentActivity].slice(0, 20);
 }
 
 function captureMessage(reason: string): string {

@@ -20,11 +20,31 @@
     },
     {
       "id": "controls-and-focus-states",
-      "requirement": "Select、Slider、Switch、Checkbox、Progress、Textarea 和 Card 的正常、键盘焦点、禁用及错误状态采用 shadcn 语法，pane 关闭后焦点回到对应 trigger"
+      "requirement": "SidebarTrigger 使用 PanelLeft 图标且 rail 默认控件保持 32 px；Select、Slider、Switch、Checkbox、Progress 和 Textarea 的正常、键盘焦点、禁用及错误状态采用 shadcn 语法，pane 或录制详情关闭后焦点回到对应 trigger"
     },
     {
       "id": "narrow-capture-reachability",
-      "requirement": "880 x 620 非模态 overlay 保持 48 px rail gap，capture/recovery 控制器距右下各 16 px、完全位于视口内且内部可滚动；背景、Escape 和关闭按钮均可关闭并恢复目标焦点"
+      "requirement": "880 x 620 非模态 overlay 保持 48 px rail gap；顶栏精简录制控制保持单行且直接提供暂停/继续和停止，录制详情在第三栏滚动，不再使用右下角大卡片"
+    },
+    {
+      "id": "card-shadow-hierarchy",
+      "requirement": "转写、播放、导出、字幕、设置和设备传输使用页面分区、分隔线与扁平行；除菜单、popover、dialog、overlay 和桌面悬浮控制外没有内容阴影或无语义的嵌套卡片"
+    },
+    {
+      "id": "capture-compact-detail-activity",
+      "requirement": "跨页录制只在顶栏显示状态、时长、暂停/继续、两步停止、详情和单一提示；设置、字幕、诊断、恢复和保存结果只在第三栏；全局消息最多 20 条且不含标题、转写、路径或原始错误"
+    },
+    {
+      "id": "floating-handoff-and-focus",
+      "requirement": "浮窗默认关闭；启用后主窗口失焦、隐藏或最小化时在活动显示器右上角无抢焦出现，主窗口恢复时隐藏；浮窗获焦不会形成循环，Tab、Escape、关闭、本次隐藏和打开详情行为正确"
+    },
+    {
+      "id": "floating-display-and-privacy",
+      "requirement": "320 x 72-112 浮窗在显示器分辨率变化或移除后仍位于 workArea，不覆盖全屏应用；只显示应用身份、录制状态、时长和允许动作，不显示录制标题、转写、路径、恢复、活动或原始错误"
+    },
+    {
+      "id": "capture-lifecycle",
+      "requirement": "切页、关闭详情、隐藏主窗口、关闭浮窗和 Renderer 重载均不停止录制；睡眠暂停、唤醒显式继续、停止等待 durable commit、退出选择与既有录制语义一致"
     },
     {
       "id": "audio-workflow",

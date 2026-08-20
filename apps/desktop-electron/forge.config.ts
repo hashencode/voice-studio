@@ -88,11 +88,20 @@ const config: ForgeConfig = {
           config: "vite.preload.config.mts",
           target: "preload",
         },
+        {
+          entry: "src/floating-preload.ts",
+          config: "vite.floating-preload.config.mts",
+          target: "preload",
+        },
       ],
       renderer: [
         {
           name: "main_window",
           config: "vite.renderer.config.mts",
+        },
+        {
+          name: "floating_capture_window",
+          config: "vite.floating-renderer.config.mts",
         },
       ],
       concurrent: false,
