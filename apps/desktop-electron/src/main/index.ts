@@ -3458,7 +3458,7 @@ async function runCaptureSmokeIfRequested(): Promise<void> {
       ),
       transport: captureNativeSession.transport,
     });
-    app.exit(85);
+    await exitInitializedCaptureSmoke(85);
     return;
   }
   const recoveries = captureService.listRecoveries();
@@ -3487,8 +3487,7 @@ async function runCaptureSmokeIfRequested(): Promise<void> {
         .update(recovery.sessionId)
         .digest("hex"),
     });
-    app.exit(86);
-    return;
+    hardExitCaptureSmoke(86);
   }
   const kept = captureService.keepRecovered(
     recovery.sessionId,
@@ -3644,6 +3643,25 @@ async function writeCaptureSmokeReceipt(
   const temporaryPath = `${outputPath}.tmp-${process.pid}`;
   await writeFile(temporaryPath, encoded, { mode: 0o600 });
   await rename(temporaryPath, outputPath);
+}
+
+async function exitInitializedCaptureSmoke(exitCode: number): Promise<void> {
+  teardownPromise ??= teardownOwnedResources();
+  await teardownPromise;
+  teardownComplete = true;
+  mainWindow?.destroy();
+  mainWindow = null;
+  hardExitCaptureSmoke(exitCode);
+}
+
+function hardExitCaptureSmoke(exitCode: number): never {
+  const reallyExit = (
+    process as NodeJS.Process & { reallyExit?: (code: number) => never }
+  ).reallyExit;
+  if (typeof reallyExit !== "function") {
+    throw new Error("capture smoke hard-exit primitive is unavailable");
+  }
+  return reallyExit(exitCode);
 }
 
 function traceCaptureSmoke(stage: string): void {
