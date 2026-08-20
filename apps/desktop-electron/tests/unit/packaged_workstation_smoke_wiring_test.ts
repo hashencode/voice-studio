@@ -54,4 +54,17 @@ describe("packaged workstation progress evidence wiring", () => {
       'button.textContent?.includes("重做") && !button.disabled',
     );
   });
+
+  it("opens the Radix export menu through its pointer contract", () => {
+    expect(mainSource).toContain(
+      "document.querySelector('[data-slot=\"dropdown-menu-trigger\"]')",
+    );
+    expect(mainSource).toContain(
+      'exportTrigger.dispatchEvent(new PointerEvent("pointerdown", {',
+    );
+    expect(mainSource).toContain('item.textContent?.trim() === "TXT"');
+    expect(mainSource).not.toContain(
+      "document.querySelector('[role=\"menuitem\"]')",
+    );
+  });
 });

@@ -1663,11 +1663,18 @@ async function runPackagedRendererAssertions(audioId: number): Promise<{
         () => document.querySelector('[aria-label="播放音频"]'),
         "paused playback"
       );
-      Array.from(document.querySelectorAll("button"))
-        .find((button) => button.textContent?.includes("导出"))
-        ?.click();
+      const exportTrigger = await waitFor(
+        () => document.querySelector('[data-slot="dropdown-menu-trigger"]'),
+        "export trigger"
+      );
+      exportTrigger.dispatchEvent(new PointerEvent("pointerdown", {
+        bubbles: true,
+        button: 0,
+        pointerType: "mouse"
+      }));
       const txtExport = await waitFor(
-        () => document.querySelector('[role="menuitem"]'),
+        () => [...document.querySelectorAll('[data-slot="dropdown-menu-item"][role="menuitem"]')]
+          .find((item) => item.textContent?.trim() === "TXT"),
         "TXT export option"
       );
       txtExport.click();
