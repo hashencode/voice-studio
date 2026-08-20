@@ -89,7 +89,7 @@
   "authorities": {
     "architecture": "docs/architecture/electron-audio-context-shell.md",
     "activityBoundary": "docs/architecture/audio-activity-source-boundary.json",
-    "electronNavigation": "apps/desktop-electron/src/renderer/components/app-sidebar.tsx",
+    "electronNavigation": "apps/desktop-electron/src/renderer/features/shell/context-pane-contract.ts",
     "electronStorage": "apps/desktop-electron/src/main/profile/profile_paths.ts",
     "electronProtocol": "apps/desktop-electron/src/shared/contracts/companion.ts",
     "dartProtocol": "packages/companion_protocol/lib/src/companion_models.dart"

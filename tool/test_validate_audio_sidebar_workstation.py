@@ -38,6 +38,16 @@ class AudioSidebarWorkstationTest(unittest.TestCase):
     def test_repository_contract_is_current(self) -> None:
         MODULE.validate()
 
+    def test_navigation_authority_owns_the_rail_labels(self) -> None:
+        relative = self.manifest["authorities"]["electronNavigation"]
+        self.assertEqual(
+            relative,
+            "apps/desktop-electron/src/renderer/features/shell/context-pane-contract.ts",
+        )
+        authority = (MODULE.ROOT / relative).read_text(encoding="utf-8")
+        for label in ("音频", "互联", "设置"):
+            self.assertIn(label, authority)
+
     def test_visually_divergent_candidate_remains_archived_and_ineligible(self) -> None:
         release_directory = MODULE.ROOT / "docs/product/audio-sidebar-release"
         invalidated_revision = "17a939231d886d6f2af1cc31843d04bfc725a1a9"
