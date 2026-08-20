@@ -1570,13 +1570,13 @@ async function runPackagedRendererReview(audioId: number): Promise<{
       buttonWithText("保存")?.click();
       const undo = await waitFor(
         () => [...document.querySelectorAll("button")]
-          .find((button) => button.textContent?.includes("撤销") && !button.disabled),
+          .find((button) => button.getAttribute("aria-label") === "撤销" && !button.disabled),
         "undo enabled"
       );
       undo.click();
       const redo = await waitFor(
         () => [...document.querySelectorAll("button")]
-          .find((button) => button.textContent?.includes("重做") && !button.disabled),
+          .find((button) => button.getAttribute("aria-label") === "重做" && !button.disabled),
         "redo enabled"
       );
       redo.click();

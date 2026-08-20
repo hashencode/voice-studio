@@ -39,4 +39,19 @@ describe("packaged workstation progress evidence wiring", () => {
     expect(mainSource).toContain("progressMax === 1");
     expect(mainSource).toContain("progressValue < 1");
   });
+
+  it("drives icon-only edit history controls through their accessible names", () => {
+    expect(mainSource).toContain(
+      'button.getAttribute("aria-label") === "撤销" && !button.disabled',
+    );
+    expect(mainSource).toContain(
+      'button.getAttribute("aria-label") === "重做" && !button.disabled',
+    );
+    expect(mainSource).not.toContain(
+      'button.textContent?.includes("撤销") && !button.disabled',
+    );
+    expect(mainSource).not.toContain(
+      'button.textContent?.includes("重做") && !button.disabled',
+    );
+  });
 });
