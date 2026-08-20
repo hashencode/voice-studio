@@ -380,8 +380,9 @@ async function ensureProcessGroupExited(
     try {
       process.kill(-pid, 0);
     } catch (error) {
-      if ((error as NodeJS.ErrnoException).code === "ESRCH") return;
-      throw error;
+      const code = (error as NodeJS.ErrnoException).code;
+      if (code === "ESRCH") return;
+      if (code !== "EPERM") throw error;
     }
     await new Promise((resolve) => setTimeout(resolve, 25));
   }
