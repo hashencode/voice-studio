@@ -23,6 +23,7 @@ import {
   powerMonitor,
   screen,
   session,
+  systemPreferences,
   Tray,
 } from "electron";
 
@@ -75,6 +76,7 @@ import {
   capturePreflightAllowsStart,
   hasVerifiedLiveCaptionCapability,
 } from "./domain/capture/capture_capability";
+import { requestMicrophonePermissionIfNeeded } from "./domain/capture/capture_permission";
 import { listAvailableCaptureRecoveries } from "./domain/capture/capture_availability";
 import { BrowserWindowPlaybackPort } from "./features/playback/browser_window_playback_port";
 import { AudioPlaybackService } from "./features/playback/audio_playback_service";
@@ -1877,12 +1879,17 @@ async function preflightCapture(options: {
   captionEnabled: boolean;
 }) {
   if (!captureService) throw new Error("macOS capture helper is unavailable");
+  if (options.requestPermissions) {
+    await requestMicrophonePermissionIfNeeded(systemPreferences);
+  }
   return await captureService.preflight({
     minimumFreeBytes: minimumCaptureFreeBytes,
     captionModelAvailable:
       !options.captionEnabled ||
       hasVerifiedLiveCaptionCapability(resourceCatalog),
-    requestPermissions: options.requestPermissions,
+    // TCC permission prompts must be owned by the foreground app bundle. The
+    // headless native helper only observes the resulting authorization state.
+    requestPermissions: false,
   });
 }
 
