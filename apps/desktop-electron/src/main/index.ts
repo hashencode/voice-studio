@@ -41,6 +41,7 @@ import {
   type FloatingCaptureWindowAction,
 } from "../shared/contracts";
 import { DesktopApplicationState } from "./application/application_state";
+import { configureRuntimeIdentity } from "./application/runtime_identity";
 import {
   deriveFloatingCaptureSnapshot,
   hasSameFloatingCapturePresentation,
@@ -170,6 +171,7 @@ if (smokeAppDataPath) {
   app.setPath("appData", smokeAppDataPath);
   app.setPath("userData", smokeUserData);
 }
+configureRuntimeIdentity(app);
 const isPrimaryInstance = runPrimaryInstance(app, () => app.enableSandbox());
 
 interface BootstrapSmokeRequest {
@@ -2100,6 +2102,11 @@ function updateCaptureTray(snapshot: CaptureSnapshot | null): void {
       {
         label: "打开 Voice2Text",
         click: () => showMainWindow(),
+      },
+      { type: "separator" },
+      {
+        label: "退出 Voice2Text",
+        click: () => app.quit(),
       },
     ]),
   );

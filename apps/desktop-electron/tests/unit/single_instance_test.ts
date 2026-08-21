@@ -3,9 +3,54 @@ import { resolve } from "node:path";
 
 import { describe, expect, it, vi } from "vitest";
 
+import { configureRuntimeIdentity } from "../../src/main/application/runtime_identity";
 import { runPrimaryInstance } from "../../src/main/application/single_instance";
 
+const mainSource = readFileSync(resolve("src/main/index.ts"), "utf8");
+
 describe("single-instance startup gate", () => {
+  it("isolates development runtime data", () => {
+    const setName = vi.fn();
+    const setPath = vi.fn();
+
+    configureRuntimeIdentity({
+      isPackaged: false,
+      getPath: (name) => {
+        expect(name).toBe("appData");
+        return "/Users/test/Library/Application Support";
+      },
+      setName,
+      setPath,
+    });
+
+    expect(setName).toHaveBeenCalledWith("Voice2Text Development");
+    expect(setPath.mock.calls).toEqual([
+      [
+        "appData",
+        "/Users/test/Library/Application Support/Voice2Text Development",
+      ],
+      [
+        "userData",
+        "/Users/test/Library/Application Support/Voice2Text Development/electron-user-data",
+      ],
+    ]);
+  });
+
+  it("preserves the packaged application identity", () => {
+    const setName = vi.fn();
+    const setPath = vi.fn();
+
+    configureRuntimeIdentity({
+      isPackaged: true,
+      getPath: vi.fn(),
+      setName,
+      setPath,
+    });
+
+    expect(setName).not.toHaveBeenCalled();
+    expect(setPath).not.toHaveBeenCalled();
+  });
+
   it("quits a second instance before any profile initialization can start", () => {
     const order: string[] = [];
     const quit = vi.fn(() => order.push("quit"));
@@ -45,7 +90,6 @@ describe("single-instance startup gate", () => {
   });
 
   it("selects isolated packaged-smoke paths before requesting the instance lock", () => {
-    const mainSource = readFileSync(resolve("src/main/index.ts"), "utf8");
     const appDataSelection = mainSource.indexOf('app.setPath("appData"');
     const userDataSelection = mainSource.indexOf('app.setPath("userData"');
     const instanceLock = mainSource.indexOf("runPrimaryInstance(app");
@@ -55,5 +99,14 @@ describe("single-instance startup gate", () => {
     expect(instanceLock).toBeGreaterThan(-1);
     expect(appDataSelection).toBeLessThan(instanceLock);
     expect(userDataSelection).toBeLessThan(instanceLock);
+  });
+
+  it("configures the normal runtime identity before requesting the instance lock", () => {
+    const runtimeIdentity = mainSource.indexOf("configureRuntimeIdentity(app)");
+    const instanceLock = mainSource.indexOf("runPrimaryInstance(app");
+
+    expect(runtimeIdentity).toBeGreaterThan(-1);
+    expect(instanceLock).toBeGreaterThan(-1);
+    expect(runtimeIdentity).toBeLessThan(instanceLock);
   });
 });
