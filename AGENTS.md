@@ -15,21 +15,32 @@ Before changing UI, screens, navigation, visual states, or Flutter component usa
 - Use Goo design tokens and component variants before hand-writing Material surfaces, typography, colors, dividers, loading states, dialogs, panels, toasts, snackbars, or form controls.
 - Preserve existing business behavior and platform contracts when migrating UI to Goo components.
 
-Run the normal project checks after relevant changes:
-
-```bash
-./tool/dev_check.sh
-```
-
 ## Verification lanes
 
-Use the lightest lane that proves the changed behavior:
+Use the lightest lane that proves the changed behavior. Routine work must not run
+the 20-stage `./tool/dev_check.sh` by default.
 
-| Change                                                                                                              | Required Electron command                                                            |
-| ------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------ |
-| Renderer layout, styling, navigation, or visual states                                                              | `bun run check:ui` from `apps/desktop-electron`                                      |
-| Main, Preload, shared contracts, storage, or ordinary worker integration                                            | `bun run check:code` from `apps/desktop-electron`                                    |
-| Release evidence, frozen-resource manifest/identity/packaged inventory, or an explicit user request for a candidate | `VOICE2TEXT_RELEASE_VALIDATION=1 bun run check:release` from `apps/desktop-electron` |
+| Change | Required verification |
+| --- | --- |
+| Documentation, comments, or analysis-only work | Inspect the diff and check affected references for consistency. Do not run tests, analyzers, or builds. |
+| Electron renderer layout, styling, navigation, or visual states | Run `bun run check:ui` from `apps/desktop-electron`. |
+| Electron Main, Preload, shared contracts, storage, or ordinary worker integration | Run `bun run check:code` from `apps/desktop-electron`. |
+| Electron release evidence, frozen-resource manifest/identity/packaged inventory, or an explicit candidate request | Run `VOICE2TEXT_RELEASE_VALIDATION=1 bun run check:release` from `apps/desktop-electron`. |
+| Pure Dart package (`audio_core`, `audio_workflows`, `companion_protocol`, `desktop_sherpa_worker`, or `processing_contracts`) | Run `dart analyze packages/<package>` and `dart test packages/<package>`. |
+| Flutter package (`packages/audio_storage`) | From the repository root, first run `python3 tool/build_cache_guard.py`, then run `flutter analyze packages/audio_storage` and `flutter test packages/audio_storage/test`. |
+| Flutter app (`apps/codex_ui_reproduction` or `apps/mobile-flutter`) | From the repository root, first run `python3 tool/build_cache_guard.py`; then, from the changed app directory, run `flutter analyze` and the narrowest relevant `flutter test <test-path>`. |
+| Cross-module or repository-wide release work, explicit full-validation request, or a change whose reverse-dependency set cannot be bounded | Run the complete `./tool/dev_check.sh` gate from the repository root. The dedicated Electron candidate row above takes precedence for Electron-only release evidence. |
+
+- Derive additional affected packages and apps from root workspace membership,
+  `pubspec.yaml` path dependencies, and import/reference searches. If that
+  evidence cannot bound the reverse-dependency set, use the complete gate.
+- Run the corresponding lane for every derived reverse consumer, not only the
+  directly changed package. This includes affected Flutter apps and Electron
+  worker or processing-contract integrations.
+- Deduplicate equivalent checks for the same code state. Do not repeat a
+  narrower check after an equivalent broader lane has passed.
+- Isolate and report unrelated pre-existing failures with evidence instead of
+  rerunning them.
 
 - Do not run `bun run package`, `resources:all`, or
   `audio_sidebar_release_candidate.py prepare` merely because a routine UI or
