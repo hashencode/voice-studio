@@ -1,0 +1,73 @@
+{
+  "schema": "voice2text-audio-sidebar-manual-receipt/v1",
+  "status": "PASS",
+  "sourceRevision": "6610dbd21c1dcf29c42c2d2aa0a1451a51958e9b",
+  "packageManifestSha256": "90da29d683752f8fceb948f548ee57052a7a3cbb96dd64d718de1cecacc0d267",
+  "targetSha256": "cfd5d83726fe1b3c661fa117ae85dd013076f8927c35e4068a9545774a5f8cb1",
+  "startedAt": "2026-08-21T03:39:19.642337Z",
+  "finishedAt": "2026-08-21T03:48:23.992585Z",
+  "elapsedMs": 544350,
+  "operator": "Codex local packaged-app QA",
+  "checks": [
+    {
+      "id": "fresh-audio-reset",
+      "status": "PASS"
+    },
+    {
+      "id": "sidebar09-side-by-side",
+      "status": "PASS"
+    },
+    {
+      "id": "desktop-shell-geometry",
+      "status": "PASS"
+    },
+    {
+      "id": "context-pane-row-treatment",
+      "status": "PASS"
+    },
+    {
+      "id": "controls-and-focus-states",
+      "status": "PASS"
+    },
+    {
+      "id": "narrow-capture-reachability",
+      "status": "PASS"
+    },
+    {
+      "id": "card-shadow-hierarchy",
+      "status": "PASS"
+    },
+    {
+      "id": "capture-compact-detail-activity",
+      "status": "PASS"
+    },
+    {
+      "id": "floating-handoff-and-focus",
+      "status": "PASS"
+    },
+    {
+      "id": "floating-display-and-privacy",
+      "status": "PASS"
+    },
+    {
+      "id": "capture-lifecycle",
+      "status": "PASS"
+    },
+    {
+      "id": "audio-workflow",
+      "status": "PASS"
+    },
+    {
+      "id": "companion-workflow",
+      "status": "PASS"
+    },
+    {
+      "id": "legacy-protocol-rejection",
+      "status": "PASS"
+    },
+    {
+      "id": "text-motion-semantics",
+      "status": "PASS"
+    }
+  ]
+}

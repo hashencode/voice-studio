@@ -1,6 +1,6 @@
 {
   "schema": "voice2text-audio-sidebar-workstation/v1",
-  "status": "DEVELOPMENT_COMPLETE_RELEASE_VALIDATION_PENDING",
+  "status": "RELEASE_VALIDATED",
   "activityNoun": "Audio",
   "navigation": {
     "rail": [
@@ -61,11 +61,11 @@
     "legacyRejectedBeforeMutation": true
   },
   "releaseCandidate": {
-    "status": "PENDING_U6_STABLE_CANDIDATE",
-    "sourceRevision": null,
-    "packageManifestSha256": null,
-    "automatedReceipt": null,
-    "manualReceipt": null,
+    "status": "PASS",
+    "sourceRevision": "6610dbd21c1dcf29c42c2d2aa0a1451a51958e9b",
+    "packageManifestSha256": "90da29d683752f8fceb948f548ee57052a7a3cbb96dd64d718de1cecacc0d267",
+    "automatedReceipt": "docs/product/audio-sidebar-release/candidate.json",
+    "manualReceipt": "docs/product/audio-sidebar-release/manual.json",
     "finalizeRebuilds": false
   },
   "historicalArtifacts": [
