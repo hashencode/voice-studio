@@ -19,6 +19,15 @@ export function captureIsRunning(snapshot: CaptureSnapshot): boolean {
   );
 }
 
+export function captureRequiresSnapshotPolling(
+  snapshot: CaptureSnapshot,
+): boolean {
+  return (
+    captureIsRunning(snapshot) ||
+    ["preparing", "paused", "finalizing"].includes(snapshot.state)
+  );
+}
+
 export function captureRequiresQuitConfirmation(
   snapshot: CaptureSnapshot | null,
 ): boolean {

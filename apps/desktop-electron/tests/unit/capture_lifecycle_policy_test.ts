@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import {
   activeCaptureQuitDialog,
+  captureRequiresSnapshotPolling,
   captureRequiresQuitConfirmation,
 } from "../../src/main/domain/capture/capture_lifecycle_policy";
 import { captureSnapshotSchema } from "../../src/shared/contracts";
@@ -29,6 +30,25 @@ describe("capture lifecycle policy", () => {
     expect(captureRequiresQuitConfirmation(recording)).toBe(true);
     expect(captureRequiresQuitConfirmation(paused)).toBe(true);
     expect(captureRequiresQuitConfirmation(finalizedPartial)).toBe(false);
+  });
+
+  it("does not poll a recovered partial session after both tracks have stopped", () => {
+    const livePartial = snapshot({
+      state: "partial_capture",
+      partialCapture: true,
+      microphoneHealthy: false,
+    });
+    const recoveredTerminalPartial = snapshot({
+      state: "partial_capture",
+      partialCapture: true,
+      systemAudioHealthy: false,
+      microphoneHealthy: false,
+    });
+
+    expect(captureRequiresSnapshotPolling(livePartial)).toBe(true);
+    expect(captureRequiresSnapshotPolling(recoveredTerminalPartial)).toBe(
+      false,
+    );
   });
 });
 

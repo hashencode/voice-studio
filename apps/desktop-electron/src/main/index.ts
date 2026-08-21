@@ -70,6 +70,7 @@ import { MacOSCaptureNativePort } from "./domain/capture/macos_capture_native_po
 import {
   activeCaptureQuitDialog,
   captureIsRunning,
+  captureRequiresSnapshotPolling,
   captureRequiresQuitConfirmation,
 } from "./domain/capture/capture_lifecycle_policy";
 import {
@@ -2012,13 +2013,7 @@ async function pollCaptureSnapshot(): Promise<void> {
     !captureService ||
     !current ||
     capturePollInFlight ||
-    ![
-      "preparing",
-      "recording",
-      "paused",
-      "finalizing",
-      "partial_capture",
-    ].includes(current.state)
+    !captureRequiresSnapshotPolling(current)
   ) {
     return;
   }
