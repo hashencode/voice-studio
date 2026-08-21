@@ -6,7 +6,7 @@ import type {
   ShellSection,
 } from "@shared/contracts";
 import { useProcessingTasks } from "@/features/processing/use-processing-tasks";
-import type { RendererShellSection } from "@/features/shell/context-pane-contract";
+import type { PersistedShellSection } from "@/features/shell/context-pane-contract";
 
 export function useApplicationShell() {
   const [snapshot, setSnapshot] = React.useState<ApplicationSnapshot | null>(
@@ -68,7 +68,7 @@ export function useApplicationShell() {
   }, [accept]);
 
   const navigate = React.useCallback(
-    async (section: RendererShellSection) => {
+    async (section: PersistedShellSection) => {
       const applicationSection = toApplicationSection(section);
       if (
         snapshot &&
@@ -98,7 +98,7 @@ export function useApplicationShell() {
   };
 }
 
-export function parseShellDeepLink(hash: string): RendererShellSection | null {
+export function parseShellDeepLink(hash: string): PersistedShellSection | null {
   const value = hash.replace(/^#\/?/, "").split("/")[0];
   if (value === "audio" || value === "library" || value === "tasks") {
     return "audio";
@@ -113,10 +113,10 @@ function isLegacyAudioDeepLink(hash: string): boolean {
 
 export function normalizeRendererSection(
   section: ShellSection,
-): RendererShellSection {
+): PersistedShellSection {
   return section === "library" || section === "tasks" ? "audio" : section;
 }
 
-function toApplicationSection(section: RendererShellSection): ShellSection {
+function toApplicationSection(section: PersistedShellSection): ShellSection {
   return section === "audio" ? "library" : section;
 }

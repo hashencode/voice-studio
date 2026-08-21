@@ -17,18 +17,19 @@ export interface ShellNavigationItem {
   section: RendererShellSection;
   title: string;
   icon: LucideIcon;
+  placement?: "primary" | "footer";
+  badgeCount?: number;
+  ariaLabel?: string;
 }
 
 export function NavMain({
   items,
   current,
   onNavigate,
-  footerAction,
 }: {
   items: readonly ShellNavigationItem[];
   current: RendererShellSection;
   onNavigate: (section: RendererShellSection) => void;
-  footerAction?: React.ReactNode;
 }) {
   const buttons = React.useRef<Array<HTMLButtonElement | null>>([]);
   const [rovingSection, setRovingSection] =
@@ -37,8 +38,8 @@ export function NavMain({
     0,
     items.findIndex((item) => item.section === (rovingSection ?? current)),
   );
-  const primaryItems = items.filter((item) => item.section !== "settings");
-  const settingsItem = items.find((item) => item.section === "settings");
+  const primaryItems = items.filter((item) => item.placement !== "footer");
+  const footerItems = items.filter((item) => item.placement === "footer");
 
   const handleKeyDown = (
     event: React.KeyboardEvent<HTMLButtonElement>,
@@ -71,7 +72,7 @@ export function NavMain({
           isActive={current === item.section}
           tabIndex={rovingIndex === index ? 0 : -1}
           aria-current={current === item.section ? "page" : undefined}
-          aria-label={item.title}
+          aria-label={item.ariaLabel ?? item.title}
           className="px-2.5 md:px-2"
           onClick={() => {
             setRovingSection(item.section);
@@ -80,6 +81,11 @@ export function NavMain({
           onKeyDown={(event) => handleKeyDown(event, index)}
         >
           <item.icon aria-hidden="true" />
+          {item.badgeCount && item.badgeCount > 0 ? (
+            <span className="absolute -top-1 -right-1 min-w-4 rounded-full bg-destructive px-1 text-center text-[10px] leading-4 text-white">
+              {item.badgeCount}
+            </span>
+          ) : null}
           <span className="sr-only">{item.title}</span>
         </SidebarMenuButton>
       </SidebarMenuItem>
@@ -96,10 +102,11 @@ export function NavMain({
           </SidebarGroupContent>
         </SidebarGroup>
       </SidebarContent>
-      {settingsItem ? (
+      {footerItems.length > 0 ? (
         <SidebarFooter>
-          {footerAction}
-          <SidebarMenu>{renderItem(settingsItem)}</SidebarMenu>
+          {footerItems.map((item) => (
+            <SidebarMenu key={item.section}>{renderItem(item)}</SidebarMenu>
+          ))}
         </SidebarFooter>
       ) : null}
     </>

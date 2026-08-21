@@ -15,6 +15,7 @@ const CONTEXT_PANE_BREAKPOINT = 1024;
 const DEFAULT_PREFERENCES: PanePreferences = {
   audio: "open",
   companion: "open",
+  messages: "open",
   settings: "open",
 };
 const PERSISTENT_CLOSE_REASONS: ReadonlySet<ContextPaneCloseReason> = new Set([
@@ -112,6 +113,7 @@ function readPanePreferences(): PanePreferences {
     return {
       audio: value.audio === "closed" ? "closed" : "open",
       companion: value.companion === "closed" ? "closed" : "open",
+      messages: value.messages === "closed" ? "closed" : "open",
       settings: value.settings === "closed" ? "closed" : "open",
     };
   } catch {

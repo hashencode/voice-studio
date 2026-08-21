@@ -2,7 +2,12 @@ import * as React from "react";
 import { BrainCircuit, Settings2, ShieldCheck } from "lucide-react";
 
 import { AppSidebar } from "@/components/app-sidebar";
-import { ActivityCenter } from "@/features/activity/activity-center";
+import {
+  ActivityContextPane,
+  ActivityErrorDialog,
+  ActivityMainWorkspace,
+  type ActivityItemView,
+} from "@/features/activity/activity-center";
 import {
   SidebarInset,
   SidebarProvider,
@@ -57,6 +62,7 @@ const SETTINGS_SECTIONS = [
   { value: "privacy", label: "隐私与安全", icon: ShieldCheck },
 ] as const;
 type SettingsSection = (typeof SETTINGS_SECTIONS)[number]["value"];
+const EMPTY_ACTIVITY_ITEMS: ActivityItemView[] = [];
 
 export default function App() {
   const {
@@ -71,9 +77,13 @@ export default function App() {
     cancelProcessing,
     retryProcessing,
   } = useApplicationShell();
-  const current = snapshot
+  const [messagesOpen, setMessagesOpen] = React.useState(false);
+  const persistedSection = snapshot
     ? normalizeRendererSection(snapshot.navigation.section)
     : "audio";
+  const current: RendererShellSection = messagesOpen
+    ? "messages"
+    : persistedSection;
   const pane = useContextPaneShell(current);
   const clearTransientPaneClose = pane.clearTransientClose;
   const paneTriggerRef = React.useRef<HTMLButtonElement>(null);
@@ -91,15 +101,39 @@ export default function App() {
     React.useState<SettingsSection>("general");
   const [captureCompactHost, setCaptureCompactHost] =
     React.useState<HTMLDivElement | null>(null);
+  const [selectedActivityId, setSelectedActivityId] = React.useState<
+    string | null
+  >(null);
+  const [activityError, setActivityError] =
+    React.useState<ActivityItemView | null>(null);
+  const activityItems = snapshot?.activity ?? EMPTY_ACTIVITY_ITEMS;
+  const unreadActivityItems = React.useMemo(
+    () => activityItems.filter((item) => !item.read),
+    [activityItems],
+  );
+  const selectedActivity =
+    activityItems.find((item) => item.id === selectedActivityId) ??
+    activityItems[0] ??
+    null;
   const navigatePrimary = React.useCallback(
     (section: RendererShellSection) => {
       clearTransientPaneClose();
       captureInvokerRef.current = null;
       setCaptureDetailOpen(false);
       setCaptureDetailSessionId(null);
+      if (section === "messages") {
+        setMessagesOpen(true);
+        setSelectedActivityId(activityItems[0]?.id ?? null);
+        const newestUnread = unreadActivityItems[0];
+        if (newestUnread) {
+          void window.voice2text.acknowledgeActivity?.(newestUnread.id);
+        }
+        return;
+      }
+      setMessagesOpen(false);
       navigate(section);
     },
-    [clearTransientPaneClose, navigate],
+    [activityItems, clearTransientPaneClose, navigate, unreadActivityItems],
   );
   const changeCaptureDetail = React.useCallback(
     (open: boolean, sessionId: string | null = null) => {
@@ -127,6 +161,14 @@ export default function App() {
       });
     },
     [],
+  );
+  const openActivityDetails = React.useCallback(
+    (item: ActivityItemView) => {
+      void window.voice2text.acknowledgeActivity?.(item.id);
+      setActivityError(null);
+      changeCaptureDetail(true, item.captureSessionId);
+    },
+    [changeCaptureDetail],
   );
   React.useEffect(
     () =>
@@ -192,18 +234,7 @@ export default function App() {
         current={current}
         onNavigate={navigatePrimary}
         presentation={pane.open ? pane.presentation : "closed"}
-        activityCenter={
-          <ActivityCenter
-            items={snapshot.activity ?? []}
-            onAcknowledgeThrough={(id) => {
-              void window.voice2text.acknowledgeActivity?.(id);
-            }}
-            onOpenDetails={(item) => {
-              void window.voice2text.acknowledgeActivity?.(item.id);
-              changeCaptureDetail(true, item.captureSessionId);
-            }}
-          />
-        }
+        unreadActivityCount={unreadActivityItems.length}
       >
         {pane.open ? (
           <ContextPaneShell
@@ -222,6 +253,21 @@ export default function App() {
               <AudioContextPane controller={audio} />
             ) : pane.paneSection === "companion" ? (
               <CompanionContextPane controller={companion} />
+            ) : pane.paneSection === "messages" ? (
+              <ActivityContextPane
+                items={activityItems}
+                selectedId={selectedActivity?.id ?? null}
+                onSelect={(item) => {
+                  setSelectedActivityId(item.id);
+                  void window.voice2text.acknowledgeActivity?.(item.id);
+                  if (item.kind === "capture_failed") {
+                    setActivityError(item);
+                  }
+                  if (pane.presentation === "overlay") {
+                    requestPaneClose("selection");
+                  }
+                }}
+              />
             ) : (
               <SettingsContextPane
                 value={settingsSection}
@@ -236,7 +282,13 @@ export default function App() {
           </ContextPaneShell>
         ) : null}
       </AppSidebar>
-      <SidebarInset className="min-h-0 min-w-0 overflow-hidden">
+      <SidebarInset
+        className={`min-h-0 min-w-0 overflow-hidden ${
+          pane.open && pane.presentation === "docked"
+            ? "ml-[calc(var(--sidebar-width)-var(--sidebar-width-icon))]"
+            : ""
+        }`}
+      >
         <header className="sticky top-0 z-10 flex min-h-16 shrink-0 flex-wrap items-center gap-3 border-b bg-background px-4 py-2">
           <ContextPaneTrigger
             ref={paneTriggerRef}
@@ -285,6 +337,9 @@ export default function App() {
               companion={companion}
               onOpenCompanionPane={pane.openPane}
               settingsSection={settingsSection}
+              current={current}
+              selectedActivity={selectedActivity}
+              onOpenActivityDetails={openActivityDetails}
             />
           ) : null}
           <CaptureWorkspace
@@ -304,6 +359,14 @@ export default function App() {
               }
             }}
           />
+          <ActivityErrorDialog
+            item={activityError}
+            open={activityError !== null}
+            onOpenChange={(open) => {
+              if (!open) setActivityError(null);
+            }}
+            onOpenDetails={openActivityDetails}
+          />
         </div>
       </SidebarInset>
     </SidebarProvider>
@@ -318,6 +381,9 @@ function ShellContent({
   companion,
   onOpenCompanionPane,
   settingsSection,
+  current,
+  selectedActivity,
+  onOpenActivityDetails,
 }: {
   snapshot: ApplicationSnapshot;
   onBootstrapAction: Parameters<typeof ProfileBlocker>[0]["onAction"];
@@ -326,6 +392,9 @@ function ShellContent({
   companion: CompanionRouteController;
   onOpenCompanionPane: () => void;
   settingsSection: SettingsSection;
+  current: RendererShellSection;
+  selectedActivity: ActivityItemView | null;
+  onOpenActivityDetails: (item: ActivityItemView) => void;
 }) {
   if (snapshot.profile.phase === "initializing") {
     return (
@@ -365,7 +434,7 @@ function ShellContent({
     );
   }
   let section: React.ReactNode;
-  switch (normalizeRendererSection(snapshot.navigation.section)) {
+  switch (current) {
     case "audio":
       section = (
         <div className="space-y-4">
@@ -390,6 +459,14 @@ function ShellContent({
       break;
     case "settings":
       section = <SettingsContent section={settingsSection} />;
+      break;
+    case "messages":
+      section = (
+        <ActivityMainWorkspace
+          item={selectedActivity}
+          onOpenDetails={onOpenActivityDetails}
+        />
+      );
       break;
   }
   return <div className="space-y-4">{section}</div>;
@@ -481,6 +558,7 @@ function contentTitle(
     return SETTINGS_SECTIONS.find((item) => item.value === settingsSection)!
       .label;
   }
+  if (section === "messages") return "消息";
   if (companion.selectedPeer) return companion.selectedPeer.displayName;
   if (companion.view.kind === "history") return "传输历史";
   if (companion.view.kind === "pairing" || companion.peers.length === 0) {

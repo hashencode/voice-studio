@@ -344,7 +344,7 @@ async function assertDockedGeometry(
 ) {
   const geometry = await shellGeometry(page);
   expectRect(geometry.wrapper, { x: 0, y: 0, width, height });
-  expectHorizontalRect(geometry.gap, { x: 0, width: 350 });
+  expectHorizontalRect(geometry.gap, { x: 0, width: 48 });
   expectRect(geometry.container, { x: 0, y: 0, width: 350, height });
   expectRect(geometry.rail, { x: 0, y: 0, width: 49, height });
   expectWithin(geometry.railContentWidth, 48);
@@ -363,19 +363,19 @@ async function assertRailOnlyGeometry(
   await expect
     .poll(async () => {
       const geometry = await shellGeometry(page);
-      return Math.abs(geometry.gap.width - 350);
+      return Math.abs(geometry.gap.width - 48);
     })
     .toBeLessThanOrEqual(1);
   const geometry = await shellGeometry(page);
   expectRect(geometry.wrapper, { x: 0, y: 0, width, height });
-  expectHorizontalRect(geometry.gap, { x: 0, width: 350 });
+  expectHorizontalRect(geometry.gap, { x: 0, width: 48 });
   expectRect(geometry.container, { x: 0, y: 0, width: 48, height });
   expectRect(geometry.rail, { x: 0, y: 0, width: 49, height });
   expectWithin(geometry.railContentWidth, 48);
   expectWithin(geometry.railBorderRight, 1);
   expect(geometry.pane).toBeNull();
-  expectWithin(geometry.inset.x, 350);
-  expectWithin(geometry.inset.width, width - 350);
+  expectWithin(geometry.inset.x, 48);
+  expectWithin(geometry.inset.width, width - 48);
 }
 
 async function assertOverlayGeometry(

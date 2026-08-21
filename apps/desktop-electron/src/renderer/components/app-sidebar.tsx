@@ -1,5 +1,5 @@
 import type * as React from "react";
-import { Cog, MonitorSmartphone, Music, Waves } from "lucide-react";
+import { Bell, Cog, MonitorSmartphone, Music, Waves } from "lucide-react";
 
 import { NavMain, type ShellNavigationItem } from "@/components/nav-main";
 import { Sidebar, SidebarHeader } from "@/components/ui/sidebar";
@@ -17,9 +17,16 @@ const navigation: readonly ShellNavigationItem[] = [
     icon: MonitorSmartphone,
   },
   {
+    section: "messages",
+    title: SHELL_SECTION_LABELS.messages,
+    icon: Bell,
+    placement: "footer",
+  },
+  {
     section: "settings",
     title: SHELL_SECTION_LABELS.settings,
     icon: Cog,
+    placement: "footer",
   },
 ];
 
@@ -27,21 +34,21 @@ export function AppSidebar({
   current,
   onNavigate,
   presentation,
-  activityCenter,
+  unreadActivityCount,
   children,
 }: React.PropsWithChildren<{
   current: RendererShellSection;
   onNavigate: (section: RendererShellSection) => void;
   presentation: ContextPanePresentation | "closed";
-  activityCenter?: React.ReactNode;
+  unreadActivityCount: number;
 }>) {
   return (
     <Sidebar
       collapsible="icon"
       mobileMode="inline"
-      preserveCollapsedGap={presentation === "closed"}
+      overlayContent
       data-presentation={presentation}
-      className="overflow-hidden *:data-[sidebar=sidebar]:flex-row data-[presentation=overlay]:z-20 data-[presentation=overlay]:!w-[min(var(--sidebar-width),100vw)]"
+      className="z-20 overflow-hidden *:data-[sidebar=sidebar]:flex-row data-[presentation=overlay]:!w-[min(var(--sidebar-width),100vw)]"
     >
       <Sidebar
         collapsible="none"
@@ -60,10 +67,17 @@ export function AppSidebar({
           </div>
         </SidebarHeader>
         <NavMain
-          items={navigation}
+          items={navigation.map((item) =>
+            item.section === "messages" && unreadActivityCount > 0
+              ? {
+                  ...item,
+                  badgeCount: unreadActivityCount,
+                  ariaLabel: `消息，${unreadActivityCount} 条未读`,
+                }
+              : item,
+          )}
           current={current}
           onNavigate={onNavigate}
-          footerAction={activityCenter}
         />
       </Sidebar>
       {children}

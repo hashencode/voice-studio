@@ -408,6 +408,24 @@ describe("application shell", () => {
     ).toBeVisible();
   });
 
+  it("restores a collapsed message pane preference", async () => {
+    window.localStorage.setItem(
+      "voice2text.shell.context-panes.v1",
+      JSON.stringify({ messages: "closed" }),
+    );
+    installApi({ ...readySnapshot, capture: { phase: "idle" } });
+    const user = userEvent.setup();
+    render(<App />);
+
+    await user.click(await screen.findByRole("button", { name: "消息" }));
+    expect(
+      screen.queryByRole("complementary", { name: "消息上下文面板" }),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: "打开消息上下文面板" }),
+    ).toBeVisible();
+  });
+
   it("does not treat context-pane child controls as dismissal", async () => {
     const onRequestClose = vi.fn();
     const user = userEvent.setup();
@@ -634,14 +652,16 @@ describe("application shell", () => {
       screen.queryByRole("heading", { name: "启动恢复需要确认" }),
     ).not.toBeInTheDocument();
     await user.click(await screen.findByRole("button", { name: "消息" }));
-    expect(screen.getByLabelText("消息中心")).toHaveTextContent("暂无消息");
     expect(
-      screen.getByRole("heading", { name: "请选择音频", level: 1 }),
+      screen.getByRole("complementary", { name: "消息上下文面板" }),
+    ).toHaveTextContent("暂无消息");
+    expect(
+      screen.getByRole("heading", { name: "消息", level: 1 }),
     ).toBeVisible();
     expect(screen.getAllByRole("heading", { level: 1 })).toHaveLength(1);
 
     expect(api.navigate).not.toHaveBeenCalled();
-    await user.keyboard("{Escape}");
+    await user.click(screen.getByRole("button", { name: "音频" }));
     await user.click(
       await screen.findByRole("button", { name: /打开 中断的音频/ }),
     );
@@ -673,7 +693,9 @@ describe("application shell", () => {
     render(<App />);
 
     await user.click(await screen.findByRole("button", { name: "消息" }));
-    expect(screen.getByLabelText("消息中心")).toHaveTextContent("暂无消息");
+    expect(
+      screen.getByRole("complementary", { name: "消息上下文面板" }),
+    ).toHaveTextContent("暂无消息");
     expect(api.navigate).not.toHaveBeenCalled();
   });
 
@@ -765,10 +787,9 @@ describe("application shell", () => {
       screen.getByRole("button", { name: /录制中断，需要处理/ }),
     );
     await user.click(
-      within(screen.getByRole("region", { name: "消息详情" })).getByRole(
-        "button",
-        { name: "打开录制详情" },
-      ),
+      within(
+        screen.getByRole("dialog", { name: "录制中断，需要处理" }),
+      ).getByRole("button", { name: "打开录制详情" }),
     );
 
     expect(

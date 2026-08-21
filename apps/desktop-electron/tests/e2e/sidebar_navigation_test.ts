@@ -144,6 +144,11 @@ describe("sidebar navigation e2e", () => {
     companion.focus();
     expect(await screen.findByRole("tooltip")).toHaveTextContent("互联");
     await user.keyboard("{ArrowDown}{Enter}");
+    expect(
+      within(navigation).getByRole("button", { name: "消息" }),
+    ).toHaveFocus();
+    expect(api.navigate).not.toHaveBeenCalled();
+    await user.keyboard("{ArrowDown}{Enter}");
     await waitFor(() => expect(api.navigate).toHaveBeenCalledWith("settings"));
     expect(
       within(navigation).getByRole("button", { name: "设置" }),
@@ -239,9 +244,9 @@ describe("sidebar navigation e2e", () => {
     ).toBeVisible();
     expect(screen.queryByText("启动恢复需要确认")).not.toBeInTheDocument();
     await user.click(screen.getByRole("button", { name: "消息" }));
-    expect(screen.getByRole("dialog", { name: "消息中心" })).toHaveTextContent(
-      "暂无消息",
-    );
+    expect(
+      screen.getByRole("complementary", { name: "消息上下文面板" }),
+    ).toHaveTextContent("暂无消息");
     expect(writes).not.toHaveBeenCalled();
 
     window.innerWidth = 1280;
@@ -293,6 +298,69 @@ describe("sidebar navigation e2e", () => {
     fireEvent.pointerDown(document.getElementById("main-content")!);
     expect(writes).toHaveBeenCalledTimes(5);
     expect(trigger).toHaveFocus();
+  });
+
+  it("reveals message details after selecting from a narrow overlay", async () => {
+    Object.defineProperty(window, "innerWidth", {
+      configurable: true,
+      value: 880,
+      writable: true,
+    });
+    const acknowledgeActivity = vi.fn(async () => restored);
+    applicationApi(
+      {
+        ...restored,
+        activity: [
+          {
+            id: "complete",
+            kind: "capture_completed",
+            captureSessionId: "capture-complete",
+            createdAt: 2,
+            title: "录制已保存",
+            severity: "info",
+            read: false,
+            resolved: true,
+            detailTarget: "capture-details",
+          },
+          {
+            id: "failed",
+            kind: "capture_failed",
+            captureSessionId: "capture-failed",
+            createdAt: 1,
+            title: "录制失败",
+            severity: "warning",
+            read: false,
+            resolved: false,
+            detailTarget: "capture-details",
+          },
+        ],
+      },
+      { acknowledgeActivity },
+    );
+    const user = userEvent.setup();
+    render(createElement(App));
+
+    await user.click(
+      await screen.findByRole("button", { name: "消息，2 条未读" }),
+    );
+    expect(acknowledgeActivity).toHaveBeenCalledWith("complete");
+    await user.click(screen.getByRole("button", { name: /录制已保存/ }));
+    expect(
+      screen.queryByRole("complementary", { name: "消息上下文面板" }),
+    ).not.toBeInTheDocument();
+    expect(screen.getByRole("region", { name: "消息详情" })).toHaveTextContent(
+      "录制已保存",
+    );
+
+    await user.click(
+      screen.getByRole("button", { name: "打开消息上下文面板" }),
+    );
+    await user.click(screen.getByRole("button", { name: /录制失败/ }));
+    expect(
+      screen.queryByRole("complementary", { name: "消息上下文面板" }),
+    ).not.toBeInTheDocument();
+    expect(screen.getByRole("dialog", { name: "录制失败" })).toBeVisible();
+    expect(acknowledgeActivity).toHaveBeenCalledWith("failed");
   });
 
   it("closes audio playback once when sidebar navigation unmounts the workspace", async () => {
