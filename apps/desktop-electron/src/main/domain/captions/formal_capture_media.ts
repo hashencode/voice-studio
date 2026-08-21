@@ -74,6 +74,8 @@ export async function prepareFormalCaptureMedia(options: {
     if (
       options.recordingSha256 !== options.journalSha256 ||
       !spoolAuthority ||
+      !("complete" in spoolAuthority) ||
+      spoolAuthority.complete !== true ||
       !["completed", "partial_capture"].includes(authority.state ?? "") ||
       spoolAuthority.captureTimelineMs !== authority.captureTimelineMs ||
       spoolAuthority.gapCount !== authorityGapCount ||

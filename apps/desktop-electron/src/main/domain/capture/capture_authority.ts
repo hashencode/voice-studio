@@ -39,14 +39,24 @@ const eventSchema = z
     reason: z.string().min(1).max(240),
   })
   .strict();
-const finalizedSpoolSchema = z
-  .object({
-    relativePath: z.literal("caption/live-caption.pcmspool"),
-    format: z.literal("s16le"),
-    sampleRate: z.literal(16_000),
-    channels: z.literal(1),
-    frameDurationMs: z.literal(100),
-    disposable: z.literal(true),
+const spoolDescriptorSchema = z.object({
+  relativePath: z.literal("caption/live-caption.pcmspool"),
+  format: z.literal("s16le"),
+  sampleRate: z.literal(16_000),
+  channels: z.literal(1),
+  frameDurationMs: z.literal(100),
+  disposable: z.literal(true),
+});
+const pendingSpoolSchema = spoolDescriptorSchema.strict();
+const degradedSpoolSchema = spoolDescriptorSchema
+  .extend({
+    complete: z.literal(false),
+    formalEligible: z.literal(false),
+    error: z.literal("caption_spool_rebuild_failed"),
+  })
+  .strict();
+const finalizedSpoolSchema = spoolDescriptorSchema
+  .extend({
     complete: z.literal(true),
     formalEligible: z.literal(true),
     bytes: z
@@ -78,7 +88,9 @@ const journalSchema = z
       ])
       .optional(),
     captureTimelineMs: z.number().int().nonnegative().safe().optional(),
-    spool: finalizedSpoolSchema.optional(),
+    spool: z
+      .union([finalizedSpoolSchema, degradedSpoolSchema, pendingSpoolSchema])
+      .optional(),
   })
   .passthrough();
 

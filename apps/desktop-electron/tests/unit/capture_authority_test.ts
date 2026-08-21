@@ -33,6 +33,36 @@ describe("capture authority validation", () => {
     );
   });
 
+  it.each([
+    {
+      relativePath: "caption/live-caption.pcmspool",
+      format: "s16le",
+      sampleRate: 16_000,
+      channels: 1,
+      frameDurationMs: 100,
+      disposable: true,
+    },
+    {
+      relativePath: "caption/live-caption.pcmspool",
+      format: "s16le",
+      sampleRate: 16_000,
+      channels: 1,
+      frameDurationMs: 100,
+      disposable: true,
+      complete: false,
+      formalEligible: false,
+      error: "caption_spool_rebuild_failed",
+    },
+  ])(
+    "accepts chunk authority when the disposable caption spool is unavailable",
+    async (spool) => {
+      const fixture = createFixture(spool);
+      await expect(validateCaptureAuthority(fixture.request)).resolves.toEqual(
+        expect.objectContaining({ spool }),
+      );
+    },
+  );
+
   it("fails closed on hash mismatch and symlink replacement", async () => {
     const mismatch = createFixture();
     await expect(
@@ -72,7 +102,7 @@ describe("capture authority validation", () => {
   );
 });
 
-function createFixture() {
+function createFixture(spool?: Record<string, unknown>) {
   const root = mkdtempSync(path.join(tmpdir(), "voice2text-authority-"));
   roots.push(root);
   const sessionId = "session-authority-123456";
@@ -111,6 +141,7 @@ function createFixture() {
         },
       ],
       events: [],
+      ...(spool ? { state: "partial_capture", spool } : {}),
     }),
   );
   const expectedJournalSha256 = createHash("sha256")
