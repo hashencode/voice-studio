@@ -20,13 +20,13 @@ bun run start
 frozen worker/model resources change. Later development runs can use
 `bun run start` directly.
 
-During active Renderer iteration, use `bun run check:ui:quick`; it checks
-formatting, lint, types, and focused Renderer behavior. `bun run check:ui:quick`
-does not launch Electron windows. Once the UI edit is stable, run
-`bun run check:ui` once for the final visual scenarios and screenshots. Broader
-Electron code work uses `bun run check:code`. None of these commands packages
-the application or downloads frozen models. Release evidence is the explicit
-heavy lane:
+For Renderer work, `bun run check:ui` checks formatting, lint, types, and
+focused Renderer behavior without launching Electron windows. Use
+`bun run check:ui:visual` only when visual acceptance is explicitly requested.
+Updating canonical screenshots is a separate, deliberate action:
+`bun run check:ui:visual:update`. Broader Electron code work uses
+`bun run check:code`. None of these commands packages the application or
+downloads frozen models. Release evidence is the explicit heavy lane:
 
 ```bash
 VOICE2TEXT_RELEASE_VALIDATION=1 bun run check:release
@@ -45,13 +45,15 @@ libraries into `resources/worker`, then packages them outside `app.asar`.
 `bun run smoke:package` launches the packaged macOS app from the system temporary
 directory and verifies the real worker health handshake.
 
-`bun run test:visual` launches the repository-pinned Electron runtime through a
+`bun run check:ui:visual` launches the repository-pinned Electron runtime through a
 test-only Main/Preload harness, exercises the production Renderer entry, checks
 sidebar geometry, and runs seven deterministic scenarios with six canonical
 screenshots, including the 320 x 96 desktop floating capture control. It also checks the 320 px compact
 shell without adding a host-sensitive full-shell pixel baseline.
 Canonical pixel baselines are macOS arm64 only; every host still runs the
-semantic and 1 px geometry assertions. Baseline updates require the environment recorded in
+semantic and 1 px geometry assertions. Run
+`bun run check:ui:visual:update` only after an explicit baseline-update request.
+Baseline updates require the environment recorded in
 `tests/visual/goldens/README.md` and a side-by-side review against the pinned
 official `sidebar-09` demo.
 

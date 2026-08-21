@@ -56,11 +56,13 @@ describe("worker resource publication", () => {
     expect(packageJson.scripts["check:ui:quick"]).not.toMatch(
       /playwright|test:visual|electron-forge|resources:|bun run package/,
     );
-    expect(packageJson.scripts["check:ui"]).toBe(
-      "bun run check:ui:quick && bun run test:visual",
-    );
+    expect(packageJson.scripts["check:ui"]).toBe("bun run check:ui:quick");
     expect(packageJson.scripts["check:ui"]).not.toMatch(
-      /resources:|bun run package|audio_sidebar_release_candidate/,
+      /playwright|test:visual|electron-forge|resources:|bun run package|audio_sidebar_release_candidate/,
+    );
+    expect(packageJson.scripts["check:ui:visual"]).toBe("bun run test:visual");
+    expect(packageJson.scripts["check:ui:visual:update"]).toBe(
+      "bun run test:visual -- --update-snapshots",
     );
     expect(packageJson.scripts["check:code"]).toBe("bun run check");
     expect(packageJson.scripts["check:release"]).toBe(
