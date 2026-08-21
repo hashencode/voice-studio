@@ -181,13 +181,7 @@ public final class CaptureController {
         forKeys: [.volumeAvailableCapacityForImportantUsageKey]
       ).volumeAvailableCapacityForImportantUsage
     ) ?? 0
-    let devices = MicrophoneCapture.devices().compactMap { raw -> CaptureDevice? in
-      guard let id = raw["id"] as? String,
-        let name = raw["name"] as? String,
-        let isDefault = raw["isDefault"] as? Bool
-      else { return nil }
-      return CaptureDevice(id: id, name: name, isDefault: isDefault)
-    }
+    let devices = MicrophoneCapture.devices()
     let supportsSystemAudio: Bool
     if #available(macOS 14.2, *) { supportsSystemAudio = true } else { supportsSystemAudio = false }
     return evaluateCapturePreflight(

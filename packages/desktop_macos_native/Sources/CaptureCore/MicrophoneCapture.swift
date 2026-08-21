@@ -12,6 +12,12 @@ enum DesktopMicrophoneCaptureError: Error {
   case engineStart(Error)
 }
 
+struct CoreAudioInputDevice {
+  let audioDeviceID: AudioDeviceID
+  let uniqueID: String
+  let name: String
+}
+
 final class MicrophoneCapture {
   private let engine = AVAudioEngine()
   private(set) var observedFrames: UInt64 = 0
@@ -59,28 +65,23 @@ final class MicrophoneCapture {
     AVCaptureDevice.requestAccess(for: .audio, completionHandler: completion)
   }
 
-  static func devices() -> [[String: Any]] {
-    let deviceTypes: [AVCaptureDevice.DeviceType]
-    if #available(macOS 14.0, *) {
-      deviceTypes = [.microphone, .external]
-    } else {
-      deviceTypes = [.builtInMicrophone, .externalUnknown]
-    }
-    let discovery = AVCaptureDevice.DiscoverySession(
-      deviceTypes: deviceTypes,
-      mediaType: .audio,
-      position: .unspecified
+  static func devices() -> [CaptureDevice] {
+    captureDevices(
+      from: coreAudioInputDevices(),
+      defaultAudioDeviceID: defaultInputAudioDeviceID()
     )
-    let defaultID = AVCaptureDevice.default(for: .audio)?.uniqueID
-    return discovery.devices.compactMap { device in
-      guard audioDeviceID(uniqueID: device.uniqueID) != nil else {
-        return nil
-      }
-      return [
-        "id": device.uniqueID,
-        "name": device.localizedName,
-        "isDefault": device.uniqueID == defaultID,
-      ]
+  }
+
+  static func captureDevices(
+    from devices: [CoreAudioInputDevice],
+    defaultAudioDeviceID: AudioDeviceID?
+  ) -> [CaptureDevice] {
+    devices.map { device in
+      CaptureDevice(
+        id: device.uniqueID,
+        name: device.name,
+        isDefault: device.audioDeviceID == defaultAudioDeviceID
+      )
     }
   }
 
@@ -167,6 +168,66 @@ final class MicrophoneCapture {
   }
 
   private static func audioDeviceID(uniqueID: String) -> AudioDeviceID? {
+    var address = AudioObjectPropertyAddress(
+      mSelector: kAudioHardwarePropertyTranslateUIDToDevice,
+      mScope: kAudioObjectPropertyScopeGlobal,
+      mElement: kAudioObjectPropertyElementMain
+    )
+    var uid = uniqueID as CFString
+    var deviceID = AudioDeviceID(kAudioObjectUnknown)
+    var resultSize = UInt32(MemoryLayout<AudioDeviceID>.size)
+    let status = withUnsafePointer(to: &uid) { pointer in
+      AudioObjectGetPropertyData(
+        AudioObjectID(kAudioObjectSystemObject),
+        &address,
+        UInt32(MemoryLayout<CFString>.size),
+        pointer,
+        &resultSize,
+        &deviceID
+      )
+    }
+    guard status == noErr, deviceID != kAudioObjectUnknown else { return nil }
+    return deviceID
+  }
+
+  private static func coreAudioInputDevices() -> [CoreAudioInputDevice] {
+    allAudioDeviceIDs().compactMap { deviceID in
+      guard hasInputStreams(deviceID),
+        let id = deviceUID(deviceID),
+        let name = deviceName(deviceID)
+      else {
+        return nil
+      }
+      return CoreAudioInputDevice(
+        audioDeviceID: deviceID,
+        uniqueID: id,
+        name: name
+      )
+    }
+  }
+
+  private static func defaultInputAudioDeviceID() -> AudioDeviceID? {
+    var address = AudioObjectPropertyAddress(
+      mSelector: kAudioHardwarePropertyDefaultInputDevice,
+      mScope: kAudioObjectPropertyScopeGlobal,
+      mElement: kAudioObjectPropertyElementMain
+    )
+    var deviceID = AudioDeviceID(kAudioObjectUnknown)
+    var size = UInt32(MemoryLayout<AudioDeviceID>.size)
+    guard AudioObjectGetPropertyData(
+      AudioObjectID(kAudioObjectSystemObject),
+      &address,
+      0,
+      nil,
+      &size,
+      &deviceID
+    ) == noErr else {
+      return nil
+    }
+    return deviceID == kAudioObjectUnknown ? nil : deviceID
+  }
+
+  private static func allAudioDeviceIDs() -> [AudioDeviceID] {
     var devicesAddress = AudioObjectPropertyAddress(
       mSelector: kAudioHardwarePropertyDevices,
       mScope: kAudioObjectPropertyScopeGlobal,
@@ -182,7 +243,7 @@ final class MicrophoneCapture {
         &devicesSize
       ) == noErr
     else {
-      return nil
+      return []
     }
     let count = Int(devicesSize) / MemoryLayout<AudioDeviceID>.size
     var devices = [AudioDeviceID](
@@ -199,31 +260,58 @@ final class MicrophoneCapture {
         &devices
       ) == noErr
     else {
-      return nil
+      return []
     }
-    for deviceID in devices {
-      var uidAddress = AudioObjectPropertyAddress(
-        mSelector: kAudioDevicePropertyDeviceUID,
-        mScope: kAudioObjectPropertyScopeGlobal,
-        mElement: kAudioObjectPropertyElementMain
+    return devices
+  }
+
+  private static func hasInputStreams(_ deviceID: AudioDeviceID) -> Bool {
+    var address = AudioObjectPropertyAddress(
+      mSelector: kAudioDevicePropertyStreams,
+      mScope: kAudioDevicePropertyScopeInput,
+      mElement: kAudioObjectPropertyElementMain
+    )
+    var size: UInt32 = 0
+    return AudioObjectGetPropertyDataSize(
+      deviceID,
+      &address,
+      0,
+      nil,
+      &size
+    ) == noErr && size >= UInt32(MemoryLayout<AudioStreamID>.size)
+  }
+
+  private static func deviceUID(_ deviceID: AudioDeviceID) -> String? {
+    stringProperty(kAudioDevicePropertyDeviceUID, deviceID: deviceID)
+  }
+
+  private static func deviceName(_ deviceID: AudioDeviceID) -> String? {
+    stringProperty(kAudioObjectPropertyName, deviceID: deviceID)
+  }
+
+  private static func stringProperty(
+    _ selector: AudioObjectPropertySelector,
+    deviceID: AudioDeviceID
+  ) -> String? {
+    var address = AudioObjectPropertyAddress(
+      mSelector: selector,
+      mScope: kAudioObjectPropertyScopeGlobal,
+      mElement: kAudioObjectPropertyElementMain
+    )
+    var value: CFString = "" as CFString
+    var size = UInt32(MemoryLayout<CFString>.size)
+    let status = withUnsafeMutablePointer(to: &value) { pointer in
+      AudioObjectGetPropertyData(
+        deviceID,
+        &address,
+        0,
+        nil,
+        &size,
+        pointer
       )
-      var value: CFString = "" as CFString
-      var valueSize = UInt32(MemoryLayout<CFString>.size)
-      let status = withUnsafeMutablePointer(to: &value) { pointer in
-        AudioObjectGetPropertyData(
-          deviceID,
-          &uidAddress,
-          0,
-          nil,
-          &valueSize,
-          pointer
-        )
-      }
-      if status == noErr, value as String == uniqueID {
-        return deviceID
-      }
     }
-    return nil
+    guard status == noErr else { return nil }
+    return value as String
   }
 
   private static func peak(_ buffer: AVAudioPCMBuffer) -> Double {
