@@ -19,7 +19,6 @@ const DEFAULT_PREFERENCES: PanePreferences = {
 };
 const PERSISTENT_CLOSE_REASONS: ReadonlySet<ContextPaneCloseReason> = new Set([
   "toggle",
-  "close-button",
   "escape",
   "background",
 ]);

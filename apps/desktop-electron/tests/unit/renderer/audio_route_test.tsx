@@ -26,7 +26,7 @@ const audioA = summary(1, "音频 A.wav");
 const audioB = summary(2, "音频 B.wav");
 const audioC = summary(3, "音频 C.wav");
 
-it("owns create/import in the pane and keeps the no-selection main minimal", async () => {
+it("prioritizes recording, keeps import secondary, and shows the recording-ready main", async () => {
   const onImport = vi.fn(async () => undefined);
   const onRecord = vi.fn();
   render(
@@ -36,7 +36,6 @@ it("owns create/import in the pane and keeps the no-selection main minimal", asy
       pendingJobActions={new Map()}
       writable
       paneOpen
-      onOpenPane={vi.fn()}
       onRecord={onRecord}
       onImport={onImport}
       onCancel={vi.fn()}
@@ -57,17 +56,144 @@ it("owns create/import in the pane and keeps the no-selection main minimal", asy
     .click(within(pane).getByRole("button", { name: "导入音频" }));
   expect(onRecord).toHaveBeenCalledOnce();
   expect(onImport).toHaveBeenCalledOnce();
+  expect(within(main).getByRole("combobox", { name: "麦克风" })).toBeVisible();
+  expect(within(main).getByRole("button", { name: "开始录制" })).toBeVisible();
   expect(
-    within(main).getByRole("button", { name: "打开音频列表" }),
+    within(main).getByRole("button", { name: "测试麦克风" }),
   ).toBeVisible();
-  expect(main).not.toHaveTextContent("开始录音");
   expect(main).not.toHaveTextContent("导入音频");
+
+  const paneActions = within(pane).getByRole("group", { name: "音频操作" });
+  const [importButton, recordButton] =
+    within(paneActions).getAllByRole("button");
+  expect(importButton).toHaveAccessibleName("导入音频");
+  expect(importButton?.querySelector("svg")).toBeNull();
+  expect(importButton).toHaveClass("col-span-1");
+  expect(recordButton).toHaveAccessibleName("开始录音");
+  expect(recordButton).toHaveClass("col-span-2");
+
+  onRecord.mockClear();
+  await userEvent
+    .setup()
+    .click(within(main).getByRole("button", { name: "开始录制" }));
+  expect(onRecord).toHaveBeenCalledWith("mic-default");
 
   const list = within(pane).getByRole("list", { name: "音频列表" });
   expect(list).toHaveAttribute("data-flat-row-list", "true");
   const row = within(list).getByRole("button", { name: /打开 音频 A/ });
   expect(row).toHaveAttribute("data-flat-row", "true");
   expect(row).not.toHaveClass("rounded-lg", "border", "bg-card");
+});
+
+it("allows system-audio-only recording when no microphone is available", async () => {
+  const onRecord = vi.fn();
+  const desktop = api({
+    preflightCapture: vi.fn(async () => ({
+      minimumMacosVersion: "13.0",
+      systemAudioMinimumMacosVersion: "13.0",
+      captureMode: "system_audio_only" as const,
+      systemAudioPermission: "granted" as const,
+      microphonePermission: "denied" as const,
+      microphones: [],
+      availableBytes: 8 * 1024 ** 3,
+      requiredBytes: 2 * 1024 ** 3,
+      captionModelAvailable: true,
+      canStart: true,
+      blockingReasons: [],
+    })),
+  });
+  render(
+    <AudioRouteFeature
+      api={desktop}
+      tasks={[]}
+      pendingJobActions={new Map()}
+      writable
+      paneOpen
+      onRecord={onRecord}
+      onImport={vi.fn()}
+      onCancel={vi.fn()}
+      onRetry={vi.fn()}
+    />,
+  );
+
+  const start = await screen.findByRole("button", { name: "开始录制" });
+  expect(start).toBeEnabled();
+  await userEvent.setup().click(start);
+  expect(onRecord).toHaveBeenCalledWith(undefined);
+});
+
+it("samples microphone input before reporting a successful test", async () => {
+  const stop = vi.fn();
+  const getUserMedia = vi.fn(async () => ({
+    getTracks: () => [{ stop }],
+  }));
+  const originalMediaDevices = Object.getOwnPropertyDescriptor(
+    navigator,
+    "mediaDevices",
+  );
+  Object.defineProperty(navigator, "mediaDevices", {
+    configurable: true,
+    value: { getUserMedia },
+  });
+  const disconnect = vi.fn();
+  const close = vi.fn(async () => undefined);
+  class AudioContextStub {
+    createMediaStreamSource() {
+      return { connect: vi.fn(), disconnect };
+    }
+
+    createAnalyser() {
+      return {
+        fftSize: 0,
+        getByteTimeDomainData: (samples: Uint8Array) => {
+          samples.fill(128);
+          samples[0] = 136;
+        },
+      };
+    }
+
+    close() {
+      return close();
+    }
+  }
+  vi.stubGlobal("AudioContext", AudioContextStub);
+
+  try {
+    render(
+      <AudioRouteFeature
+        api={api()}
+        tasks={[]}
+        pendingJobActions={new Map()}
+        writable
+        paneOpen
+        onRecord={vi.fn()}
+        onImport={vi.fn()}
+        onCancel={vi.fn()}
+        onRetry={vi.fn()}
+      />,
+    );
+    const testMicrophone = await screen.findByRole("button", {
+      name: "测试麦克风",
+    });
+    await userEvent.setup().click(testMicrophone);
+
+    expect(
+      await screen.findByText("麦克风工作正常：MacBook 麦克风"),
+    ).toBeVisible();
+    expect(getUserMedia).toHaveBeenCalledWith({
+      audio: { deviceId: { exact: "mic-default" } },
+    });
+    expect(stop).toHaveBeenCalledOnce();
+    expect(disconnect).toHaveBeenCalledOnce();
+    expect(close).toHaveBeenCalledOnce();
+  } finally {
+    vi.unstubAllGlobals();
+    if (originalMediaDevices) {
+      Object.defineProperty(navigator, "mediaDevices", originalMediaDevices);
+    } else {
+      Reflect.deleteProperty(navigator, "mediaDevices");
+    }
+  }
 });
 
 it("filters Audio summaries and projects every non-completed processing state", async () => {
@@ -99,7 +225,6 @@ it("filters Audio summaries and projects every non-completed processing state", 
       pendingJobActions={new Map()}
       writable
       paneOpen
-      onOpenPane={vi.fn()}
       onRecord={vi.fn()}
       onImport={vi.fn()}
       onCancel={vi.fn()}
@@ -257,7 +382,6 @@ it("chooses the newest processing job id before comparing attempts", async () =>
       pendingJobActions={new Map()}
       writable
       paneOpen
-      onOpenPane={vi.fn()}
       onRecord={vi.fn()}
       onImport={vi.fn()}
       onCancel={vi.fn()}
@@ -300,7 +424,6 @@ it("reopens the still-selected Audio exactly once when its current task complete
     pendingJobActions: new Map<number, never>(),
     writable: true,
     paneOpen: true,
-    onOpenPane: vi.fn(),
     onRecord: vi.fn(),
     onImport: vi.fn(),
     onCancel: vi.fn(),
@@ -332,7 +455,6 @@ it("refreshes the list for structural task changes but not progress-only updates
     pendingJobActions: new Map<number, never>(),
     writable: true,
     paneOpen: true,
-    onOpenPane: vi.fn(),
     onRecord: vi.fn(),
     onImport: vi.fn(),
     onCancel: vi.fn(),
@@ -415,7 +537,6 @@ it("clears a selected Audio only after its playback closes when a structural ref
     pendingJobActions: new Map<number, never>(),
     writable: true,
     paneOpen: true,
-    onOpenPane: vi.fn(),
     onRecord: vi.fn(),
     onImport: vi.fn(),
     onCancel: vi.fn(),
@@ -437,9 +558,7 @@ it("clears a selected Audio only after its playback closes when a structural ref
       action: "close",
     }),
   );
-  expect(
-    await screen.findByRole("button", { name: "打开音频列表" }),
-  ).toBeVisible();
+  expect(await screen.findByRole("button", { name: "开始录制" })).toBeVisible();
   expect(
     screen.queryByRole("region", { name: "音频 A.wav 工作区" }),
   ).not.toBeInTheDocument();
@@ -469,7 +588,6 @@ function renderRoute(desktop: Voice2TextDesktopApi) {
       pendingJobActions={new Map()}
       writable
       paneOpen
-      onOpenPane={vi.fn()}
       onRecord={vi.fn()}
       onImport={vi.fn()}
       onCancel={vi.fn()}
@@ -531,6 +649,21 @@ function playback(audioId: number, initialized: boolean) {
 
 function api(overrides: Partial<Voice2TextDesktopApi> = {}) {
   return {
+    preflightCapture: vi.fn(async () => ({
+      minimumMacosVersion: "13.0",
+      systemAudioMinimumMacosVersion: "13.0",
+      captureMode: "dual_track" as const,
+      systemAudioPermission: "granted" as const,
+      microphonePermission: "granted" as const,
+      microphones: [
+        { id: "mic-default", name: "MacBook 麦克风", isDefault: true },
+      ],
+      availableBytes: 8 * 1024 ** 3,
+      requiredBytes: 2 * 1024 ** 3,
+      captionModelAvailable: true,
+      canStart: true,
+      blockingReasons: [],
+    })),
     getAudioAiSnapshot: vi.fn(async () => null),
     prepareAudioAi: vi.fn(),
     generateAudioAi: vi.fn(),

@@ -313,7 +313,13 @@ describe("application shell", () => {
     const navigation = screen.getByRole("navigation", { name: "工作站主导航" });
     const audio = within(navigation).getByRole("button", { name: "音频" });
     expect(audio).toHaveAttribute("aria-current", "page");
-    expect(within(navigation).getAllByRole("button")).toHaveLength(3);
+    expect(within(navigation).getAllByRole("button")).toHaveLength(4);
+    const message = within(navigation).getByRole("button", { name: "消息" });
+    const settings = within(navigation).getByRole("button", { name: "设置" });
+    expect(
+      message.compareDocumentPosition(settings) &
+        Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
     expect(
       within(navigation).queryByRole("button", { name: "转写任务" }),
     ).not.toBeInTheDocument();
@@ -326,6 +332,9 @@ describe("application shell", () => {
     });
     expect(captureControl).toHaveTextContent("录制中");
     expect(captureControl).not.toHaveTextContent("产品周会");
+    expect(
+      screen.queryByRole("region", { name: "录制准备" }),
+    ).not.toBeInTheDocument();
     await user.click(within(navigation).getByRole("button", { name: "设置" }));
     await waitFor(() => expect(api.navigate).toHaveBeenCalledWith("settings"));
     expect(
@@ -359,7 +368,7 @@ describe("application shell", () => {
       await screen.findByRole("complementary", { name: "互联上下文面板" }),
     ).toBeVisible();
     await user.click(
-      screen.getByRole("button", { name: "关闭互联上下文面板" }),
+      screen.getByRole("button", { name: "收起互联上下文面板" }),
     );
     expect(writes).toHaveBeenCalledTimes(1);
 
@@ -754,6 +763,12 @@ describe("application shell", () => {
     );
     await user.click(
       screen.getByRole("button", { name: /录制中断，需要处理/ }),
+    );
+    await user.click(
+      within(screen.getByRole("region", { name: "消息详情" })).getByRole(
+        "button",
+        { name: "打开录制详情" },
+      ),
     );
 
     expect(

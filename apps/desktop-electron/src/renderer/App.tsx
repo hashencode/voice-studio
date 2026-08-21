@@ -81,6 +81,8 @@ export default function App() {
   const captureInvokerRef = React.useRef<HTMLElement | null>(null);
   const restoreFocusFrameRef = React.useRef<number | null>(null);
   const [recordRequest, setRecordRequest] = React.useState(0);
+  const [preferredMicrophoneDeviceId, setPreferredMicrophoneDeviceId] =
+    React.useState<string | null>(null);
   const [captureDetailOpen, setCaptureDetailOpen] = React.useState(false);
   const [captureDetailSessionId, setCaptureDetailSessionId] = React.useState<
     string | null
@@ -150,11 +152,12 @@ export default function App() {
       snapshot.capability.processing === "available",
     active: current === "audio",
     enabled: snapshot?.profile.phase === "ready",
-    onRecord: () => {
+    onRecord: (microphoneDeviceId) => {
       captureInvokerRef.current =
         document.activeElement instanceof HTMLElement
           ? document.activeElement
           : null;
+      setPreferredMicrophoneDeviceId(microphoneDeviceId ?? null);
       setRecordRequest((value) => value + 1);
     },
     onImport: importAudio,
@@ -189,6 +192,18 @@ export default function App() {
         current={current}
         onNavigate={navigatePrimary}
         presentation={pane.open ? pane.presentation : "closed"}
+        activityCenter={
+          <ActivityCenter
+            items={snapshot.activity ?? []}
+            onAcknowledgeThrough={(id) => {
+              void window.voice2text.acknowledgeActivity?.(id);
+            }}
+            onOpenDetails={(item) => {
+              void window.voice2text.acknowledgeActivity?.(item.id);
+              changeCaptureDetail(true, item.captureSessionId);
+            }}
+          />
+        }
       >
         {pane.open ? (
           <ContextPaneShell
@@ -244,16 +259,6 @@ export default function App() {
               ref={setCaptureCompactHost}
               className="flex min-w-0 items-center"
             />
-            <ActivityCenter
-              items={snapshot.activity ?? []}
-              onAcknowledgeThrough={(id) => {
-                void window.voice2text.acknowledgeActivity?.(id);
-              }}
-              onOpenDetails={(item) => {
-                void window.voice2text.acknowledgeActivity?.(item.id);
-                changeCaptureDetail(true, item.captureSessionId);
-              }}
-            />
           </div>
         </header>
         {snapshot.connectivity === "offline" ? <OfflineBanner /> : null}
@@ -278,7 +283,6 @@ export default function App() {
               operationError={operationError}
               audio={audio}
               companion={companion}
-              onOpenAudioPane={pane.openPane}
               onOpenCompanionPane={pane.openPane}
               settingsSection={settingsSection}
             />
@@ -288,6 +292,7 @@ export default function App() {
             recordRequest={recordRequest}
             detailOpen={captureDetailOpen}
             focusSessionId={captureDetailSessionId}
+            preferredMicrophoneDeviceId={preferredMicrophoneDeviceId}
             compactHost={captureCompactHost}
             onDetailOpenChange={changeCaptureDetail}
             onAttentionDetailsOpened={(sessionId) => {
@@ -311,7 +316,6 @@ function ShellContent({
   operationError,
   audio,
   companion,
-  onOpenAudioPane,
   onOpenCompanionPane,
   settingsSection,
 }: {
@@ -320,7 +324,6 @@ function ShellContent({
   operationError: string | null;
   audio: AudioRouteController;
   companion: CompanionRouteController;
-  onOpenAudioPane: () => void;
   onOpenCompanionPane: () => void;
   settingsSection: SettingsSection;
 }) {
@@ -371,8 +374,8 @@ function ShellContent({
           ) : null}
           <AudioMainWorkspace
             controller={audio}
-            onOpenPane={onOpenAudioPane}
             operationError={operationError}
+            showRecordingReady={snapshot.capture.phase === "idle"}
           />
         </div>
       );

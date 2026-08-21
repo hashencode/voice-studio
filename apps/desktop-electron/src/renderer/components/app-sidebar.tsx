@@ -1,5 +1,5 @@
 import type * as React from "react";
-import { AudioLines, RadioTower, Settings2, Waves } from "lucide-react";
+import { Cog, MonitorSmartphone, Music, Waves } from "lucide-react";
 
 import { NavMain, type ShellNavigationItem } from "@/components/nav-main";
 import { Sidebar, SidebarHeader } from "@/components/ui/sidebar";
@@ -10,16 +10,16 @@ import type {
 import { SHELL_SECTION_LABELS } from "@/features/shell/context-pane-contract";
 
 const navigation: readonly ShellNavigationItem[] = [
-  { section: "audio", title: SHELL_SECTION_LABELS.audio, icon: AudioLines },
+  { section: "audio", title: SHELL_SECTION_LABELS.audio, icon: Music },
   {
     section: "companion",
     title: SHELL_SECTION_LABELS.companion,
-    icon: RadioTower,
+    icon: MonitorSmartphone,
   },
   {
     section: "settings",
     title: SHELL_SECTION_LABELS.settings,
-    icon: Settings2,
+    icon: Cog,
   },
 ];
 
@@ -27,16 +27,19 @@ export function AppSidebar({
   current,
   onNavigate,
   presentation,
+  activityCenter,
   children,
 }: React.PropsWithChildren<{
   current: RendererShellSection;
   onNavigate: (section: RendererShellSection) => void;
   presentation: ContextPanePresentation | "closed";
+  activityCenter?: React.ReactNode;
 }>) {
   return (
     <Sidebar
       collapsible="icon"
       mobileMode="inline"
+      preserveCollapsedGap={presentation === "closed"}
       data-presentation={presentation}
       className="overflow-hidden *:data-[sidebar=sidebar]:flex-row data-[presentation=overlay]:z-20 data-[presentation=overlay]:!w-[min(var(--sidebar-width),100vw)]"
     >
@@ -56,7 +59,12 @@ export function AppSidebar({
             </span>
           </div>
         </SidebarHeader>
-        <NavMain items={navigation} current={current} onNavigate={onNavigate} />
+        <NavMain
+          items={navigation}
+          current={current}
+          onNavigate={onNavigate}
+          footerAction={activityCenter}
+        />
       </Sidebar>
       {children}
     </Sidebar>

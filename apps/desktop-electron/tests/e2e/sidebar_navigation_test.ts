@@ -269,10 +269,13 @@ describe("sidebar navigation e2e", () => {
 
     const audio = screen.getByRole("button", { name: "音频" });
     await user.click(audio);
-    const close = await screen.findByRole("button", {
-      name: "关闭音频上下文面板",
+    expect(
+      screen.queryByRole("button", { name: "关闭音频上下文面板" }),
+    ).not.toBeInTheDocument();
+    const collapse = screen.getByRole("button", {
+      name: "收起音频上下文面板",
     });
-    await user.click(close);
+    await user.click(collapse);
     expect(writes).toHaveBeenCalledTimes(1);
     const trigger = screen.getByRole("button", {
       name: "打开音频上下文面板",

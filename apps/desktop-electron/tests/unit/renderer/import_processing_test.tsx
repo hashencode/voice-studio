@@ -145,7 +145,6 @@ function route(
       pendingJobActions={new Map()}
       writable
       paneOpen
-      onOpenPane={vi.fn()}
       onRecord={vi.fn()}
       onImport={vi.fn()}
       onCancel={overrides.onCancel ?? vi.fn()}

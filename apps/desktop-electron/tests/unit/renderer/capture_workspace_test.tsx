@@ -94,7 +94,7 @@ describe("capture workspace", () => {
     ).toBeEnabled();
   });
 
-  it("requires captions to be disabled when the optional model is unavailable", async () => {
+  it("keeps recording available when the optional caption model is unavailable", async () => {
     const startCapture = vi.fn(async () => recording);
     installCaptureApi({
       preflightCapture: vi.fn(async () => ({
@@ -112,15 +112,14 @@ describe("capture workspace", () => {
     expect(await screen.findByRole("alert")).toHaveTextContent(
       "本机字幕模型不可用",
     );
+    expect(screen.getByRole("button", { name: "开始录制" })).toBeEnabled();
     expect(
-      screen.queryByRole("button", { name: "开始录制" }),
+      screen.queryByRole("switch", { name: /同时生成本机字幕/ }),
     ).not.toBeInTheDocument();
-
-    await user.click(screen.getByRole("switch", { name: /同时生成本机字幕/ }));
-    expect(
-      screen.queryByRole("button", { name: "开始录制" }),
-    ).not.toBeInTheDocument();
-    expect(startCapture).not.toHaveBeenCalled();
+    await user.click(screen.getByRole("button", { name: "开始录制" }));
+    expect(startCapture).toHaveBeenCalledWith(
+      expect.objectContaining({ captionEnabled: false }),
+    );
   });
 
   it("keeps a visible warning when one input degrades but recording can continue", async () => {

@@ -1,7 +1,4 @@
 import * as React from "react";
-import { X } from "lucide-react";
-
-import { Button } from "@/components/ui/button";
 import {
   Sidebar,
   SidebarContent,
@@ -50,17 +47,8 @@ export function ContextPaneShell({
         data-context-pane-fixed-header="true"
         className="shrink-0 gap-2 border-b p-2"
       >
-        <div className="flex min-h-10 items-center justify-between gap-3 px-2">
+        <div className="flex min-h-10 items-center px-2">
           <h2 className="font-semibold">{label}</h2>
-          <Button
-            type="button"
-            variant="ghost"
-            size="icon"
-            aria-label={`关闭${label}上下文面板`}
-            onClick={() => onRequestClose("close-button")}
-          >
-            <X aria-hidden="true" />
-          </Button>
         </div>
         {header}
       </SidebarHeader>

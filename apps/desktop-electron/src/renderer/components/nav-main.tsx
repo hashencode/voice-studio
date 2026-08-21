@@ -23,10 +23,12 @@ export function NavMain({
   items,
   current,
   onNavigate,
+  footerAction,
 }: {
   items: readonly ShellNavigationItem[];
   current: RendererShellSection;
   onNavigate: (section: RendererShellSection) => void;
+  footerAction?: React.ReactNode;
 }) {
   const buttons = React.useRef<Array<HTMLButtonElement | null>>([]);
   const [rovingSection, setRovingSection] =
@@ -96,6 +98,7 @@ export function NavMain({
       </SidebarContent>
       {settingsItem ? (
         <SidebarFooter>
+          {footerAction}
           <SidebarMenu>{renderItem(settingsItem)}</SidebarMenu>
         </SidebarFooter>
       ) : null}

@@ -4,7 +4,7 @@ import {
   AlertTriangle,
   CheckCircle2,
   CirclePause,
-  Mic2,
+  Mic,
   Play,
   RotateCcw,
   Square,
@@ -45,6 +45,7 @@ export function CaptureWorkspace({
   recordRequest,
   detailOpen = true,
   focusSessionId = null,
+  preferredMicrophoneDeviceId = null,
   compactHost = null,
   onDetailOpenChange,
   onAttentionDetailsOpened,
@@ -55,6 +56,7 @@ export function CaptureWorkspace({
   recordRequest?: number;
   detailOpen?: boolean;
   focusSessionId?: string | null;
+  preferredMicrophoneDeviceId?: string | null;
   compactHost?: HTMLElement | null;
   onDetailOpenChange?: (open: boolean) => void;
   onAttentionDetailsOpened?: (sessionId: string) => void;
@@ -173,9 +175,13 @@ export function CaptureWorkspace({
         captionEnabled,
       });
       setPreflight(result);
+      if (!result.captionModelAvailable) setCaptionEnabled(false);
       setSetupOpen(true);
       onDetailOpenChange?.(true);
       const defaultMicrophone =
+        result.microphones.find(
+          (device) => device.id === preferredMicrophoneDeviceId,
+        ) ??
         result.microphones.find((device) => device.isDefault) ??
         result.microphones[0];
       setMicrophoneDeviceId(defaultMicrophone?.id ?? "");
@@ -185,7 +191,12 @@ export function CaptureWorkspace({
           : "录制条件需要处理",
       );
     });
-  }, [captionEnabled, onDetailOpenChange, runExclusive]);
+  }, [
+    captionEnabled,
+    onDetailOpenChange,
+    preferredMicrophoneDeviceId,
+    runExclusive,
+  ]);
 
   React.useEffect(() => {
     if (
@@ -418,7 +429,6 @@ export function CaptureWorkspace({
           setupOpen={setupOpen}
           preflight={preflight}
           title={title}
-          captionEnabled={captionEnabled}
           microphoneDeviceId={microphoneDeviceId}
           busy={busy}
           titleRef={titleRef}
@@ -426,14 +436,9 @@ export function CaptureWorkspace({
           onCheck={checkPreflight}
           onStart={start}
           onTitleChange={setTitle}
-          onCaptionChange={(value) => {
-            setCaptionEnabled(value);
-            setPreflight(null);
-          }}
           onMicrophoneChange={setMicrophoneDeviceId}
         />
       ) : null}
-      <FloatingCapturePreferenceSetting className="border-t pt-4" />
     </section>
   ) : null;
 
@@ -535,7 +540,6 @@ function CaptureSetup({
   setupOpen,
   preflight,
   title,
-  captionEnabled,
   microphoneDeviceId,
   busy,
   titleRef,
@@ -543,13 +547,11 @@ function CaptureSetup({
   onCheck,
   onStart,
   onTitleChange,
-  onCaptionChange,
   onMicrophoneChange,
 }: {
   setupOpen: boolean;
   preflight: CapturePreflight | null;
   title: string;
-  captionEnabled: boolean;
   microphoneDeviceId: string;
   busy: boolean;
   titleRef: React.RefObject<HTMLInputElement | null>;
@@ -557,14 +559,13 @@ function CaptureSetup({
   onCheck: () => void;
   onStart: () => void;
   onTitleChange: (value: string) => void;
-  onCaptionChange: (value: boolean) => void;
   onMicrophoneChange: (value: string) => void;
 }) {
   if (!setupOpen) {
     return (
       <div className="flex items-center gap-3">
         <span className="flex size-9 shrink-0 items-center justify-center rounded-full bg-primary/10 text-primary">
-          <Mic2 className="size-5" aria-hidden="true" />
+          <Mic className="size-5" aria-hidden="true" />
         </span>
         <div className="min-w-0 flex-1">
           <h2 className="font-semibold">音频录制</h2>
@@ -580,10 +581,7 @@ function CaptureSetup({
   }
 
   const blockers = preflight?.blockingReasons ?? [];
-  const captionsUnavailable = Boolean(
-    preflight && captionEnabled && !preflight.captionModelAvailable,
-  );
-  const readyToStart = Boolean(preflight?.canStart && !captionsUnavailable);
+  const readyToStart = Boolean(preflight?.canStart);
   return (
     <section aria-labelledby="capture-setup-heading" className="space-y-3">
       <div>
@@ -662,18 +660,6 @@ function CaptureSetup({
           </SelectContent>
         </Select>
       </div>
-      <div className="flex items-start gap-2">
-        <Switch
-          id="capture-caption-enabled"
-          checked={captionEnabled}
-          disabled={busy}
-          onCheckedChange={onCaptionChange}
-          className="mt-0.5"
-        />
-        <Label htmlFor="capture-caption-enabled" className="leading-5">
-          同时生成本机字幕（模型不可用时可关闭后重新检查）
-        </Label>
-      </div>
       <div className="flex flex-wrap justify-end gap-2">
         <Button
           type="button"
@@ -690,7 +676,7 @@ function CaptureSetup({
             disabled={busy || !title.trim()}
             onClick={onStart}
           >
-            <Mic2 aria-hidden="true" />
+            <Mic aria-hidden="true" />
             {busy ? "正在开始…" : "开始录制"}
           </Button>
         ) : null}
@@ -739,7 +725,7 @@ function ActiveCapture({
           {paused ? (
             <CirclePause className="size-5" aria-hidden="true" />
           ) : (
-            <Mic2 className="size-5" aria-hidden="true" />
+            <Mic className="size-5" aria-hidden="true" />
           )}
         </span>
         <div className="min-w-0 flex-1">
@@ -807,7 +793,7 @@ function ActiveCapture({
         finalizedPartial ? (
         <div className="flex justify-end">
           <Button type="button" disabled={busy} onClick={onBeginAnother}>
-            <Mic2 aria-hidden="true" />
+            <Mic aria-hidden="true" />
             {capture.phase === "completed" || finalizedPartial
               ? "录制另一个音频"
               : "重新设置录制"}
@@ -942,7 +928,7 @@ function CompactCaptureController({
         aria-label="打开录制详情"
         onClick={onOpenDetails}
       >
-        <Mic2 aria-hidden="true" />
+        <Mic aria-hidden="true" />
       </Button>
     </div>
   );

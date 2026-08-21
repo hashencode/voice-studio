@@ -51,7 +51,7 @@ test.describe("sidebar-09 production Renderer", () => {
       await expect(
         page.getByRole("heading", { name: "请选择音频", level: 1 }),
       ).toBeVisible();
-      await page.getByRole("button", { name: "关闭音频上下文面板" }).click();
+      await page.getByRole("button", { name: "收起音频上下文面板" }).click();
       await expect(
         page.getByRole("complementary", { name: "音频上下文面板" }),
       ).toHaveCount(0);
@@ -59,6 +59,22 @@ test.describe("sidebar-09 production Renderer", () => {
       await assertRuntimeContract(page, 1240, 820);
       await assertRailOnlyGeometry(page, 1240, 820);
       await screenshot(session, "audio-pane-closed.png", 1240, 820);
+    });
+  });
+
+  test("1240x820 Empty audio library and recording ready", async () => {
+    await withVisualSession("audio-empty", 1240, 820, async (session) => {
+      const { page } = session;
+      await expect(
+        page.getByRole("status", { name: "还没有音频" }),
+      ).toBeVisible();
+      await expect(
+        page.getByRole("region", { name: "录制准备" }),
+      ).toBeVisible();
+
+      await assertRuntimeContract(page, 1240, 820);
+      await assertDockedGeometry(page, 1240, 820);
+      await screenshot(session, "audio-empty-recording-ready.png", 1240, 820);
     });
   });
 
@@ -71,6 +87,23 @@ test.describe("sidebar-09 production Renderer", () => {
       await assertRuntimeContract(page, 1240, 820);
       await assertDockedGeometry(page, 1240, 820);
       await screenshot(session, "settings.png", 1240, 820);
+    });
+  });
+
+  test("1240x820 Activity messages with detail", async () => {
+    await withVisualSession("activity-messages", 1240, 820, async (session) => {
+      const { page } = session;
+      await page.getByRole("button", { name: "消息，2 条未读" }).click();
+      await page
+        .getByRole("button", { name: /产品设计评审录制不完整/ })
+        .click();
+      await expect(
+        page.getByRole("region", { name: "消息详情" }),
+      ).toContainText("只保存了部分音频");
+
+      await assertRuntimeContract(page, 1240, 820);
+      await assertDockedGeometry(page, 1240, 820);
+      await screenshot(session, "activity-messages.png", 1240, 820);
     });
   });
 
@@ -100,18 +133,20 @@ test.describe("sidebar-09 production Renderer", () => {
   test("320x620 keeps the rail and overlay controls reachable", async () => {
     await withVisualSession("audio-active", 320, 620, async (session) => {
       const { page } = session;
-      const close = page.getByRole("button", {
-        name: "关闭音频上下文面板",
+      const collapse = page.getByRole("button", {
+        name: "收起音频上下文面板",
       });
 
-      await expect(close).toBeVisible();
+      await expect(collapse).toBeVisible();
       await assertRuntimeContract(page, 320, 620);
       await assertOverlayGeometry(page, 320, 620);
 
-      const closeBounds = await close.boundingBox();
-      expect(closeBounds).not.toBeNull();
-      expect(closeBounds!.x).toBeGreaterThanOrEqual(0);
-      expect(closeBounds!.x + closeBounds!.width).toBeLessThanOrEqual(320);
+      const collapseBounds = await collapse.boundingBox();
+      expect(collapseBounds).not.toBeNull();
+      expect(collapseBounds!.x).toBeGreaterThanOrEqual(0);
+      expect(collapseBounds!.x + collapseBounds!.width).toBeLessThanOrEqual(
+        320,
+      );
     });
   });
 
@@ -328,19 +363,19 @@ async function assertRailOnlyGeometry(
   await expect
     .poll(async () => {
       const geometry = await shellGeometry(page);
-      return Math.abs(geometry.gap.width - 48);
+      return Math.abs(geometry.gap.width - 350);
     })
     .toBeLessThanOrEqual(1);
   const geometry = await shellGeometry(page);
   expectRect(geometry.wrapper, { x: 0, y: 0, width, height });
-  expectHorizontalRect(geometry.gap, { x: 0, width: 48 });
+  expectHorizontalRect(geometry.gap, { x: 0, width: 350 });
   expectRect(geometry.container, { x: 0, y: 0, width: 48, height });
   expectRect(geometry.rail, { x: 0, y: 0, width: 49, height });
   expectWithin(geometry.railContentWidth, 48);
   expectWithin(geometry.railBorderRight, 1);
   expect(geometry.pane).toBeNull();
-  expectWithin(geometry.inset.x, 48);
-  expectWithin(geometry.inset.width, width - 48);
+  expectWithin(geometry.inset.x, 350);
+  expectWithin(geometry.inset.width, width - 350);
 }
 
 async function assertOverlayGeometry(

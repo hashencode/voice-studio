@@ -7,4 +7,4 @@ export const SHELL_SECTION_LABELS: Record<RendererShellSection, string> = {
 };
 export type ContextPanePresentation = "docked" | "overlay";
 export type ContextPaneCloseReason =
-  "toggle" | "close-button" | "escape" | "background" | "selection";
+  "toggle" | "escape" | "background" | "selection";

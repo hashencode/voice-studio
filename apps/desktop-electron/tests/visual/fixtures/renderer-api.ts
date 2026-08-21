@@ -11,6 +11,8 @@ import type {
 export type VisualScenario =
   | "audio-active"
   | "audio-closed"
+  | "audio-empty"
+  | "activity-messages"
   | "settings"
   | "audio-recovery"
   | "companion-devices";
@@ -33,7 +35,7 @@ export function buildVisualFixture(
   const activeCapture = scenario === "audio-active";
   const recovery = scenario === "audio-recovery";
   const companion = companionFixture();
-  const audios = audioFixtures();
+  const audios = scenario === "audio-empty" ? [] : audioFixtures();
 
   return {
     application: {
@@ -52,6 +54,33 @@ export function buildVisualFixture(
       capability: { processing: "available" },
       library: { phase: "ready", audioCount: audios.length },
       reconciliation: [],
+      activity:
+        scenario === "activity-messages"
+          ? [
+              {
+                id: "activity-visual-warning",
+                kind: "capture_partial",
+                captureSessionId: "session-visual-recovery-0001",
+                createdAt: VISUAL_NOW_MS - 120_000,
+                title: "产品设计评审录制不完整",
+                severity: "warning",
+                read: false,
+                resolved: false,
+                detailTarget: "capture-details",
+              },
+              {
+                id: "activity-visual-complete",
+                kind: "capture_completed",
+                captureSessionId: "session-visual-complete-0001",
+                createdAt: VISUAL_NOW_MS - 3_600_000,
+                title: "移动端同步讨论已保存",
+                severity: "info",
+                read: false,
+                resolved: true,
+                detailTarget: "capture-details",
+              },
+            ]
+          : [],
       capture: activeCapture
         ? {
             phase: "recording",

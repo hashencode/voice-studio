@@ -3,16 +3,26 @@ import {
   Ban,
   CircleAlert,
   Clock3,
+  FileAudio,
   LoaderCircle,
-  Mic2,
+  Mic,
   RotateCcw,
   Search,
+  SearchX,
   Square,
-  Upload,
 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
+import { EmptyState } from "@/components/ui/empty-state";
+import { Label } from "@/components/ui/label";
 import { Progress } from "@/components/ui/progress";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import {
   SidebarGroup,
   SidebarGroupContent,
@@ -23,6 +33,7 @@ import type { PendingJobAction } from "@/features/processing/use-processing-task
 import type {
   AudioSummary,
   AudioWorkspaceSnapshot,
+  CapturePreflight,
   ProcessingTask,
   Voice2TextDesktopApi,
 } from "@shared/contracts";
@@ -34,7 +45,7 @@ type AudioRouteOptions = {
   writable: boolean;
   active?: boolean;
   enabled?: boolean;
-  onRecord: () => void;
+  onRecord: (microphoneDeviceId?: string) => void;
   onImport: () => void | Promise<void>;
   onCancel: (jobId: number) => void | Promise<void>;
   onRetry: (jobId: number, attempt: number) => void | Promise<void>;
@@ -341,9 +352,8 @@ export function useAudioRouteController({
 
 export function AudioRouteFeature({
   paneOpen,
-  onOpenPane,
   ...options
-}: AudioRouteOptions & { paneOpen: boolean; onOpenPane: () => void }) {
+}: AudioRouteOptions & { paneOpen: boolean }) {
   const controller = useAudioRouteController(options);
   return (
     <div className="contents">
@@ -354,7 +364,7 @@ export function AudioRouteFeature({
         </section>
       ) : null}
       <section role="region" aria-label="音频工作区">
-        <AudioMainWorkspace controller={controller} onOpenPane={onOpenPane} />
+        <AudioMainWorkspace controller={controller} />
       </section>
     </div>
   );
@@ -380,26 +390,31 @@ export function AudioContextPaneHeader({
           className="pl-8"
         />
       </div>
-      <div className="grid grid-cols-2 gap-2">
-        <Button
-          type="button"
-          size="sm"
-          disabled={!controller.writable}
-          onClick={controller.record}
-        >
-          <Mic2 aria-hidden="true" />
-          开始录音
-        </Button>
+      <div
+        role="group"
+        aria-label="音频操作"
+        className="grid grid-cols-3 gap-2"
+      >
         <Button
           type="button"
           size="sm"
           variant="outline"
+          className="col-span-1"
           disabled={!controller.writable || controller.importPending}
           aria-busy={controller.importPending}
           onClick={() => void controller.importAudio()}
         >
-          <Upload aria-hidden="true" />
           {controller.importPending ? "正在导入音频" : "导入音频"}
+        </Button>
+        <Button
+          type="button"
+          size="sm"
+          className="col-span-2"
+          disabled={!controller.writable}
+          onClick={() => controller.record()}
+        >
+          <Mic aria-hidden="true" />
+          开始录音
         </Button>
       </div>
     </>
@@ -443,16 +458,16 @@ export function AudioContextPane({
             正在载入音频列表
           </div>
         ) : controller.filteredAudios.length === 0 ? (
-          <div className="px-3 py-4 text-sm">
-            <p className="font-medium">
-              {controller.query.trim() ? "没有匹配的音频" : "还没有音频"}
-            </p>
-            <p className="mt-1 text-muted-foreground">
-              {controller.query.trim()
-                ? "请调整搜索内容。"
-                : "可从上方开始录音或导入音频。"}
-            </p>
-          </div>
+          <EmptyState
+            icon={controller.query.trim() ? SearchX : FileAudio}
+            title={controller.query.trim() ? "没有匹配的音频" : "还没有音频"}
+            description={
+              controller.query.trim()
+                ? "换个关键词再试试。"
+                : "开始录音或导入一段音频后，会显示在这里。"
+            }
+            compact
+          />
         ) : (
           <ul
             aria-label="音频列表"
@@ -502,12 +517,12 @@ export function AudioContextPane({
 
 export function AudioMainWorkspace({
   controller,
-  onOpenPane,
   operationError,
+  showRecordingReady = true,
 }: {
   controller: AudioRouteController;
-  onOpenPane: () => void;
   operationError?: string | null;
+  showRecordingReady?: boolean;
 }) {
   const workspace = controller.workspace;
   const task = workspace
@@ -522,21 +537,9 @@ export function AudioMainWorkspace({
       {controller.transitionError ? (
         <AudioOperationError message={controller.transitionError} />
       ) : null}
-      {!workspace ? (
-        <section
-          className="grid min-h-96 place-items-center text-center"
-          aria-busy={controller.transitionPending}
-        >
-          <div>
-            <p className="text-sm text-muted-foreground">
-              从音频列表选择要复核的内容。
-            </p>
-            <Button type="button" className="mt-5" onClick={onOpenPane}>
-              打开音频列表
-            </Button>
-          </div>
-        </section>
-      ) : (
+      {!workspace && showRecordingReady ? (
+        <RecordingReadyState controller={controller} />
+      ) : workspace ? (
         <div key={workspace.summary.audioId} className="space-y-4">
           {task &&
           !(task.state === "completed" && workspace.segments.length > 0) ? (
@@ -554,9 +557,146 @@ export function AudioMainWorkspace({
             onWorkspaceChange={controller.setWorkspace}
           />
         </div>
-      )}
+      ) : null}
     </div>
   );
+}
+
+function RecordingReadyState({
+  controller,
+}: {
+  controller: AudioRouteController;
+}) {
+  const [preflight, setPreflight] = React.useState<CapturePreflight | null>(
+    null,
+  );
+  const [microphoneDeviceId, setMicrophoneDeviceId] = React.useState("");
+  const [testing, setTesting] = React.useState(false);
+  const [testMessage, setTestMessage] = React.useState("");
+
+  const loadMicrophones = React.useCallback(
+    async (requestPermissions: boolean, selectedDeviceId: string) => {
+      setTesting(true);
+      setTestMessage("");
+      try {
+        const next = await controller.api.preflightCapture({
+          requestPermissions,
+          captionEnabled: false,
+        });
+        setPreflight(next);
+        const preferred =
+          next.microphones.find((device) => device.id === selectedDeviceId) ??
+          next.microphones.find((device) => device.isDefault) ??
+          next.microphones[0];
+        setMicrophoneDeviceId(preferred?.id ?? "");
+        if (requestPermissions) {
+          if (next.microphonePermission === "granted" && preferred) {
+            const signalDetected = await detectMicrophoneSignal(preferred.id);
+            setTestMessage(
+              signalDetected
+                ? `麦克风工作正常：${preferred.name}`
+                : `已连接 ${preferred.name}，但未检测到声音，请说话并检查静音状态。`,
+            );
+          } else {
+            setTestMessage("麦克风暂不可用，请检查系统权限或设备连接。");
+          }
+        }
+      } catch (reason) {
+        setTestMessage(errorMessage(reason, "无法测试麦克风"));
+      } finally {
+        setTesting(false);
+      }
+    },
+    [controller.api],
+  );
+
+  React.useEffect(() => {
+    void Promise.resolve().then(() => loadMicrophones(false, ""));
+  }, [loadMicrophones]);
+
+  return (
+    <section
+      aria-label="录制准备"
+      aria-busy={testing || controller.transitionPending}
+      className="mx-auto flex min-h-[28rem] w-full max-w-xl flex-col justify-center"
+    >
+      <div className="space-y-2">
+        <Label htmlFor="ready-microphone">麦克风</Label>
+        <Select
+          value={microphoneDeviceId}
+          disabled={testing || !preflight?.microphones.length}
+          onValueChange={setMicrophoneDeviceId}
+        >
+          <SelectTrigger id="ready-microphone" className="w-full">
+            <SelectValue
+              placeholder={testing ? "正在检测设备" : "没有可用设备"}
+            />
+          </SelectTrigger>
+          <SelectContent>
+            {preflight?.microphones.map((device) => (
+              <SelectItem key={device.id} value={device.id}>
+                {device.name}
+                {device.isDefault ? "（默认）" : ""}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </div>
+      <div className="mt-4 grid grid-cols-3 gap-3">
+        <Button
+          type="button"
+          variant="outline"
+          className="col-span-1"
+          disabled={testing}
+          onClick={() => void loadMicrophones(true, microphoneDeviceId)}
+        >
+          测试麦克风
+        </Button>
+        <Button
+          type="button"
+          className="col-span-2"
+          disabled={!controller.writable || !preflight?.canStart}
+          onClick={() => controller.record(microphoneDeviceId || undefined)}
+        >
+          <Mic aria-hidden="true" />
+          开始录制
+        </Button>
+      </div>
+      {testMessage ? (
+        <p role="status" className="mt-3 text-sm text-muted-foreground">
+          {testMessage}
+        </p>
+      ) : null}
+    </section>
+  );
+}
+
+async function detectMicrophoneSignal(deviceId: string): Promise<boolean> {
+  if (!navigator.mediaDevices?.getUserMedia || !window.AudioContext) {
+    return false;
+  }
+  const stream = await navigator.mediaDevices.getUserMedia({
+    audio: { deviceId: { exact: deviceId } },
+  });
+  const audioContext = new AudioContext();
+  const source = audioContext.createMediaStreamSource(stream);
+  const analyser = audioContext.createAnalyser();
+  analyser.fftSize = 1024;
+  source.connect(analyser);
+  const samples = new Uint8Array(analyser.fftSize);
+  const deadline = performance.now() + 1_200;
+  try {
+    while (performance.now() < deadline) {
+      analyser.getByteTimeDomainData(samples);
+      if (samples.some((sample) => Math.abs(sample - 128) >= 4)) return true;
+      await new Promise<void>((resolve) => window.setTimeout(resolve, 50));
+    }
+    return false;
+  } finally {
+    source.disconnect();
+    stream.getTracks().forEach((track) => track.stop());
+    await audioContext.close();
+  }
 }
 
 function AudioProcessingDetail({

@@ -162,6 +162,7 @@ function Sidebar({
   variant = "sidebar",
   collapsible = "offcanvas",
   mobileMode = "sheet",
+  preserveCollapsedGap = false,
   className,
   children,
   ...props
@@ -170,6 +171,7 @@ function Sidebar({
   variant?: "sidebar" | "floating" | "inset";
   collapsible?: "offcanvas" | "icon" | "none";
   mobileMode?: "sheet" | "inline";
+  preserveCollapsedGap?: boolean;
 }) {
   const { isMobile, state, openMobile, setOpenMobile } = useSidebar();
 
@@ -235,6 +237,8 @@ function Sidebar({
           variant === "floating" || variant === "inset"
             ? "group-data-[collapsible=icon]:w-[calc(var(--sidebar-width-icon)+(--spacing(4)))]"
             : "group-data-[collapsible=icon]:w-(--sidebar-width-icon)",
+          preserveCollapsedGap &&
+            "lg:group-data-[collapsible=icon]:w-(--sidebar-width)",
         )}
       />
       <div
