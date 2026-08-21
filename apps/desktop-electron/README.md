@@ -20,9 +20,13 @@ bun run start
 frozen worker/model resources change. Later development runs can use
 `bun run start` directly.
 
-Routine Renderer work uses `bun run check:ui`; broader Electron code work uses
-`bun run check:code`. Neither command packages the application or downloads
-frozen models. Release evidence is the explicit heavy lane:
+During active Renderer iteration, use `bun run check:ui:quick`; it checks
+formatting, lint, types, and focused Renderer behavior. `bun run check:ui:quick`
+does not launch Electron windows. Once the UI edit is stable, run
+`bun run check:ui` once for the final visual scenarios and screenshots. Broader
+Electron code work uses `bun run check:code`. None of these commands packages
+the application or downloads frozen models. Release evidence is the explicit
+heavy lane:
 
 ```bash
 VOICE2TEXT_RELEASE_VALIDATION=1 bun run check:release

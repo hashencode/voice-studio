@@ -23,7 +23,7 @@ the 20-stage `./tool/dev_check.sh` by default.
 | Change | Required verification |
 | --- | --- |
 | Documentation, comments, or analysis-only work | Inspect the diff and check affected references for consistency. Do not run tests, analyzers, or builds. |
-| Electron renderer layout, styling, navigation, or visual states | Run `bun run check:ui` from `apps/desktop-electron`. |
+| Electron renderer layout, styling, navigation, or visual states | During iteration, use `bun run check:ui:quick` from `apps/desktop-electron`; run `bun run check:ui` once after the UI edit is stable and before handoff. Do not rerun it unless UI code changes after that result. |
 | Electron Main, Preload, shared contracts, storage, or ordinary worker integration | Run `bun run check:code` from `apps/desktop-electron`. |
 | Electron release evidence, frozen-resource manifest/identity/packaged inventory, or an explicit candidate request | Run `VOICE2TEXT_RELEASE_VALIDATION=1 bun run check:release` from `apps/desktop-electron`. |
 | Pure Dart package (`audio_core`, `audio_workflows`, `companion_protocol`, `desktop_sherpa_worker`, or `processing_contracts`) | Run `dart analyze packages/<package>` and `dart test packages/<package>`. |
