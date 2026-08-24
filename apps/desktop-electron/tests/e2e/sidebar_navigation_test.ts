@@ -155,8 +155,8 @@ describe("sidebar navigation e2e", () => {
     ).toHaveFocus();
 
     expect(
-      screen.getByRole("complementary", { name: "录制控制" }),
-    ).toBeVisible();
+      screen.queryByRole("complementary", { name: "录制控制" }),
+    ).not.toBeInTheDocument();
 
     first.unmount();
     render(createElement(App));
@@ -165,8 +165,8 @@ describe("sidebar navigation e2e", () => {
       "page",
     );
     expect(
-      screen.getByRole("complementary", { name: "录制控制" }),
-    ).toBeVisible();
+      screen.queryByRole("complementary", { name: "录制控制" }),
+    ).not.toBeInTheDocument();
   });
 
   it.each(["tasks", "library"])(
@@ -189,12 +189,12 @@ describe("sidebar navigation e2e", () => {
         screen.getByRole("complementary", { name: "音频上下文面板" }),
       ).toBeVisible();
       expect(
-        screen.getByRole("complementary", { name: "录制控制" }),
-      ).not.toHaveTextContent("访谈");
+        screen.queryByRole("complementary", { name: "录制控制" }),
+      ).not.toBeInTheDocument();
     },
   );
 
-  it("derives an 880px non-modal overlay without preference writes and preserves focus semantics", async () => {
+  it("keeps the pane docked across widths without preference writes and preserves focus semantics", async () => {
     Object.defineProperty(window, "innerWidth", {
       configurable: true,
       value: 880,
@@ -229,19 +229,16 @@ describe("sidebar navigation e2e", () => {
     const container = outer.querySelector<HTMLElement>(
       ':scope > [data-slot="sidebar-container"]',
     )!;
-    expect(pane).toHaveAttribute("data-presentation", "overlay");
-    expect(outer).toHaveAttribute("data-state", "collapsed");
-    expect(container).toHaveAttribute("data-presentation", "overlay");
-    expect(container).toHaveClass(
-      "data-[presentation=overlay]:!w-[min(var(--sidebar-width),100vw)]",
-    );
+    expect(pane).toHaveAttribute("data-presentation", "docked");
+    expect(outer).toHaveAttribute("data-state", "expanded");
+    expect(container).toHaveAttribute("data-presentation", "docked");
     expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
     expect(
       screen.getByRole("navigation", { name: "工作站主导航" }),
     ).toBeVisible();
     expect(
-      screen.getByRole("complementary", { name: "录制控制" }),
-    ).toBeVisible();
+      screen.queryByRole("complementary", { name: "录制控制" }),
+    ).not.toBeInTheDocument();
     expect(screen.queryByText("启动恢复需要确认")).not.toBeInTheDocument();
     await user.click(screen.getByRole("button", { name: "消息" }));
     expect(
@@ -251,17 +248,13 @@ describe("sidebar navigation e2e", () => {
 
     window.innerWidth = 1280;
     window.dispatchEvent(new Event("resize"));
-    await waitFor(() =>
-      expect(pane).toHaveAttribute("data-presentation", "docked"),
-    );
+    expect(pane).toHaveAttribute("data-presentation", "docked");
     expect(outer).toHaveAttribute("data-state", "expanded");
     expect(container).toHaveAttribute("data-presentation", "docked");
     window.innerWidth = 880;
     window.dispatchEvent(new Event("resize"));
-    await waitFor(() =>
-      expect(pane).toHaveAttribute("data-presentation", "overlay"),
-    );
-    expect(outer).toHaveAttribute("data-state", "collapsed");
+    expect(pane).toHaveAttribute("data-presentation", "docked");
+    expect(outer).toHaveAttribute("data-state", "expanded");
     expect(api.listAudios).toHaveBeenCalledTimes(1);
     expect(writes).not.toHaveBeenCalled();
 
@@ -291,16 +284,21 @@ describe("sidebar navigation e2e", () => {
     expect(writes).toHaveBeenCalledTimes(2);
     await user.keyboard("{Escape}");
     expect(writes).toHaveBeenCalledTimes(3);
-    expect(trigger).toHaveFocus();
+    const reopenedTrigger = screen.getByRole("button", {
+      name: "打开音频上下文面板",
+    });
+    expect(reopenedTrigger).toHaveFocus();
 
-    await user.click(trigger);
+    await user.click(reopenedTrigger);
     expect(writes).toHaveBeenCalledTimes(4);
     fireEvent.pointerDown(document.getElementById("main-content")!);
-    expect(writes).toHaveBeenCalledTimes(5);
-    expect(trigger).toHaveFocus();
+    expect(writes).toHaveBeenCalledTimes(4);
+    expect(
+      screen.getByRole("complementary", { name: "音频上下文面板" }),
+    ).toBeVisible();
   });
 
-  it("reveals message details after selecting from a narrow overlay", async () => {
+  it("reveals message details while keeping a narrow pane docked", async () => {
     Object.defineProperty(window, "innerWidth", {
       configurable: true,
       value: 880,
@@ -346,19 +344,16 @@ describe("sidebar navigation e2e", () => {
     expect(acknowledgeActivity).toHaveBeenCalledWith("complete");
     await user.click(screen.getByRole("button", { name: /录制已保存/ }));
     expect(
-      screen.queryByRole("complementary", { name: "消息上下文面板" }),
-    ).not.toBeInTheDocument();
+      screen.getByRole("complementary", { name: "消息上下文面板" }),
+    ).toBeVisible();
     expect(screen.getByRole("region", { name: "消息详情" })).toHaveTextContent(
       "录制已保存",
     );
 
-    await user.click(
-      screen.getByRole("button", { name: "打开消息上下文面板" }),
-    );
     await user.click(screen.getByRole("button", { name: /录制失败/ }));
     expect(
-      screen.queryByRole("complementary", { name: "消息上下文面板" }),
-    ).not.toBeInTheDocument();
+      document.querySelector('[aria-label="消息上下文面板"]'),
+    ).not.toBeNull();
     expect(screen.getByRole("dialog", { name: "录制失败" })).toBeVisible();
     expect(acknowledgeActivity).toHaveBeenCalledWith("failed");
   });

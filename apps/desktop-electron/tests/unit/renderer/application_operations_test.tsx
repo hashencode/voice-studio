@@ -176,10 +176,11 @@ describe("renderer processing operation races", () => {
     const action = await screen.findByRole("button", { name: "导入音频" });
     await user.dblClick(action);
     expect(importAudio).toHaveBeenCalledTimes(1);
-    expect(screen.getByRole("button", { name: "正在导入音频" })).toBeDisabled();
-    expect(
-      screen.getByRole("button", { name: "正在导入音频" }),
-    ).toHaveAttribute("aria-busy", "true");
+    expect(screen.getByRole("button", { name: "导入音频" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "导入音频" })).toHaveAttribute(
+      "aria-busy",
+      "true",
+    );
 
     request.reject(new Error("导入失败"));
     expect(await screen.findByRole("alert")).toHaveTextContent("导入失败");

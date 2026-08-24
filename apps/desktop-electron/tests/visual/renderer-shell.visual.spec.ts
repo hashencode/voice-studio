@@ -22,15 +22,25 @@ test.describe("sidebar-09 production Renderer", () => {
     await withVisualSession("audio-active", 1240, 820, async (session) => {
       const { page } = session;
       await expect(
-        page.getByRole("heading", { name: "请选择音频", level: 1 }),
-      ).toBeVisible();
-      await page.getByRole("button", { name: /打开 产品设计评审/ }).click();
-      await expect(
-        page.getByRole("heading", { name: "产品设计评审.wav", level: 1 }),
+        page.getByRole("heading", { name: "录制详情", level: 1 }),
       ).toBeVisible();
       await expect(
         page.getByRole("complementary", { name: "录制控制" }),
-      ).toContainText("录制中");
+      ).toHaveCount(0);
+      await expect(
+        page.getByRole("region", { name: "录制详情" }),
+      ).toContainText("正在录制");
+
+      const headerHeights = await page.evaluate(() => ({
+        pane: document
+          .querySelector<HTMLElement>("[data-context-pane-fixed-header]")!
+          .getBoundingClientRect().height,
+        content: document
+          .querySelector<HTMLElement>('[data-slot="sidebar-inset"] > header')!
+          .getBoundingClientRect().height,
+      }));
+      expect(headerHeights.pane).toBeGreaterThan(58);
+      expectWithin(headerHeights.content, 58);
 
       await assertRuntimeContract(page, 1240, 820);
       await assertDockedGeometry(page, 1240, 820);
@@ -49,11 +59,20 @@ test.describe("sidebar-09 production Renderer", () => {
     await withVisualSession("audio-closed", 1240, 820, async (session) => {
       const { page } = session;
       await expect(
-        page.getByRole("heading", { name: "请选择音频", level: 1 }),
+        page.getByRole("region", { name: "录制准备" }),
       ).toBeVisible();
+      await expect(
+        page.getByRole("heading", { name: "请选择音频", level: 1 }),
+      ).toHaveCount(0);
       await page.getByRole("button", { name: "收起音频上下文面板" }).click();
       await expect(
         page.getByRole("complementary", { name: "音频上下文面板" }),
+      ).toBeHidden();
+      await expect(
+        page.getByRole("button", { name: "打开音频上下文面板" }),
+      ).toBeVisible();
+      await expect(
+        page.getByRole("heading", { name: "请选择音频", level: 1 }),
       ).toHaveCount(0);
 
       await assertRuntimeContract(page, 1240, 820);
@@ -71,6 +90,29 @@ test.describe("sidebar-09 production Renderer", () => {
       await expect(
         page.getByRole("region", { name: "录制准备" }),
       ).toBeVisible();
+
+      const layout = await page.evaluate(() => {
+        const paneHeader = document.querySelector<HTMLElement>(
+          "[data-context-pane-fixed-header]",
+        )!;
+        const paneContent = document.querySelector<HTMLElement>(
+          "[data-context-pane-scrolling-content]",
+        )!;
+        const empty = document.querySelector<HTMLElement>(
+          '[role="status"][aria-label="还没有音频"]',
+        )!;
+        const paneContentRect = paneContent.getBoundingClientRect();
+        const emptyRect = empty.getBoundingClientRect();
+        return {
+          paneHeaderHeight: paneHeader.getBoundingClientRect().height,
+          emptyCenterRatio:
+            (emptyRect.y + emptyRect.height / 2 - paneContentRect.y) /
+            paneContentRect.height,
+        };
+      });
+      expect(layout.paneHeaderHeight).toBeGreaterThan(58);
+      expect(layout.emptyCenterRatio).toBeGreaterThan(0.3);
+      expect(layout.emptyCenterRatio).toBeLessThan(0.37);
 
       await assertRuntimeContract(page, 1240, 820);
       await assertDockedGeometry(page, 1240, 820);
@@ -107,30 +149,29 @@ test.describe("sidebar-09 production Renderer", () => {
     });
   });
 
-  test("880x620 Audio overlay with capture recovery and internal scroll", async () => {
+  test("880x620 docked Audio with capture recovery and internal scroll", async () => {
     await withVisualSession("audio-recovery", 880, 620, async (session) => {
       const { page } = session;
       await expect(
-        page.getByRole("heading", { name: "请选择音频", level: 1 }),
+        page.getByRole("heading", { name: "录制详情", level: 1 }),
       ).toBeVisible();
       await expect(
         page.getByRole("complementary", { name: "录制控制" }),
-      ).toContainText("需要处理");
-      await page.getByRole("button", { name: "打开详情" }).click();
+      ).toHaveCount(0);
       await expect(
         page.getByRole("heading", { name: "发现可恢复录制" }),
       ).toBeVisible();
       await page.getByRole("button", { name: "管理恢复录制" }).first().click();
 
       await assertRuntimeContract(page, 880, 620);
-      await assertOverlayGeometry(page, 880, 620);
+      await assertDockedGeometry(page, 880, 620);
       await assertFlatRows(page, "音频列表");
       await assertCaptureContainment(page, 880, 620, true);
       await screenshot(session, "audio-overlay-capture-recovery.png", 880, 620);
     });
   });
 
-  test("320x620 keeps the rail and overlay controls reachable", async () => {
+  test("320x620 keeps the fixed docked pane controls reachable", async () => {
     await withVisualSession("audio-active", 320, 620, async (session) => {
       const { page } = session;
       const collapse = page.getByRole("button", {
@@ -139,7 +180,7 @@ test.describe("sidebar-09 production Renderer", () => {
 
       await expect(collapse).toBeVisible();
       await assertRuntimeContract(page, 320, 620);
-      await assertOverlayGeometry(page, 320, 620);
+      await assertDockedGeometry(page, 320, 620);
 
       const collapseBounds = await collapse.boundingBox();
       expect(collapseBounds).not.toBeNull();
@@ -352,7 +393,7 @@ async function assertDockedGeometry(
   if (!geometry.pane) throw new Error("Expected a docked context pane");
   expectRect(geometry.pane, { x: 49, y: 0, width: 301, height });
   expectWithin(geometry.inset.x, 350);
-  expectWithin(geometry.inset.width, width - 350);
+  expectWithin(geometry.inset.width, Math.max(0, width - 350));
 }
 
 async function assertRailOnlyGeometry(
@@ -373,37 +414,11 @@ async function assertRailOnlyGeometry(
   expectRect(geometry.rail, { x: 0, y: 0, width: 49, height });
   expectWithin(geometry.railContentWidth, 48);
   expectWithin(geometry.railBorderRight, 1);
-  expect(geometry.pane).toBeNull();
+  if (!geometry.pane)
+    throw new Error("Expected the collapsed pane to remain mounted");
+  expectRect(geometry.pane, { x: 49, y: 0, width: 0, height });
   expectWithin(geometry.inset.x, 48);
   expectWithin(geometry.inset.width, width - 48);
-}
-
-async function assertOverlayGeometry(
-  page: Awaited<ReturnType<typeof launch>>["page"],
-  width: number,
-  height: number,
-) {
-  const geometry = await shellGeometry(page);
-  const overlayWidth = Math.min(350, width);
-  expectRect(geometry.wrapper, { x: 0, y: 0, width, height });
-  expectHorizontalRect(geometry.gap, { x: 0, width: 48 });
-  expectRect(geometry.container, {
-    x: 0,
-    y: 0,
-    width: overlayWidth,
-    height,
-  });
-  expectRect(geometry.rail, { x: 0, y: 0, width: 49, height });
-  if (!geometry.pane) throw new Error("Expected an overlay context pane");
-  expectRect(geometry.pane, {
-    x: 49,
-    y: 0,
-    width: overlayWidth - 49,
-    height,
-  });
-  expectWithin(geometry.inset.x, 48);
-  expectWithin(geometry.inset.width, width - 48);
-  expect(geometry.pane!.right).toBeLessThanOrEqual(geometry.inset.right);
 }
 
 async function assertFlatRows(
@@ -435,9 +450,7 @@ async function assertCaptureContainment(
   height: number,
   mustScroll: boolean,
 ) {
-  const capture = mustScroll
-    ? page.getByRole("region", { name: "录制详情" })
-    : page.getByRole("complementary", { name: "录制控制" });
+  const capture = page.getByRole("region", { name: "录制详情" });
   const metrics = await capture.evaluate((element) => {
     const rect = element.getBoundingClientRect();
     const style = getComputedStyle(element);
@@ -473,7 +486,7 @@ async function assertCaptureContainment(
     );
   } else {
     expect(metrics.rect.bottom).toBeLessThanOrEqual(height);
-    expect(metrics.rect.height).toBeLessThanOrEqual(48);
+    expect(metrics.rect.height).toBeGreaterThan(0);
   }
 }
 

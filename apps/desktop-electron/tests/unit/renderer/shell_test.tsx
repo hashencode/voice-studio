@@ -119,7 +119,7 @@ function testAiSettings() {
 }
 
 describe("application shell", () => {
-  it("keeps the inline rail and overlay pane reachable below the shadcn mobile breakpoint", async () => {
+  it("keeps the context pane docked when the window width changes", async () => {
     Object.defineProperty(window, "innerWidth", {
       configurable: true,
       value: 320,
@@ -135,7 +135,17 @@ describe("application shell", () => {
     expect(navigation).toBeVisible();
     expect(
       screen.getByRole("complementary", { name: "音频上下文面板" }),
-    ).toHaveAttribute("data-presentation", "overlay");
+    ).toHaveAttribute("data-presentation", "docked");
+
+    Object.defineProperty(window, "innerWidth", {
+      configurable: true,
+      value: 1240,
+      writable: true,
+    });
+    window.dispatchEvent(new Event("resize"));
+    expect(
+      screen.getByRole("complementary", { name: "音频上下文面板" }),
+    ).toHaveAttribute("data-presentation", "docked");
 
     const outer = navigation.closest<HTMLElement>(
       '[data-slot="sidebar-inner"]',
@@ -150,7 +160,7 @@ describe("application shell", () => {
     const user = userEvent.setup();
     render(<App />);
 
-    await screen.findByRole("heading", { name: "请选择音频", level: 1 });
+    await screen.findByRole("heading", { name: "录制详情", level: 1 });
 
     const wrapper = document.querySelector<HTMLElement>(
       '[data-slot="sidebar-wrapper"]',
@@ -220,7 +230,10 @@ describe("application shell", () => {
       '[data-slot="sidebar-inset"] > header',
     );
     expect(insetHeader).not.toBeNull();
-    const contextTrigger = within(insetHeader!).getByRole("button", {
+    const pane = screen.getByRole("complementary", {
+      name: "音频上下文面板",
+    });
+    const contextTrigger = within(pane).getByRole("button", {
       name: "收起音频上下文面板",
     });
     expect(contextTrigger).toHaveAttribute("data-sidebar", "trigger");
@@ -230,33 +243,75 @@ describe("application shell", () => {
     ).not.toBeNull();
     expect(contextTrigger).not.toHaveTextContent(/[‹›]/);
 
-    const pane = screen.getByRole("complementary", {
-      name: "音频上下文面板",
-    });
     expect(pane).toBe(nestedSidebars[1]);
     expect(pane).toHaveAttribute("data-presentation", "docked");
+    expect(pane).toHaveClass(
+      "w-[calc(var(--sidebar-width)-var(--sidebar-width-icon)-1px)]!",
+      "shrink-0",
+    );
+    expect(pane).not.toHaveClass("flex-1");
     const fixedPaneHeader = pane.querySelector<HTMLElement>(
       "[data-context-pane-fixed-header]",
     );
     const scrollingPaneContent = pane.querySelector<HTMLElement>(
       "[data-context-pane-scrolling-content]",
     );
+    const fixedPaneFooter = pane.querySelector<HTMLElement>(
+      "[data-context-pane-fixed-footer]",
+    );
     const headerControls = [
       within(pane).getByRole("heading", { name: "音频" }),
-      within(pane).getByRole("searchbox", { name: "搜索音频" }),
-      within(pane).getByRole("button", { name: "开始录音" }),
+    ];
+    const footerControls = [
       within(pane).getByRole("button", { name: "导入音频" }),
     ];
     for (const control of headerControls) {
       expect(fixedPaneHeader).toContainElement(control);
     }
+    for (const control of footerControls) {
+      expect(fixedPaneFooter).toContainElement(control);
+    }
     expect(
       fixedPaneHeader?.compareDocumentPosition(scrollingPaneContent!),
     ).toBe(Node.DOCUMENT_POSITION_FOLLOWING);
+    expect(
+      scrollingPaneContent?.compareDocumentPosition(fixedPaneFooter!),
+    ).toBe(Node.DOCUMENT_POSITION_FOLLOWING);
+    expect(scrollingPaneContent).toContainElement(
+      within(pane).getByRole("searchbox", { name: "搜索音频" }),
+    );
+    expect(insetHeader).not.toContainElement(contextTrigger);
+    expect(fixedPaneHeader).toHaveClass("min-h-[58px]", "flex-col");
+    expect(insetHeader).toHaveClass("min-h-[58px]");
+    expect(insetHeader).not.toHaveAttribute("style");
+    const paneTitleRow = within(pane).getByRole("heading", {
+      name: "音频",
+    }).parentElement;
+    const paneActions = within(pane).getByRole("group", { name: "音频操作" });
+    expect(paneTitleRow).not.toContainElement(paneActions);
+    expect(fixedPaneFooter).toContainElement(paneActions);
 
     const mains = screen.getAllByRole("main");
     expect(mains).toHaveLength(1);
     expect(mains[0]!).toHaveAttribute("data-slot", "sidebar-inset");
+    expect(mains[0]).toHaveClass(
+      "z-30",
+      "transition-[margin]",
+      "duration-200",
+      "ease-linear",
+    );
+    expect(document.querySelector('[data-slot="sidebar-gap"]')).toHaveClass(
+      "transition-[width]",
+      "duration-200",
+      "ease-linear",
+    );
+    expect(
+      document.querySelector('[data-slot="sidebar-container"]'),
+    ).toHaveClass(
+      "transition-[left,right,width]",
+      "duration-200",
+      "ease-linear",
+    );
     expect(document.getElementById("main-content")?.tagName).toBe("DIV");
     expect(mains[0]!.querySelector("header")).toHaveClass(
       "sticky",
@@ -296,7 +351,7 @@ describe("application shell", () => {
     expect(document.cookie).not.toContain("sidebar_state=");
   });
 
-  it("restores navigation and keeps privacy-safe capture controls in the global header", async () => {
+  it("restores recording in the content area without global header controls", async () => {
     const api = installApi(readySnapshot);
     const user = userEvent.setup();
     render(<App />);
@@ -305,7 +360,7 @@ describe("application shell", () => {
       screen.getByRole("status", { name: "正在加载工作台" }),
     ).toBeVisible();
     expect(
-      await screen.findByRole("heading", { name: "请选择音频", level: 1 }),
+      await screen.findByRole("heading", { name: "录制详情", level: 1 }),
     ).toBeVisible();
     expect(await screen.findByText("还没有音频")).toBeVisible();
     expect(screen.queryByText(/旧版资料库/)).not.toBeInTheDocument();
@@ -313,6 +368,7 @@ describe("application shell", () => {
     const navigation = screen.getByRole("navigation", { name: "工作站主导航" });
     const audio = within(navigation).getByRole("button", { name: "音频" });
     expect(audio).toHaveAttribute("aria-current", "page");
+    expect(audio.querySelector("svg.lucide-audio-lines")).not.toBeNull();
     expect(within(navigation).getAllByRole("button")).toHaveLength(4);
     const message = within(navigation).getByRole("button", { name: "消息" });
     const settings = within(navigation).getByRole("button", { name: "设置" });
@@ -327,19 +383,134 @@ describe("application shell", () => {
       screen.getByRole("complementary", { name: "音频上下文面板" }),
     ).toHaveAttribute("data-presentation", "docked");
 
-    const captureControl = screen.getByRole("complementary", {
-      name: "录制控制",
-    });
-    expect(captureControl).toHaveTextContent("录制中");
-    expect(captureControl).not.toHaveTextContent("产品周会");
+    expect(
+      screen.queryByRole("complementary", { name: "录制控制" }),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: "正在录音" }),
+    ).not.toBeInTheDocument();
+    expect(screen.getByRole("region", { name: "录制详情" })).toHaveTextContent(
+      "产品周会",
+    );
     expect(
       screen.queryByRole("region", { name: "录制准备" }),
     ).not.toBeInTheDocument();
     await user.click(within(navigation).getByRole("button", { name: "设置" }));
     await waitFor(() => expect(api.navigate).toHaveBeenCalledWith("settings"));
     expect(
-      screen.getByRole("complementary", { name: "录制控制" }),
+      screen.queryByRole("complementary", { name: "录制控制" }),
+    ).not.toBeInTheDocument();
+  });
+
+  it("hides the third-column header whenever no audio is selected", async () => {
+    installApi({ ...readySnapshot, capture: { phase: "idle" } });
+    const user = userEvent.setup();
+    render(<App />);
+
+    expect(await screen.findByText("还没有音频")).toBeVisible();
+    expect(
+      screen.queryByRole("heading", { name: "请选择音频", level: 1 }),
+    ).not.toBeInTheDocument();
+    expect(screen.getByRole("region", { name: "录制准备" })).toHaveClass(
+      "flex-1",
+      "justify-center",
+    );
+    const pane = screen.getByRole("complementary", {
+      name: "音频上下文面板",
+    });
+
+    await user.click(
+      screen.getByRole("button", { name: "收起音频上下文面板" }),
+    );
+    expect(pane).toBeInTheDocument();
+    expect(pane).toHaveAttribute("aria-hidden", "true");
+    const reopen = screen.getByRole("button", {
+      name: "打开音频上下文面板",
+    });
+    expect(reopen).toBeVisible();
+    expect(
+      screen.queryByRole("heading", { name: "请选择音频", level: 1 }),
+    ).not.toBeInTheDocument();
+    expect(
+      document.querySelector<HTMLElement>(
+        '[data-slot="sidebar-inset"] > header',
+      ),
+    ).toBeNull();
+    expect(reopen).toHaveFocus();
+    await user.click(reopen);
+    expect(
+      screen.getByRole("complementary", { name: "音频上下文面板" }),
     ).toBeVisible();
+  });
+
+  it("opens a selected audio from recording setup after the back action is removed", async () => {
+    const summary = {
+      audioId: 12,
+      displayName: "已有录音.wav",
+      durationMs: 1_000,
+      createdAtMs: 1,
+      processingState: "completed" as const,
+      generationId: null,
+      generationKind: null,
+      segmentCount: 0,
+    };
+    installApi(
+      {
+        ...readySnapshot,
+        capture: {
+          phase: "failed",
+          sessionId: "capture-failed-12",
+          title: "失败的录制",
+          elapsedMs: 1_000,
+        },
+      },
+      {
+        listAudios: vi.fn(async () => [summary]),
+        openAudio: vi.fn(async () => ({
+          revision: 1,
+          summary,
+          segments: [],
+          speakers: [],
+          canUndo: false,
+          canRedo: false,
+        })),
+        preflightCapture: vi.fn(async () => ({
+          minimumMacosVersion: "13.0",
+          systemAudioMinimumMacosVersion: "13.0",
+          captureMode: "dual_track" as const,
+          systemAudioPermission: "granted" as const,
+          microphonePermission: "granted" as const,
+          microphones: [
+            { id: "mic-default", name: "默认麦克风", isDefault: true },
+          ],
+          availableBytes: 8 * 1024 ** 3,
+          requiredBytes: 2 * 1024 ** 3,
+          captionModelAvailable: true,
+          canStart: true,
+          blockingReasons: [],
+        })),
+      },
+    );
+    const user = userEvent.setup();
+    render(<App />);
+
+    await user.click(
+      await screen.findByRole("button", { name: "打开 已有录音.wav" }),
+    );
+    const newRecording = await screen.findByRole("button", { name: "新录音" });
+    await waitFor(() => expect(newRecording).toBeEnabled());
+    await user.click(newRecording);
+    expect(
+      await screen.findByRole("heading", { name: "设置音频录制" }),
+    ).toBeVisible();
+    await user.click(screen.getByRole("button", { name: "打开 已有录音.wav" }));
+
+    expect(
+      await screen.findByRole("heading", { name: "已有录音.wav", level: 1 }),
+    ).toBeVisible();
+    expect(
+      screen.queryByRole("region", { name: "录制详情" }),
+    ).not.toBeInTheDocument();
   });
 
   it("keeps independent first-use pane preferences including settings", async () => {
@@ -394,9 +565,15 @@ describe("application shell", () => {
     const user = userEvent.setup();
     render(<App />);
 
+    const openAudioPane = await screen.findByRole("button", {
+      name: "打开音频上下文面板",
+    });
+    expect(openAudioPane).toBeVisible();
     expect(
-      await screen.findByRole("button", { name: "打开音频上下文面板" }),
-    ).toBeVisible();
+      document.querySelector<HTMLElement>(
+        '[data-slot="sidebar-inset"] > header',
+      ),
+    ).toContainElement(openAudioPane);
     expect(
       screen.queryByRole("complementary", { name: "音频上下文面板" }),
     ).not.toBeInTheDocument();
@@ -432,6 +609,7 @@ describe("application shell", () => {
     render(
       <SidebarProvider persistState={false} enableKeyboardShortcut={false}>
         <ContextPaneShell
+          open
           section="audio"
           presentation="overlay"
           onRequestClose={onRequestClose}
@@ -699,7 +877,7 @@ describe("application shell", () => {
     expect(api.navigate).not.toHaveBeenCalled();
   });
 
-  it("treats a narrow settings selection as transient pane dismissal", async () => {
+  it("keeps a narrow settings pane open after selection", async () => {
     Object.defineProperty(window, "innerWidth", {
       configurable: true,
       value: 880,
@@ -718,8 +896,8 @@ describe("application shell", () => {
     });
     await user.click(screen.getByRole("button", { name: "音频智能" }));
     expect(
-      screen.queryByRole("complementary", { name: "设置上下文面板" }),
-    ).not.toBeInTheDocument();
+      screen.getByRole("complementary", { name: "设置上下文面板" }),
+    ).toBeVisible();
 
     await user.click(within(navigation).getByRole("button", { name: "音频" }));
     await waitFor(() => expect(api.navigate).toHaveBeenCalledWith("library"));

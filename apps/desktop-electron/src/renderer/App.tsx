@@ -16,6 +16,7 @@ import {
   SidebarTrigger,
 } from "@/components/ui/sidebar";
 import { Button } from "@/components/ui/button";
+import { cn } from "@/lib/utils";
 import {
   AudioContextPane,
   AudioContextPaneHeader,
@@ -36,7 +37,6 @@ import {
 } from "@/features/companion/companion-feature";
 import { ContextPaneShell } from "@/features/shell/context-pane-shell";
 import type {
-  ContextPaneCloseReason,
   ContextPaneSection,
   RendererShellSection,
 } from "@/features/shell/context-pane-contract";
@@ -85,8 +85,8 @@ export default function App() {
     ? "messages"
     : persistedSection;
   const pane = useContextPaneShell(current);
-  const clearTransientPaneClose = pane.clearTransientClose;
   const paneTriggerRef = React.useRef<HTMLButtonElement>(null);
+  const paneTriggerFocusPendingRef = React.useRef(false);
   const contentTitleRef = React.useRef<HTMLHeadingElement>(null);
   const captureInvokerRef = React.useRef<HTMLElement | null>(null);
   const restoreFocusFrameRef = React.useRef<number | null>(null);
@@ -97,15 +97,24 @@ export default function App() {
   const [captureDetailSessionId, setCaptureDetailSessionId] = React.useState<
     string | null
   >(null);
+  const [dismissedCaptureDetailSessionId, setDismissedCaptureDetailSessionId] =
+    React.useState<string | null>(null);
   const [settingsSection, setSettingsSection] =
     React.useState<SettingsSection>("general");
-  const [captureCompactHost, setCaptureCompactHost] =
-    React.useState<HTMLDivElement | null>(null);
   const [selectedActivityId, setSelectedActivityId] = React.useState<
     string | null
   >(null);
   const [activityError, setActivityError] =
     React.useState<ActivityItemView | null>(null);
+  const automaticCaptureDetailSessionId =
+    snapshot?.capture && snapshot.capture.phase !== "idle"
+      ? snapshot.capture.sessionId
+      : null;
+  const captureDetailVisible =
+    captureDetailOpen ||
+    (current === "audio" &&
+      hasCaptureDetail(snapshot?.capture) &&
+      automaticCaptureDetailSessionId !== dismissedCaptureDetailSessionId);
   const activityItems = snapshot?.activity ?? EMPTY_ACTIVITY_ITEMS;
   const unreadActivityItems = React.useMemo(
     () => activityItems.filter((item) => !item.read),
@@ -117,7 +126,6 @@ export default function App() {
     null;
   const navigatePrimary = React.useCallback(
     (section: RendererShellSection) => {
-      clearTransientPaneClose();
       captureInvokerRef.current = null;
       setCaptureDetailOpen(false);
       setCaptureDetailSessionId(null);
@@ -133,7 +141,7 @@ export default function App() {
       setMessagesOpen(false);
       navigate(section);
     },
-    [activityItems, clearTransientPaneClose, navigate, unreadActivityItems],
+    [activityItems, navigate, unreadActivityItems],
   );
   const changeCaptureDetail = React.useCallback(
     (open: boolean, sessionId: string | null = null) => {
@@ -142,6 +150,7 @@ export default function App() {
         restoreFocusFrameRef.current = null;
       }
       if (open) {
+        setDismissedCaptureDetailSessionId(null);
         captureInvokerRef.current =
           document.activeElement instanceof HTMLElement
             ? document.activeElement
@@ -185,6 +194,12 @@ export default function App() {
     },
     [],
   );
+  const closeUnblockedCaptureDetailForAudioSelection = React.useCallback(() => {
+    if (isNewRecordingBlocked(snapshot?.capture)) return;
+    setCaptureDetailOpen(false);
+    setCaptureDetailSessionId(null);
+    setDismissedCaptureDetailSessionId(automaticCaptureDetailSessionId);
+  }, [automaticCaptureDetailSessionId, snapshot?.capture]);
   const audio = useAudioRouteController({
     api: window.voice2text,
     tasks,
@@ -192,8 +207,11 @@ export default function App() {
     writable:
       snapshot?.profile.phase === "ready" &&
       snapshot.capability.processing === "available",
+    recordingActive: isCaptureInProgress(snapshot?.capture),
+    newRecordingBlocked: isNewRecordingBlocked(snapshot?.capture),
     active: current === "audio",
     enabled: snapshot?.profile.phase === "ready",
+    onAudioSelected: closeUnblockedCaptureDetailForAudioSelection,
     onRecord: (microphoneDeviceId) => {
       captureInvokerRef.current =
         document.activeElement instanceof HTMLElement
@@ -211,20 +229,30 @@ export default function App() {
     enabled: snapshot !== null && current === "companion",
   });
   const persistPaneClose = pane.requestClose;
-  const requestPaneClose = React.useCallback(
-    (reason: ContextPaneCloseReason) => {
-      persistPaneClose(reason);
-      paneTriggerRef.current?.focus();
-    },
-    [persistPaneClose],
-  );
+  const requestPaneClose = React.useCallback(() => {
+    paneTriggerFocusPendingRef.current = true;
+    persistPaneClose();
+  }, [persistPaneClose]);
+  const requestPaneToggle = React.useCallback(() => {
+    if (pane.open) paneTriggerFocusPendingRef.current = true;
+    pane.toggle();
+  }, [pane]);
+  React.useEffect(() => {
+    if (pane.open || !paneTriggerFocusPendingRef.current) return;
+    paneTriggerFocusPendingRef.current = false;
+    paneTriggerRef.current?.focus();
+  }, [pane.open]);
 
   if (loadError) return <ShellLoadError message={loadError} />;
   if (!snapshot) return <LoadingShell />;
 
+  const contentHeaderVisible =
+    captureDetailVisible || current !== "audio" || audio.workspace !== null;
+  const standalonePaneTriggerVisible = !pane.open && !contentHeaderVisible;
+
   return (
     <SidebarProvider
-      open={pane.open && pane.presentation === "docked"}
+      open={pane.open}
       persistState={false}
       enableKeyboardShortcut={false}
       className="h-svh overflow-hidden"
@@ -236,99 +264,100 @@ export default function App() {
         presentation={pane.open ? pane.presentation : "closed"}
         unreadActivityCount={unreadActivityItems.length}
       >
-        {pane.open ? (
-          <ContextPaneShell
-            section={pane.paneSection}
-            presentation={pane.presentation}
-            onRequestClose={requestPaneClose}
-            header={
-              pane.paneSection === "audio" ? (
-                <AudioContextPaneHeader controller={audio} />
-              ) : pane.paneSection === "companion" ? (
-                <CompanionContextPaneHeader controller={companion} />
-              ) : null
-            }
-          >
-            {pane.paneSection === "audio" ? (
-              <AudioContextPane controller={audio} />
-            ) : pane.paneSection === "companion" ? (
-              <CompanionContextPane controller={companion} />
-            ) : pane.paneSection === "messages" ? (
-              <ActivityContextPane
-                items={activityItems}
-                selectedId={selectedActivity?.id ?? null}
-                onSelect={(item) => {
-                  setSelectedActivityId(item.id);
-                  void window.voice2text.acknowledgeActivity?.(item.id);
-                  if (item.kind === "capture_failed") {
-                    setActivityError(item);
-                  }
-                  if (pane.presentation === "overlay") {
-                    requestPaneClose("selection");
-                  }
-                }}
-              />
-            ) : (
-              <SettingsContextPane
-                value={settingsSection}
-                onValueChange={setSettingsSection}
-                onSelected={() => {
-                  if (pane.presentation === "overlay") {
-                    requestPaneClose("selection");
-                  }
-                }}
-              />
-            )}
-          </ContextPaneShell>
-        ) : null}
+        <ContextPaneShell
+          open={pane.open}
+          section={pane.paneSection}
+          presentation={pane.presentation}
+          onRequestClose={requestPaneClose}
+          collapseControl={
+            <ContextPaneTrigger
+              ref={paneTriggerRef}
+              section={pane.paneSection}
+              open={pane.open}
+              onToggle={requestPaneToggle}
+              className="max-[349px]:mr-[calc(var(--sidebar-width)-100vw)]"
+            />
+          }
+          header={
+            pane.paneSection === "companion" ? (
+              <CompanionContextPaneHeader controller={companion} />
+            ) : null
+          }
+          footer={
+            pane.paneSection === "audio" ? (
+              <AudioContextPaneHeader controller={audio} />
+            ) : null
+          }
+        >
+          {pane.paneSection === "audio" ? (
+            <AudioContextPane controller={audio} />
+          ) : pane.paneSection === "companion" ? (
+            <CompanionContextPane controller={companion} />
+          ) : pane.paneSection === "messages" ? (
+            <ActivityContextPane
+              items={activityItems}
+              selectedId={selectedActivity?.id ?? null}
+              onSelect={(item) => {
+                setSelectedActivityId(item.id);
+                void window.voice2text.acknowledgeActivity?.(item.id);
+                if (item.kind === "capture_failed") {
+                  setActivityError(item);
+                }
+              }}
+            />
+          ) : (
+            <SettingsContextPane
+              value={settingsSection}
+              onValueChange={setSettingsSection}
+            />
+          )}
+        </ContextPaneShell>
       </AppSidebar>
       <SidebarInset
-        className={`min-h-0 min-w-0 overflow-hidden ${
-          pane.open && pane.presentation === "docked"
+        className={`z-30 min-h-0 min-w-0 overflow-hidden transition-[margin] duration-200 ease-linear ${
+          pane.open
             ? "ml-[calc(var(--sidebar-width)-var(--sidebar-width-icon))]"
             : ""
         }`}
       >
-        <header className="sticky top-0 z-10 flex min-h-16 shrink-0 flex-wrap items-center gap-3 border-b bg-background px-4 py-2">
+        {contentHeaderVisible ? (
+          <header className="sticky top-0 z-10 flex min-h-[58px] shrink-0 items-center gap-3 border-b bg-background px-4 py-2">
+            {!pane.open ? (
+              <ContextPaneTrigger
+                ref={paneTriggerRef}
+                section={pane.paneSection}
+                open={pane.open}
+                onToggle={requestPaneToggle}
+              />
+            ) : null}
+            <h1
+              ref={contentTitleRef}
+              tabIndex={-1}
+              className="truncate text-sm font-medium"
+              data-slot="content-title"
+            >
+              {captureDetailVisible
+                ? "录制详情"
+                : contentTitle(current, audio, companion, settingsSection)}
+            </h1>
+          </header>
+        ) : null}
+        {standalonePaneTriggerVisible ? (
           <ContextPaneTrigger
             ref={paneTriggerRef}
             section={pane.paneSection}
             open={pane.open}
-            onToggle={pane.toggle}
+            onToggle={requestPaneToggle}
+            className="absolute top-4 left-4 z-20 ml-0"
           />
-          <h1
-            ref={contentTitleRef}
-            tabIndex={-1}
-            className="truncate text-sm font-medium"
-            data-slot="content-title"
-          >
-            {captureDetailOpen
-              ? "录制详情"
-              : contentTitle(current, audio, companion, settingsSection)}
-          </h1>
-          <div className="ml-auto flex min-w-0 items-center gap-1.5">
-            <div
-              ref={setCaptureCompactHost}
-              className="flex min-w-0 items-center"
-            />
-          </div>
-        </header>
+        ) : null}
         {snapshot.connectivity === "offline" ? <OfflineBanner /> : null}
         <div
           id="main-content"
           data-context-pane-background="true"
-          className="min-h-0 flex-1 overflow-auto p-4 sm:p-6"
-          onPointerDown={(event) => {
-            if (
-              pane.presentation === "overlay" &&
-              pane.open &&
-              event.target === event.currentTarget
-            ) {
-              requestPaneClose("background");
-            }
-          }}
+          className="flex min-h-0 flex-1 flex-col overflow-auto p-4 sm:p-6"
         >
-          {!captureDetailOpen ? (
+          {!captureDetailVisible ? (
             <ShellContent
               snapshot={snapshot}
               onBootstrapAction={requestBootstrapAction}
@@ -345,19 +374,12 @@ export default function App() {
           <CaptureWorkspace
             capture={snapshot.capture}
             recordRequest={recordRequest}
-            detailOpen={captureDetailOpen}
+            detailOpen={captureDetailVisible}
             focusSessionId={captureDetailSessionId}
             preferredMicrophoneDeviceId={preferredMicrophoneDeviceId}
-            compactHost={captureCompactHost}
+            autoOpenRecoveries={current === "audio"}
+            onPreflightResolved={audio.acceptCapturePreflight}
             onDetailOpenChange={changeCaptureDetail}
-            onAttentionDetailsOpened={(sessionId) => {
-              const activity = snapshot.activity?.find(
-                (item) => !item.read && item.captureSessionId === sessionId,
-              );
-              if (activity) {
-                void window.voice2text.acknowledgeActivity?.(activity.id);
-              }
-            }}
           />
           <ActivityErrorDialog
             item={activityError}
@@ -370,6 +392,42 @@ export default function App() {
         </div>
       </SidebarInset>
     </SidebarProvider>
+  );
+}
+
+function isCaptureInProgress(
+  capture: ApplicationSnapshot["capture"] | undefined,
+): boolean {
+  if (!capture || capture.phase === "idle") return false;
+  if (capture.phase === "partial_capture") {
+    return Boolean(capture.systemAudioHealthy || capture.microphoneHealthy);
+  }
+  return [
+    "preflight",
+    "preparing",
+    "recording",
+    "paused",
+    "finalizing",
+  ].includes(capture.phase);
+}
+
+function isNewRecordingBlocked(
+  capture: ApplicationSnapshot["capture"] | undefined,
+): boolean {
+  if (!capture || ["idle", "completed", "failed"].includes(capture.phase)) {
+    return false;
+  }
+  if (capture.phase === "partial_capture") {
+    return Boolean(capture.systemAudioHealthy || capture.microphoneHealthy);
+  }
+  return true;
+}
+
+function hasCaptureDetail(
+  capture: ApplicationSnapshot["capture"] | undefined,
+): boolean {
+  return Boolean(
+    capture && capture.phase !== "idle" && capture.phase !== "completed",
   );
 }
 
@@ -437,7 +495,7 @@ function ShellContent({
   switch (current) {
     case "audio":
       section = (
-        <div className="space-y-4">
+        <div className="flex min-h-full flex-col gap-4">
           {snapshot.capability.processing === "unavailable" ? (
             <CapabilityUnavailable reason={snapshot.capability.reason} />
           ) : null}
@@ -469,17 +527,15 @@ function ShellContent({
       );
       break;
   }
-  return <div className="space-y-4">{section}</div>;
+  return <div className="flex min-h-full w-full flex-col gap-4">{section}</div>;
 }
 
 function SettingsContextPane({
   value,
   onValueChange,
-  onSelected,
 }: {
   value: SettingsSection;
   onValueChange: (value: SettingsSection) => void;
-  onSelected: () => void;
 }) {
   return (
     <SidebarGroup className="p-2">
@@ -497,7 +553,6 @@ function SettingsContextPane({
                     className="w-full justify-start aria-current:bg-sidebar-accent"
                     onClick={() => {
                       onValueChange(item.value);
-                      onSelected();
                     }}
                   >
                     <Icon aria-hidden="true" />
@@ -528,8 +583,9 @@ const ContextPaneTrigger = React.forwardRef<
     section: ContextPaneSection;
     open: boolean;
     onToggle: () => void;
+    className?: string;
   }
->(function ContextPaneTrigger({ section, open, onToggle }, ref) {
+>(function ContextPaneTrigger({ section, open, onToggle, className }, ref) {
   const sectionLabel = SHELL_SECTION_LABELS[section];
   const label = `${open ? "收起" : "打开"}${sectionLabel}上下文面板`;
   return (
@@ -540,7 +596,7 @@ const ContextPaneTrigger = React.forwardRef<
       aria-expanded={open}
       onClick={onToggle}
       toggleSidebarOnClick={false}
-      className="-ml-1 shrink-0"
+      className={cn("-ml-1 shrink-0", className)}
     />
   );
 });

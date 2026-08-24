@@ -26,7 +26,7 @@ const audioA = summary(1, "音频 A.wav");
 const audioB = summary(2, "音频 B.wav");
 const audioC = summary(3, "音频 C.wav");
 
-it("prioritizes recording, keeps import secondary, and shows the recording-ready main", async () => {
+it("uses a full-width import action until an audio is selected", async () => {
   const onImport = vi.fn(async () => undefined);
   const onRecord = vi.fn();
   render(
@@ -50,29 +50,28 @@ it("prioritizes recording, keeps import secondary, and shows the recording-ready
   ).toBeVisible();
   await userEvent
     .setup()
-    .click(within(pane).getByRole("button", { name: "开始录音" }));
-  await userEvent
-    .setup()
     .click(within(pane).getByRole("button", { name: "导入音频" }));
-  expect(onRecord).toHaveBeenCalledOnce();
   expect(onImport).toHaveBeenCalledOnce();
   expect(within(main).getByRole("combobox", { name: "麦克风" })).toBeVisible();
   expect(within(main).getByRole("button", { name: "开始录制" })).toBeVisible();
   expect(
     within(main).getByRole("button", { name: "测试麦克风" }),
   ).toBeVisible();
-  expect(main).not.toHaveTextContent("导入音频");
+  expect(main).not.toHaveTextContent("导入");
 
   const paneActions = within(pane).getByRole("group", { name: "音频操作" });
-  const [importButton, recordButton] =
-    within(paneActions).getAllByRole("button");
+  const paneFooter = pane.querySelector<HTMLElement>(
+    "[data-context-pane-fixed-footer]",
+  );
+  expect(paneFooter).toContainElement(paneActions);
+  const [importButton] = within(paneActions).getAllByRole("button");
   expect(importButton).toHaveAccessibleName("导入音频");
   expect(importButton?.querySelector("svg")).toBeNull();
-  expect(importButton).toHaveClass("col-span-1");
-  expect(recordButton).toHaveAccessibleName("开始录音");
-  expect(recordButton).toHaveClass("col-span-2");
+  expect(importButton).toHaveClass("col-span-3");
+  expect(
+    within(paneActions).queryByRole("button", { name: "新录音" }),
+  ).not.toBeInTheDocument();
 
-  onRecord.mockClear();
   await userEvent
     .setup()
     .click(within(main).getByRole("button", { name: "开始录制" }));
@@ -80,12 +79,120 @@ it("prioritizes recording, keeps import secondary, and shows the recording-ready
 
   const list = within(pane).getByRole("list", { name: "音频列表" });
   expect(list).toHaveAttribute("data-flat-row-list", "true");
+  expect(list).toHaveClass("border-b");
+  expect(list).not.toHaveClass("border-y");
   const row = within(list).getByRole("button", { name: /打开 音频 A/ });
   expect(row).toHaveAttribute("data-flat-row", "true");
   expect(row).not.toHaveClass("rounded-lg", "border", "bg-card");
+
+  await userEvent.setup().click(row);
+  const recordButton = await within(paneActions).findByRole("button", {
+    name: "新录音",
+  });
+  expect(importButton).toHaveAccessibleName("导入");
+  expect(importButton).toHaveClass("col-span-1");
+  expect(recordButton).toHaveClass("col-span-2");
 });
 
-it("allows system-audio-only recording when no microphone is available", async () => {
+it("disables the new recording action and announces an active recording", async () => {
+  render(
+    <AudioRouteFeature
+      api={api()}
+      tasks={[]}
+      pendingJobActions={new Map()}
+      writable
+      paneOpen
+      recordingActive
+      onRecord={vi.fn()}
+      onImport={vi.fn()}
+      onCancel={vi.fn()}
+      onRetry={vi.fn()}
+    />,
+  );
+
+  await userEvent
+    .setup()
+    .click(await screen.findByRole("button", { name: /打开 音频 A/ }));
+  const record = await screen.findByRole("button", { name: "正在录音" });
+  expect(record).toBeDisabled();
+  expect(
+    screen.queryByRole("button", { name: "新录音" }),
+  ).not.toBeInTheDocument();
+});
+
+it("disables new recording while capture recovery needs attention", async () => {
+  render(
+    <AudioRouteFeature
+      api={api()}
+      tasks={[]}
+      pendingJobActions={new Map()}
+      writable
+      paneOpen
+      newRecordingBlocked
+      onRecord={vi.fn()}
+      onImport={vi.fn()}
+      onCancel={vi.fn()}
+      onRetry={vi.fn()}
+    />,
+  );
+
+  await userEvent
+    .setup()
+    .click(await screen.findByRole("button", { name: /打开 音频 A/ }));
+  expect(await screen.findByRole("button", { name: "新录音" })).toBeDisabled();
+});
+
+it("keeps search with the list and aligns loading with the empty state", async () => {
+  const listAudios = deferred<AudioSummary[]>();
+  render(
+    <AudioRouteFeature
+      api={api({ listAudios: vi.fn(() => listAudios.promise) })}
+      tasks={[]}
+      pendingJobActions={new Map()}
+      writable
+      paneOpen
+      onRecord={vi.fn()}
+      onImport={vi.fn()}
+      onCancel={vi.fn()}
+      onRetry={vi.fn()}
+    />,
+  );
+
+  const pane = screen.getByRole("region", { name: "音频列表" });
+  const search = within(pane).getByRole("searchbox", { name: "搜索音频" });
+  const loading = await within(pane).findByRole("status", {
+    name: "正在载入音频列表",
+  });
+  expect(loading.parentElement).toHaveClass(
+    "grid",
+    "flex-1",
+    "grid-rows-[1fr_auto_3fr]",
+  );
+  expect(loading).toHaveClass("row-start-2", "justify-center");
+  const loadingLayoutClassName = loading.parentElement?.className;
+
+  await act(async () => listAudios.resolve([]));
+
+  const empty = await within(pane).findByRole("status", {
+    name: "还没有音频",
+  });
+  expect(search.closest('[data-slot="sidebar-group-content"]')).toBe(
+    empty.closest('[data-slot="sidebar-group-content"]'),
+  );
+  expect(search.compareDocumentPosition(empty)).toBe(
+    Node.DOCUMENT_POSITION_FOLLOWING,
+  );
+  expect(search.parentElement).not.toHaveClass("border-b");
+  expect(empty.parentElement).toHaveClass(
+    "grid",
+    "flex-1",
+    "grid-rows-[1fr_auto_3fr]",
+  );
+  expect(empty).toHaveClass("row-start-2");
+  expect(loadingLayoutClassName).toBe(empty.parentElement?.className);
+});
+
+it("disables recording when no microphone is available", async () => {
   const onRecord = vi.fn();
   const desktop = api({
     preflightCapture: vi.fn(async () => ({
@@ -117,12 +224,16 @@ it("allows system-audio-only recording when no microphone is available", async (
   );
 
   const start = await screen.findByRole("button", { name: "开始录制" });
-  expect(start).toBeEnabled();
+  expect(start).toBeDisabled();
   await userEvent.setup().click(start);
-  expect(onRecord).toHaveBeenCalledWith(undefined);
+  expect(onRecord).not.toHaveBeenCalled();
+  await userEvent
+    .setup()
+    .click(await screen.findByRole("button", { name: /打开 音频 A/ }));
+  expect(screen.getByRole("button", { name: "新录音" })).toBeDisabled();
 });
 
-it("samples microphone input before reporting a successful test", async () => {
+it("samples microphone input before reporting success in a dialog", async () => {
   const stop = vi.fn();
   const getUserMedia = vi.fn(async () => ({
     getTracks: () => [{ stop }],
@@ -177,9 +288,15 @@ it("samples microphone input before reporting a successful test", async () => {
     });
     await userEvent.setup().click(testMicrophone);
 
+    const dialog = await screen.findByRole("dialog", {
+      name: "麦克风测试成功",
+    });
+    expect(dialog).toHaveTextContent("麦克风工作正常：MacBook 麦克风");
     expect(
-      await screen.findByText("麦克风工作正常：MacBook 麦克风"),
-    ).toBeVisible();
+      screen.queryByText("麦克风工作正常：MacBook 麦克风", {
+        selector: "p[role='status']",
+      }),
+    ).not.toBeInTheDocument();
     expect(getUserMedia).toHaveBeenCalledWith({
       audio: { deviceId: { exact: "mic-default" } },
     });
@@ -194,6 +311,49 @@ it("samples microphone input before reporting a successful test", async () => {
       Reflect.deleteProperty(navigator, "mediaDevices");
     }
   }
+});
+
+it("reports an unavailable microphone in a dialog", async () => {
+  render(
+    <AudioRouteFeature
+      api={api({
+        preflightCapture: vi.fn(async () => ({
+          minimumMacosVersion: "13.0",
+          systemAudioMinimumMacosVersion: "13.0",
+          captureMode: "system_audio_only" as const,
+          systemAudioPermission: "granted" as const,
+          microphonePermission: "denied" as const,
+          microphones: [],
+          availableBytes: 8 * 1024 ** 3,
+          requiredBytes: 2 * 1024 ** 3,
+          captionModelAvailable: true,
+          canStart: true,
+          blockingReasons: [],
+        })),
+      })}
+      tasks={[]}
+      pendingJobActions={new Map()}
+      writable
+      paneOpen
+      onRecord={vi.fn()}
+      onImport={vi.fn()}
+      onCancel={vi.fn()}
+      onRetry={vi.fn()}
+    />,
+  );
+
+  const testMicrophone = await screen.findByRole("button", {
+    name: "测试麦克风",
+  });
+  await waitFor(() => expect(testMicrophone).toBeEnabled());
+  await userEvent.setup().click(testMicrophone);
+
+  const dialog = await screen.findByRole("dialog", {
+    name: "麦克风测试失败",
+  });
+  expect(dialog).toHaveTextContent(
+    "麦克风暂不可用，请检查系统权限或设备连接。",
+  );
 });
 
 it("filters Audio summaries and projects every non-completed processing state", async () => {

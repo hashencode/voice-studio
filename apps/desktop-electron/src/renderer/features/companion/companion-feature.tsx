@@ -10,6 +10,7 @@ import {
 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
+import { EmptyState } from "@/components/ui/empty-state";
 import { Progress } from "@/components/ui/progress";
 import { SidebarGroup, SidebarGroupContent } from "@/components/ui/sidebar";
 import type {
@@ -213,12 +214,15 @@ export function CompanionContextPane({
     );
   }
   return (
-    <SidebarGroup className="p-0">
-      <SidebarGroupContent>
+    <SidebarGroup className="h-full p-0">
+      <SidebarGroupContent className="flex h-full flex-col">
         {controller.peers.length === 0 ? (
-          <p className="px-3 py-4 text-sm text-muted-foreground">
-            没有已信任设备
-          </p>
+          <EmptyState
+            icon={Smartphone}
+            title="没有已信任设备"
+            compact
+            className="min-h-0 flex-1"
+          />
         ) : (
           <ul
             aria-label="已信任设备列表"
@@ -258,21 +262,16 @@ export function CompanionContextPaneHeader({
   controller: CompanionRouteController;
 }) {
   return (
-    <>
-      <p className="px-2 text-xs leading-relaxed text-muted-foreground">
-        选择只会切换查看内容，不会主动连接设备。
-      </p>
-      <Button
-        type="button"
-        size="sm"
-        variant="outline"
-        className="w-full"
-        disabled={controller.loading || !controller.snapshot}
-        onClick={controller.showPairing}
-      >
-        添加或配对设备
-      </Button>
-    </>
+    <Button
+      type="button"
+      size="sm"
+      variant="outline"
+      className="w-full"
+      disabled={controller.loading || !controller.snapshot}
+      onClick={controller.showPairing}
+    >
+      添加或配对设备
+    </Button>
   );
 }
 

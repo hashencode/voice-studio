@@ -9,5 +9,3 @@ export const SHELL_SECTION_LABELS: Record<RendererShellSection, string> = {
   settings: "设置",
 };
 export type ContextPanePresentation = "docked" | "overlay";
-export type ContextPaneCloseReason =
-  "toggle" | "escape" | "background" | "selection";

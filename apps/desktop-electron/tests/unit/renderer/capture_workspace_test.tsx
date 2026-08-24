@@ -65,12 +65,12 @@ function installCaptureApi(overrides: Partial<Voice2TextDesktopApi> = {}) {
 
 describe("capture workspace", () => {
   it.each([
-    ["microphone_permission_denied", "麦克风权限被拒绝"],
-    ["system_audio_runtime_unsupported", "系统音频录制不可用"],
-    ["microphone_device_missing", "没有可用的麦克风"],
-    ["disk_space_low", "磁盘空间不足"],
-    ["caption_model_unavailable", "本机字幕模型不可用"],
-  ])("shows an actionable preflight branch for %s", async (reason, label) => {
+    "microphone_permission_denied",
+    "system_audio_runtime_unsupported",
+    "microphone_device_missing",
+    "disk_space_low",
+    "caption_model_unavailable",
+  ])("does not surface redundant preflight controls for %s", async (reason) => {
     installCaptureApi({
       preflightCapture: vi.fn(async () => ({
         ...readyPreflight,
@@ -83,15 +83,28 @@ describe("capture workspace", () => {
       })),
     });
     const user = userEvent.setup();
-    render(<CaptureWorkspace capture={idle} applicationRevision={1} />);
+    const onPreflightResolved = vi.fn();
+    render(
+      <CaptureWorkspace
+        capture={idle}
+        applicationRevision={1}
+        onPreflightResolved={onPreflightResolved}
+      />,
+    );
 
     await user.click(screen.getByRole("button", { name: "检查并设置录制" }));
-    const alert = await screen.findByRole("alert");
-    expect(alert).toHaveTextContent(label);
-    expect(alert).toHaveFocus();
+    await waitFor(() => expect(onPreflightResolved).toHaveBeenCalledOnce());
     expect(
-      screen.getByRole("button", { name: "重新检查录制条件" }),
-    ).toBeEnabled();
+      screen.queryByRole("heading", { name: "设置音频录制" }),
+    ).not.toBeInTheDocument();
+    expect(screen.queryByText("录制条件需要处理")).not.toBeInTheDocument();
+    expect(screen.queryByText("可使用降级录制")).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("combobox", { name: "麦克风" }),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: "重新检查录制条件" }),
+    ).not.toBeInTheDocument();
   });
 
   it("keeps recording available when the optional caption model is unavailable", async () => {
@@ -106,12 +119,19 @@ describe("capture workspace", () => {
       startCapture,
     });
     const user = userEvent.setup();
-    render(<CaptureWorkspace capture={idle} applicationRevision={1} />);
+    const onPreflightResolved = vi.fn();
+    render(
+      <CaptureWorkspace
+        capture={idle}
+        applicationRevision={1}
+        onPreflightResolved={onPreflightResolved}
+      />,
+    );
 
     await user.click(screen.getByRole("button", { name: "检查并设置录制" }));
-    expect(await screen.findByRole("alert")).toHaveTextContent(
-      "本机字幕模型不可用",
-    );
+    await waitFor(() => expect(onPreflightResolved).toHaveBeenCalledOnce());
+    await screen.findByRole("heading", { name: "设置音频录制" });
+    expect(screen.queryByText("本机字幕模型不可用")).not.toBeInTheDocument();
     expect(screen.getByRole("button", { name: "开始录制" })).toBeEnabled();
     expect(
       screen.queryByRole("switch", { name: /同时生成本机字幕/ }),
@@ -122,8 +142,8 @@ describe("capture workspace", () => {
     );
   });
 
-  it("keeps a visible warning when one input degrades but recording can continue", async () => {
-    installCaptureApi({
+  it("does not show degraded-recording guidance after entering setup", async () => {
+    const api = installCaptureApi({
       preflightCapture: vi.fn(async () => ({
         ...readyPreflight,
         captureMode: "system_audio_only" as const,
@@ -137,11 +157,15 @@ describe("capture workspace", () => {
     render(<CaptureWorkspace capture={idle} applicationRevision={1} />);
 
     await user.click(screen.getByRole("button", { name: "检查并设置录制" }));
-    expect(await screen.findByRole("alert")).toHaveTextContent(
-      "麦克风权限被拒绝",
-    );
-    expect(screen.getByText("可使用降级录制")).toBeVisible();
-    expect(screen.getByRole("button", { name: "开始录制" })).toBeEnabled();
+    await waitFor(() => expect(api.preflightCapture).toHaveBeenCalledOnce());
+    expect(
+      screen.queryByRole("heading", { name: "设置音频录制" }),
+    ).not.toBeInTheDocument();
+    expect(screen.queryByText("麦克风权限被拒绝")).not.toBeInTheDocument();
+    expect(screen.queryByText("可使用降级录制")).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: "开始录制" }),
+    ).not.toBeInTheDocument();
   });
 
   it("starts once on repeated activation and exposes a semantic recording status", async () => {
@@ -224,7 +248,7 @@ describe("capture workspace", () => {
     expect(window.voice2text.preflightCapture).toHaveBeenCalledTimes(1);
   });
 
-  it("starts with the selected microphone from the shared Select control", async () => {
+  it("starts with the default microphone without showing a selector", async () => {
     const startCapture = vi.fn(async () => recording);
     installCaptureApi({
       preflightCapture: vi.fn(async () => ({
@@ -240,13 +264,35 @@ describe("capture workspace", () => {
     render(<CaptureWorkspace capture={idle} applicationRevision={1} />);
 
     await user.click(screen.getByRole("button", { name: "检查并设置录制" }));
-    await user.click(screen.getByRole("combobox", { name: "麦克风" }));
-    await user.click(await screen.findByRole("option", { name: "USB 麦克风" }));
+    expect(
+      screen.queryByRole("combobox", { name: "麦克风" }),
+    ).not.toBeInTheDocument();
     await user.click(screen.getByRole("button", { name: "开始录制" }));
 
     expect(startCapture).toHaveBeenCalledWith(
-      expect.objectContaining({ microphoneDeviceId: "mic-usb" }),
+      expect.objectContaining({ microphoneDeviceId: "mic-default" }),
     );
+  });
+
+  it("omits the redundant local-recording header and back action", async () => {
+    installCaptureApi();
+    render(
+      <CaptureWorkspace
+        capture={{
+          phase: "recording",
+          sessionId: recording.sessionId,
+          title: "访谈录制",
+          elapsedMs: recording.captureTimelineMs,
+        }}
+        onDetailOpenChange={vi.fn()}
+      />,
+    );
+
+    await screen.findByRole("region", { name: "录制详情" });
+    expect(screen.queryByText("本机录制")).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: "返回" }),
+    ).not.toBeInTheDocument();
   });
 
   it("guards repeated stop and announces the completed terminal state", async () => {
@@ -554,31 +600,6 @@ describe("capture workspace", () => {
     ).toBeEnabled();
   });
 
-  it("acknowledges compact attention when details are opened", async () => {
-    installCaptureApi();
-    const compactHost = document.createElement("div");
-    document.body.append(compactHost);
-    const onAttentionDetailsOpened = vi.fn();
-    render(
-      <CaptureWorkspace
-        capture={{
-          phase: "failed",
-          sessionId: recording.sessionId,
-          title: "故障录制",
-          elapsedMs: recording.captureTimelineMs,
-        }}
-        detailOpen={false}
-        compactHost={compactHost}
-        onAttentionDetailsOpened={onAttentionDetailsOpened}
-      />,
-    );
-
-    await userEvent
-      .setup()
-      .click(await screen.findByRole("button", { name: "打开详情" }));
-    expect(onAttentionDetailsOpened).toHaveBeenCalledWith(recording.sessionId);
-  });
-
   it("reloads recovery actions when Main capture bootstrap finishes after mount", async () => {
     const recoverable: CaptureSnapshot = {
       ...recording,
@@ -618,5 +639,29 @@ describe("capture workspace", () => {
       screen.queryByText("capture bootstrap unavailable"),
     ).not.toBeInTheDocument();
     expect(listCaptureRecoveries).toHaveBeenCalledTimes(2);
+  });
+
+  it("opens recording details when recoverable audio is discovered", async () => {
+    const recoverable: CaptureSnapshot = {
+      ...recording,
+      state: "recoverable",
+      systemAudioHealthy: false,
+      microphoneHealthy: false,
+    };
+    installCaptureApi({
+      listCaptureRecoveries: vi.fn(async () => [recoverable]),
+    });
+    const onDetailOpenChange = vi.fn();
+
+    render(
+      <CaptureWorkspace
+        capture={idle}
+        detailOpen={false}
+        autoOpenRecoveries
+        onDetailOpenChange={onDetailOpenChange}
+      />,
+    );
+
+    await waitFor(() => expect(onDetailOpenChange).toHaveBeenCalledWith(true));
   });
 });

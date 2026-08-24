@@ -1,27 +1,16 @@
 import * as React from "react";
-import { createPortal } from "react-dom";
 import {
-  AlertTriangle,
   CheckCircle2,
   CirclePause,
   Mic,
   Play,
-  RotateCcw,
   Square,
   Trash2,
-  X,
 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
 import { CaptionWorkspace } from "@/features/captions/caption-workspace";
 import type {
@@ -46,9 +35,9 @@ export function CaptureWorkspace({
   detailOpen = true,
   focusSessionId = null,
   preferredMicrophoneDeviceId = null,
-  compactHost = null,
+  autoOpenRecoveries = false,
+  onPreflightResolved,
   onDetailOpenChange,
-  onAttentionDetailsOpened,
 }: {
   capture: ApplicationSnapshot["capture"];
   /** @deprecated Capture state is authoritative in Main and arrives via snapshots. */
@@ -57,9 +46,9 @@ export function CaptureWorkspace({
   detailOpen?: boolean;
   focusSessionId?: string | null;
   preferredMicrophoneDeviceId?: string | null;
-  compactHost?: HTMLElement | null;
+  autoOpenRecoveries?: boolean;
+  onPreflightResolved?: (preflight: CapturePreflight) => void;
   onDetailOpenChange?: (open: boolean) => void;
-  onAttentionDetailsOpened?: (sessionId: string) => void;
 }) {
   const [preflight, setPreflight] = React.useState<CapturePreflight | null>(
     null,
@@ -81,10 +70,7 @@ export function CaptureWorkspace({
   const [error, setError] = React.useState<string | null>(null);
   const [stopConfirmationSessionId, setStopConfirmationSessionId] =
     React.useState<string | null>(null);
-  const [dismissedCompactSessionId, setDismissedCompactSessionId] =
-    React.useState<string | null>(null);
   const pendingRef = React.useRef(new Set<string>());
-  const preflightAlertRef = React.useRef<HTMLDivElement>(null);
   const errorRef = React.useRef<HTMLDivElement>(null);
   const titleRef = React.useRef<HTMLInputElement>(null);
   const lastRecordRequestRef = React.useRef(recordRequest ?? 0);
@@ -111,6 +97,13 @@ export function CaptureWorkspace({
               )
             : values,
         );
+        if (
+          autoOpenRecoveries &&
+          values.length > 0 &&
+          !prioritizedRecoverySessionId
+        ) {
+          onDetailOpenChange?.(true);
+        }
         setLoadedRecoveryTarget(loadTarget);
       })
       .catch((reason: unknown) => {
@@ -122,13 +115,7 @@ export function CaptureWorkspace({
     return () => {
       active = false;
     };
-  }, [prioritizedRecoverySessionId]);
-
-  React.useEffect(() => {
-    if (preflight && preflight.blockingReasons.length > 0) {
-      preflightAlertRef.current?.focus();
-    }
-  }, [preflight]);
+  }, [autoOpenRecoveries, onDetailOpenChange, prioritizedRecoverySessionId]);
 
   React.useEffect(() => {
     if (error) errorRef.current?.focus();
@@ -175,9 +162,8 @@ export function CaptureWorkspace({
         captionEnabled,
       });
       setPreflight(result);
+      onPreflightResolved?.(result);
       if (!result.captionModelAvailable) setCaptionEnabled(false);
-      setSetupOpen(true);
-      onDetailOpenChange?.(true);
       const defaultMicrophone =
         result.microphones.find(
           (device) => device.id === preferredMicrophoneDeviceId,
@@ -185,15 +171,19 @@ export function CaptureWorkspace({
         result.microphones.find((device) => device.isDefault) ??
         result.microphones[0];
       setMicrophoneDeviceId(defaultMicrophone?.id ?? "");
-      setOperationMessage(
-        result.canStart && !(captionEnabled && !result.captionModelAvailable)
-          ? "录制条件检查完成"
-          : "录制条件需要处理",
-      );
+      if (!result.canStart || !defaultMicrophone) {
+        setSetupOpen(false);
+        setOperationMessage("录制条件已变化");
+        return;
+      }
+      setSetupOpen(true);
+      onDetailOpenChange?.(true);
+      setOperationMessage("录制设置已打开");
     });
   }, [
     captionEnabled,
     onDetailOpenChange,
+    onPreflightResolved,
     preferredMicrophoneDeviceId,
     runExclusive,
   ]);
@@ -321,7 +311,6 @@ export function CaptureWorkspace({
   const focusedRecoveries = focusSessionId
     ? recoveries.filter((item) => item.sessionId === focusSessionId)
     : recoveries;
-  const recoveryCapture = focusedRecoveries[0];
   const focusedActiveCapture =
     !focusSessionId || activeCapture?.sessionId === focusSessionId
       ? activeCapture
@@ -331,18 +320,6 @@ export function CaptureWorkspace({
     loadedRecoveryTarget === focusSessionId &&
     focusedRecoveries.length === 0 &&
     !focusedActiveCapture;
-  const compactPresentation = deriveCaptureCompactPresentation(
-    activeCapture ??
-      (recoveryCapture
-        ? {
-            phase: "recovery",
-            sessionId: recoveryCapture.sessionId,
-            title: "恢复的音频录制",
-            elapsedMs: recoveryCapture.captureTimelineMs,
-          }
-        : { phase: "idle" }),
-  );
-
   if (
     recordRequest !== undefined &&
     !activeCapture &&
@@ -360,19 +337,6 @@ export function CaptureWorkspace({
       aria-busy={busy}
       className="mx-auto w-full max-w-3xl space-y-5"
     >
-      {onDetailOpenChange ? (
-        <div className="flex items-center justify-between gap-3 border-b pb-3">
-          <p className="text-sm font-medium text-muted-foreground">本机录制</p>
-          <Button
-            type="button"
-            variant="ghost"
-            onClick={() => onDetailOpenChange(false)}
-          >
-            <X aria-hidden="true" />
-            返回
-          </Button>
-        </div>
-      ) : null}
       <p
         role="status"
         aria-label="录制操作状态"
@@ -429,52 +393,17 @@ export function CaptureWorkspace({
           setupOpen={setupOpen}
           preflight={preflight}
           title={title}
-          microphoneDeviceId={microphoneDeviceId}
           busy={busy}
           titleRef={titleRef}
-          alertRef={preflightAlertRef}
           onCheck={checkPreflight}
           onStart={start}
           onTitleChange={setTitle}
-          onMicrophoneChange={setMicrophoneDeviceId}
         />
       ) : null}
     </section>
   ) : null;
 
-  const compact =
-    compactHost &&
-    compactPresentation &&
-    compactPresentation.sessionId !== dismissedCompactSessionId
-      ? createPortal(
-          <CompactCaptureController
-            presentation={compactPresentation}
-            busy={busy}
-            stopConfirmationOpen={stopConfirmationOpen}
-            onControl={requestControl}
-            onConfirmStop={confirmStop}
-            onCancelStop={() => setStopConfirmationSessionId(null)}
-            onOpenDetails={() => {
-              if (compactPresentation.needsAttention) {
-                setDismissedCompactSessionId(compactPresentation.sessionId);
-                onAttentionDetailsOpened?.(compactPresentation.sessionId);
-              }
-              onDetailOpenChange?.(true);
-            }}
-            onDismiss={() =>
-              setDismissedCompactSessionId(compactPresentation.sessionId)
-            }
-          />,
-          compactHost,
-        )
-      : null;
-
-  return (
-    <>
-      {detail}
-      {compact}
-    </>
-  );
+  return detail;
 }
 
 export function FloatingCapturePreferenceSetting({
@@ -540,26 +469,20 @@ function CaptureSetup({
   setupOpen,
   preflight,
   title,
-  microphoneDeviceId,
   busy,
   titleRef,
-  alertRef,
   onCheck,
   onStart,
   onTitleChange,
-  onMicrophoneChange,
 }: {
   setupOpen: boolean;
   preflight: CapturePreflight | null;
   title: string;
-  microphoneDeviceId: string;
   busy: boolean;
   titleRef: React.RefObject<HTMLInputElement | null>;
-  alertRef: React.RefObject<HTMLDivElement | null>;
   onCheck: () => void;
   onStart: () => void;
   onTitleChange: (value: string) => void;
-  onMicrophoneChange: (value: string) => void;
 }) {
   if (!setupOpen) {
     return (
@@ -580,55 +503,12 @@ function CaptureSetup({
     );
   }
 
-  const blockers = preflight?.blockingReasons ?? [];
   const readyToStart = Boolean(preflight?.canStart);
   return (
     <section aria-labelledby="capture-setup-heading" className="space-y-3">
-      <div>
-        <p className="text-xs font-medium text-muted-foreground">本机录制</p>
-        <h2 id="capture-setup-heading" className="font-semibold">
-          设置音频录制
-        </h2>
-      </div>
-      {preflight && blockers.length > 0 ? (
-        <div
-          ref={alertRef}
-          role="alert"
-          tabIndex={-1}
-          className="border-y border-amber-500/40 bg-amber-500/5 py-3 outline-none focus-visible:ring-2 focus-visible:ring-ring"
-        >
-          <div className="flex gap-2">
-            <AlertTriangle
-              className="mt-0.5 size-4 shrink-0"
-              aria-hidden="true"
-            />
-            <div>
-              <p className="font-medium">录制条件需要处理</p>
-              <ul className="mt-1 list-disc space-y-1 pl-4 text-sm">
-                {blockers.map((reason) => (
-                  <li key={reason}>{preflightReason(reason)}</li>
-                ))}
-              </ul>
-            </div>
-          </div>
-        </div>
-      ) : null}
-      {readyToStart ? (
-        <div className="border-y bg-muted/30 py-3 text-sm">
-          <p className="flex items-center gap-2 font-medium">
-            <CheckCircle2
-              className="size-4 text-emerald-600"
-              aria-hidden="true"
-            />
-            {blockers.length > 0 ? "可使用降级录制" : "录制条件已就绪"}
-          </p>
-          <p className="mt-1 text-muted-foreground">
-            {preflight?.captureMode === "dual_track"
-              ? "系统音频与麦克风将分别保存。"
-              : "当前将仅保存麦克风轨道。"}
-          </p>
-        </div>
-      ) : null}
+      <h2 id="capture-setup-heading" className="font-semibold">
+        设置音频录制
+      </h2>
       <div className="space-y-1.5">
         <Label htmlFor="capture-title">录制名称</Label>
         <Input
@@ -640,36 +520,7 @@ function CaptureSetup({
           onChange={(event) => onTitleChange(event.currentTarget.value)}
         />
       </div>
-      <div className="space-y-1.5">
-        <Label htmlFor="capture-microphone">麦克风</Label>
-        <Select
-          value={microphoneDeviceId || undefined}
-          disabled={busy || !preflight?.microphones.length}
-          onValueChange={onMicrophoneChange}
-        >
-          <SelectTrigger id="capture-microphone" className="w-full">
-            <SelectValue placeholder="没有可用设备" />
-          </SelectTrigger>
-          <SelectContent>
-            {preflight?.microphones.map((device) => (
-              <SelectItem key={device.id} value={device.id}>
-                {device.name}
-                {device.isDefault ? "（默认）" : ""}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-      </div>
       <div className="flex flex-wrap justify-end gap-2">
-        <Button
-          type="button"
-          variant="outline"
-          disabled={busy}
-          onClick={onCheck}
-        >
-          <RotateCcw aria-hidden="true" />
-          重新检查录制条件
-        </Button>
         {readyToStart ? (
           <Button
             type="button"
@@ -811,126 +662,6 @@ function canBeginAnotherCapture(capture: CaptureView): boolean {
     (capture.phase === "partial_capture" &&
       !capture.systemAudioHealthy &&
       !capture.microphoneHealthy)
-  );
-}
-
-function CompactCaptureController({
-  presentation,
-  busy,
-  stopConfirmationOpen,
-  onControl,
-  onConfirmStop,
-  onCancelStop,
-  onOpenDetails,
-  onDismiss,
-}: {
-  presentation: NonNullable<
-    ReturnType<typeof deriveCaptureCompactPresentation>
-  >;
-  busy: boolean;
-  stopConfirmationOpen: boolean;
-  onControl: (action: CaptureControlAction) => void;
-  onConfirmStop: () => void;
-  onCancelStop: () => void;
-  onOpenDetails: () => void;
-  onDismiss: () => void;
-}) {
-  return (
-    <div
-      role="complementary"
-      aria-label="录制控制"
-      aria-busy={busy}
-      className="ml-auto flex min-w-0 items-center gap-1.5 rounded-lg border bg-background px-2 py-1"
-    >
-      <span
-        className="size-2 shrink-0 rounded-full bg-destructive"
-        aria-hidden="true"
-      />
-      <span className="hidden text-xs font-medium sm:inline">
-        {presentation.status}
-      </span>
-      <span className="min-w-12 text-xs font-medium tabular-nums">
-        {presentation.elapsed}
-      </span>
-      {presentation.indicator ? (
-        <span className="hidden text-xs text-amber-700 lg:inline">
-          {presentation.indicator}
-        </span>
-      ) : null}
-      {stopConfirmationOpen && presentation.phase === "finalizing" ? (
-        <span className="text-xs font-medium">正在安全保存…</span>
-      ) : presentation.needsAttention ? (
-        <>
-          <span className="text-xs font-medium text-amber-700">需要处理</span>
-          <Button
-            type="button"
-            size="sm"
-            variant="outline"
-            onClick={onOpenDetails}
-          >
-            打开详情
-          </Button>
-          <Button type="button" size="sm" variant="ghost" onClick={onDismiss}>
-            忽略
-          </Button>
-        </>
-      ) : (
-        <>
-          {presentation.action ? (
-            <Button
-              type="button"
-              size="sm"
-              variant="ghost"
-              disabled={busy}
-              aria-label={
-                presentation.action === "pause" ? "暂停录制" : "继续录制"
-              }
-              onClick={() => onControl(presentation.action!)}
-            >
-              {presentation.action === "pause" ? (
-                <CirclePause aria-hidden="true" />
-              ) : (
-                <Play aria-hidden="true" />
-              )}
-              <span className="hidden xl:inline">
-                {presentation.action === "pause" ? "暂停" : "继续"}
-              </span>
-            </Button>
-          ) : null}
-          {presentation.canStop ? (
-            stopConfirmationOpen ? (
-              <StopConfirmation
-                compact
-                busy={busy}
-                onCancel={onCancelStop}
-                onConfirm={onConfirmStop}
-              />
-            ) : (
-              <Button
-                type="button"
-                size="sm"
-                variant="destructive"
-                disabled={busy}
-                aria-label="停止并保存"
-                onClick={() => onControl("stop")}
-              >
-                <Square aria-hidden="true" />
-                <span className="hidden xl:inline">停止</span>
-              </Button>
-            )
-          ) : null}
-        </>
-      )}
-      <Button
-        type="button"
-        size="icon-sm"
-        variant="ghost"
-        aria-label="打开录制详情"
-        onClick={onOpenDetails}
-      >
-        <Mic aria-hidden="true" />
-      </Button>
-    </div>
   );
 }
 
@@ -1127,20 +858,6 @@ function capturePhaseLabel(
     partial_capture: "部分轨道录制中",
     failed: "录制需要处理",
   }[phase];
-}
-
-function preflightReason(reason: string): string {
-  return (
-    {
-      microphone_permission_denied:
-        "麦克风权限被拒绝，请在系统设置中允许后重新检查。",
-      system_audio_runtime_unsupported:
-        "系统音频录制不可用；可在支持的 macOS 上重试。",
-      microphone_device_missing: "没有可用的麦克风，请连接设备后重新检查。",
-      disk_space_low: "磁盘空间不足，请释放空间后重新检查。",
-      caption_model_unavailable: "本机字幕模型不可用，可关闭字幕后重新检查。",
-    }[reason] ?? `录制条件未满足：${reason}`
-  );
 }
 
 function commandKey(action: string): string {

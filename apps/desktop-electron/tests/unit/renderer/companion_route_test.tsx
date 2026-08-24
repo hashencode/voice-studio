@@ -75,18 +75,16 @@ describe("Companion route composition", () => {
     expect(
       await within(pane).findByRole("button", { name: /Alpha Phone/ }),
     ).toBeVisible();
-    const helper = within(pane).getByText(
-      "选择只会切换查看内容，不会主动连接设备。",
-    );
     const pairingAction = within(pane).getByRole("button", {
       name: "添加或配对设备",
     });
-    expect(helper).toBeVisible();
     expect(pairingAction).toBeVisible();
-    expect(helper.closest("[data-context-pane-fixed-header]")).not.toBeNull();
     expect(
       pairingAction.closest("[data-context-pane-fixed-header]"),
     ).not.toBeNull();
+    expect(
+      within(pane).queryByText("选择只会切换查看内容，不会主动连接设备。"),
+    ).not.toBeInTheDocument();
     const list = within(pane).getByRole("list", { name: "已信任设备列表" });
     expect(list).toHaveAttribute("data-flat-row-list", "true");
     const alphaRow = within(list).getByRole("button", { name: /Alpha Phone/ });
@@ -139,7 +137,13 @@ describe("Companion route composition", () => {
     const pane = await screen.findByRole("complementary", {
       name: "互联上下文面板",
     });
-    expect(await within(pane).findByText("没有已信任设备")).toBeVisible();
+    const empty = await within(pane).findByRole("status", {
+      name: "没有已信任设备",
+    });
+    expect(empty).toHaveClass("flex-1", "min-h-0");
+    expect(
+      within(empty).getByRole("heading", { name: "没有已信任设备" }),
+    ).toBeVisible();
     expect(within(pane).queryByText("Old Phone")).not.toBeInTheDocument();
     expect(
       await screen.findByRole("heading", { name: "配对手机", level: 1 }),

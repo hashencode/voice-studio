@@ -1,8 +1,6 @@
 import * as React from "react";
 
 import type {
-  ContextPaneCloseReason,
-  ContextPanePresentation,
   ContextPaneSection,
   RendererShellSection,
 } from "@/features/shell/context-pane-contract";
@@ -11,29 +9,19 @@ type PanePreference = "open" | "closed";
 type PanePreferences = Record<ContextPaneSection, PanePreference>;
 
 const CONTEXT_PANE_STORAGE_KEY = "voice2text.shell.context-panes.v1";
-const CONTEXT_PANE_BREAKPOINT = 1024;
 const DEFAULT_PREFERENCES: PanePreferences = {
   audio: "open",
   companion: "open",
   messages: "open",
   settings: "open",
 };
-const PERSISTENT_CLOSE_REASONS: ReadonlySet<ContextPaneCloseReason> = new Set([
-  "toggle",
-  "escape",
-  "background",
-]);
 
 export function useContextPaneShell(section: RendererShellSection) {
   const [preferences, setPreferences] = React.useState(readPanePreferences);
-  const [transientClosedSection, setTransientClosedSection] =
-    React.useState<ContextPaneSection | null>(null);
   const preferencesRef = React.useRef(preferences);
-  const presentation = useContextPanePresentation();
+  const presentation = "docked" as const;
   const paneSection = section;
-  const open =
-    preferences[paneSection] === "open" &&
-    transientClosedSection !== paneSection;
+  const open = preferences[paneSection] === "open";
 
   const updatePreference = React.useCallback(
     (target: ContextPaneSection, preference: PanePreference) => {
@@ -46,35 +34,20 @@ export function useContextPaneShell(section: RendererShellSection) {
     [],
   );
 
-  const requestClose = React.useCallback(
-    (reason: ContextPaneCloseReason) => {
-      if (reason === "selection") {
-        setTransientClosedSection(paneSection);
-        return;
-      }
-      if (!PERSISTENT_CLOSE_REASONS.has(reason)) return;
-      setTransientClosedSection(null);
-      updatePreference(paneSection, "closed");
-    },
-    [paneSection, updatePreference],
-  );
+  const requestClose = React.useCallback(() => {
+    updatePreference(paneSection, "closed");
+  }, [paneSection, updatePreference]);
 
   const toggle = React.useCallback(() => {
-    setTransientClosedSection(null);
     updatePreference(paneSection, open ? "closed" : "open");
   }, [open, paneSection, updatePreference]);
 
   const openPane = React.useCallback(
     (target: ContextPaneSection = paneSection) => {
-      if (target === paneSection) setTransientClosedSection(null);
       updatePreference(target, "open");
     },
     [paneSection, updatePreference],
   );
-
-  const clearTransientClose = React.useCallback(() => {
-    setTransientClosedSection(null);
-  }, []);
 
   return {
     open,
@@ -83,25 +56,7 @@ export function useContextPaneShell(section: RendererShellSection) {
     requestClose,
     toggle,
     openPane,
-    clearTransientClose,
   };
-}
-
-function useContextPanePresentation(): ContextPanePresentation {
-  const [presentation, setPresentation] =
-    React.useState<ContextPanePresentation>(deriveContextPanePresentation);
-
-  React.useEffect(() => {
-    const handleResize = () => setPresentation(deriveContextPanePresentation());
-    window.addEventListener("resize", handleResize);
-    return () => window.removeEventListener("resize", handleResize);
-  }, []);
-
-  return presentation;
-}
-
-function deriveContextPanePresentation(): ContextPanePresentation {
-  return window.innerWidth < CONTEXT_PANE_BREAKPOINT ? "overlay" : "docked";
 }
 
 function readPanePreferences(): PanePreferences {
