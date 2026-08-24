@@ -15,6 +15,20 @@ Before changing UI, screens, navigation, visual states, or Flutter component usa
 - Use Goo design tokens and component variants before hand-writing Material surfaces, typography, colors, dividers, loading states, dialogs, panels, toasts, snackbars, or form controls.
 - Preserve existing business behavior and platform contracts when migrating UI to Goo components.
 
+## Visual styling guidance
+
+- Default to shadowless UI. Do not add shadows unless the user explicitly requests them or an existing platform contract requires them.
+- Establish hierarchy with spacing, borders, surface color differences, and typography before considering elevation.
+- Keep keyboard focus visible but lightweight. Inputs, buttons, and other form controls should use a thin focus indicator rather than a thick ring or glow.
+- Keep interface copy concise. Do not narrate behavior that is already clear from the control, state, or surrounding context.
+
+## Visual validation permission
+
+- Never perform visual validation unless the user has explicitly authorized it in the current task.
+- Visual validation includes launching, relaunching, closing, or controlling an app, browser, simulator, emulator, or physical device; taking or updating screenshots or goldens; running visual or browser-driven test suites; and starting UI device watchers.
+- A request to implement or change UI is not permission to perform visual validation. Ask first, and treat permission as limited to the scope granted for that task.
+- Without permission, use only non-visual static checks and tests that do not launch or control UI processes. Report visual validation as skipped by user policy; do not substitute another UI-launching command.
+
 ## Verification lanes
 
 Use the lightest lane that proves the changed behavior. Routine work must not run
@@ -23,7 +37,7 @@ the 20-stage `./tool/dev_check.sh` by default.
 | Change | Required verification |
 | --- | --- |
 | Documentation, comments, or analysis-only work | Inspect the diff and check affected references for consistency. Do not run tests, analyzers, or builds. |
-| Electron renderer layout, styling, navigation, or visual states | During iteration, use `bun run check:ui:quick` from `apps/desktop-electron`; run `bun run check:ui` once after the UI edit is stable and before handoff. Do not rerun it unless UI code changes after that result. |
+| Electron renderer layout, styling, navigation, or visual states | Run `bun run check:ui:quick` and the final `bun run check:ui` from `apps/desktop-electron` only after the user explicitly authorizes visual validation for the current task. Otherwise skip them and report that visual validation was not authorized. Do not rerun the final check unless UI code changes after that result. |
 | Electron Main, Preload, shared contracts, storage, or ordinary worker integration | Run `bun run check:code` from `apps/desktop-electron`. |
 | Electron release evidence, frozen-resource manifest/identity/packaged inventory, or an explicit candidate request | Run `VOICE2TEXT_RELEASE_VALIDATION=1 bun run check:release` from `apps/desktop-electron`. |
 | Pure Dart package (`audio_core`, `audio_workflows`, `companion_protocol`, `desktop_sherpa_worker`, or `processing_contracts`) | Run `dart analyze packages/<package>` and `dart test packages/<package>`. |
@@ -79,10 +93,10 @@ the 20-stage `./tool/dev_check.sh` by default.
 
 ## UI device watcher
 
-After generating or changing code in this `voice2text-flutter` project, run this best-effort watcher check before finishing:
+After generating or changing code in this `voice2text-flutter` project, run this best-effort watcher check before finishing only when the user has explicitly authorized visual validation for the current task:
 
 ```bash
 ./tool/ensure_ui_watcher.sh
 ```
 
-The script starts `tool/watch_ui_device.sh` only when a physical Android device is connected and the watcher is not already running. If no physical device is connected, or the watcher is already running, it exits without changing anything.
+Without that permission, do not run the script. When authorized, the script starts `tool/watch_ui_device.sh` only when a physical Android device is connected and the watcher is not already running. If no physical device is connected, or the watcher is already running, it exits without changing anything.
