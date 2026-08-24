@@ -35,10 +35,6 @@ FLUTTER_PROJECTS = (
         cache_limit_gib=7.0,
         clean_android_gradle=True,
     ),
-    FlutterProject(
-        pathlib.Path("apps/codex_ui_reproduction"),
-        cache_limit_gib=0.5,
-    ),
     FlutterProject(pathlib.Path("packages/audio_core"), cache_limit_gib=0.5),
     FlutterProject(
         pathlib.Path("packages/audio_storage"),

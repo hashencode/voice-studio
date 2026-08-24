@@ -7,7 +7,6 @@ environment:
 
 workspace:
   - apps/mobile-flutter
-  - apps/codex_ui_reproduction
   - packages/audio_core
   - packages/audio_storage
   - packages/audio_workflows
