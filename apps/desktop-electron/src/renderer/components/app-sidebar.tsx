@@ -1,5 +1,5 @@
 import type * as React from "react";
-import { AudioLines, Bell, Cog, MonitorSmartphone, Waves } from "lucide-react";
+import { AudioLines, Bell, Cog, SendHorizontal, Waves } from "lucide-react";
 
 import { NavMain, type ShellNavigationItem } from "@/components/nav-main";
 import { Sidebar, SidebarHeader } from "@/components/ui/sidebar";
@@ -14,7 +14,7 @@ const navigation: readonly ShellNavigationItem[] = [
   {
     section: "companion",
     title: SHELL_SECTION_LABELS.companion,
-    icon: MonitorSmartphone,
+    icon: SendHorizontal,
   },
   {
     section: "messages",

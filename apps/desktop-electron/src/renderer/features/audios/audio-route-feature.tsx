@@ -4,6 +4,7 @@ import {
   CircleAlert,
   Clock3,
   FileAudio,
+  FileUp,
   LoaderCircle,
   Mic,
   RotateCcw,
@@ -36,6 +37,12 @@ import {
   SidebarGroupContent,
   SidebarInput,
 } from "@/components/ui/sidebar";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 import { AudioDetailWorkspace } from "@/features/audios/audio-workspace-feature";
 import type { PendingJobAction } from "@/features/processing/use-processing-tasks";
 import type {
@@ -51,6 +58,7 @@ type AudioRouteOptions = {
   tasks: readonly ProcessingTask[];
   pendingJobActions: ReadonlyMap<number, PendingJobAction>;
   writable: boolean;
+  processingAvailable?: boolean;
   recordingActive?: boolean;
   newRecordingBlocked?: boolean;
   active?: boolean;
@@ -58,6 +66,7 @@ type AudioRouteOptions = {
   onAudioSelected?: () => void;
   onRecord: (microphoneDeviceId?: string) => void;
   onImport: () => void | Promise<void>;
+  onProcessingUnavailable?: () => void;
   onCancel: (jobId: number) => void | Promise<void>;
   onRetry: (jobId: number, attempt: number) => void | Promise<void>;
 };
@@ -71,6 +80,7 @@ export function useAudioRouteController({
   tasks,
   pendingJobActions,
   writable,
+  processingAvailable = true,
   recordingActive = false,
   newRecordingBlocked = false,
   active = true,
@@ -78,6 +88,7 @@ export function useAudioRouteController({
   onAudioSelected,
   onRecord,
   onImport,
+  onProcessingUnavailable,
   onCancel,
   onRetry,
 }: AudioRouteOptions) {
@@ -324,6 +335,10 @@ export function useAudioRouteController({
 
   const importAudio = React.useCallback(async () => {
     if (!writable || importPendingRef.current) return;
+    if (!processingAvailable) {
+      onProcessingUnavailable?.();
+      return;
+    }
     importPendingRef.current = true;
     setImportPending(true);
     setImportError(null);
@@ -335,7 +350,18 @@ export function useAudioRouteController({
       importPendingRef.current = false;
       setImportPending(false);
     }
-  }, [onImport, writable]);
+  }, [onImport, onProcessingUnavailable, processingAvailable, writable]);
+
+  const retryProcessing = React.useCallback(
+    (jobId: number, attempt: number) => {
+      if (!processingAvailable) {
+        onProcessingUnavailable?.();
+        return;
+      }
+      return onRetry(jobId, attempt);
+    },
+    [onProcessingUnavailable, onRetry, processingAvailable],
+  );
 
   const refreshCapturePreflight = React.useCallback(
     async (requestPermissions: boolean) => {
@@ -420,7 +446,7 @@ export function useAudioRouteController({
     tasksByAudioId,
     pendingJobActions,
     onCancel,
-    onRetry,
+    onRetry: retryProcessing,
   };
 }
 
@@ -440,12 +466,14 @@ export function AudioRouteFeature({
           <div className="min-h-0 flex-1">
             <AudioContextPane controller={controller} />
           </div>
-          <div
-            data-context-pane-fixed-footer="true"
-            className="shrink-0 border-t p-2"
-          >
-            <AudioContextPaneHeader controller={controller} />
-          </div>
+          {controller.workspace !== null ? (
+            <div
+              data-context-pane-fixed-footer="true"
+              className="shrink-0 border-t p-2"
+            >
+              <AudioContextPaneHeader controller={controller} />
+            </div>
+          ) : null}
         </section>
       ) : null}
       <section role="region" aria-label="音频工作区">
@@ -460,44 +488,24 @@ export function AudioContextPaneHeader({
 }: {
   controller: AudioRouteController;
 }) {
-  const hasSelectedAudio = controller.workspace !== null;
   return (
-    <>
-      <div
-        role="group"
-        aria-label="音频操作"
-        className="grid grid-cols-3 gap-2"
+    <div role="group" aria-label="录音操作">
+      <Button
+        type="button"
+        size="sm"
+        className="w-full"
+        disabled={
+          !controller.captureReadyWithMicrophone ||
+          controller.recordingActive ||
+          controller.newRecordingBlocked ||
+          controller.capturePreflightPending
+        }
+        onClick={() => controller.record()}
       >
-        <Button
-          type="button"
-          size="sm"
-          variant="outline"
-          className={hasSelectedAudio ? "col-span-1" : "col-span-3"}
-          disabled={!controller.writable || controller.importPending}
-          aria-busy={controller.importPending}
-          onClick={() => void controller.importAudio()}
-        >
-          {hasSelectedAudio ? "导入" : "导入音频"}
-        </Button>
-        {hasSelectedAudio ? (
-          <Button
-            type="button"
-            size="sm"
-            className="col-span-2"
-            disabled={
-              !controller.captureReadyWithMicrophone ||
-              controller.recordingActive ||
-              controller.newRecordingBlocked ||
-              controller.capturePreflightPending
-            }
-            onClick={() => controller.record()}
-          >
-            <Mic aria-hidden="true" />
-            {controller.recordingActive ? "正在录音" : "新录音"}
-          </Button>
-        ) : null}
-      </div>
-    </>
+        <Mic aria-hidden="true" />
+        {controller.recordingActive ? "正在录音" : "新录音"}
+      </Button>
+    </div>
   );
 }
 
@@ -510,18 +518,40 @@ export function AudioContextPane({
     <SidebarGroup className="h-full p-0">
       <SidebarGroupContent className="flex h-full flex-col">
         <h3 className="sr-only">音频列表</h3>
-        <div className="relative shrink-0 p-2">
-          <Search
-            aria-hidden="true"
-            className="pointer-events-none absolute top-4 left-4.5 size-4 text-muted-foreground"
-          />
-          <SidebarInput
-            type="search"
-            aria-label="搜索音频"
-            value={controller.query}
-            onChange={(event) => controller.setQuery(event.currentTarget.value)}
-            className="pl-8"
-          />
+        <div className="flex shrink-0 items-center gap-2 p-2">
+          <div className="relative min-w-0 flex-1">
+            <Search
+              aria-hidden="true"
+              className="pointer-events-none absolute top-2 left-2.5 size-4 text-muted-foreground"
+            />
+            <SidebarInput
+              type="search"
+              aria-label="搜索音频"
+              value={controller.query}
+              onChange={(event) =>
+                controller.setQuery(event.currentTarget.value)
+              }
+              className="pl-8"
+            />
+          </div>
+          <TooltipProvider>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  type="button"
+                  size="icon-sm"
+                  variant="ghost"
+                  aria-label="导入音频"
+                  aria-busy={controller.importPending}
+                  disabled={!controller.writable || controller.importPending}
+                  onClick={() => void controller.importAudio()}
+                >
+                  <FileUp aria-hidden="true" />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent side="bottom">导入音频</TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
         </div>
         {controller.importError ? (
           <p role="alert" className="border-b px-3 py-2 text-sm">
@@ -672,6 +702,9 @@ function RecordingReadyState({
   const [selectedMicrophoneDeviceId, setSelectedMicrophoneDeviceId] =
     React.useState("");
   const [testing, setTesting] = React.useState(false);
+  const [testPhase, setTestPhase] = React.useState<
+    "closed" | "instructions" | "testing" | "result"
+  >("closed");
   const [testResult, setTestResult] = React.useState<{
     title: string;
     description: string;
@@ -685,6 +718,7 @@ function RecordingReadyState({
   const loadMicrophones = React.useCallback(
     async (requestPermissions: boolean, selectedDeviceId: string) => {
       setTesting(true);
+      setTestPhase("testing");
       setTestResult(null);
       try {
         const next = await refreshCapturePreflight(requestPermissions);
@@ -702,11 +736,13 @@ function RecordingReadyState({
                 ? `麦克风工作正常：${preferred.name}`
                 : `已连接 ${preferred.name}，但未检测到声音，请说话并检查静音状态。`,
             });
+            setTestPhase("result");
           } else {
             setTestResult({
               title: "麦克风测试失败",
               description: "麦克风暂不可用，请检查系统权限或设备连接。",
             });
+            setTestPhase("result");
           }
         }
       } catch (reason) {
@@ -714,6 +750,7 @@ function RecordingReadyState({
           title: "麦克风测试失败",
           description: errorMessage(reason, "无法测试麦克风"),
         });
+        setTestPhase("result");
       } finally {
         setTesting(false);
       }
@@ -759,7 +796,7 @@ function RecordingReadyState({
           variant="outline"
           className="col-span-1"
           disabled={testing || controller.capturePreflightPending}
-          onClick={() => void loadMicrophones(true, microphoneDeviceId)}
+          onClick={() => setTestPhase("instructions")}
         >
           测试麦克风
         </Button>
@@ -776,21 +813,52 @@ function RecordingReadyState({
         </Button>
       </div>
       <Dialog
-        open={testResult !== null}
+        open={testPhase !== "closed"}
         onOpenChange={(open) => {
-          if (!open) setTestResult(null);
+          if (!open && !testing) {
+            setTestPhase("closed");
+            setTestResult(null);
+          }
         }}
       >
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>{testResult?.title}</DialogTitle>
-            <DialogDescription>{testResult?.description}</DialogDescription>
+            <DialogTitle>
+              {testPhase === "instructions"
+                ? "测试麦克风"
+                : testPhase === "testing"
+                  ? "正在测试麦克风"
+                  : testResult?.title}
+            </DialogTitle>
+            <DialogDescription>
+              {testPhase === "instructions"
+                ? "点击开始后，请对着当前选择的麦克风持续说话，测试最多需要 3 秒。"
+                : testPhase === "testing"
+                  ? "请持续说话，正在检测麦克风输入。"
+                  : testResult?.description}
+            </DialogDescription>
           </DialogHeader>
-          <div className="flex justify-end pt-2">
-            <DialogClose asChild>
-              <Button type="button">知道了</Button>
-            </DialogClose>
-          </div>
+          {testPhase === "instructions" ? (
+            <div className="flex justify-end gap-2 pt-2">
+              <DialogClose asChild>
+                <Button type="button" variant="outline">
+                  取消
+                </Button>
+              </DialogClose>
+              <Button
+                type="button"
+                onClick={() => void loadMicrophones(true, microphoneDeviceId)}
+              >
+                开始测试
+              </Button>
+            </div>
+          ) : testPhase === "result" ? (
+            <div className="flex justify-end pt-2">
+              <DialogClose asChild>
+                <Button type="button">知道了</Button>
+              </DialogClose>
+            </div>
+          ) : null}
         </DialogContent>
       </Dialog>
     </section>
@@ -820,7 +888,7 @@ async function detectMicrophoneSignal(deviceId: string): Promise<boolean> {
   analyser.fftSize = 1024;
   source.connect(analyser);
   const samples = new Uint8Array(analyser.fftSize);
-  const deadline = performance.now() + 1_200;
+  const deadline = performance.now() + 3_000;
   try {
     while (performance.now() < deadline) {
       analyser.getByteTimeDomainData(samples);

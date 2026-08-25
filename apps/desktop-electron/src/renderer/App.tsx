@@ -43,7 +43,7 @@ import type {
 import { SHELL_SECTION_LABELS } from "@/features/shell/context-pane-contract";
 import { useContextPaneShell } from "@/features/shell/use-context-pane-shell";
 import {
-  CapabilityUnavailable,
+  CapabilityUnavailableDialog,
   LoadingShell,
   OfflineBanner,
   ProfileBlocker,
@@ -91,6 +91,8 @@ export default function App() {
   const captureInvokerRef = React.useRef<HTMLElement | null>(null);
   const restoreFocusFrameRef = React.useRef<number | null>(null);
   const [recordRequest, setRecordRequest] = React.useState(0);
+  const [processingUnavailableReason, setProcessingUnavailableReason] =
+    React.useState<string | null>(null);
   const [preferredMicrophoneDeviceId, setPreferredMicrophoneDeviceId] =
     React.useState<string | null>(null);
   const [captureDetailOpen, setCaptureDetailOpen] = React.useState(false);
@@ -204,9 +206,8 @@ export default function App() {
     api: window.voice2text,
     tasks,
     pendingJobActions,
-    writable:
-      snapshot?.profile.phase === "ready" &&
-      snapshot.capability.processing === "available",
+    writable: snapshot?.profile.phase === "ready",
+    processingAvailable: snapshot?.capability.processing === "available",
     recordingActive: isCaptureInProgress(snapshot?.capture),
     newRecordingBlocked: isNewRecordingBlocked(snapshot?.capture),
     active: current === "audio",
@@ -221,6 +222,11 @@ export default function App() {
       setRecordRequest((value) => value + 1);
     },
     onImport: importAudio,
+    onProcessingUnavailable: () => {
+      if (snapshot?.capability.processing === "unavailable") {
+        setProcessingUnavailableReason(snapshot.capability.reason);
+      }
+    },
     onCancel: cancelProcessing,
     onRetry: retryProcessing,
   });
@@ -284,7 +290,7 @@ export default function App() {
             ) : null
           }
           footer={
-            pane.paneSection === "audio" ? (
+            pane.paneSection === "audio" && audio.workspace !== null ? (
               <AudioContextPaneHeader controller={audio} />
             ) : null
           }
@@ -388,6 +394,13 @@ export default function App() {
               if (!open) setActivityError(null);
             }}
             onOpenDetails={openActivityDetails}
+          />
+          <CapabilityUnavailableDialog
+            reason={processingUnavailableReason ?? ""}
+            open={processingUnavailableReason !== null}
+            onOpenChange={(open) => {
+              if (!open) setProcessingUnavailableReason(null);
+            }}
           />
         </div>
       </SidebarInset>
@@ -496,9 +509,6 @@ function ShellContent({
     case "audio":
       section = (
         <div className="flex min-h-full flex-col gap-4">
-          {snapshot.capability.processing === "unavailable" ? (
-            <CapabilityUnavailable reason={snapshot.capability.reason} />
-          ) : null}
           <AudioMainWorkspace
             controller={audio}
             operationError={operationError}
