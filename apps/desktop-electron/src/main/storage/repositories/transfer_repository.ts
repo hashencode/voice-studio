@@ -726,7 +726,7 @@ export class TransferRepository {
     rawReceipt: CompanionTransferReceipt,
     authority: {
       audioId: number;
-      processingJobId: number;
+      processingJobId?: number | null;
       recordingId: number;
       sourceSha256: string;
     },
@@ -769,18 +769,12 @@ export class TransferRepository {
       }
       const committedImport = this.database
         .prepare(
-          `SELECT m.id AS audio_id, m.media_authority_id, j.id AS processing_job_id,
-             a.source_sha256
+          `SELECT m.id AS audio_id, m.media_authority_id, a.source_sha256
            FROM audio_items m
-           JOIN processing_jobs j ON j.audio_id = m.id
            JOIN media_authorities a ON a.id = m.media_authority_id
-           WHERE m.id = ? AND j.id = ? AND a.id = ?`,
+           WHERE m.id = ? AND a.id = ?`,
         )
-        .get(
-          authority.audioId,
-          authority.processingJobId,
-          authority.recordingId,
-        );
+        .get(authority.audioId, authority.recordingId);
       if (
         !committedImport ||
         String(committedImport.source_sha256) !== authority.sourceSha256
@@ -802,7 +796,7 @@ export class TransferRepository {
         .run(
           authority.recordingId,
           authority.audioId,
-          authority.processingJobId,
+          authority.processingJobId ?? null,
           JSON.stringify(receipt),
           receipt.committedAtMs,
           receipt.committedAtMs,

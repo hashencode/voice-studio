@@ -27,9 +27,9 @@ describe("live caption capability", () => {
     ).toBe(true);
   });
 
-  it("blocks a caption-enabled start until the verified model is available", () => {
+  it("allows recording while the optional caption model is unavailable", () => {
     const degraded = { canStart: true, captionModelAvailable: false };
-    expect(capturePreflightAllowsStart(degraded, true)).toBe(false);
+    expect(capturePreflightAllowsStart(degraded, true)).toBe(true);
     expect(capturePreflightAllowsStart(degraded, false)).toBe(true);
     expect(
       capturePreflightAllowsStart(
@@ -37,5 +37,11 @@ describe("live caption capability", () => {
         true,
       ),
     ).toBe(true);
+    expect(
+      capturePreflightAllowsStart(
+        { canStart: false, captionModelAvailable: true },
+        false,
+      ),
+    ).toBe(false);
   });
 });

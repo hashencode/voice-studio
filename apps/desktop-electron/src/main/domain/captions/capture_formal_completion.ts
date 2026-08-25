@@ -17,14 +17,20 @@ export async function finalizeCommittedCaptureTranscript(options: {
   publish(snapshot: CaptionSnapshot): void;
   reportFailure(): void;
 }): Promise<CaptionSnapshot | null> {
-  if (!options.handoff || !options.processing) return null;
+  if (!options.handoff) return null;
   try {
-    const snapshot = await options.handoff.finalize({
-      sessionId: options.sessionId,
-      displayName: options.displayName,
-      processing: options.processing,
-    });
-    options.publish(snapshot);
+    const snapshot = options.processing
+      ? await options.handoff.finalize({
+          sessionId: options.sessionId,
+          displayName: options.displayName,
+          processing: options.processing,
+        })
+      : await options.handoff.finalize({
+          sessionId: options.sessionId,
+          displayName: options.displayName,
+          processing: null,
+        });
+    if (snapshot) options.publish(snapshot);
     return snapshot;
   } catch {
     options.reportFailure();

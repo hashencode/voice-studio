@@ -5,6 +5,7 @@ import {
   mkdirSync,
   mkdtempSync,
   readFileSync,
+  realpathSync,
   readdirSync,
   rmSync,
   writeFileSync,
@@ -15,7 +16,10 @@ import { dirname, join, resolve } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 
 import { hasVerifiedLiveCaptionCapability } from "../../src/main/domain/capture/capture_capability";
-import { ResourceCatalog } from "../../src/main/resources/resource_catalog";
+import {
+  assertAuthorizedResourceCommand,
+  ResourceCatalog,
+} from "../../src/main/resources/resource_catalog";
 
 const roots: string[] = [];
 
@@ -107,7 +111,65 @@ describe("worker resource publication", () => {
     );
 
     expect(result.status, result.stderr).toBe(0);
+    const manifest = JSON.parse(
+      readFileSync(join(root, "manifest.json"), "utf8"),
+    ) as {
+      artifacts: Array<{ path: string; sha256: string }>;
+      operations: Array<Record<string, unknown>>;
+    };
+    expect(
+      manifest.artifacts.every((item) => !item.path.startsWith("models/")),
+    ).toBe(true);
+    const formalRoot = mkdtempSync(join(tmpdir(), "formal-model-authority-"));
+    const liveRoot = mkdtempSync(join(tmpdir(), "live-model-authority-"));
+    roots.push(formalRoot, liveRoot);
+    const formalPaths = artifactPaths
+      .filter(
+        (item) =>
+          item.startsWith("models/asr/") ||
+          item.startsWith("models/diarization/"),
+      )
+      .map((item) => item.slice("models/".length));
+    const livePaths = artifactPaths
+      .filter((item) => item.startsWith("models/live-caption/"))
+      .map((item) => item.slice("models/live-caption/".length));
+    for (const [authorityRoot, paths] of [
+      [formalRoot, formalPaths],
+      [liveRoot, livePaths],
+    ] as const) {
+      mkdirSync(authorityRoot, { recursive: true });
+      writeFileSync(join(authorityRoot, "installed.json"), "{}\n");
+      for (const relativePath of paths) {
+        const destination = join(authorityRoot, relativePath);
+        mkdirSync(dirname(destination), { recursive: true });
+        const sourcePrefix =
+          authorityRoot === liveRoot ? "models/live-caption/" : "models/";
+        writeFileSync(destination, `fixture:${sourcePrefix}${relativePath}`);
+      }
+    }
+    rmSync(join(root, "models"), { recursive: true });
     const catalog = await ResourceCatalog.load(root);
+    const authority = (
+      bundleId: "formal-transcription" | "live-caption",
+      authorityRoot: string,
+      paths: readonly string[],
+    ) => ({
+      bundleId,
+      root: authorityRoot,
+      identity: `${bundleId}-identity`,
+      artifacts: paths.map((relativePath) => ({
+        path: relativePath,
+        sha256: createHash("sha256")
+          .update(readFileSync(join(authorityRoot, relativePath)))
+          .digest("hex"),
+      })),
+    });
+    catalog.installModelAuthority(
+      authority("formal-transcription", formalRoot, formalPaths),
+    );
+    catalog.installModelAuthority(
+      authority("live-caption", liveRoot, livePaths),
+    );
     const command = catalog.command("live-caption", {
       attemptOutput: join(root, "..", "caption-attempt"),
     });
@@ -115,24 +177,20 @@ describe("worker resource publication", () => {
       join(root, "bin/desktop_sensevoice_caption_worker"),
     );
     expect(command.args).toContain(
-      `--model=${join(root, "models/live-caption/model.int8.onnx")}`,
+      `--model=${join(realpathSync(liveRoot), "model.int8.onnx")}`,
     );
-    const manifest = JSON.parse(
-      readFileSync(join(root, "manifest.json"), "utf8"),
-    ) as {
-      operations: Array<Record<string, unknown>>;
-    };
     expect(
       manifest.operations.find(
         (operation) => operation.operation === "live-caption",
       ),
     ).toMatchObject({
-      workerReportedModelArtifact: "models/live-caption/model.int8.onnx",
+      workerReportedModelArtifact: "model.int8.onnx",
+      modelBundleId: "live-caption",
     });
     const liveCaptionIdentity = catalog.processingIdentity("live-caption");
     expect(liveCaptionIdentity).toEqual({
       protocolIdentity: "sensevoice-live-caption-worker/v1",
-      resourceIdentity: catalog.identity,
+      resourceIdentity: expect.stringMatching(/^[a-f0-9]{64}$/),
       modelSha256: createHash("sha256")
         .update("fixture:models/live-caption/model.int8.onnx")
         .digest("hex"),
@@ -151,17 +209,10 @@ describe("worker resource publication", () => {
     );
     expect(verified.status, verified.stderr).toBe(0);
 
-    writeFileSync(
-      join(root, "models/live-caption/model.int8.onnx"),
-      "replacement",
+    writeFileSync(join(liveRoot, "model.int8.onnx"), "replacement");
+    await expect(assertAuthorizedResourceCommand(command)).rejects.toThrow(
+      /artifact hash mismatch/i,
     );
-    const replaced = spawnSync(
-      "bun",
-      [resolve("scripts/verify-worker-resources.ts"), root],
-      { encoding: "utf8" },
-    );
-    expect(replaced.status).not.toBe(0);
-    expect(replaced.stderr).toMatch(/SHA-256 mismatch/i);
   });
 
   it("rejects a SenseVoice lock that is not bound to the frozen reference", () => {

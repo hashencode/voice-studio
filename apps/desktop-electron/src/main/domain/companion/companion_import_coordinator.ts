@@ -3,7 +3,6 @@ import type { TransferRepository } from "../../storage/repositories/transfer_rep
 
 export interface CompanionCommittedImportAuthority {
   audioId: number;
-  jobId: number;
   recordingId: number;
   sourceSha256: string;
   normalizedPath: string;
@@ -86,8 +85,6 @@ function assertCommittedAuthority(
   if (
     !Number.isSafeInteger(authority.audioId) ||
     authority.audioId < 1 ||
-    !Number.isSafeInteger(authority.jobId) ||
-    authority.jobId < 1 ||
     !Number.isSafeInteger(authority.recordingId) ||
     authority.recordingId < 1 ||
     authority.sourceSha256 !== manifest.wholeFileSha256 ||

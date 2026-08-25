@@ -216,6 +216,11 @@ describe("application shell", () => {
         .getByRole("button", { name: "互联" })
         .closest('[data-slot="sidebar-content"]'),
     ).not.toBeNull();
+    expect(
+      within(navigation)
+        .getByRole("button", { name: "互联" })
+        .querySelector("svg.lucide-send-horizontal"),
+    ).not.toBeNull();
 
     for (const label of ["音频", "互联", "设置"]) {
       const railAction = within(navigation).getByRole("button", {
@@ -262,20 +267,16 @@ describe("application shell", () => {
     const headerControls = [
       within(pane).getByRole("heading", { name: "音频" }),
     ];
-    const footerControls = [
-      within(pane).getByRole("button", { name: "导入音频" }),
-    ];
+    const importButton = within(pane).getByRole("button", {
+      name: "导入音频",
+    });
     for (const control of headerControls) {
       expect(fixedPaneHeader).toContainElement(control);
     }
-    for (const control of footerControls) {
-      expect(fixedPaneFooter).toContainElement(control);
-    }
+    expect(scrollingPaneContent).toContainElement(importButton);
+    expect(fixedPaneFooter).toBeNull();
     expect(
       fixedPaneHeader?.compareDocumentPosition(scrollingPaneContent!),
-    ).toBe(Node.DOCUMENT_POSITION_FOLLOWING);
-    expect(
-      scrollingPaneContent?.compareDocumentPosition(fixedPaneFooter!),
     ).toBe(Node.DOCUMENT_POSITION_FOLLOWING);
     expect(scrollingPaneContent).toContainElement(
       within(pane).getByRole("searchbox", { name: "搜索音频" }),
@@ -287,9 +288,10 @@ describe("application shell", () => {
     const paneTitleRow = within(pane).getByRole("heading", {
       name: "音频",
     }).parentElement;
-    const paneActions = within(pane).getByRole("group", { name: "音频操作" });
-    expect(paneTitleRow).not.toContainElement(paneActions);
-    expect(fixedPaneFooter).toContainElement(paneActions);
+    expect(
+      within(pane).queryByRole("group", { name: "录音操作" }),
+    ).not.toBeInTheDocument();
+    expect(paneTitleRow).not.toContainElement(importButton);
 
     const mains = screen.getAllByRole("main");
     expect(mains).toHaveLength(1);
@@ -732,29 +734,58 @@ describe("application shell", () => {
     expect(screen.getByRole("button", { name: "重新载入" })).toBeEnabled();
   });
 
-  it("announces offline and unavailable capability without color-only meaning", async () => {
-    const api = installApi({
-      ...readySnapshot,
-      connectivity: "offline",
-      capability: {
-        processing: "unavailable",
-        reason: "当前设备缺少本地处理运行时",
+  it("keeps import and recording available without local processing", async () => {
+    const api = installApi(
+      {
+        ...readySnapshot,
+        connectivity: "offline",
+        capability: {
+          processing: "unavailable",
+          reason: "当前设备缺少本地处理运行时",
+        },
+        navigation: { section: "tasks" },
+        capture: { phase: "idle" },
       },
-      navigation: { section: "tasks" },
-      capture: { phase: "idle" },
-    });
+      {
+        preflightCapture: vi.fn(async () => ({
+          minimumMacosVersion: "13.0",
+          systemAudioMinimumMacosVersion: "13.0",
+          captureMode: "dual_track" as const,
+          systemAudioPermission: "granted" as const,
+          microphonePermission: "granted" as const,
+          microphones: [
+            { id: "mic-default", name: "MacBook 麦克风", isDefault: true },
+          ],
+          availableBytes: 8 * 1024 ** 3,
+          requiredBytes: 2 * 1024 ** 3,
+          captionModelAvailable: false,
+          canStart: true,
+          blockingReasons: [],
+        })),
+      },
+    );
     render(<App />);
     expect(
       await screen.findByRole("status", { name: "离线状态" }),
     ).toHaveTextContent("离线");
-    expect(screen.getByRole("alert")).toHaveTextContent(
-      "当前设备缺少本地处理运行时",
-    );
     await waitFor(() => expect(api.navigate).toHaveBeenCalledWith("library"));
     expect(screen.getByRole("button", { name: "音频" })).toHaveAttribute(
       "aria-current",
       "page",
     );
+    expect(
+      screen.queryByRole("dialog", { name: "本地处理不可用" }),
+    ).not.toBeInTheDocument();
+    expect(
+      await screen.findByRole("button", { name: "开始录制" }),
+    ).toBeEnabled();
+    await userEvent
+      .setup()
+      .click(screen.getByRole("button", { name: "导入音频" }));
+    expect(
+      screen.queryByRole("dialog", { name: "本地处理不可用" }),
+    ).not.toBeInTheDocument();
+    expect(api.importAudio).toHaveBeenCalledOnce();
   });
 
   it("keeps reconciliation out of global activity and does not auto-retry", async () => {

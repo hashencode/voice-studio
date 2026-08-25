@@ -131,6 +131,33 @@ export const captureRecoveryActionRequestSchema = z
   .strict();
 export const captureRecoveryListRequestSchema = z.object({}).strict();
 
+export const microphoneTestStateSchema = z.enum([
+  "running",
+  "stopped",
+  "timed-out",
+]);
+export const microphoneTestSnapshotSchema = z
+  .object({
+    testId: z.string().regex(/^mic-test-[a-zA-Z0-9-]{12,120}$/),
+    state: microphoneTestStateSchema,
+    elapsedMs: z.number().int().nonnegative().max(30_000),
+    remainingMs: z.number().int().nonnegative().max(30_000),
+    normalizedPeak: z.number().min(0).max(1),
+    observedFrames: z.number().int().nonnegative().safe(),
+    detectedInput: z.boolean(),
+  })
+  .strict();
+export const microphoneTestStartRequestSchema = z
+  .object({
+    microphoneDeviceId: z.string().min(1).max(512).optional(),
+  })
+  .strict();
+export const microphoneTestControlRequestSchema = z
+  .object({
+    testId: z.string().regex(/^mic-test-[a-zA-Z0-9-]{12,120}$/),
+  })
+  .strict();
+
 export const desktopCaptureParitySchema = z
   .object({
     schemaVersion: z.literal(1),
@@ -183,3 +210,6 @@ export type CaptureSnapshot = z.infer<typeof captureSnapshotSchema>;
 export type CaptureStartCommand = z.infer<typeof captureStartCommandSchema>;
 export type CaptureControlCommand = z.infer<typeof captureControlCommandSchema>;
 export type CaptureControlRequest = z.infer<typeof captureControlRequestSchema>;
+export type MicrophoneTestSnapshot = z.infer<
+  typeof microphoneTestSnapshotSchema
+>;

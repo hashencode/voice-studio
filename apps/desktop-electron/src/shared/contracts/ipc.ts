@@ -16,6 +16,7 @@ import type {
   PlaybackAction,
 } from "./audio_workspace";
 import type { CapturePreflight, CaptureSnapshot } from "./capture";
+import type { MicrophoneTestSnapshot } from "./capture";
 import type {
   FloatingCaptureControlRequest,
   FloatingCapturePreference,
@@ -42,6 +43,7 @@ import type {
   CompanionTransferCancelRequest,
   CompanionTransferRetryRequest,
 } from "./companion";
+import type { LocalModelIntent, LocalModelSnapshot } from "./local_models";
 
 export const desktopProtocolVersion = 2 as const;
 export const desktopWorkerHealthProtocolVersion = 1 as const;
@@ -58,6 +60,7 @@ export const ipcChannels = {
   workerHealth: "desktop.worker.health.v1",
   cancelProcessing: "desktop.processing.cancel.v1",
   retryProcessing: "desktop.processing.retry.v1",
+  startTranscription: "desktop.processing.start-transcription.v1",
   processingTasks: "desktop.processing.tasks.v1",
   importAudio: "desktop.importing.choose-and-import-audio.v2",
   operationEvent: "desktop.processing.event.v1",
@@ -77,6 +80,9 @@ export const ipcChannels = {
   captureControl: "desktop.capture.control.v1",
   captureRecoveryList: "desktop.capture.recovery-list.v1",
   captureRecoveryAction: "desktop.capture.recovery-action.v1",
+  microphoneTestStart: "desktop.capture.microphone-test.start.v1",
+  microphoneTestSnapshot: "desktop.capture.microphone-test.snapshot.v1",
+  microphoneTestStop: "desktop.capture.microphone-test.stop.v1",
   floatingCaptureSnapshotGet: "desktop.floating-capture.snapshot.get.v1",
   floatingCaptureControl: "desktop.floating-capture.control.v1",
   floatingCaptureWindowAction: "desktop.floating-capture.window-action.v1",
@@ -102,6 +108,10 @@ export const ipcChannels = {
   companionTransferCancel: "desktop.companion.transfer.cancel.v1",
   companionTransferRetry: "desktop.companion.transfer.retry.v1",
   companionSnapshotEvent: "desktop.companion.snapshot.v1",
+  localModelsSnapshotGet: "desktop.local-models.snapshot.get.v1",
+  localModelsIntent: "desktop.local-models.intent.v1",
+  localModelsChangeRoot: "desktop.local-models.change-root.v1",
+  localModelsSnapshotEvent: "desktop.local-models.snapshot.v1",
 } as const;
 
 export const workerHealthRequestSchema = z
@@ -146,6 +156,12 @@ export const retryProcessingResponseSchema = z
   })
   .strict();
 
+export const startTranscriptionRequestSchema = z
+  .object({ audioId: z.number().int().positive() })
+  .strict();
+
+export const startTranscriptionResponseSchema = retryProcessingResponseSchema;
+
 export const processingTasksRequestSchema = z
   .object({ expectedProtocolVersion: z.literal(desktopProtocolVersion) })
   .strict();
@@ -169,20 +185,10 @@ export const importAudioResponseSchema = z.union([
   z
     .object({
       protocolVersion: z.literal(desktopProtocolVersion),
-      state: z.enum([
-        "queued",
-        "running",
-        "canceling",
-        "canceled",
-        "interrupted",
-        "completed",
-        "failed",
-      ]),
+      state: z.literal("imported"),
       audioId: z.number().int().positive(),
-      jobId: z.number().int().positive(),
       mediaSha256: sha256Schema,
       inserted: z.boolean(),
-      progressFraction: z.number().min(0).max(1),
     })
     .strict(),
 ]);
@@ -229,6 +235,9 @@ export type ProcessingTaskDelta = z.infer<typeof processingTaskDeltaSchema>;
 export type RetryProcessingResponse = z.infer<
   typeof retryProcessingResponseSchema
 >;
+export type StartTranscriptionResponse = z.infer<
+  typeof startTranscriptionResponseSchema
+>;
 export type ImportAudioResponse = z.infer<typeof importAudioResponseSchema>;
 export type DesktopError = z.infer<typeof desktopErrorSchema>;
 
@@ -249,6 +258,14 @@ export interface Voice2TextDesktopApi {
   ): Promise<CompanionSnapshot>;
   onCompanionSnapshot(
     listener: (snapshot: CompanionSnapshot) => void,
+  ): () => void;
+  getLocalModelSnapshot(): Promise<LocalModelSnapshot>;
+  sendLocalModelIntent(options: LocalModelIntent): Promise<LocalModelSnapshot>;
+  changeLocalModelRoot(options: {
+    expectedRevision: number;
+  }): Promise<LocalModelSnapshot>;
+  onLocalModelSnapshot(
+    listener: (snapshot: LocalModelSnapshot) => void,
   ): () => void;
   getAiSettings(): Promise<AiSettingsSnapshot>;
   saveAiSettings(options: {
@@ -298,6 +315,7 @@ export interface Voice2TextDesktopApi {
     jobId: number,
     expectedAttempt: number,
   ): Promise<RetryProcessingResponse>;
+  startTranscription(audioId: number): Promise<StartTranscriptionResponse>;
   listProcessingTasks(): Promise<
     import("./import_processing").ProcessingTask[]
   >;
@@ -382,6 +400,11 @@ export interface Voice2TextDesktopApi {
     sessionId: string;
     idempotencyKey: string;
   }): Promise<CaptureSnapshot | null>;
+  startMicrophoneTest(options: {
+    microphoneDeviceId?: string;
+  }): Promise<MicrophoneTestSnapshot>;
+  getMicrophoneTestSnapshot(testId: string): Promise<MicrophoneTestSnapshot>;
+  stopMicrophoneTest(testId: string): Promise<MicrophoneTestSnapshot>;
   getFloatingCapturePreference?(): Promise<FloatingCapturePreference>;
   setFloatingCapturePreference?(
     enabled: boolean,

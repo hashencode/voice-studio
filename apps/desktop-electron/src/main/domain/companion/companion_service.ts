@@ -94,7 +94,6 @@ export interface CompanionImportCommitPort {
     manifest: CompanionTransferManifest,
   ): Promise<{
     audioId: number;
-    jobId: number;
     recordingId: number;
     sourceSha256: string;
   }>;
@@ -750,7 +749,6 @@ export class CompanionService {
     });
     this.repository.recordCommittedReceipt(manifest, receipt, {
       audioId: committed.audioId,
-      processingJobId: committed.jobId,
       recordingId: committed.recordingId,
       sourceSha256: committed.sourceSha256,
     });

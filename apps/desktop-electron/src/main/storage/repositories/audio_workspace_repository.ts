@@ -819,7 +819,7 @@ export class AudioWorkspaceRepository {
 }
 
 function mapSummary(row: Record<string, unknown>): AudioSummary {
-  const state = row.job_state == null ? "queued" : String(row.job_state);
+  const state = row.job_state == null ? "not-started" : String(row.job_state);
   return {
     audioId: Number(row.audio_id),
     displayName: String(row.display_name),

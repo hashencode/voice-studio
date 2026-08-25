@@ -4,6 +4,7 @@ import {
   bootstrapActionSchema,
   cancelProcessingResponseSchema,
   retryProcessingResponseSchema,
+  startTranscriptionResponseSchema,
   processingTasksResponseSchema,
   importAudioResponseSchema,
   desktopProtocolVersion,
@@ -40,6 +41,9 @@ import {
   captureRecoveryActionRequestSchema,
   capturePreflightSchema,
   captureSnapshotSchema,
+  microphoneTestStartRequestSchema,
+  microphoneTestControlRequestSchema,
+  microphoneTestSnapshotSchema,
   floatingCapturePreferenceRequestSchema,
   floatingCapturePreferenceSchema,
   captionSnapshotRequestSchema,
@@ -66,6 +70,11 @@ import {
   companionTransferRetryRequestSchema,
   companionSnapshotSchema,
   type CompanionSnapshot,
+  localModelSnapshotRequestSchema,
+  localModelSnapshotSchema,
+  localModelIntentSchema,
+  changeLocalModelRootRequestSchema,
+  type LocalModelSnapshot,
 } from "../shared/contracts";
 
 export interface PreloadIpcBridge {
@@ -87,6 +96,46 @@ export function createDesktopApi(
     for (const listener of captureDetailsListeners) listener();
   });
   return Object.freeze({
+    async getLocalModelSnapshot() {
+      return localModelSnapshotSchema.parse(
+        await bridge.invoke(
+          ipcChannels.localModelsSnapshotGet,
+          localModelSnapshotRequestSchema.parse({}),
+        ),
+      );
+    },
+    async sendLocalModelIntent(
+      options: Parameters<Voice2TextDesktopApi["sendLocalModelIntent"]>[0],
+    ) {
+      return localModelSnapshotSchema.parse(
+        await bridge.invoke(
+          ipcChannels.localModelsIntent,
+          localModelIntentSchema.parse(options),
+        ),
+      );
+    },
+    async changeLocalModelRoot(
+      options: Parameters<Voice2TextDesktopApi["changeLocalModelRoot"]>[0],
+    ) {
+      return localModelSnapshotSchema.parse(
+        await bridge.invoke(
+          ipcChannels.localModelsChangeRoot,
+          changeLocalModelRootRequestSchema.parse(options),
+        ),
+      );
+    },
+    onLocalModelSnapshot(listener: (snapshot: LocalModelSnapshot) => void) {
+      let subscribed = true;
+      const validatedListener = (payload: unknown) => {
+        listener(localModelSnapshotSchema.parse(payload));
+      };
+      bridge.on(ipcChannels.localModelsSnapshotEvent, validatedListener);
+      return () => {
+        if (!subscribed) return;
+        subscribed = false;
+        bridge.off(ipcChannels.localModelsSnapshotEvent, validatedListener);
+      };
+    },
     async getCompanionSnapshot() {
       return companionSnapshotSchema.parse(
         await bridge.invoke(
@@ -318,6 +367,12 @@ export function createDesktopApi(
       });
       return retryProcessingResponseSchema.parse(response);
     },
+    async startTranscription(audioId: number) {
+      const response = await bridge.invoke(ipcChannels.startTranscription, {
+        audioId,
+      });
+      return startTranscriptionResponseSchema.parse(response);
+    },
     async listProcessingTasks() {
       const response = await bridge.invoke(ipcChannels.processingTasks, {
         expectedProtocolVersion: desktopProtocolVersion,
@@ -367,6 +422,32 @@ export function createDesktopApi(
         payload,
       );
       return response === null ? null : captureSnapshotSchema.parse(response);
+    },
+    async startMicrophoneTest(
+      options: Parameters<Voice2TextDesktopApi["startMicrophoneTest"]>[0],
+    ) {
+      return microphoneTestSnapshotSchema.parse(
+        await bridge.invoke(
+          ipcChannels.microphoneTestStart,
+          microphoneTestStartRequestSchema.parse(options),
+        ),
+      );
+    },
+    async getMicrophoneTestSnapshot(testId: string) {
+      return microphoneTestSnapshotSchema.parse(
+        await bridge.invoke(
+          ipcChannels.microphoneTestSnapshot,
+          microphoneTestControlRequestSchema.parse({ testId }),
+        ),
+      );
+    },
+    async stopMicrophoneTest(testId: string) {
+      return microphoneTestSnapshotSchema.parse(
+        await bridge.invoke(
+          ipcChannels.microphoneTestStop,
+          microphoneTestControlRequestSchema.parse({ testId }),
+        ),
+      );
     },
     async getCaptionSnapshot(
       options: Parameters<Voice2TextDesktopApi["getCaptionSnapshot"]>[0],

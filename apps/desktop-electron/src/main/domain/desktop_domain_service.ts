@@ -90,21 +90,12 @@ export class DesktopDomainService {
     normalizedSizeBytes: number;
     durationMs: number;
     receipt: Record<string, unknown>;
-    resourceIdentity: string;
-    phase: ProcessingPhase;
-    protocolIdentity: string;
-    modelSha256: string;
-    runtimeSha256: string;
   }) {
     requireText(command.displayName, "audio display name");
     requireText(command.normalizedPath, "normalized media path");
     for (const [value, label] of [
       [command.normalizedSha256, "normalized media hash"],
       [command.sourceSha256, "source hash"],
-      [command.resourceIdentity, "resource identity"],
-      [command.protocolIdentity, "protocol identity"],
-      [command.modelSha256, "model hash"],
-      [command.runtimeSha256, "runtime hash"],
     ] as const) {
       requireText(value, label);
     }

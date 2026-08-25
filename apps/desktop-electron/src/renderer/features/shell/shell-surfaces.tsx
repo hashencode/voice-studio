@@ -8,6 +8,14 @@ import {
 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
+import {
+  Dialog,
+  DialogClose,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import type { ApplicationSnapshot, BootstrapAction } from "@shared/contracts";
 
 export function LoadingShell() {
@@ -82,15 +90,36 @@ export function OfflineBanner() {
   );
 }
 
-export function CapabilityUnavailable({ reason }: { reason: string }) {
+export function CapabilityUnavailableDialog({
+  reason,
+  open,
+  onOpenChange,
+  onOpenLocalModels,
+}: {
+  reason: string;
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  onOpenLocalModels: () => void;
+}) {
   return (
-    <section role="alert" className="rounded-xl border bg-card p-6">
-      <AlertTriangle className="size-7 text-destructive" aria-hidden="true" />
-      <h2 className="mt-3 text-lg font-semibold">本地处理不可用</h2>
-      <p className="mt-2 text-sm text-muted-foreground">{reason}</p>
-      <p className="mt-3 text-sm">
-        音频资料不会因此丢失；可在设置中修复运行时后重试。
-      </p>
-    </section>
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>本地处理不可用</DialogTitle>
+          <DialogDescription>{reason}</DialogDescription>
+        </DialogHeader>
+        <p className="text-sm">
+          录音和导入仍可使用。安装对应模型后，可再次主动发起转写或实时字幕。
+        </p>
+        <div className="flex justify-end gap-2 pt-2">
+          <Button type="button" variant="outline" onClick={onOpenLocalModels}>
+            前往本地模型
+          </Button>
+          <DialogClose asChild>
+            <Button type="button">知道了</Button>
+          </DialogClose>
+        </div>
+      </DialogContent>
+    </Dialog>
   );
 }

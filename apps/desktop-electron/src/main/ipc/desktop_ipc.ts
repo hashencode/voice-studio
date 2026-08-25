@@ -6,6 +6,7 @@ import {
   acknowledgeActivityRequestSchema,
   cancelProcessingRequestSchema,
   retryProcessingRequestSchema,
+  startTranscriptionRequestSchema,
   processingTasksRequestSchema,
   importAudioRequestSchema,
   desktopProtocolVersion,
@@ -37,8 +38,11 @@ import {
   captureControlRequestSchema,
   captureRecoveryListRequestSchema,
   captureRecoveryActionRequestSchema,
+  microphoneTestStartRequestSchema,
+  microphoneTestControlRequestSchema,
   type CapturePreflight,
   type CaptureSnapshot,
+  type MicrophoneTestSnapshot,
   floatingCaptureControlRequestSchema,
   floatingCapturePreferenceRequestSchema,
   floatingCapturePreferenceSchema,
@@ -84,6 +88,11 @@ import {
   type CompanionSnapshot,
   type CompanionTransferCancelRequest,
   type CompanionTransferRetryRequest,
+  localModelSnapshotRequestSchema,
+  localModelIntentSchema,
+  changeLocalModelRootRequestSchema,
+  type LocalModelIntent,
+  type LocalModelSnapshot,
 } from "../../shared/contracts";
 
 export interface IpcInvocationContext {
@@ -100,6 +109,14 @@ export interface IpcTrustPolicy {
 }
 
 export interface DesktopIpcServices {
+  getLocalModelSnapshot(): Promise<LocalModelSnapshot>;
+  sendLocalModelIntent(options: LocalModelIntent): Promise<LocalModelSnapshot>;
+  changeLocalModelRoot(options: {
+    expectedRevision: number;
+  }): Promise<LocalModelSnapshot>;
+  onLocalModelSnapshot?(
+    listener: (snapshot: LocalModelSnapshot) => void,
+  ): () => void;
   getCompanionSnapshot(): Promise<CompanionSnapshot>;
   setCompanionOptIn(options: CompanionOptInRequest): Promise<CompanionSnapshot>;
   createCompanionPairingInvite(
@@ -154,6 +171,7 @@ export interface DesktopIpcServices {
     jobId: number,
     expectedAttempt: number,
   ): Promise<RetryProcessingResponse>;
+  startTranscription(audioId: number): Promise<RetryProcessingResponse>;
   listProcessingTasks(): Promise<ProcessingTask[]>;
   importAudio(): Promise<ImportAudioResponse>;
   preflightCapture(options: {
@@ -177,6 +195,19 @@ export interface DesktopIpcServices {
     sessionId: string;
     idempotencyKey: string;
   }): Promise<CaptureSnapshot | null>;
+  startMicrophoneTest(options: {
+    ownerId: number;
+    microphoneDeviceId?: string;
+  }): Promise<MicrophoneTestSnapshot>;
+  getMicrophoneTestSnapshot(options: {
+    ownerId: number;
+    testId: string;
+  }): Promise<MicrophoneTestSnapshot>;
+  stopMicrophoneTest(options: {
+    ownerId: number;
+    testId: string;
+  }): Promise<MicrophoneTestSnapshot>;
+  stopMicrophoneTestForOwner?(ownerId: number): Promise<void>;
   floatingCaptureSnapshot?(): FloatingCaptureSnapshot;
   controlFloatingCapture?(
     options: FloatingCaptureControlRequest,
@@ -267,7 +298,7 @@ export class IpcContractError extends Error {
 
 type RegisteredHandler = {
   schema: ZodType;
-  invoke(payload: never): Promise<unknown>;
+  invoke(payload: never, event: IpcInvocationContext): Promise<unknown>;
 };
 
 export class DesktopIpcHandlers {
@@ -315,7 +346,7 @@ export class DesktopIpcHandlers {
         { cause: parsed.error },
       );
     }
-    return await handler.invoke(parsed.data as never);
+    return await handler.invoke(parsed.data as never, event);
   }
 }
 
@@ -325,6 +356,29 @@ export function createDesktopIpcHandlers(options: {
   maximumPayloadBytes?: number;
 }): DesktopIpcHandlers {
   const handlers = new Map<string, RegisteredHandler>([
+    [
+      ipcChannels.localModelsSnapshotGet,
+      {
+        schema: localModelSnapshotRequestSchema,
+        invoke: async () => options.services.getLocalModelSnapshot(),
+      },
+    ],
+    [
+      ipcChannels.localModelsIntent,
+      {
+        schema: localModelIntentSchema,
+        invoke: async (payload: LocalModelIntent) =>
+          options.services.sendLocalModelIntent(payload),
+      } as RegisteredHandler,
+    ],
+    [
+      ipcChannels.localModelsChangeRoot,
+      {
+        schema: changeLocalModelRootRequestSchema,
+        invoke: async (payload: { expectedRevision: number }) =>
+          options.services.changeLocalModelRoot(payload),
+      } as RegisteredHandler,
+    ],
     [
       ipcChannels.companionSnapshotGet,
       {
@@ -502,6 +556,14 @@ export function createDesktopIpcHandlers(options: {
       } as RegisteredHandler,
     ],
     [
+      ipcChannels.startTranscription,
+      {
+        schema: startTranscriptionRequestSchema,
+        invoke: async (payload: { audioId: number }) =>
+          await options.services.startTranscription(payload.audioId),
+      } as RegisteredHandler,
+    ],
+    [
       ipcChannels.processingTasks,
       {
         schema: processingTasksRequestSchema,
@@ -549,6 +611,48 @@ export function createDesktopIpcHandlers(options: {
           sessionId: string;
           idempotencyKey: string;
         }) => await options.services.controlCapture(payload),
+      } as RegisteredHandler,
+    ],
+    [
+      ipcChannels.microphoneTestStart,
+      {
+        schema: microphoneTestStartRequestSchema,
+        invoke: async (
+          payload: { microphoneDeviceId?: string },
+          event: IpcInvocationContext,
+        ) =>
+          await options.services.startMicrophoneTest({
+            ...payload,
+            ownerId: event.senderId,
+          }),
+      } as RegisteredHandler,
+    ],
+    [
+      ipcChannels.microphoneTestSnapshot,
+      {
+        schema: microphoneTestControlRequestSchema,
+        invoke: async (
+          payload: { testId: string },
+          event: IpcInvocationContext,
+        ) =>
+          await options.services.getMicrophoneTestSnapshot({
+            ...payload,
+            ownerId: event.senderId,
+          }),
+      } as RegisteredHandler,
+    ],
+    [
+      ipcChannels.microphoneTestStop,
+      {
+        schema: microphoneTestControlRequestSchema,
+        invoke: async (
+          payload: { testId: string },
+          event: IpcInvocationContext,
+        ) =>
+          await options.services.stopMicrophoneTest({
+            ...payload,
+            ownerId: event.senderId,
+          }),
       } as RegisteredHandler,
     ],
     [

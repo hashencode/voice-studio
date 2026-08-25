@@ -24,10 +24,10 @@ async function files(directory: string): Promise<string[]> {
   return nested.flat().sort();
 }
 
-const artifacts: Array<{ path: string; sha256: string }> = [];
+const allArtifacts: Array<{ path: string; sha256: string }> = [];
 const artifactFiles = await files(root);
 for (let index = 0; index < artifactFiles.length; index += 4) {
-  artifacts.push(
+  allArtifacts.push(
     ...(await Promise.all(
       artifactFiles.slice(index, index + 4).map(async (file) => ({
         path: path.relative(root, file),
@@ -37,12 +37,15 @@ for (let index = 0; index < artifactFiles.length; index += 4) {
   );
 }
 const artifactSha256 = (relativePath: string): string => {
-  const artifact = artifacts.find(
+  const artifact = allArtifacts.find(
     (candidate) => candidate.path === relativePath,
   );
   if (!artifact) throw new Error(`worker artifact is missing: ${relativePath}`);
   return artifact.sha256;
 };
+const artifacts = allArtifacts.filter(
+  (artifact) => !artifact.path.startsWith("models/"),
+);
 await writeFile(
   path.join(root, "manifest.json"),
   `${JSON.stringify(
@@ -59,27 +62,24 @@ await writeFile(
         },
         {
           operation: "live-caption",
+          modelBundleId: "live-caption",
           executable: "bin/desktop_sensevoice_caption_worker",
           protocolIdentity: "sensevoice-live-caption-worker/v1",
           arguments: [
             "--runtime-root={runtimeRoot}",
-            "--model-root={resourceRoot}/models/live-caption",
-            "--asset-root={resourceRoot}/models/live-caption",
+            "--model-root={modelRoot}",
+            "--asset-root={modelRoot}",
             "--fixture-root={attemptOutput}",
-            "--model={resourceRoot}/models/live-caption/model.int8.onnx",
+            "--model={modelRoot}/model.int8.onnx",
             `--model-sha256=${artifactSha256("models/live-caption/model.int8.onnx")}`,
-            "--tokens={resourceRoot}/models/live-caption/tokens.txt",
+            "--tokens={modelRoot}/tokens.txt",
             `--tokens-sha256=${artifactSha256("models/live-caption/tokens.txt")}`,
-            "--vad={resourceRoot}/models/live-caption/silero_vad.onnx",
+            "--vad={modelRoot}/silero_vad.onnx",
             `--vad-sha256=${artifactSha256("models/live-caption/silero_vad.onnx")}`,
             '--control-json={"provider":"cpu","threads":2,"concurrency":1,"decodingMethod":"greedy_search","language":"auto","useInverseTextNormalization":false,"recognizerLifecycle":"resident_preloaded","vadThreshold":0.5,"minimumSpeechSeconds":0.25,"minimumSilenceSeconds":0.5,"maximumUtteranceSeconds":15,"publishesTokenPartials":false,"publishesCompletedUtterancesOnly":true}',
           ],
-          modelArtifacts: [
-            "models/live-caption/model.int8.onnx",
-            "models/live-caption/tokens.txt",
-            "models/live-caption/silero_vad.onnx",
-          ],
-          workerReportedModelArtifact: "models/live-caption/model.int8.onnx",
+          modelArtifacts: ["model.int8.onnx", "tokens.txt", "silero_vad.onnx"],
+          workerReportedModelArtifact: "model.int8.onnx",
           runtimeArtifacts: [
             "runtime/libonnxruntime.1.27.0.dylib",
             "runtime/libsherpa-onnx-c-api.dylib",
@@ -88,6 +88,7 @@ await writeFile(
         },
         {
           operation: "asr",
+          modelBundleId: "formal-transcription",
           executable: "bin/desktop_sherpa_worker",
           protocolIdentity: "desktop-sherpa-worker/v1",
           arguments: [
@@ -118,26 +119,26 @@ await writeFile(
             "--maximum-speech-seconds",
             "12",
             "--conv-frontend",
-            "{resourceRoot}/models/asr/conv_frontend.onnx",
+            "{modelRoot}/asr/conv_frontend.onnx",
             "--encoder",
-            "{resourceRoot}/models/asr/encoder.int8.onnx",
+            "{modelRoot}/asr/encoder.int8.onnx",
             "--decoder",
-            "{resourceRoot}/models/asr/decoder.int8.onnx",
+            "{modelRoot}/asr/decoder.int8.onnx",
             "--tokenizer",
-            "{resourceRoot}/models/asr/tokenizer",
+            "{modelRoot}/asr/tokenizer",
             "--vad",
-            "{resourceRoot}/models/asr/silero_vad.onnx",
+            "{modelRoot}/asr/silero_vad.onnx",
           ],
           modelArtifacts: [
-            "models/asr/conv_frontend.onnx",
-            "models/asr/encoder.int8.onnx",
-            "models/asr/decoder.int8.onnx",
-            "models/asr/tokenizer/tokenizer_config.json",
-            "models/asr/tokenizer/merges.txt",
-            "models/asr/tokenizer/vocab.json",
-            "models/asr/silero_vad.onnx",
-            "models/diarization/segmentation.onnx",
-            "models/diarization/embedding.onnx",
+            "asr/conv_frontend.onnx",
+            "asr/encoder.int8.onnx",
+            "asr/decoder.int8.onnx",
+            "asr/tokenizer/tokenizer_config.json",
+            "asr/tokenizer/merges.txt",
+            "asr/tokenizer/vocab.json",
+            "asr/silero_vad.onnx",
+            "diarization/segmentation.onnx",
+            "diarization/embedding.onnx",
           ],
           runtimeArtifacts: [
             "runtime/libonnxruntime.1.27.0.dylib",
@@ -147,6 +148,7 @@ await writeFile(
         },
         {
           operation: "diarization",
+          modelBundleId: "formal-transcription",
           executable: "bin/desktop_sherpa_worker",
           protocolIdentity: "desktop-sherpa-worker/v1",
           arguments: [
@@ -159,20 +161,20 @@ await writeFile(
             "--diarization-threshold",
             "0.65",
             "--segmentation",
-            "{resourceRoot}/models/diarization/segmentation.onnx",
+            "{modelRoot}/diarization/segmentation.onnx",
             "--embedding",
-            "{resourceRoot}/models/diarization/embedding.onnx",
+            "{modelRoot}/diarization/embedding.onnx",
           ],
           modelArtifacts: [
-            "models/asr/conv_frontend.onnx",
-            "models/asr/encoder.int8.onnx",
-            "models/asr/decoder.int8.onnx",
-            "models/asr/tokenizer/tokenizer_config.json",
-            "models/asr/tokenizer/merges.txt",
-            "models/asr/tokenizer/vocab.json",
-            "models/asr/silero_vad.onnx",
-            "models/diarization/segmentation.onnx",
-            "models/diarization/embedding.onnx",
+            "asr/conv_frontend.onnx",
+            "asr/encoder.int8.onnx",
+            "asr/decoder.int8.onnx",
+            "asr/tokenizer/tokenizer_config.json",
+            "asr/tokenizer/merges.txt",
+            "asr/tokenizer/vocab.json",
+            "asr/silero_vad.onnx",
+            "diarization/segmentation.onnx",
+            "diarization/embedding.onnx",
           ],
           runtimeArtifacts: [
             "runtime/libonnxruntime.1.27.0.dylib",

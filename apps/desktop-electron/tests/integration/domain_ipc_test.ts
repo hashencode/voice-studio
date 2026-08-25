@@ -6,6 +6,7 @@ import {
   createDesktopIpcHandlers,
 } from "../../src/main/ipc/desktop_ipc";
 import { createDesktopApi } from "../../src/preload/api";
+import { companionCommandStubs } from "../fixtures/companion";
 
 const trustedEvent = {
   senderId: 41,
@@ -35,6 +36,7 @@ function handlers() {
         origins: new Set([trustedEvent.origin]),
       },
       services: {
+        ...companionCommandStubs(),
         getCompanionSnapshot: vi.fn(),
         setCompanionOptIn: vi.fn(),
         createCompanionPairingInvite: vi.fn(),
@@ -243,6 +245,7 @@ describe("Main IPC validation", () => {
         fileUrls: new Set(["file:///Voice2Text/renderer/index.html"]),
       },
       services: {
+        ...companionCommandStubs(),
         getCompanionSnapshot: vi.fn(),
         setCompanionOptIn: vi.fn(),
         createCompanionPairingInvite: vi.fn(),

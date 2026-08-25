@@ -184,7 +184,14 @@ describe.skipIf(process.platform !== "darwin")(
           const committed = await importing.commitValidatedImport({
             displayName: "en.wav",
             receipt,
-            processing: { operationId: "asr", ...processing },
+          });
+          const queued = domain.enqueueProcessingJob({
+            audioId: committed.audioId,
+            idempotencyKey: `packaged-manual:${committed.audioId}`,
+            operationId: "asr",
+            phase: "asr",
+            sourceSha256: receipt.normalizedSha256,
+            ...processing,
           });
           const intent = domain.claimNextProcessingJob({
             sourceIdentity: "packaged-smoke-worker",
@@ -272,12 +279,12 @@ describe.skipIf(process.platform !== "darwin")(
             .prepare(
               "SELECT operation_id, phase, payload_json, source_sha256, model_sha256, runtime_sha256 FROM result_publications WHERE job_id = ?",
             )
-            .get(committed.jobId);
+            .get(queued.value.id);
           const durableJob = database
             .prepare(
               "SELECT state, progress_fraction FROM processing_jobs WHERE id = ?",
             )
-            .get(committed.jobId);
+            .get(queued.value.id);
           const durableAudio = database
             .prepare(
               "SELECT media_path, active_publication_id FROM audio_items WHERE id = ?",
@@ -333,7 +340,7 @@ describe.skipIf(process.platform !== "darwin")(
             modelSha256: processing.modelSha256,
             runtimeSha256: diarizationIdentity.runtimeSha256,
             audioId: committed.audioId,
-            jobId: committed.jobId,
+            jobId: queued.value.id,
             attempt: intent.attempt,
             state: String(durableJob?.state),
             transcriptNonEmpty: transcriptSegments.some(

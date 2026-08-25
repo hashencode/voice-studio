@@ -68,6 +68,7 @@ import {
 import { DesktopCaptureService } from "./domain/capture/desktop_capture_service";
 import type { CaptureNativePort } from "./domain/capture/capture_native_port";
 import { MacOSCaptureNativePort } from "./domain/capture/macos_capture_native_port";
+import { MicrophoneTestService } from "./domain/capture/microphone_test_service";
 import {
   activeCaptureQuitDialog,
   captureIsRunning,
@@ -102,10 +103,15 @@ import { prepareProcessingAttempt } from "./processes/processing_attempt";
 import { initializeAudioProfile } from "./profile/audio_profile";
 import type { AudioProfilePaths } from "./profile/audio_profile";
 import {
+  assertAuthorizedResourceCommand,
   ResourceCatalog,
   requireProcessingPipelineIdentities,
   resolveResourceRoot,
 } from "./resources/resource_catalog";
+import { LocalModelService } from "./resources/local_model_service";
+import { ModelLeaseCoordinator } from "./resources/model_lease_coordinator";
+import { ModelStore } from "./resources/model_store";
+import { ModelStorageAccess } from "./resources/model_storage_access";
 import { secureWebPreferences } from "./security";
 import { sha256File } from "./security/sha256_file";
 import { DesktopRepository } from "./storage/desktop_repository";
@@ -250,8 +256,12 @@ let companionService: CompanionService | null = null;
 let companionNativeAdapter: MacOSCompanionNativeAdapter | null = null;
 let unsubscribeCompanion: (() => void) | null = null;
 let resourceCatalog: ResourceCatalog | null = null;
+let localModelService: LocalModelService | null = null;
+let modelLeaseCoordinator: ModelLeaseCoordinator | null = null;
+let modelStorageAccess: ModelStorageAccess | null = null;
 let captureService: DesktopCaptureService | null = null;
 let captureNativeSession: MacOSNativeHelperSession | null = null;
+let microphoneTestService: MicrophoneTestService | null = null;
 let captureTray: Tray | null = null;
 let activeCaptureTitle = "音频录制";
 let captureLifecycleBound = false;
@@ -273,6 +283,9 @@ const operationListeners = new Set<(event: OperationEvent) => void>();
 const captionListeners = new Set<(snapshot: CaptionSnapshot) => void>();
 const audioAiListeners = new Set<(snapshot: AudioAiSnapshot) => void>();
 const companionListeners = new Set<(snapshot: CompanionSnapshot) => void>();
+const localModelListeners = new Set<
+  (snapshot: import("../shared/contracts").LocalModelSnapshot) => void
+>();
 const floatingCaptureListeners = new Set<
   (snapshot: FloatingCaptureSnapshot) => void
 >();
@@ -936,7 +949,12 @@ function decodeCompanionSmokeSecret(value: unknown): Buffer {
 async function runProcessingSmokeIfRequested(): Promise<void> {
   const request = processingSmokeRequest;
   if (!request) return;
-  if (!profileDatabase || !desktopRepository || !resourceCatalog) {
+  if (
+    !profileDatabase ||
+    !desktopRepository ||
+    !domainService ||
+    !resourceCatalog
+  ) {
     throw new Error("packaged processing smoke authority is unavailable");
   }
   const sourceSha256 = await sha256File(request.sourcePath);
@@ -948,10 +966,23 @@ async function runProcessingSmokeIfRequested(): Promise<void> {
     minimumFreeBytes: 0,
     destinationId: "audio-packaged-smoke",
   });
+  const pipeline = requireProcessingPipelineIdentities(resourceCatalog);
+  const queued = domainService.enqueueProcessingJob({
+    audioId: imported.audioId,
+    idempotencyKey: `packaged-processing-smoke:${imported.audioId}`,
+    operationId: "asr",
+    resourceIdentity: pipeline.asr.resourceIdentity,
+    phase: "asr",
+    protocolIdentity: pipeline.asr.protocolIdentity,
+    sourceSha256: imported.mediaSha256,
+    modelSha256: pipeline.asr.modelSha256,
+    runtimeSha256: pipeline.asr.runtimeSha256,
+  });
+  scheduleProcessing();
   const workstationProgress = request.workstationOutputPath
-    ? observePackagedRendererProgress(imported.jobId, imported.audioId)
+    ? observePackagedRendererProgress(queued.value.id, imported.audioId)
     : null;
-  if (!imported.inserted || imported.attempt !== 0) {
+  if (!imported.inserted || !queued.inserted || queued.value.attempt !== 0) {
     throw new Error("packaged processing smoke profile was not independent");
   }
   const activeLoop = processingLoop;
@@ -964,7 +995,7 @@ async function runProcessingSmokeIfRequested(): Promise<void> {
     : false;
   const task = desktopRepository
     .listProcessingTasks()
-    .find((candidate) => candidate.id === imported.jobId);
+    .find((candidate) => candidate.id === queued.value.id);
   if (!task || task.state !== "completed") {
     throw new Error(
       `packaged processing smoke did not complete: ${task?.state ?? "missing"}`,
@@ -987,14 +1018,14 @@ async function runProcessingSmokeIfRequested(): Promise<void> {
         progress_fraction
       FROM processing_jobs WHERE id = ?`,
     )
-    .get(imported.jobId);
+    .get(queued.value.id);
   const publication = profileDatabase
     .prepare(
       `SELECT operation_id, attempt, payload_json, phase, protocol_identity,
         source_sha256, model_sha256, runtime_sha256
       FROM result_publications WHERE job_id = ?`,
     )
-    .get(imported.jobId);
+    .get(queued.value.id);
   if (!audio || !job || !publication) {
     throw new Error("packaged processing smoke durable projection is missing");
   }
@@ -1002,7 +1033,6 @@ async function runProcessingSmokeIfRequested(): Promise<void> {
   if (!resultPayload || typeof resultPayload !== "object") {
     throw new Error("packaged processing smoke result payload is invalid");
   }
-  const pipeline = requireProcessingPipelineIdentities(resourceCatalog);
   if (String(job.resource_identity) !== resourceCatalog.identity) {
     throw new Error("packaged processing smoke resource identity changed");
   }
@@ -1903,6 +1933,7 @@ async function startCapture(options: {
   idempotencyKey: string;
 }): Promise<CaptureSnapshot> {
   if (!captureService) throw new Error("macOS capture helper is unavailable");
+  await microphoneTestService?.stopBeforeFormalCapture();
   const preflight = await preflightCapture({
     requestPermissions: false,
     captionEnabled: options.captionEnabled,
@@ -1920,7 +1951,7 @@ async function startCapture(options: {
     microphoneDeviceId: options.microphoneDeviceId,
     captionEnabled: options.captionEnabled,
   });
-  if (options.captionEnabled) {
+  if (options.captionEnabled && preflight.captionModelAvailable) {
     const identity = resourceCatalog?.processingIdentity("live-caption");
     if (!identity || !liveCaptionService || !profilePaths) {
       throw new Error("verified live-caption runtime is unavailable");
@@ -1970,12 +2001,7 @@ async function performCaptureControl(options: {
       handoff: formalTranscriptHandoff,
       sessionId: options.sessionId,
       displayName: activeCaptureTitle,
-      processing: resourceCatalog?.processingPipelineIdentities()
-        ? {
-            operationId: "asr",
-            ...resourceCatalog.processingPipelineIdentities()!.asr,
-          }
-        : null,
+      processing: null,
       publish: publishCaption,
       reportFailure: () =>
         console.error("Voice2Text formal transcript handoff failed"),
@@ -2170,6 +2196,67 @@ async function prepareCaptureForQuit(): Promise<boolean> {
 function bindDesktopIpc(window: BrowserWindow): void {
   unregisterIpc?.();
   unregisterIpc = registerDesktopIpc(window, {
+    getLocalModelSnapshot: async () => {
+      if (!localModelService) throw new Error("本地模型服务暂不可用");
+      synchronizeModelProcessingTasks();
+      return await modelStorageAccess!.withStoreAccess(
+        localModelService.activeStoreId,
+        async () => await localModelService!.snapshot(),
+      );
+    },
+    sendLocalModelIntent: async (options) => {
+      if (!localModelService) throw new Error("本地模型服务暂不可用");
+      synchronizeModelProcessingTasks();
+      const snapshot = await modelStorageAccess!.withStoreAccess(
+        localModelService.activeStoreId,
+        async () => await localModelService!.intent(options),
+      );
+      await refreshResourceModelAuthorities();
+      return snapshot;
+    },
+    changeLocalModelRoot: async ({ expectedRevision }) => {
+      if (!localModelService || !modelStorageAccess) {
+        throw new Error("本地模型服务暂不可用");
+      }
+      synchronizeModelProcessingTasks();
+      const selection = await modelStorageAccess.chooseRoot(window);
+      if (!selection) return await localModelService.snapshot();
+      const current = await localModelService.snapshot();
+      if (current.storage.usedBytes > 0) {
+        const confirmation = await dialog.showMessageBox(window, {
+          type: "warning",
+          buttons: ["取消", "迁移模型"],
+          defaultId: 0,
+          cancelId: 0,
+          title: "迁移本地模型",
+          message: "要把全部本地模型迁移到新位置吗？",
+          detail: `迁移约 ${Math.ceil(current.storage.usedBytes / 1024 ** 2)} MB。完成复制、校验和加载探测前，原位置不会被删除。`,
+        });
+        if (confirmation.response !== 1) return current;
+      }
+      const snapshot = await modelStorageAccess.withStoreAccess(
+        localModelService.activeStoreId,
+        async () =>
+          await modelStorageAccess!.withSelectedAccess(
+            selection.securityScopedBookmark,
+            async () =>
+              await localModelService!.changeRoot(
+                selection.path,
+                expectedRevision,
+              ),
+          ),
+      );
+      modelStorageAccess.remember(
+        snapshot.storage.storeId,
+        selection.securityScopedBookmark,
+      );
+      await refreshResourceModelAuthorities();
+      return snapshot;
+    },
+    onLocalModelSnapshot: (listener) => {
+      localModelListeners.add(listener);
+      return () => localModelListeners.delete(listener);
+    },
     getCompanionSnapshot: async () => {
       return requireCompanionService().snapshot();
     },
@@ -2281,34 +2368,106 @@ function bindDesktopIpc(window: BrowserWindow): void {
       return canceledResponse(jobId);
     },
     retryProcessing: async (jobId, expectedAttempt) => {
-      const pipeline = resourceCatalog?.processingPipelineIdentities();
-      if (
-        !pipeline ||
-        !domainService?.retryInterruptedJob(jobId, expectedAttempt, {
+      if (!localModelService) throw new Error("本地转写服务暂不可用");
+      const releaseAdmission = modelLeaseCoordinator?.beginProcessingTask();
+      try {
+        const capability = await localModelService.capability(
+          "formal-transcription",
+        );
+        if (!capability.available) {
+          throw new Error(`本地转写不可用：${capability.reason}`);
+        }
+        const pipeline = resourceCatalog?.processingPipelineIdentities();
+        if (
+          !pipeline ||
+          !domainService?.retryInterruptedJob(jobId, expectedAttempt, {
+            operationId: "asr",
+            phase: "asr",
+            ...pipeline.asr,
+          })
+        ) {
+          throw new Error(
+            "processing resources are incomplete or the job is not interrupted at the expected attempt",
+          );
+        }
+        const queued = domainService
+          .listProcessingTasks()
+          .find((task) => task.id === jobId && task.state === "queued");
+        if (!queued) {
+          throw new Error("durable queued processing state is unavailable");
+        }
+        synchronizeModelProcessingTasks();
+        emitOperation({ jobId, state: "queued", attempt: queued.attempt });
+        scheduleProcessing();
+        return queuedResponse(jobId);
+      } finally {
+        releaseAdmission?.();
+      }
+    },
+    startTranscription: async (audioId) => {
+      if (!localModelService || !domainService || !desktopRepository) {
+        throw new Error("本地转写服务暂不可用");
+      }
+      const releaseAdmission = modelLeaseCoordinator?.beginProcessingTask();
+      try {
+        const capability = await localModelService.capability(
+          "formal-transcription",
+        );
+        if (!capability.available) {
+          throw new Error(`本地转写不可用：${capability.reason}`);
+        }
+        const pipeline = resourceCatalog?.processingPipelineIdentities();
+        const media = desktopRepository.mediaAuthorityForAudio(audioId);
+        if (!pipeline || !media) throw new Error("音频或本地转写资源不可用");
+        const queued = domainService.enqueueProcessingJob({
+          audioId,
+          idempotencyKey: `manual-transcription:${audioId}:${randomBytes(16).toString("hex")}`,
           operationId: "asr",
           phase: "asr",
-          ...pipeline.asr,
-        })
-      ) {
-        throw new Error(
-          "processing resources are incomplete or the job is not interrupted at the expected attempt",
-        );
+          resourceIdentity: pipeline.asr.resourceIdentity,
+          protocolIdentity: pipeline.asr.protocolIdentity,
+          sourceSha256: media.contentSha256,
+          modelSha256: pipeline.asr.modelSha256,
+          runtimeSha256: pipeline.asr.runtimeSha256,
+        });
+        synchronizeModelProcessingTasks();
+        emitOperation({
+          jobId: queued.value.id,
+          state: "queued",
+          attempt: queued.value.attempt,
+        });
+        scheduleProcessing();
+        return queuedResponse(queued.value.id);
+      } finally {
+        releaseAdmission?.();
       }
-      const queued = domainService
-        .listProcessingTasks()
-        .find((task) => task.id === jobId && task.state === "queued");
-      if (!queued) {
-        throw new Error("durable queued processing state is unavailable");
-      }
-      emitOperation({ jobId, state: "queued", attempt: queued.attempt });
-      scheduleProcessing();
-      return queuedResponse(jobId);
     },
     listProcessingTasks: async () => domainService?.listProcessingTasks() ?? [],
     importAudio: async () => await chooseAndImportAudio(),
     preflightCapture: async (options) => await preflightCapture(options),
     startCapture: async (options) => await startCapture(options),
     controlCapture: async (options) => await controlCapture(options),
+    startMicrophoneTest: async (options) => {
+      if (!microphoneTestService) {
+        throw new Error("麦克风测试暂不可用");
+      }
+      return await microphoneTestService.start(options);
+    },
+    getMicrophoneTestSnapshot: async (options) => {
+      if (!microphoneTestService) {
+        throw new Error("麦克风测试暂不可用");
+      }
+      return await microphoneTestService.snapshot(options);
+    },
+    stopMicrophoneTest: async (options) => {
+      if (!microphoneTestService) {
+        throw new Error("麦克风测试暂不可用");
+      }
+      return await microphoneTestService.stop(options);
+    },
+    stopMicrophoneTestForOwner: async (ownerId) => {
+      await microphoneTestService?.stopForOwner(ownerId);
+    },
     floatingCaptureSnapshot: () =>
       deriveFloatingCaptureSnapshot(applicationState.snapshot()),
     controlFloatingCapture: async (options) => {
@@ -2344,12 +2503,11 @@ function bindDesktopIpc(window: BrowserWindow): void {
         options.idempotencyKey,
       );
       publishCapture(kept);
-      const pipeline = resourceCatalog?.processingPipelineIdentities();
       await finalizeCommittedCaptureTranscript({
         handoff: formalTranscriptHandoff,
         sessionId: kept.sessionId,
         displayName: activeCaptureTitle,
-        processing: pipeline ? { operationId: "asr", ...pipeline.asr } : null,
+        processing: null,
         publish: publishCaption,
         reportFailure: () =>
           console.error("Voice2Text recovered formal handoff failed"),
@@ -2359,12 +2517,30 @@ function bindDesktopIpc(window: BrowserWindow): void {
     getCaptionSnapshot: async ({ sessionId }) =>
       transcriptRepository?.getSnapshot(sessionId) ?? null,
     retryFormalTranscript: async (command) => {
-      if (!formalTranscriptHandoff) {
+      if (!formalTranscriptHandoff || !localModelService) {
         throw new Error("formal transcript retry is unavailable");
       }
-      const snapshot = await formalTranscriptHandoff.retry(command);
-      publishCaption(snapshot);
-      return snapshot;
+      const releaseAdmission = modelLeaseCoordinator?.beginProcessingTask();
+      try {
+        const capability = await localModelService.capability(
+          "formal-transcription",
+        );
+        const pipeline = resourceCatalog?.processingPipelineIdentities();
+        if (!capability.available || !pipeline) {
+          throw new Error(
+            `本地转写不可用：${capability.available ? "model-not-installed" : capability.reason}`,
+          );
+        }
+        const snapshot = await formalTranscriptHandoff.retry(command, {
+          operationId: "asr",
+          ...pipeline.asr,
+        });
+        synchronizeModelProcessingTasks();
+        publishCaption(snapshot);
+        return snapshot;
+      } finally {
+        releaseAdmission?.();
+      }
     },
     listAudios: async (options) => {
       if (!audioWorkspaceService)
@@ -2474,12 +2650,10 @@ async function chooseAndImportAudio(): Promise<ImportAudioResponse> {
   });
   return {
     protocolVersion: desktopProtocolVersion,
-    state: result.state,
+    state: "imported",
     audioId: result.audioId,
-    jobId: result.jobId,
     mediaSha256: result.mediaSha256,
     inserted: result.inserted,
-    progressFraction: result.progressFraction,
   };
 }
 
@@ -2495,7 +2669,6 @@ async function importAudioFromSource(
   if (!profilePaths || !domainService || !desktopRepository) {
     throw new Error("Electron profile is not ready for import");
   }
-  const pipeline = requireProcessingPipelineIdentities(resourceCatalog);
   if (options.expectedSourceSha256) {
     const existing = desktopRepository.committedImportForSourceSha256(
       options.expectedSourceSha256,
@@ -2503,24 +2676,12 @@ async function importAudioFromSource(
     if (existing) {
       const result = {
         audioId: existing.audio.id,
-        jobId: existing.job.id,
         recordingId: existing.mediaAuthorityId,
         mediaSha256: existing.contentSha256,
         inserted: false,
-        state: existing.job.state,
-        attempt: existing.job.attempt,
-        progressFraction: existing.job.progressFraction,
         sourceSha256: options.expectedSourceSha256,
       };
       applicationState.setLibraryCount(desktopRepository.countAudios());
-      emitOperation({
-        jobId: result.jobId,
-        state: result.state,
-        attempt: result.attempt,
-        phase: "asr",
-        progressFraction: result.progressFraction,
-      });
-      if (result.state === "queued") scheduleProcessing();
       return result;
     }
   }
@@ -2570,17 +2731,8 @@ async function importAudioFromSource(
     const result = await importing.commitValidatedImport({
       displayName: path.basename(sourcePath),
       receipt,
-      processing: { operationId: "asr", ...pipeline.asr },
     });
     applicationState.setLibraryCount(desktopRepository.countAudios());
-    emitOperation({
-      jobId: result.jobId,
-      state: result.state,
-      attempt: result.attempt,
-      phase: "asr",
-      progressFraction: result.progressFraction,
-    });
-    if (result.state === "queued") scheduleProcessing();
     return { ...result, sourceSha256: receipt.sourceSha256 };
   } finally {
     await nativeSession.close();
@@ -2658,6 +2810,8 @@ async function initializeApplication(): Promise<void> {
     traceCaptureSmoke("capture-ready");
   } catch (error) {
     console.error("macOS capture initialization failed", error);
+    await microphoneTestService?.stopBeforeFormalCapture();
+    microphoneTestService = null;
     await captureNativeSession?.close().catch(() => undefined);
     captureNativeSession = null;
     captureService = null;
@@ -2778,21 +2932,55 @@ async function initializeApplication(): Promise<void> {
         resourcesPath: process.resourcesPath,
       }),
     );
+    await initializeLocalModels(true);
     const liveCaptionIdentity =
       resourceCatalog.processingIdentity("live-caption");
     if (liveCaptionIdentity && transcriptRepository) {
       liveCaptionService = new LiveCaptionService(
         transcriptRepository,
         {
-          launch: async (options) =>
-            await CaptionWorkerSupervisor.launch({
-              ...options,
-              workspaceRoot: profile.profile.captureDirectory,
-              command: resourceCatalog!.command("live-caption", {
-                runtimeRoot: path.join(resourceCatalog!.root, "runtime"),
-                attemptOutput: options.sessionRoot,
-              }),
-            }),
+          launch: async (options) => {
+            if (!localModelService || !modelLeaseCoordinator) {
+              throw new Error("实时字幕模型服务不可用");
+            }
+            const capability =
+              await localModelService.capability("live-caption");
+            if (!capability.available) {
+              throw new Error(`实时字幕不可用：${capability.reason}`);
+            }
+            const lease = modelLeaseCoordinator.acquire(
+              "live-caption",
+              capability.generation,
+            );
+            const releaseStorageAccess = modelStorageAccess?.acquire(
+              capability.storeId,
+            );
+            try {
+              const worker = await CaptionWorkerSupervisor.launch({
+                ...options,
+                workspaceRoot: profile.profile.captureDirectory,
+                command: resourceCatalog!.command("live-caption", {
+                  attemptOutput: options.sessionRoot,
+                }),
+              });
+              return {
+                poll: async () => await worker.poll(),
+                flush: async () => await worker.flush(),
+                close: async () => {
+                  try {
+                    await worker.close();
+                  } finally {
+                    lease.release();
+                    releaseStorageAccess?.();
+                  }
+                },
+              };
+            } catch (error) {
+              lease.release();
+              releaseStorageAccess?.();
+              throw error;
+            }
+          },
         },
         publishCaption,
       );
@@ -2846,11 +3034,20 @@ async function initializeApplication(): Promise<void> {
                 : String(durableCapture!.journal_sha256)),
           });
         },
+        commitMedia: (media) => {
+          domainService!.commitValidatedImport({
+            displayName: media.displayName,
+            normalizedPath: media.normalizedPath,
+            normalizedSha256: media.normalizedSha256,
+            sourceSha256: media.sourceSha256,
+            normalizedSizeBytes: media.normalizedSizeBytes,
+            durationMs: media.durationMs,
+            receipt: media.receipt,
+          });
+          applicationState.setLibraryCount(desktopRepository!.countAudios());
+        },
         scheduleProcessing: () => scheduleProcessing(),
       });
-      for (const snapshot of await formalTranscriptHandoff.reconcileStartup()) {
-        publishCaption(snapshot);
-      }
     }
     workerSupervisor = new WorkerHealthSupervisor(
       resourceCatalog.command("worker-health"),
@@ -2865,11 +3062,10 @@ async function initializeApplication(): Promise<void> {
       await runProcessingSmokeIfRequested();
     } else if (captionFormalSmokeRequest) {
       await runCaptionFormalSmokeIfRequested();
-    } else {
-      scheduleProcessing();
     }
     traceCaptureSmoke("catalog-ready");
   } catch (error) {
+    await initializeLocalModels(false);
     applicationState.setProcessingCapability(
       error instanceof Error ? error.message : "本地处理运行时不可用",
     );
@@ -2898,6 +3094,84 @@ async function initializeApplication(): Promise<void> {
     !companionSmokeRequest
   )
     await runBootstrapSmokeIfRequested();
+}
+
+async function initializeLocalModels(runtimeReady: boolean): Promise<void> {
+  if (localModelService) return;
+  modelLeaseCoordinator = new ModelLeaseCoordinator();
+  modelStorageAccess = new ModelStorageAccess(
+    dialog,
+    app,
+    path.join(app.getPath("userData"), "local-models"),
+  );
+  localModelService = new LocalModelService({
+    store: new ModelStore(app.getPath("userData")),
+    gate: modelLeaseCoordinator,
+    runtime: {
+      state: runtimeReady ? "ready" : "damaged",
+      message: runtimeReady
+        ? "Worker Runtime 正常"
+        : "应用运行组件损坏，请重新安装或修复应用",
+      identity: runtimeReady ? (resourceCatalog?.identity ?? null) : null,
+    },
+    probeStore: async () => {
+      await probeCurrentModelAuthorities();
+    },
+    probeBundle: async () => await probeCurrentModelAuthorities(),
+    acquireStorageAccess: (storeId) => modelStorageAccess!.acquire(storeId),
+  });
+  localModelService.subscribe((snapshot) => {
+    for (const listener of localModelListeners) listener(snapshot);
+  });
+  await modelStorageAccess.withAllStoredAccess(
+    async () => await localModelService!.initialize(),
+  );
+  await refreshResourceModelAuthorities();
+}
+
+function synchronizeModelProcessingTasks(): void {
+  modelLeaseCoordinator?.synchronizeProcessingTasks(
+    domainService
+      ? domainService
+          .listProcessingTasks()
+          .filter((task) =>
+            ["queued", "running", "canceling"].includes(task.state),
+          ).length
+      : 0,
+  );
+}
+
+async function refreshResourceModelAuthorities(): Promise<void> {
+  if (!resourceCatalog || !localModelService) return;
+  for (const bundleId of ["formal-transcription", "live-caption"] as const) {
+    resourceCatalog.removeModelAuthority(bundleId);
+    const authority = await localModelService.resourceAuthority(bundleId);
+    if (authority) resourceCatalog.installModelAuthority(authority);
+  }
+  applicationState.setProcessingCapability(
+    resourceCatalog.processingPipelineIdentities()
+      ? undefined
+      : "本地转写模型尚未安装",
+  );
+}
+
+async function probeCurrentModelAuthorities(): Promise<void> {
+  await refreshResourceModelAuthorities();
+  if (!resourceCatalog) throw new Error("Worker Runtime 不可用");
+  for (const operation of ["asr", "diarization", "live-caption"]) {
+    try {
+      await assertAuthorizedResourceCommand(
+        resourceCatalog.command(operation, {
+          attemptOutput:
+            profilePaths?.workspaceDirectory ?? resourceCatalog.root,
+        }),
+      );
+    } catch (error) {
+      const bundle =
+        operation === "live-caption" ? "live-caption" : "formal-transcription";
+      if (await localModelService?.resourceAuthority(bundle)) throw error;
+    }
+  }
 }
 
 async function runAiBoundarySmokeIfRequested(): Promise<void> {
@@ -3084,7 +3358,10 @@ async function runCompanionSmokeIfRequested(): Promise<void> {
       .update(transfer.receipt.signature)
       .digest("hex"),
     audioId: Number(durable.audio_id),
-    processingJobId: Number(durable.processing_job_id),
+    processingJobId:
+      durable.processing_job_id == null
+        ? null
+        : Number(durable.processing_job_id),
     recordingId: Number(durable.recording_id),
     transferRevision: Number(durable.revision),
     senderDeleteAllowed: true,
@@ -3165,9 +3442,11 @@ async function initializeCapture(
     destinationRoots: [],
     captureSessionRoot: profile.captureDirectory,
   });
+  const captureNativePort = new MacOSCaptureNativePort(captureNativeSession);
+  microphoneTestService = new MicrophoneTestService(captureNativePort);
   captureService = new DesktopCaptureService(
     new CaptureRepository(database),
-    new MacOSCaptureNativePort(captureNativeSession),
+    captureNativePort,
     profile.captureDirectory,
   );
   const recoveries = await captureService.recover();
@@ -3225,7 +3504,6 @@ async function initializeCompanion(
       return committed
         ? {
             audioId: committed.audio.id,
-            jobId: committed.job.id,
             recordingId: committed.mediaAuthorityId,
             sourceSha256,
             normalizedPath: committed.normalizedPath,
@@ -3277,7 +3555,6 @@ async function initializeCompanion(
       }
       return {
         audioId: committed.audio.id,
-        jobId: committed.job.id,
         recordingId: committed.mediaAuthorityId,
         sourceSha256: imported.sourceSha256,
         normalizedPath: committed.normalizedPath,
@@ -3605,6 +3882,33 @@ async function runCaptureSmokeIfRequested(): Promise<void> {
     snapshot: async () => recording(),
     recover: async () => [],
     discard: async () => undefined,
+    startMicrophoneTest: async (testId) => ({
+      testId,
+      state: "running",
+      elapsedMs: 0,
+      remainingMs: 30_000,
+      normalizedPeak: 0,
+      observedFrames: 0,
+      detectedInput: false,
+    }),
+    microphoneTestSnapshot: async (testId) => ({
+      testId,
+      state: "running",
+      elapsedMs: 0,
+      remainingMs: 30_000,
+      normalizedPeak: 0,
+      observedFrames: 0,
+      detectedInput: false,
+    }),
+    stopMicrophoneTest: async (testId) => ({
+      testId,
+      state: "stopped",
+      elapsedMs: 0,
+      remainingMs: 30_000,
+      normalizedPeak: 0,
+      observedFrames: 0,
+      detectedInput: false,
+    }),
   };
   captureService = new DesktopCaptureService(
     new CaptureRepository(profileDatabase),
@@ -3808,6 +4112,8 @@ async function teardownOwnedResources(): Promise<void> {
   capturePollTimer = null;
   await liveCaptionService?.shutdown();
   liveCaptionService = null;
+  await microphoneTestService?.stopBeforeFormalCapture();
+  microphoneTestService = null;
   await captureNativeSession?.close();
   captureNativeSession = null;
   captureService = null;
@@ -3820,6 +4126,10 @@ async function teardownOwnedResources(): Promise<void> {
   domainService = null;
   desktopRepository = null;
   transcriptRepository = null;
+  localModelService?.close();
+  localModelService = null;
+  modelLeaseCoordinator = null;
+  modelStorageAccess = null;
   resourceCatalog = null;
 }
 
@@ -3886,6 +4196,9 @@ async function drainProcessingQueue(): Promise<void> {
     });
     if (!intent) return;
     let activeIntent = intent;
+    let releaseProcessingTask: (() => void) | null = null;
+    let modelLease: ReturnType<ModelLeaseCoordinator["acquire"]> | null = null;
+    let releaseModelStorageAccess: (() => void) | null = null;
     const sourcePath = repository.sourcePathForJob(intent.jobId);
     const attemptDirectory = path.join(
       profile.workspaceDirectory,
@@ -3917,6 +4230,22 @@ async function drainProcessingQueue(): Promise<void> {
       progressFraction: 0,
     });
     try {
+      if (!localModelService || !modelLeaseCoordinator) {
+        throw new Error("本地转写模型服务不可用");
+      }
+      const capability = await localModelService.capability(
+        "formal-transcription",
+      );
+      if (!capability.available) {
+        throw new Error(`本地转写不可用：${capability.reason}`);
+      }
+      modelLease = modelLeaseCoordinator.acquire(
+        "formal-transcription",
+        capability.generation,
+      );
+      releaseModelStorageAccess =
+        modelStorageAccess?.acquire(capability.storeId) ?? null;
+      releaseProcessingTask = modelLeaseCoordinator.beginProcessingTask();
       if (!sourcePath)
         throw new Error("processing job has no authoritative media path");
       const startedAtMs = Date.now();
@@ -4003,6 +4332,9 @@ async function drainProcessingQueue(): Promise<void> {
         });
       }
     } finally {
+      releaseProcessingTask?.();
+      modelLease?.release();
+      releaseModelStorageAccess?.();
       await rm(attemptDirectory, { force: true, recursive: true });
     }
   }

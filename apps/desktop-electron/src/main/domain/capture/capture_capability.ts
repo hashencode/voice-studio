@@ -15,9 +15,8 @@ export function hasVerifiedLiveCaptionCapability(
 
 export function capturePreflightAllowsStart(
   preflight: { canStart: boolean; captionModelAvailable: boolean },
-  captionEnabled: boolean,
+  _captionEnabled: boolean,
 ): boolean {
-  return (
-    preflight.canStart && (!captionEnabled || preflight.captionModelAvailable)
-  );
+  void _captionEnabled;
+  return preflight.canStart;
 }

@@ -599,6 +599,25 @@ export class DesktopRepository {
     return row ? String(row.media_path) : null;
   }
 
+  mediaAuthorityForAudio(
+    audioId: number,
+  ): { mediaPath: string; contentSha256: string } | null {
+    const row = this.database
+      .prepare(
+        `SELECT audio_items.media_path, media_authorities.content_sha256
+         FROM audio_items
+         JOIN media_authorities ON media_authorities.id = audio_items.media_authority_id
+         WHERE audio_items.id = ?`,
+      )
+      .get(audioId);
+    return row
+      ? {
+          mediaPath: String(row.media_path),
+          contentSha256: String(row.content_sha256),
+        }
+      : null;
+  }
+
   findJob(id: number): ProcessingJobRecord | null {
     const row = this.database
       .prepare("SELECT * FROM processing_jobs WHERE id = ?")
@@ -650,7 +669,6 @@ export class DesktopRepository {
 
   committedImportForSourceSha256(sourceSha256: string): {
     audio: AudioRecord;
-    job: ProcessingJobRecord;
     mediaAuthorityId: number;
     contentSha256: string;
     normalizedPath: string;
@@ -663,13 +681,11 @@ export class DesktopRepository {
       .prepare(
         `SELECT a.id AS media_authority_id, a.content_sha256,
           a.normalized_path, a.size_bytes,
-          m.id AS audio_id, j.id AS job_id
+          m.id AS audio_id
          FROM media_authorities a
          JOIN audio_items m ON m.media_authority_id = a.id
-         JOIN processing_jobs j ON j.audio_id = m.id
-           AND j.idempotency_key = 'processing:' || a.content_sha256
          WHERE a.source_sha256 = ?
-         ORDER BY a.id, m.id, j.id LIMIT 2`,
+         ORDER BY a.id, m.id LIMIT 2`,
       )
       .all(sourceSha256);
     if (rows.length === 0) return null;
@@ -679,7 +695,6 @@ export class DesktopRepository {
     const row = rows[0]!;
     return {
       audio: this.requireAudio(Number(row.audio_id)),
-      job: this.requireJob(Number(row.job_id)),
       mediaAuthorityId: Number(row.media_authority_id),
       contentSha256: String(row.content_sha256),
       normalizedPath: String(row.normalized_path),
@@ -696,16 +711,10 @@ export class DesktopRepository {
       normalizedSizeBytes: number;
       durationMs: number;
       receipt: Record<string, unknown>;
-      resourceIdentity: string;
-      phase: ProcessingPhase;
-      protocolIdentity: string;
-      modelSha256: string;
-      runtimeSha256: string;
     },
     nowMs: number,
   ): {
     audio: AudioRecord;
-    job: ProcessingJobRecord;
     mediaAuthorityId: number;
     inserted: boolean;
   } {
@@ -719,16 +728,8 @@ export class DesktopRepository {
           .prepare("SELECT * FROM audio_items WHERE media_authority_id = ?")
           .get(Number(existingAsset.id));
         if (!audioRow) throw new Error("media authority is missing its audio");
-        const jobRow = this.database
-          .prepare(
-            "SELECT * FROM processing_jobs WHERE audio_id = ? ORDER BY id LIMIT 1",
-          )
-          .get(Number(audioRow.id));
-        if (!jobRow)
-          throw new Error("media authority is missing its processing job");
         return {
           audio: mapAudio(audioRow),
-          job: mapJob(jobRow),
           mediaAuthorityId: Number(existingAsset.id),
           inserted: false,
         };
@@ -766,27 +767,8 @@ export class DesktopRepository {
           nowMs,
         );
       const audioId = Number(audio.lastInsertRowid);
-      const operationId = command.phase;
-      const job = this.database
-        .prepare(
-          "INSERT INTO processing_jobs (audio_id, idempotency_key, operation_id, resource_identity, state, attempt, phase, protocol_identity, source_sha256, model_sha256, runtime_sha256, created_at_ms, updated_at_ms) VALUES (?, ?, ?, ?, 'queued', 0, ?, ?, ?, ?, ?, ?, ?)",
-        )
-        .run(
-          audioId,
-          `processing:${command.normalizedSha256}`,
-          operationId,
-          command.resourceIdentity,
-          command.phase,
-          command.protocolIdentity,
-          command.normalizedSha256,
-          command.modelSha256,
-          command.runtimeSha256,
-          nowMs,
-          nowMs,
-        );
       return {
         audio: this.requireAudio(audioId),
-        job: this.requireJob(Number(job.lastInsertRowid)),
         mediaAuthorityId: mediaId,
         inserted: true,
       };

@@ -1,5 +1,5 @@
 import * as React from "react";
-import { BrainCircuit, Settings2, ShieldCheck } from "lucide-react";
+import { BrainCircuit, HardDrive, Settings2, ShieldCheck } from "lucide-react";
 
 import { AppSidebar } from "@/components/app-sidebar";
 import {
@@ -43,7 +43,7 @@ import type {
 import { SHELL_SECTION_LABELS } from "@/features/shell/context-pane-contract";
 import { useContextPaneShell } from "@/features/shell/use-context-pane-shell";
 import {
-  CapabilityUnavailable,
+  CapabilityUnavailableDialog,
   LoadingShell,
   OfflineBanner,
   ProfileBlocker,
@@ -54,10 +54,12 @@ import {
   useApplicationShell,
 } from "@/features/shell/use-application-shell";
 import { AiSettingsFeature } from "@/features/settings/ai-settings-feature";
+import { LocalModelsFeature } from "@/features/settings/local-models-feature";
 import type { ApplicationSnapshot } from "@shared/contracts";
 
 const SETTINGS_SECTIONS = [
   { value: "general", label: "通用", icon: Settings2 },
+  { value: "local-models", label: "本地模型", icon: HardDrive },
   { value: "intelligence", label: "音频智能", icon: BrainCircuit },
   { value: "privacy", label: "隐私与安全", icon: ShieldCheck },
 ] as const;
@@ -91,6 +93,8 @@ export default function App() {
   const captureInvokerRef = React.useRef<HTMLElement | null>(null);
   const restoreFocusFrameRef = React.useRef<number | null>(null);
   const [recordRequest, setRecordRequest] = React.useState(0);
+  const [processingUnavailableReason, setProcessingUnavailableReason] =
+    React.useState<string | null>(null);
   const [preferredMicrophoneDeviceId, setPreferredMicrophoneDeviceId] =
     React.useState<string | null>(null);
   const [captureDetailOpen, setCaptureDetailOpen] = React.useState(false);
@@ -204,9 +208,8 @@ export default function App() {
     api: window.voice2text,
     tasks,
     pendingJobActions,
-    writable:
-      snapshot?.profile.phase === "ready" &&
-      snapshot.capability.processing === "available",
+    writable: snapshot?.profile.phase === "ready",
+    processingAvailable: snapshot?.capability.processing === "available",
     recordingActive: isCaptureInProgress(snapshot?.capture),
     newRecordingBlocked: isNewRecordingBlocked(snapshot?.capture),
     active: current === "audio",
@@ -221,6 +224,14 @@ export default function App() {
       setRecordRequest((value) => value + 1);
     },
     onImport: importAudio,
+    onProcessingUnavailable: (reason) => {
+      setProcessingUnavailableReason(
+        reason ??
+          (snapshot?.capability.processing === "unavailable"
+            ? snapshot.capability.reason
+            : "本地转写模型暂不可用"),
+      );
+    },
     onCancel: cancelProcessing,
     onRetry: retryProcessing,
   });
@@ -284,7 +295,7 @@ export default function App() {
             ) : null
           }
           footer={
-            pane.paneSection === "audio" ? (
+            pane.paneSection === "audio" && audio.workspace !== null ? (
               <AudioContextPaneHeader controller={audio} />
             ) : null
           }
@@ -380,6 +391,10 @@ export default function App() {
             autoOpenRecoveries={current === "audio"}
             onPreflightResolved={audio.acceptCapturePreflight}
             onDetailOpenChange={changeCaptureDetail}
+            onOpenLocalModels={() => {
+              setSettingsSection("local-models");
+              navigatePrimary("settings");
+            }}
           />
           <ActivityErrorDialog
             item={activityError}
@@ -388,6 +403,18 @@ export default function App() {
               if (!open) setActivityError(null);
             }}
             onOpenDetails={openActivityDetails}
+          />
+          <CapabilityUnavailableDialog
+            reason={processingUnavailableReason ?? ""}
+            open={processingUnavailableReason !== null}
+            onOpenChange={(open) => {
+              if (!open) setProcessingUnavailableReason(null);
+            }}
+            onOpenLocalModels={() => {
+              setProcessingUnavailableReason(null);
+              setSettingsSection("local-models");
+              navigatePrimary("settings");
+            }}
           />
         </div>
       </SidebarInset>
@@ -496,9 +523,6 @@ function ShellContent({
     case "audio":
       section = (
         <div className="flex min-h-full flex-col gap-4">
-          {snapshot.capability.processing === "unavailable" ? (
-            <CapabilityUnavailable reason={snapshot.capability.reason} />
-          ) : null}
           <AudioMainWorkspace
             controller={audio}
             operationError={operationError}
@@ -572,6 +596,7 @@ function SettingsContent({ section }: { section: SettingsSection }) {
   if (section === "general") {
     return <FloatingCapturePreferenceSetting className="border-y py-4" />;
   }
+  if (section === "local-models") return <LocalModelsFeature />;
   return (
     <AiSettingsFeature view={section === "privacy" ? "privacy" : "provider"} />
   );

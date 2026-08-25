@@ -26,7 +26,7 @@ const audioA = summary(1, "音频 A.wav");
 const audioB = summary(2, "音频 B.wav");
 const audioC = summary(3, "音频 C.wav");
 
-it("uses a full-width import action until an audio is selected", async () => {
+it("keeps import beside search and new recording in the fixed footer", async () => {
   const onImport = vi.fn(async () => undefined);
   const onRecord = vi.fn();
   render(
@@ -48,9 +48,13 @@ it("uses a full-width import action until an audio is selected", async () => {
   expect(
     await within(pane).findByRole("searchbox", { name: "搜索音频" }),
   ).toBeVisible();
-  await userEvent
-    .setup()
-    .click(within(pane).getByRole("button", { name: "导入音频" }));
+  const user = userEvent.setup();
+  const importButton = within(pane).getByRole("button", {
+    name: "导入音频",
+  });
+  await user.hover(importButton);
+  expect(await screen.findByRole("tooltip")).toHaveTextContent("导入音频");
+  await user.click(importButton);
   expect(onImport).toHaveBeenCalledOnce();
   expect(within(main).getByRole("combobox", { name: "麦克风" })).toBeVisible();
   expect(within(main).getByRole("button", { name: "开始录制" })).toBeVisible();
@@ -59,17 +63,14 @@ it("uses a full-width import action until an audio is selected", async () => {
   ).toBeVisible();
   expect(main).not.toHaveTextContent("导入");
 
-  const paneActions = within(pane).getByRole("group", { name: "音频操作" });
-  const paneFooter = pane.querySelector<HTMLElement>(
-    "[data-context-pane-fixed-footer]",
-  );
-  expect(paneFooter).toContainElement(paneActions);
-  const [importButton] = within(paneActions).getAllByRole("button");
-  expect(importButton).toHaveAccessibleName("导入音频");
-  expect(importButton?.querySelector("svg")).toBeNull();
-  expect(importButton).toHaveClass("col-span-3");
   expect(
-    within(paneActions).queryByRole("button", { name: "新录音" }),
+    pane.querySelector("[data-context-pane-fixed-footer]"),
+  ).not.toBeInTheDocument();
+  expect(importButton).toHaveAccessibleName("导入音频");
+  expect(importButton.querySelector("svg.lucide-file-up")).not.toBeNull();
+  expect(importButton).not.toHaveTextContent("导入音频");
+  expect(
+    within(pane).queryByRole("group", { name: "录音操作" }),
   ).not.toBeInTheDocument();
 
   await userEvent
@@ -85,13 +86,81 @@ it("uses a full-width import action until an audio is selected", async () => {
   expect(row).toHaveAttribute("data-flat-row", "true");
   expect(row).not.toHaveClass("rounded-lg", "border", "bg-card");
 
-  await userEvent.setup().click(row);
+  await user.click(row);
+  const paneActions = await within(pane).findByRole("group", {
+    name: "录音操作",
+  });
+  const paneFooter = pane.querySelector<HTMLElement>(
+    "[data-context-pane-fixed-footer]",
+  );
+  expect(paneFooter).toContainElement(paneActions);
+  expect(paneFooter).not.toContainElement(importButton);
   const recordButton = await within(paneActions).findByRole("button", {
     name: "新录音",
   });
-  expect(importButton).toHaveAccessibleName("导入");
-  expect(importButton).toHaveClass("col-span-1");
-  expect(recordButton).toHaveClass("col-span-2");
+  expect(importButton).toHaveAccessibleName("导入音频");
+  expect(recordButton).toHaveClass("w-full");
+});
+
+it("allows recording and pure audio import without local processing", async () => {
+  const onImport = vi.fn();
+  const onProcessingUnavailable = vi.fn();
+  render(
+    <AudioRouteFeature
+      api={api()}
+      tasks={[]}
+      pendingJobActions={new Map()}
+      writable
+      processingAvailable={false}
+      paneOpen
+      onProcessingUnavailable={onProcessingUnavailable}
+      onRecord={vi.fn()}
+      onImport={onImport}
+      onCancel={vi.fn()}
+      onRetry={vi.fn()}
+    />,
+  );
+
+  expect(await screen.findByRole("button", { name: "开始录制" })).toBeEnabled();
+  await userEvent
+    .setup()
+    .click(screen.getByRole("button", { name: "导入音频" }));
+  expect(onProcessingUnavailable).not.toHaveBeenCalled();
+  expect(onImport).toHaveBeenCalledOnce();
+});
+
+it("creates processing only after the user explicitly starts transcription", async () => {
+  const startTranscription = vi.fn(async (audioId: number) => ({
+    protocolVersion: 2 as const,
+    jobId: audioId + 100,
+    state: "queued" as const,
+  }));
+  const untranscribed = {
+    ...workspace(audioA),
+    summary: {
+      ...audioA,
+      processingState: "not-started" as const,
+      generationId: null,
+      generationKind: null,
+      segmentCount: 0,
+    },
+    segments: [],
+  };
+  renderRoute(
+    api({
+      startTranscription,
+      openAudio: vi.fn(async () => untranscribed),
+    }),
+  );
+  await userEvent
+    .setup()
+    .click(await screen.findByRole("button", { name: /打开 音频 A/ }));
+  expect(await screen.findByText("尚未转写")).toBeVisible();
+  expect(startTranscription).not.toHaveBeenCalled();
+  await userEvent
+    .setup()
+    .click(screen.getByRole("button", { name: "开始转写" }));
+  expect(startTranscription).toHaveBeenCalledWith(audioA.audioId);
 });
 
 it("disables the new recording action and announces an active recording", async () => {
@@ -233,84 +302,61 @@ it("disables recording when no microphone is available", async () => {
   expect(screen.getByRole("button", { name: "新录音" })).toBeDisabled();
 });
 
-it("samples microphone input before reporting success in a dialog", async () => {
-  const stop = vi.fn();
-  const getUserMedia = vi.fn(async () => ({
-    getTracks: () => [{ stop }],
+it("uses the native capture lifecycle for a user-ended microphone test", async () => {
+  const running = {
+    testId: "mic-test-123456789012",
+    state: "running" as const,
+    elapsedMs: 1_000,
+    remainingMs: 29_000,
+    normalizedPeak: 0.5,
+    observedFrames: 10,
+    detectedInput: true,
+  };
+  const startMicrophoneTest = vi.fn(async () => running);
+  const stopMicrophoneTest = vi.fn(async () => ({
+    ...running,
+    state: "stopped" as const,
   }));
-  const originalMediaDevices = Object.getOwnPropertyDescriptor(
-    navigator,
-    "mediaDevices",
+  render(
+    <AudioRouteFeature
+      api={api({ startMicrophoneTest, stopMicrophoneTest })}
+      tasks={[]}
+      pendingJobActions={new Map()}
+      writable
+      paneOpen
+      onRecord={vi.fn()}
+      onImport={vi.fn()}
+      onCancel={vi.fn()}
+      onRetry={vi.fn()}
+    />,
   );
-  Object.defineProperty(navigator, "mediaDevices", {
-    configurable: true,
-    value: { getUserMedia },
+  await userEvent
+    .setup()
+    .click(await screen.findByRole("button", { name: "测试麦克风" }));
+  const instructions = await screen.findByRole("dialog", {
+    name: "测试麦克风",
   });
-  const disconnect = vi.fn();
-  const close = vi.fn(async () => undefined);
-  class AudioContextStub {
-    createMediaStreamSource() {
-      return { connect: vi.fn(), disconnect };
-    }
-
-    createAnalyser() {
-      return {
-        fftSize: 0,
-        getByteTimeDomainData: (samples: Uint8Array) => {
-          samples.fill(128);
-          samples[0] = 136;
-        },
-      };
-    }
-
-    close() {
-      return close();
-    }
-  }
-  vi.stubGlobal("AudioContext", AudioContextStub);
-
-  try {
-    render(
-      <AudioRouteFeature
-        api={api()}
-        tasks={[]}
-        pendingJobActions={new Map()}
-        writable
-        paneOpen
-        onRecord={vi.fn()}
-        onImport={vi.fn()}
-        onCancel={vi.fn()}
-        onRetry={vi.fn()}
-      />,
-    );
-    const testMicrophone = await screen.findByRole("button", {
-      name: "测试麦克风",
-    });
-    await userEvent.setup().click(testMicrophone);
-
-    const dialog = await screen.findByRole("dialog", {
-      name: "麦克风测试成功",
-    });
-    expect(dialog).toHaveTextContent("麦克风工作正常：MacBook 麦克风");
-    expect(
-      screen.queryByText("麦克风工作正常：MacBook 麦克风", {
-        selector: "p[role='status']",
-      }),
-    ).not.toBeInTheDocument();
-    expect(getUserMedia).toHaveBeenCalledWith({
-      audio: { deviceId: { exact: "mic-default" } },
-    });
-    expect(stop).toHaveBeenCalledOnce();
-    expect(disconnect).toHaveBeenCalledOnce();
-    expect(close).toHaveBeenCalledOnce();
-  } finally {
-    vi.unstubAllGlobals();
-    if (originalMediaDevices) {
-      Object.defineProperty(navigator, "mediaDevices", originalMediaDevices);
-    } else {
-      Reflect.deleteProperty(navigator, "mediaDevices");
-    }
-  }
+  expect(instructions).toHaveTextContent("最长 30 秒");
+  await userEvent
+    .setup()
+    .click(within(instructions).getByRole("button", { name: "开始测试" }));
+  const testingDialog = await screen.findByRole("dialog", {
+    name: "正在测试麦克风",
+  });
+  expect(within(testingDialog).getByRole("meter")).toHaveAttribute(
+    "aria-valuenow",
+    "3",
+  );
+  await userEvent
+    .setup()
+    .click(within(testingDialog).getByRole("button", { name: "结束测试" }));
+  expect(
+    await screen.findByRole("dialog", { name: "麦克风测试完成" }),
+  ).toHaveTextContent("已检测到麦克风输入");
+  expect(startMicrophoneTest).toHaveBeenCalledWith({
+    microphoneDeviceId: "mic-default",
+  });
+  expect(stopMicrophoneTest).toHaveBeenCalledWith(running.testId);
 });
 
 it("reports an unavailable microphone in a dialog", async () => {
@@ -347,6 +393,13 @@ it("reports an unavailable microphone in a dialog", async () => {
   });
   await waitFor(() => expect(testMicrophone).toBeEnabled());
   await userEvent.setup().click(testMicrophone);
+
+  const instructions = await screen.findByRole("dialog", {
+    name: "测试麦克风",
+  });
+  await userEvent
+    .setup()
+    .click(within(instructions).getByRole("button", { name: "开始测试" }));
 
   const dialog = await screen.findByRole("dialog", {
     name: "麦克风测试失败",

@@ -189,9 +189,8 @@ export function useProcessingTasks(
     setOperationError(null);
     try {
       const result = await window.voice2text.importAudio();
-      if (result.state === "queued") {
+      if (result.state === "imported") {
         acceptSnapshot(await window.voice2text.getApplicationSnapshot());
-        await requestReconcile({ queueIfBusy: false });
       }
     } catch (error) {
       if (mountedRef.current)
@@ -200,7 +199,7 @@ export function useProcessingTasks(
       importPendingRef.current = false;
       if (mountedRef.current) setImportPending(false);
     }
-  }, [acceptSnapshot, requestReconcile]);
+  }, [acceptSnapshot]);
 
   const cancelProcessing = React.useCallback(
     async (jobId: number) => {
