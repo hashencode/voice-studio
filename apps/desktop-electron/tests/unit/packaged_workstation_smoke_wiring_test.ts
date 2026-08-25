@@ -9,7 +9,7 @@ const mainSource = readFileSync(
 );
 
 describe("packaged workstation progress evidence wiring", () => {
-  it("observes renderer progress from before import and binds it to the imported job", () => {
+  it("observes renderer progress after pure import is explicitly queued", () => {
     const prepare = mainSource.indexOf(
       "await preparePackagedRendererTelemetry()",
     );
@@ -21,7 +21,7 @@ describe("packaged workstation progress evidence wiring", () => {
     expect(imported).toBeGreaterThan(-1);
     expect(prepare).toBeLessThan(imported);
     expect(mainSource).toContain(
-      "observePackagedRendererProgress(imported.jobId, imported.audioId)",
+      "observePackagedRendererProgress(queued.value.id, imported.audioId)",
     );
     expect(mainSource).toContain('`[data-audio-id="${audioId}"]`');
     expect(mainSource).toContain('`[data-processing-job-id="${jobId}"]`');

@@ -11,6 +11,28 @@ const processing = {
 };
 
 describe("capture formal completion boundary", () => {
+  it("registers committed capture media without a processing identity", async () => {
+    const publish = vi.fn();
+    const handoff = {
+      finalize: vi.fn(async () => null),
+    };
+
+    await expect(
+      finalizeCommittedCaptureTranscript({
+        handoff: handoff as never,
+        sessionId: "session-media-only-123456",
+        displayName: "Media only",
+        processing: null,
+        publish,
+        reportFailure: vi.fn(),
+      }),
+    ).resolves.toBeNull();
+    expect(handoff.finalize).toHaveBeenCalledWith(
+      expect.objectContaining({ processing: null }),
+    );
+    expect(publish).not.toHaveBeenCalled();
+  });
+
   it("does not turn a committed capture into a failed stop when formal handoff fails", async () => {
     const reportFailure = vi.fn();
     const publish = vi.fn();

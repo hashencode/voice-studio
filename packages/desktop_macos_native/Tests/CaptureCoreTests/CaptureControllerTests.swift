@@ -4,6 +4,57 @@ import XCTest
 @testable import CaptureCore
 
 final class CaptureControllerTests: XCTestCase {
+  func testMicrophoneTestUsesInjectedEngineAndStopsWithoutCreatingCaptureFiles() throws {
+    let root = try temporaryRoot()
+    defer { try? FileManager.default.removeItem(at: root) }
+    let engine = TestMicrophoneEngine()
+    engine.frames = 1_024
+    engine.peak = 0.2
+    let controller = try CaptureController(
+      captureRootPath: root.path,
+      microphoneTestFactory: { _ in engine }
+    )
+
+    let started = try controller.startMicrophoneTest(
+      testId: "mic-test-manual-stop-123456",
+      microphoneDeviceId: "core-audio-device"
+    )
+    XCTAssertEqual(started.state, "running")
+    let running = try controller.microphoneTestSnapshot(
+      testId: started.testId
+    )
+    XCTAssertEqual(running.observedFrames, 1_024)
+    XCTAssertTrue(running.detectedInput)
+    let stopped = try controller.stopMicrophoneTest(testId: started.testId)
+    XCTAssertEqual(stopped.state, "stopped")
+    XCTAssertEqual(engine.stopCount, 1)
+    XCTAssertEqual(try FileManager.default.contentsOfDirectory(atPath: root.path), [])
+  }
+
+  func testMicrophoneTestRejectsConcurrentStartAndKeepsSilenceNonfatal() throws {
+    let root = try temporaryRoot()
+    defer { try? FileManager.default.removeItem(at: root) }
+    let engine = TestMicrophoneEngine()
+    let controller = try CaptureController(
+      captureRootPath: root.path,
+      microphoneTestFactory: { _ in engine }
+    )
+    let first = try controller.startMicrophoneTest(
+      testId: "mic-test-silent-test-123456",
+      microphoneDeviceId: nil
+    )
+    XCTAssertThrowsError(
+      try controller.startMicrophoneTest(
+        testId: "mic-test-second-test-123456",
+        microphoneDeviceId: nil
+      )
+    )
+    XCTAssertFalse(
+      try controller.microphoneTestSnapshot(testId: first.testId).detectedInput
+    )
+    XCTAssertNoThrow(try controller.stopMicrophoneTest(testId: first.testId))
+  }
+
   func testPreflightReportsEveryFrozenBranchWithoutBlockingOnOptionalCaptions() {
     let device = CaptureDevice(id: "microphone", name: "Mic", isDefault: true)
     let denied = evaluateCapturePreflight(
@@ -493,5 +544,17 @@ final class CaptureControllerTests: XCTestCase {
       "relativePath": relativePath, "bytes": bytes,
       "sha256": hash, "finalized": true,
     ]
+  }
+}
+
+private final class TestMicrophoneEngine: MicrophoneTestEngine {
+  var frames: UInt64 = 0
+  var peak: Double = 0
+  var stopCount = 0
+
+  func start() throws {}
+  func stop() { stopCount += 1 }
+  func snapshot() -> (observedFrames: UInt64, normalizedPeak: Double) {
+    (frames, peak)
   }
 }

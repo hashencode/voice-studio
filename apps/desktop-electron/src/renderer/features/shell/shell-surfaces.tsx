@@ -94,10 +94,12 @@ export function CapabilityUnavailableDialog({
   reason,
   open,
   onOpenChange,
+  onOpenLocalModels,
 }: {
   reason: string;
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  onOpenLocalModels: () => void;
 }) {
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -107,9 +109,12 @@ export function CapabilityUnavailableDialog({
           <DialogDescription>{reason}</DialogDescription>
         </DialogHeader>
         <p className="text-sm">
-          录音仍可使用，但实时字幕、导入转写和本地处理暂不可用。安装或生成本地资源包后，请重新启动应用。
+          录音和导入仍可使用。安装对应模型后，可再次主动发起转写或实时字幕。
         </p>
-        <div className="flex justify-end pt-2">
+        <div className="flex justify-end gap-2 pt-2">
+          <Button type="button" variant="outline" onClick={onOpenLocalModels}>
+            前往本地模型
+          </Button>
           <DialogClose asChild>
             <Button type="button">知道了</Button>
           </DialogClose>

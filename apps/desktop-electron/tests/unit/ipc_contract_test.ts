@@ -31,14 +31,12 @@ describe("shared IPC contracts", () => {
     expect(
       importAudioResponseSchema.parse({
         protocolVersion: 2,
-        state: "failed",
+        state: "imported",
         audioId: 3,
-        jobId: 7,
         mediaSha256: "a".repeat(64),
         inserted: false,
-        progressFraction: 0.4,
       }),
-    ).toEqual(expect.objectContaining({ state: "failed", inserted: false }));
+    ).toEqual(expect.objectContaining({ state: "imported", inserted: false }));
     expect(() =>
       importAudioResponseSchema.parse({
         protocolVersion: 2,

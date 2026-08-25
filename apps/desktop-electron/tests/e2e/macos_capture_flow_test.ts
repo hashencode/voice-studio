@@ -397,7 +397,28 @@ function nativeFixture() {
     snapshot: vi.fn(async () => snapshot()),
     recover: vi.fn(async (): Promise<CaptureSnapshot[]> => []),
     discard: vi.fn(async () => undefined),
+    startMicrophoneTest: vi.fn(async (testId: string) =>
+      microphoneTestSnapshot(testId, "running"),
+    ),
+    microphoneTestSnapshot: vi.fn(async (testId: string) =>
+      microphoneTestSnapshot(testId, "running"),
+    ),
+    stopMicrophoneTest: vi.fn(async (testId: string) =>
+      microphoneTestSnapshot(testId, "stopped"),
+    ),
   } satisfies CaptureNativePort;
+}
+
+function microphoneTestSnapshot(testId: string, state: "running" | "stopped") {
+  return {
+    testId,
+    state,
+    elapsedMs: 0,
+    remainingMs: 30_000,
+    normalizedPeak: 0,
+    observedFrames: 0,
+    detectedInput: false,
+  } as const;
 }
 
 function snapshot(overrides: Partial<CaptureSnapshot> = {}): CaptureSnapshot {

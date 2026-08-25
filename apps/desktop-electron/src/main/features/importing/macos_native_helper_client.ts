@@ -6,6 +6,7 @@ import { createInterface, type Interface } from "node:readline";
 import {
   capturePreflightSchema,
   captureSnapshotSchema,
+  microphoneTestSnapshotSchema,
   secureImportReceiptSchema,
   secureImportRequestSchema,
   type SecureImportReceipt,
@@ -14,6 +15,7 @@ import {
   type CaptureSnapshot,
   type CaptureStartCommand,
   type CaptureControlCommand,
+  type MicrophoneTestSnapshot,
 } from "../../../shared/contracts";
 
 export interface HelperCapabilities {
@@ -233,6 +235,35 @@ export class MacOSNativeHelperSession {
       commandId,
       request: { sessionId },
     });
+  }
+
+  async startMicrophoneTest(
+    testId: string,
+    microphoneDeviceId?: string,
+  ): Promise<MicrophoneTestSnapshot> {
+    const response = await this.invoke({
+      command: "microphone-test-start",
+      request: { testId, microphoneDeviceId },
+    });
+    return microphoneTestSnapshotSchema.parse(response.microphoneTest);
+  }
+
+  async microphoneTestSnapshot(
+    testId: string,
+  ): Promise<MicrophoneTestSnapshot> {
+    const response = await this.invoke({
+      command: "microphone-test-snapshot",
+      request: { testId },
+    });
+    return microphoneTestSnapshotSchema.parse(response.microphoneTest);
+  }
+
+  async stopMicrophoneTest(testId: string): Promise<MicrophoneTestSnapshot> {
+    const response = await this.invoke({
+      command: "microphone-test-stop",
+      request: { testId },
+    });
+    return microphoneTestSnapshotSchema.parse(response.microphoneTest);
   }
 
   async invokeRaw(command: Record<string, unknown>): Promise<HelperFrame> {

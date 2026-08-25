@@ -1,4 +1,5 @@
 import { createHash } from "node:crypto";
+import { realpathSync } from "node:fs";
 import { readFile, readdir, realpath } from "node:fs/promises";
 import path from "node:path";
 
@@ -32,13 +33,28 @@ export interface ProcessingPipelineIdentities {
   diarization: ProcessingResourceIdentity;
 }
 
+export interface ModelResourceAuthority {
+  readonly bundleId: "formal-transcription" | "live-caption";
+  readonly root: string;
+  readonly identity: string;
+  readonly artifacts: readonly { path: string; sha256: string }[];
+}
+
 const authorizedCommands = new WeakSet<object>();
 interface ArtifactExpectation {
+  root: string;
   path: string;
   sha256: string;
 }
 const commandArtifacts = new WeakMap<object, readonly ArtifactExpectation[]>();
-const commandInventories = new WeakMap<object, readonly string[]>();
+const commandInventories = new WeakMap<
+  object,
+  readonly {
+    root: string;
+    paths: readonly string[];
+    implicitManifest: boolean;
+  }[]
+>();
 const supportedResourceTarget = "darwin-arm64";
 
 const relativeArtifactPathSchema = z
@@ -83,6 +99,9 @@ const manifestSchema = z
               .array(relativeArtifactPathSchema)
               .max(64)
               .optional(),
+            modelBundleId: z
+              .enum(["formal-transcription", "live-caption"])
+              .optional(),
           })
           .strict(),
       )
@@ -100,6 +119,10 @@ export function resolveResourceRoot(input: ResourceRootInput): string {
 }
 
 export class ResourceCatalog {
+  private readonly models = new Map<
+    ModelResourceAuthority["bundleId"],
+    ModelResourceAuthority
+  >();
   private constructor(
     readonly root: string,
     readonly identity: string,
@@ -150,10 +173,12 @@ export class ResourceCatalog {
     if (!artifact) {
       throw new Error("resource operation executable is absent from manifest");
     }
-    const referencedArtifacts = [
+    const runtimeReferencedArtifacts = [
       operationEntry.executable,
-      ...(operationEntry.modelArtifacts ?? []),
       ...(operationEntry.runtimeArtifacts ?? []),
+      ...(operationEntry.modelBundleId
+        ? []
+        : (operationEntry.modelArtifacts ?? [])),
     ].map((artifactPath) => {
       const referenced = this.manifest.artifacts.find(
         (candidate) => candidate.path === artifactPath,
@@ -164,27 +189,80 @@ export class ResourceCatalog {
         );
       }
       return Object.freeze({
+        root: this.root,
         path: containedResourcePath(this.root, referenced.path),
         sha256: referenced.sha256,
       });
     });
+    const model = operationEntry.modelBundleId
+      ? this.models.get(operationEntry.modelBundleId)
+      : null;
+    if (operationEntry.modelBundleId && !model) {
+      throw new Error("resource operation model bundle is unavailable");
+    }
+    const modelReferencedArtifacts = model
+      ? (operationEntry.modelArtifacts ?? []).map((artifactPath) => {
+          const referenced = model.artifacts.find(
+            (candidate) => candidate.path === artifactPath,
+          );
+          if (!referenced) {
+            throw new Error(
+              `model operation artifact is absent from authority: ${artifactPath}`,
+            );
+          }
+          return Object.freeze({
+            root: model.root,
+            path: containedResourcePath(model.root, referenced.path),
+            sha256: referenced.sha256,
+          });
+        })
+      : [];
+    const operationIdentity = model
+      ? compositeIdentity(this.identity, model.identity)
+      : this.identity;
     const executable = containedResourcePath(this.root, artifact.path);
     const command = Object.freeze({
-      catalogIdentity: this.identity,
+      catalogIdentity: operationIdentity,
       resourceRoot: this.root,
       operation,
       executable,
       args: Object.freeze(
         operationEntry.arguments.map((argument) =>
-          substituteArgument(argument, variables, this.root),
+          substituteArgument(argument, variables, this.root, model?.root),
         ),
       ),
     });
     authorizedCommands.add(command);
-    commandArtifacts.set(command, Object.freeze(referencedArtifacts));
+    commandArtifacts.set(
+      command,
+      Object.freeze([
+        ...runtimeReferencedArtifacts,
+        ...modelReferencedArtifacts,
+      ]),
+    );
     commandInventories.set(
       command,
-      Object.freeze(this.manifest.artifacts.map((artifact) => artifact.path)),
+      Object.freeze([
+        {
+          root: this.root,
+          paths: Object.freeze(
+            this.manifest.artifacts.map((artifact) => artifact.path),
+          ),
+          implicitManifest: true,
+        },
+        ...(model
+          ? [
+              {
+                root: model.root,
+                paths: Object.freeze([
+                  "installed.json",
+                  ...model.artifacts.map((item) => item.path),
+                ]),
+                implicitManifest: false,
+              },
+            ]
+          : []),
+      ]),
     );
     return command;
   }
@@ -200,17 +278,54 @@ export class ResourceCatalog {
     ) {
       return null;
     }
+    const model = entry.modelBundleId
+      ? this.models.get(entry.modelBundleId)
+      : null;
+    if (entry.modelBundleId && !model) return null;
     return {
       protocolIdentity: entry.protocolIdentity,
-      modelSha256: entry.workerReportedModelArtifact
-        ? artifactHash(this.manifest, entry.workerReportedModelArtifact)
-        : combinedArtifactHash(this.manifest, entry.modelArtifacts),
+      modelSha256: model
+        ? entry.workerReportedModelArtifact
+          ? externalArtifactHash(
+              model.artifacts,
+              entry.workerReportedModelArtifact,
+            )
+          : combinedExternalArtifactHash(model.artifacts, entry.modelArtifacts)
+        : entry.workerReportedModelArtifact
+          ? artifactHash(this.manifest, entry.workerReportedModelArtifact)
+          : combinedArtifactHash(this.manifest, entry.modelArtifacts),
       runtimeSha256: combinedArtifactHash(
         this.manifest,
         entry.runtimeArtifacts,
       ),
-      resourceIdentity: this.identity,
+      resourceIdentity: model
+        ? compositeIdentity(this.identity, model.identity)
+        : this.identity,
     };
+  }
+
+  installModelAuthority(authority: ModelResourceAuthority): void {
+    const canonicalRoot = realpathSyncSafe(authority.root);
+    if (
+      new Set(authority.artifacts.map((item) => item.path)).size !==
+      authority.artifacts.length
+    ) {
+      throw new Error("model authority contains duplicate artifacts");
+    }
+    this.models.set(
+      authority.bundleId,
+      Object.freeze({
+        ...authority,
+        root: canonicalRoot,
+        artifacts: Object.freeze(
+          authority.artifacts.map((item) => Object.freeze({ ...item })),
+        ),
+      }),
+    );
+  }
+
+  removeModelAuthority(bundleId: ModelResourceAuthority["bundleId"]): void {
+    this.models.delete(bundleId);
   }
 
   processingPipelineIdentities(): ProcessingPipelineIdentities | null {
@@ -245,8 +360,12 @@ export function requireProcessingPipelineIdentities(
 async function assertExactInventory(
   root: string,
   artifactPaths: readonly string[],
+  implicitManifest = true,
 ): Promise<void> {
-  const expected = new Set(["manifest.json", ...artifactPaths]);
+  const expected = new Set([
+    ...(implicitManifest ? ["manifest.json"] : []),
+    ...artifactPaths,
+  ]);
   const visit = async (directory: string): Promise<void> => {
     for (const entry of await readdir(directory, { withFileTypes: true })) {
       const candidate = path.join(directory, entry.name);
@@ -300,14 +419,21 @@ export async function assertAuthorizedResourceCommand(
   if (!expectedArtifacts) {
     throw new Error("resource command verification metadata is unavailable");
   }
-  const canonicalRoot = await realpath(command.resourceRoot);
   const expectedInventory = commandInventories.get(command);
   if (!expectedInventory) {
     throw new Error("resource command inventory metadata is unavailable");
   }
-  await assertExactInventory(canonicalRoot, expectedInventory);
+  for (const inventory of expectedInventory) {
+    const canonicalRoot = await realpath(inventory.root);
+    await assertExactInventory(
+      canonicalRoot,
+      inventory.paths,
+      inventory.implicitManifest,
+    );
+  }
   for (const artifact of expectedArtifacts) {
     const canonicalArtifact = await realpath(artifact.path);
+    const canonicalRoot = await realpath(artifact.root);
     if (!isInside(canonicalRoot, canonicalArtifact)) {
       throw new Error("resource command artifact escapes the catalog root");
     }
@@ -338,6 +464,7 @@ function substituteArgument(
   argument: string,
   variables: { runtimeRoot?: string; attemptOutput?: string },
   resourceRoot: string,
+  modelRoot?: string,
 ): string {
   const option = /^(--[a-z][a-z0-9-]{0,127})=(.+)$/i.exec(argument);
   if (option) {
@@ -352,6 +479,7 @@ function substituteArgument(
       option[2]!,
       variables,
       resourceRoot,
+      modelRoot,
     )}`;
   }
   if (argument === "{runtimeRoot}") {
@@ -364,6 +492,17 @@ function substituteArgument(
     return variables.attemptOutput;
   }
   if (argument === "{resourceRoot}") return resourceRoot;
+  if (argument === "{modelRoot}") {
+    if (!modelRoot) throw new Error("resource operation requires model root");
+    return modelRoot;
+  }
+  if (argument.startsWith("{modelRoot}/")) {
+    if (!modelRoot) throw new Error("resource operation requires model root");
+    return containedResourcePath(
+      modelRoot,
+      argument.slice("{modelRoot}/".length),
+    );
+  }
   if (argument.startsWith("{resourceRoot}/")) {
     return containedResourcePath(
       resourceRoot,
@@ -374,6 +513,54 @@ function substituteArgument(
     throw new Error("resource operation contains an unknown argument template");
   }
   return argument;
+}
+
+function combinedExternalArtifactHash(
+  artifacts: readonly { path: string; sha256: string }[],
+  paths: readonly string[],
+): string {
+  const hash = createHash("sha256");
+  for (const artifactPath of [...paths].sort()) {
+    const artifact = artifacts.find((item) => item.path === artifactPath);
+    if (!artifact)
+      throw new Error(`model identity artifact is absent: ${artifactPath}`);
+    hash
+      .update(artifact.path)
+      .update("\0")
+      .update(artifact.sha256)
+      .update("\0");
+  }
+  return hash.digest("hex");
+}
+
+function externalArtifactHash(
+  artifacts: readonly { path: string; sha256: string }[],
+  artifactPath: string,
+): string {
+  const artifact = artifacts.find(
+    (candidate) => candidate.path === artifactPath,
+  );
+  if (!artifact) throw new Error("model identity artifact is unavailable");
+  return artifact.sha256;
+}
+
+function compositeIdentity(
+  runtimeIdentity: string,
+  modelIdentity: string,
+): string {
+  return createHash("sha256")
+    .update("voice2text-resource-authority/v2\0")
+    .update(runtimeIdentity)
+    .update("\0")
+    .update(modelIdentity)
+    .digest("hex");
+}
+
+function realpathSyncSafe(candidate: string): string {
+  const resolved = path.resolve(candidate);
+  // Model authorities are installed only after LocalModelService verification;
+  // synchronous canonicalization here prevents alias substitution at attachment.
+  return realpathSync(resolved);
 }
 
 function assertUniqueManifestEntries(manifest: ResourceManifest): void {

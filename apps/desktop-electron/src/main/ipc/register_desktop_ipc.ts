@@ -1,7 +1,12 @@
 import path from "node:path";
 import { pathToFileURL } from "node:url";
 
-import type { BrowserWindow, IpcMain, IpcMainInvokeEvent } from "electron";
+import type {
+  BrowserWindow,
+  Event as ElectronEvent,
+  IpcMain,
+  IpcMainInvokeEvent,
+} from "electron";
 import { ipcMain } from "electron";
 
 import { ipcChannels } from "../../shared/contracts";
@@ -15,6 +20,9 @@ import {
 } from "./desktop_ipc";
 
 export const desktopIpcInvokeChannels = [
+  ipcChannels.localModelsSnapshotGet,
+  ipcChannels.localModelsIntent,
+  ipcChannels.localModelsChangeRoot,
   ipcChannels.companionSnapshotGet,
   ipcChannels.companionOptInSet,
   ipcChannels.companionPairingInviteCreate,
@@ -36,11 +44,15 @@ export const desktopIpcInvokeChannels = [
   ipcChannels.workerHealth,
   ipcChannels.cancelProcessing,
   ipcChannels.retryProcessing,
+  ipcChannels.startTranscription,
   ipcChannels.processingTasks,
   ipcChannels.importAudio,
   ipcChannels.capturePreflight,
   ipcChannels.captureStart,
   ipcChannels.captureControl,
+  ipcChannels.microphoneTestStart,
+  ipcChannels.microphoneTestSnapshot,
+  ipcChannels.microphoneTestStop,
   ipcChannels.captureRecoveryList,
   ipcChannels.captureRecoveryAction,
   ipcChannels.floatingCaptureSnapshotGet,
@@ -70,7 +82,8 @@ type DesktopIpcEventChannel =
   | typeof ipcChannels.captionSnapshotEvent
   | typeof ipcChannels.audioAiSnapshotEvent
   | typeof ipcChannels.companionSnapshotEvent
-  | typeof ipcChannels.floatingCaptureSnapshotEvent;
+  | typeof ipcChannels.floatingCaptureSnapshotEvent
+  | typeof ipcChannels.localModelsSnapshotEvent;
 
 export type DesktopIpcWindowCapability = "main" | "floating-capture";
 
@@ -117,6 +130,7 @@ const mainEventChannels = new Set<DesktopIpcEventChannel>([
   ipcChannels.captionSnapshotEvent,
   ipcChannels.audioAiSnapshotEvent,
   ipcChannels.companionSnapshotEvent,
+  ipcChannels.localModelsSnapshotEvent,
 ]);
 const floatingEventChannels = new Set<DesktopIpcEventChannel>([
   ipcChannels.floatingCaptureSnapshotEvent,
@@ -184,6 +198,9 @@ export function createDesktopIpcRegistry(
     subscribe(services.onFloatingCaptureSnapshot, (snapshot) => {
       fanOut(ipcChannels.floatingCaptureSnapshotEvent, snapshot);
     }),
+    subscribe(services.onLocalModelSnapshot, (snapshot) => {
+      fanOut(ipcChannels.localModelsSnapshotEvent, snapshot);
+    }),
   ];
 
   function fanOut(channel: DesktopIpcEventChannel, payload: unknown): void {
@@ -210,12 +227,26 @@ export function createDesktopIpcRegistry(
     const frameId = window.webContents.mainFrame.routingId;
     const capability = capabilityProfile(options.capability);
     let unregistered = false;
+    const stopOwnedMicrophone = () => {
+      void services.stopMicrophoneTestForOwner?.(senderId);
+    };
+    const handleMainFrameNavigation = (
+      _event: ElectronEvent,
+      _url: string,
+      _isInPlace: boolean,
+      isMainFrame: boolean,
+    ) => {
+      if (isMainFrame) stopOwnedMicrophone();
+    };
     const unregister = () => {
       if (unregistered) return;
       unregistered = true;
       if (windows.get(senderId) === registered) windows.delete(senderId);
+      stopOwnedMicrophone();
       window.off("closed", unregister);
       window.webContents.off("destroyed", unregister);
+      window.webContents.off("render-process-gone", unregister);
+      window.webContents.off("did-start-navigation", handleMainFrameNavigation);
     };
     const registered: RegisteredWindow = {
       window,
@@ -233,6 +264,8 @@ export function createDesktopIpcRegistry(
     windows.set(senderId, registered);
     window.on("closed", unregister);
     window.webContents.on("destroyed", unregister);
+    window.webContents.on("render-process-gone", unregister);
+    window.webContents.on("did-start-navigation", handleMainFrameNavigation);
     return unregister;
   }
 

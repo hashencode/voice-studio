@@ -883,6 +883,63 @@ export class TranscriptRepository {
     return result;
   }
 
+  rebindFormalProcessing(
+    sessionId: string,
+    expectedAttempt: number,
+    identity: {
+      resourceIdentity: string;
+      protocolIdentity: string;
+      modelSha256: string;
+      runtimeSha256: string;
+    },
+    nowMs: number,
+  ): void {
+    if (
+      !SHA256.test(identity.resourceIdentity) ||
+      identity.protocolIdentity !== "desktop-sherpa-worker/v1" ||
+      !SHA256.test(identity.modelSha256) ||
+      !SHA256.test(identity.runtimeSha256)
+    ) {
+      throw new Error("formal retry processing identity is invalid");
+    }
+    const preparation = this.database
+      .prepare(
+        `UPDATE caption_formal_preparations SET
+          resource_identity = ?, protocol_identity = ?, model_sha256 = ?,
+          runtime_sha256 = ?, updated_at_ms = ?
+         WHERE session_id = ? AND current_attempt = ? AND state = 'failed'`,
+      )
+      .run(
+        identity.resourceIdentity,
+        identity.protocolIdentity,
+        identity.modelSha256,
+        identity.runtimeSha256,
+        nowMs,
+        sessionId,
+        expectedAttempt,
+      ).changes;
+    const handoff = this.database
+      .prepare(
+        `UPDATE caption_formal_handoffs SET
+          resource_identity = ?, protocol_identity = ?, model_sha256 = ?,
+          runtime_sha256 = ?, updated_at_ms = ?
+         WHERE session_id = ? AND current_attempt = ?
+           AND state IN ('failed', 'interrupted')`,
+      )
+      .run(
+        identity.resourceIdentity,
+        identity.protocolIdentity,
+        identity.modelSha256,
+        identity.runtimeSha256,
+        nowMs,
+        sessionId,
+        expectedAttempt,
+      ).changes;
+    if (Number(preparation) + Number(handoff) === 0) {
+      throw new Error("formal retry attempt fence rejected");
+    }
+  }
+
   formalRetryReceipt(command: {
     sessionId: string;
     expectedAttempt: number;

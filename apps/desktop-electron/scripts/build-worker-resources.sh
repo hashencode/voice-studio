@@ -82,6 +82,11 @@ if [[ "${CODE_SIGNING_ALLOWED:-NO}" == "YES" ]] &&
 fi
 bun scripts/write-worker-manifest.ts "$staging_root"
 
+# Models are development materialization inputs only. The signed application
+# publishes immutable Worker Runtime; user-managed bundles live in the managed
+# model store and are never copied into app resources.
+rm -rf -- "$staging_root/models"
+
 bash "$electron_root/scripts/publish-worker-resources.sh" \
   "$staging_root" \
   "$worker_root"

@@ -3,6 +3,7 @@ import type {
   CapturePreflight,
   CaptureSnapshot,
   CaptureStartCommand,
+  MicrophoneTestSnapshot,
 } from "../../../shared/contracts";
 
 export interface CaptureNativePort {
@@ -20,4 +21,10 @@ export interface CaptureNativePort {
   snapshot(sessionId: string): Promise<CaptureSnapshot>;
   recover(): Promise<CaptureSnapshot[]>;
   discard(sessionId: string, idempotencyKey: string): Promise<void>;
+  startMicrophoneTest(
+    testId: string,
+    microphoneDeviceId?: string,
+  ): Promise<MicrophoneTestSnapshot>;
+  microphoneTestSnapshot(testId: string): Promise<MicrophoneTestSnapshot>;
+  stopMicrophoneTest(testId: string): Promise<MicrophoneTestSnapshot>;
 }

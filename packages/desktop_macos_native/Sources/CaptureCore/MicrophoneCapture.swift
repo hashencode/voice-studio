@@ -19,6 +19,11 @@ struct CoreAudioInputDevice {
 }
 
 final class MicrophoneCapture {
+  struct MeterSnapshot {
+    let observedFrames: UInt64
+    let normalizedPeak: Double
+  }
+
   private let engine = AVAudioEngine()
   private(set) var observedFrames: UInt64 = 0
   private(set) var deliveredFrames: UInt64 = 0
@@ -31,6 +36,7 @@ final class MicrophoneCapture {
   private var installedTap = false
   private var configurationObserver: NSObjectProtocol?
   private let selectedDeviceUniqueID: String?
+  private let meterLock = NSLock()
 
   init(
     selectedDeviceUniqueID: String? = nil,
@@ -106,8 +112,10 @@ final class MicrophoneCapture {
         format: format
       ) { [weak self] buffer, _ in
         guard let self else { return }
+        self.meterLock.lock()
         self.observedFrames &+= UInt64(buffer.frameLength)
         self.normalizedPeak = Self.peak(buffer)
+        self.meterLock.unlock()
         guard let handler = self.bufferHandler,
           let copy = CaptureChunkJournal.clone(buffer)
         else {
@@ -141,6 +149,15 @@ final class MicrophoneCapture {
     } catch {
       throw DesktopMicrophoneCaptureError.engineStart(error)
     }
+  }
+
+  func meterSnapshot() -> MeterSnapshot {
+    meterLock.lock()
+    defer { meterLock.unlock() }
+    return MeterSnapshot(
+      observedFrames: observedFrames,
+      normalizedPeak: normalizedPeak
+    )
   }
 
   private func selectInputDeviceIfNeeded(_ input: AVAudioInputNode) throws {

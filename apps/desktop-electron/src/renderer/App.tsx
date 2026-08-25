@@ -1,5 +1,5 @@
 import * as React from "react";
-import { BrainCircuit, Settings2, ShieldCheck } from "lucide-react";
+import { BrainCircuit, HardDrive, Settings2, ShieldCheck } from "lucide-react";
 
 import { AppSidebar } from "@/components/app-sidebar";
 import {
@@ -54,10 +54,12 @@ import {
   useApplicationShell,
 } from "@/features/shell/use-application-shell";
 import { AiSettingsFeature } from "@/features/settings/ai-settings-feature";
+import { LocalModelsFeature } from "@/features/settings/local-models-feature";
 import type { ApplicationSnapshot } from "@shared/contracts";
 
 const SETTINGS_SECTIONS = [
   { value: "general", label: "通用", icon: Settings2 },
+  { value: "local-models", label: "本地模型", icon: HardDrive },
   { value: "intelligence", label: "音频智能", icon: BrainCircuit },
   { value: "privacy", label: "隐私与安全", icon: ShieldCheck },
 ] as const;
@@ -222,10 +224,13 @@ export default function App() {
       setRecordRequest((value) => value + 1);
     },
     onImport: importAudio,
-    onProcessingUnavailable: () => {
-      if (snapshot?.capability.processing === "unavailable") {
-        setProcessingUnavailableReason(snapshot.capability.reason);
-      }
+    onProcessingUnavailable: (reason) => {
+      setProcessingUnavailableReason(
+        reason ??
+          (snapshot?.capability.processing === "unavailable"
+            ? snapshot.capability.reason
+            : "本地转写模型暂不可用"),
+      );
     },
     onCancel: cancelProcessing,
     onRetry: retryProcessing,
@@ -386,6 +391,10 @@ export default function App() {
             autoOpenRecoveries={current === "audio"}
             onPreflightResolved={audio.acceptCapturePreflight}
             onDetailOpenChange={changeCaptureDetail}
+            onOpenLocalModels={() => {
+              setSettingsSection("local-models");
+              navigatePrimary("settings");
+            }}
           />
           <ActivityErrorDialog
             item={activityError}
@@ -400,6 +409,11 @@ export default function App() {
             open={processingUnavailableReason !== null}
             onOpenChange={(open) => {
               if (!open) setProcessingUnavailableReason(null);
+            }}
+            onOpenLocalModels={() => {
+              setProcessingUnavailableReason(null);
+              setSettingsSection("local-models");
+              navigatePrimary("settings");
             }}
           />
         </div>
@@ -582,6 +596,7 @@ function SettingsContent({ section }: { section: SettingsSection }) {
   if (section === "general") {
     return <FloatingCapturePreferenceSetting className="border-y py-4" />;
   }
+  if (section === "local-models") return <LocalModelsFeature />;
   return (
     <AiSettingsFeature view={section === "privacy" ? "privacy" : "provider"} />
   );

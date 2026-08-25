@@ -31,6 +31,15 @@ struct CaptureControlRequest: Codable {
   let reason: String?
 }
 
+struct MicrophoneTestStartRequest: Codable {
+  let testId: String
+  let microphoneDeviceId: String?
+}
+
+struct MicrophoneTestControlRequest: Codable {
+  let testId: String
+}
+
 struct SecretProviderRequest: Codable {
   let providerId: String
 }
@@ -232,6 +241,7 @@ let captureCommands: Set<String> = [
   "capture-preflight", "capture-start", "capture-pause", "capture-resume",
   "capture-stop", "capture-snapshot", "capture-recover", "capture-discard",
   "capture-system-sleep", "capture-system-wake",
+  "microphone-test-start", "microphone-test-snapshot", "microphone-test-stop",
 ]
 let securityCommands: Set<String> = [
   "secret-read", "secret-replace", "secret-delete", "filevault-status",
@@ -379,6 +389,21 @@ while let commandData = readLine() {
       let request = try decodeRequest(CaptureControlRequest.self, from: object)
       try captureController!.discard(sessionId: request.sessionId)
       emitSession(["type": "result", "command": command])
+    case "microphone-test-start":
+      let request = try decodeRequest(MicrophoneTestStartRequest.self, from: object)
+      let value = try captureController!.startMicrophoneTest(
+        testId: request.testId,
+        microphoneDeviceId: request.microphoneDeviceId
+      )
+      emitSession(["type": "result", "command": command, "microphoneTest": try encodedObject(value)])
+    case "microphone-test-snapshot":
+      let request = try decodeRequest(MicrophoneTestControlRequest.self, from: object)
+      let value = try captureController!.microphoneTestSnapshot(testId: request.testId)
+      emitSession(["type": "result", "command": command, "microphoneTest": try encodedObject(value)])
+    case "microphone-test-stop":
+      let request = try decodeRequest(MicrophoneTestControlRequest.self, from: object)
+      let value = try captureController!.stopMicrophoneTest(testId: request.testId)
+      emitSession(["type": "result", "command": command, "microphoneTest": try encodedObject(value)])
     case "secret-read":
       let request = try decodeSecurityRequest(SecretProviderRequest.self, from: object)
       let value = try providerSecretStore.read(providerId: request.providerId)

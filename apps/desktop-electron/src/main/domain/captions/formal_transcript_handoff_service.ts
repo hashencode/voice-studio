@@ -30,6 +30,7 @@ export class FormalTranscriptHandoffService {
       profile: AudioProfilePaths;
       flushDraft(sessionId: string): Promise<unknown>;
       prepareMedia(sessionId: string): Promise<FormalCaptureMedia>;
+      commitMedia?(command: FormalCaptureMedia & { displayName: string }): void;
       scheduleProcessing(jobId: number): void;
       now?: () => number;
     },
@@ -39,13 +40,33 @@ export class FormalTranscriptHandoffService {
     sessionId: string;
     displayName: string;
     processing: FormalProcessingIdentity;
-  }): Promise<CaptionSnapshot> {
+  }): Promise<CaptionSnapshot>;
+  async finalize(command: {
+    sessionId: string;
+    displayName: string;
+    processing: null;
+  }): Promise<CaptionSnapshot | null>;
+  async finalize(command: {
+    sessionId: string;
+    displayName: string;
+    processing: FormalProcessingIdentity | null;
+  }): Promise<CaptionSnapshot | null> {
     // A caption flush failure degrades only the disposable draft. The durable
     // capture remains authoritative and must still receive one formal attempt.
     await this.options.flushDraft(command.sessionId).catch(() => undefined);
     const existing = this.options.repository.getSnapshot(command.sessionId);
-    if (existing && existing.formal.attempt > 0) return existing;
+    if (command.processing && existing && existing.formal.attempt > 0)
+      return existing;
     const nowMs = this.now();
+    if (!command.processing) {
+      const media = await this.options.prepareMedia(command.sessionId);
+      await validateFormalMediaAuthority(this.options.profile, media);
+      if (!this.options.commitMedia) {
+        throw new Error("capture media registration is unavailable");
+      }
+      this.options.commitMedia({ ...media, displayName: command.displayName });
+      return existing;
+    }
     this.options.repository.beginFormalPreparation({
       sessionId: command.sessionId,
       displayName: command.displayName,
@@ -105,9 +126,20 @@ export class FormalTranscriptHandoffService {
     return snapshots;
   }
 
-  async retry(command: CaptionFormalRetryRequest): Promise<CaptionSnapshot> {
+  async retry(
+    command: CaptionFormalRetryRequest,
+    processing?: FormalProcessingIdentity,
+  ): Promise<CaptionSnapshot> {
     const cached = this.options.repository.formalRetryReceipt(command);
     if (cached) return cached;
+    if (processing) {
+      this.options.repository.rebindFormalProcessing(
+        command.sessionId,
+        command.expectedAttempt,
+        processing,
+        this.now(),
+      );
+    }
     const persistedMedia = this.options.repository.formalHandoffMedia(
       command.sessionId,
     );

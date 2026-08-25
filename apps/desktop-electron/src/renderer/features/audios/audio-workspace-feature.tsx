@@ -1249,6 +1249,7 @@ function speakerLabel(segment: AudioSegment): string {
 
 function processingLabel(state: AudioSummary["processingState"]): string {
   return {
+    "not-started": "尚未转写",
     queued: "等待处理",
     running: "处理中",
     canceling: "正在取消",

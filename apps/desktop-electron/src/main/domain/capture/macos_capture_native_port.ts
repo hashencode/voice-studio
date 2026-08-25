@@ -55,4 +55,16 @@ export class MacOSCaptureNativePort implements CaptureNativePort {
   discard(sessionId: string, idempotencyKey: string) {
     return this.session.captureDiscard(sessionId, idempotencyKey);
   }
+
+  startMicrophoneTest(testId: string, microphoneDeviceId?: string) {
+    return this.session.startMicrophoneTest(testId, microphoneDeviceId);
+  }
+
+  microphoneTestSnapshot(testId: string) {
+    return this.session.microphoneTestSnapshot(testId);
+  }
+
+  stopMicrophoneTest(testId: string) {
+    return this.session.stopMicrophoneTest(testId);
+  }
 }

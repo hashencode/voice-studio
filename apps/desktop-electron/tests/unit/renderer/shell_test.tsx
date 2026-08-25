@@ -734,7 +734,7 @@ describe("application shell", () => {
     expect(screen.getByRole("button", { name: "重新载入" })).toBeEnabled();
   });
 
-  it("defers the processing warning until import and keeps recording available", async () => {
+  it("keeps import and recording available without local processing", async () => {
     const api = installApi(
       {
         ...readySnapshot,
@@ -782,11 +782,10 @@ describe("application shell", () => {
     await userEvent
       .setup()
       .click(screen.getByRole("button", { name: "导入音频" }));
-    const dialog = await screen.findByRole("dialog", {
-      name: "本地处理不可用",
-    });
-    expect(dialog).toHaveTextContent("当前设备缺少本地处理运行时");
-    expect(api.importAudio).not.toHaveBeenCalled();
+    expect(
+      screen.queryByRole("dialog", { name: "本地处理不可用" }),
+    ).not.toBeInTheDocument();
+    expect(api.importAudio).toHaveBeenCalledOnce();
   });
 
   it("keeps reconciliation out of global activity and does not auto-retry", async () => {

@@ -38,6 +38,7 @@ export function CaptureWorkspace({
   autoOpenRecoveries = false,
   onPreflightResolved,
   onDetailOpenChange,
+  onOpenLocalModels,
 }: {
   capture: ApplicationSnapshot["capture"];
   /** @deprecated Capture state is authoritative in Main and arrives via snapshots. */
@@ -49,6 +50,7 @@ export function CaptureWorkspace({
   autoOpenRecoveries?: boolean;
   onPreflightResolved?: (preflight: CapturePreflight) => void;
   onDetailOpenChange?: (open: boolean) => void;
+  onOpenLocalModels?: () => void;
 }) {
   const [preflight, setPreflight] = React.useState<CapturePreflight | null>(
     null,
@@ -398,6 +400,9 @@ export function CaptureWorkspace({
           onCheck={checkPreflight}
           onStart={start}
           onTitleChange={setTitle}
+          captionAvailable={preflight?.captionModelAvailable ?? true}
+          captionEnabled={captionEnabled}
+          onOpenLocalModels={onOpenLocalModels}
         />
       ) : null}
     </section>
@@ -474,6 +479,9 @@ function CaptureSetup({
   onCheck,
   onStart,
   onTitleChange,
+  captionAvailable,
+  captionEnabled,
+  onOpenLocalModels,
 }: {
   setupOpen: boolean;
   preflight: CapturePreflight | null;
@@ -483,6 +491,9 @@ function CaptureSetup({
   onCheck: () => void;
   onStart: () => void;
   onTitleChange: (value: string) => void;
+  captionAvailable: boolean;
+  captionEnabled: boolean;
+  onOpenLocalModels?: () => void;
 }) {
   if (!setupOpen) {
     return (
@@ -519,6 +530,18 @@ function CaptureSetup({
           disabled={busy}
           onChange={(event) => onTitleChange(event.currentTarget.value)}
         />
+      </div>
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <p role="status" className="text-sm text-muted-foreground">
+          {captionEnabled && captionAvailable
+            ? "实时字幕已启用。"
+            : "实时字幕模型未安装，本次仍可正常录音。"}
+        </p>
+        {!captionAvailable && onOpenLocalModels ? (
+          <Button type="button" variant="outline" onClick={onOpenLocalModels}>
+            前往本地模型
+          </Button>
+        ) : null}
       </div>
       <div className="flex flex-wrap justify-end gap-2">
         {readyToStart ? (

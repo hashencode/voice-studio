@@ -85,6 +85,37 @@ public struct CaptureSnapshot: Codable, Sendable {
   }
 }
 
+public struct MicrophoneTestSnapshot: Codable, Sendable {
+  public let testId: String
+  public let state: String
+  public let elapsedMs: Int
+  public let remainingMs: Int
+  public let normalizedPeak: Double
+  public let observedFrames: UInt64
+  public let detectedInput: Bool
+}
+
+public protocol MicrophoneTestEngine: AnyObject {
+  func start() throws
+  func stop()
+  func snapshot() -> (observedFrames: UInt64, normalizedPeak: Double)
+}
+
+private final class NativeMicrophoneTestEngine: MicrophoneTestEngine {
+  private let capture: MicrophoneCapture
+
+  init(deviceId: String?) {
+    capture = MicrophoneCapture(selectedDeviceUniqueID: deviceId)
+  }
+
+  func start() throws { try capture.start() }
+  func stop() { capture.teardown() }
+  func snapshot() -> (observedFrames: UInt64, normalizedPeak: Double) {
+    let meter = capture.meterSnapshot()
+    return (meter.observedFrames, meter.normalizedPeak)
+  }
+}
+
 /// Owns the native authority tracks for one helper process. The helper remains
 /// the sole caller, so commands are serialized by its line protocol while
 /// audio callbacks serialize their durable writes inside CaptureChunkJournal.
@@ -108,8 +139,25 @@ public final class CaptureController {
   private var interruptionReason: String?
   private var recordingSha256: String?
   private var journalSha256: String?
+  private let microphoneTestFactory: (String?) -> MicrophoneTestEngine
+  private var microphoneTest: MicrophoneTestEngine?
+  private var microphoneTestID: String?
+  private var microphoneTestStartedAt = DispatchTime.now()
+  private var microphoneTestPeak: Double = 0
+  private var microphoneTestTimer: DispatchSourceTimer?
+  private var lastMicrophoneTestSnapshot: MicrophoneTestSnapshot?
 
-  public init(captureRootPath: String) throws {
+  public convenience init(captureRootPath: String) throws {
+    try self.init(
+      captureRootPath: captureRootPath,
+      microphoneTestFactory: { NativeMicrophoneTestEngine(deviceId: $0) }
+    )
+  }
+
+  init(
+    captureRootPath: String,
+    microphoneTestFactory: @escaping (String?) -> MicrophoneTestEngine
+  ) throws {
     let requestedRoot = URL(filePath: captureRootPath, directoryHint: .isDirectory)
       .standardizedFileURL
     guard requestedRoot.path.hasPrefix("/"), requestedRoot.path.utf8.count <= 2048 else {
@@ -138,6 +186,7 @@ public final class CaptureController {
     }
     captureRoot = root
     rootIdentity = (UInt64(info.st_dev), UInt64(info.st_ino))
+    self.microphoneTestFactory = microphoneTestFactory
   }
 
   deinit { teardown() }
@@ -215,6 +264,7 @@ public final class CaptureController {
     minimumFreeBytes: Int64,
     microphoneDeviceId: String?
   ) throws -> CaptureSnapshot {
+    stopMicrophoneTestLocked()
     try validateRootIdentity()
     guard Self.validSessionID(sessionId), state == "idle" || state == "completed" || state == "failed" else {
       throw CaptureFailure("CAPTURE_ILLEGAL_TRANSITION", "capture cannot start in the current state")
@@ -325,6 +375,105 @@ public final class CaptureController {
       if let failure = error as? CaptureFailure { throw failure }
       throw CaptureFailure("CAPTURE_NATIVE_START_FAILED", "native authority tracks could not start")
     }
+  }
+
+  public func startMicrophoneTest(
+    testId: String,
+    microphoneDeviceId: String?
+  ) throws -> MicrophoneTestSnapshot {
+    try stateQueue.sync {
+      guard Self.validMicrophoneTestID(testId) else {
+        throw CaptureFailure("MICROPHONE_TEST_ARGUMENTS_INVALID", "microphone test id is invalid")
+      }
+      guard state == "idle" || state == "completed" || state == "failed" else {
+        throw CaptureFailure("MICROPHONE_TEST_BUSY", "formal capture owns the microphone")
+      }
+      guard microphoneTest == nil else {
+        throw CaptureFailure("MICROPHONE_TEST_BUSY", "a microphone test is already active")
+      }
+      let engine = microphoneTestFactory(microphoneDeviceId)
+      do {
+        try engine.start()
+      } catch DesktopMicrophoneCaptureError.permissionDenied {
+        throw CaptureFailure("MICROPHONE_PERMISSION_DENIED", "microphone permission was denied")
+      } catch DesktopMicrophoneCaptureError.selectedInputUnavailable {
+        throw CaptureFailure("MICROPHONE_DEVICE_MISSING", "selected microphone is unavailable")
+      } catch DesktopMicrophoneCaptureError.invalidFormat {
+        throw CaptureFailure("MICROPHONE_FORMAT_INVALID", "microphone format is invalid")
+      } catch {
+        throw CaptureFailure("MICROPHONE_OPEN_FAILED", "microphone could not be opened")
+      }
+      microphoneTest = engine
+      microphoneTestID = testId
+      microphoneTestStartedAt = .now()
+      microphoneTestPeak = 0
+      lastMicrophoneTestSnapshot = nil
+      let timer = DispatchSource.makeTimerSource(queue: stateQueue)
+      timer.schedule(deadline: .now() + .seconds(30))
+      timer.setEventHandler { [weak self] in
+        guard let self else { return }
+        self.lastMicrophoneTestSnapshot = self.microphoneTestSnapshotLocked(state: "timed-out")
+        self.stopMicrophoneTestLocked()
+      }
+      microphoneTestTimer = timer
+      timer.resume()
+      return microphoneTestSnapshotLocked(state: "running")
+    }
+  }
+
+  public func microphoneTestSnapshot(testId: String) throws -> MicrophoneTestSnapshot {
+    try stateQueue.sync {
+      if let terminal = lastMicrophoneTestSnapshot, terminal.testId == testId {
+        return terminal
+      }
+      guard microphoneTestID == testId, microphoneTest != nil else {
+        throw CaptureFailure("MICROPHONE_TEST_NOT_ACTIVE", "microphone test is not active")
+      }
+      return microphoneTestSnapshotLocked(state: "running")
+    }
+  }
+
+  public func stopMicrophoneTest(testId: String) throws -> MicrophoneTestSnapshot {
+    try stateQueue.sync {
+      if let terminal = lastMicrophoneTestSnapshot, terminal.testId == testId {
+        return terminal
+      }
+      guard microphoneTestID == testId, microphoneTest != nil else {
+        throw CaptureFailure("MICROPHONE_TEST_NOT_ACTIVE", "microphone test is not active")
+      }
+      let snapshot = microphoneTestSnapshotLocked(state: "stopped")
+      lastMicrophoneTestSnapshot = snapshot
+      stopMicrophoneTestLocked()
+      return snapshot
+    }
+  }
+
+  private func microphoneTestSnapshotLocked(state: String) -> MicrophoneTestSnapshot {
+    let elapsed = min(
+      30_000,
+      Int(DispatchTime.now().uptimeNanoseconds - microphoneTestStartedAt.uptimeNanoseconds) / 1_000_000
+    )
+    let meter = microphoneTest?.snapshot() ?? (
+      observedFrames: UInt64(0), normalizedPeak: 0.0
+    )
+    microphoneTestPeak = max(microphoneTestPeak, meter.normalizedPeak)
+    return MicrophoneTestSnapshot(
+      testId: microphoneTestID ?? "mic-test-unavailable",
+      state: state,
+      elapsedMs: elapsed,
+      remainingMs: max(0, 30_000 - elapsed),
+      normalizedPeak: min(1, max(0, meter.normalizedPeak)),
+      observedFrames: meter.observedFrames,
+      detectedInput: microphoneTestPeak >= 0.01
+    )
+  }
+
+  private func stopMicrophoneTestLocked() {
+    microphoneTestTimer?.cancel()
+    microphoneTestTimer = nil
+    microphoneTest?.stop()
+    microphoneTest = nil
+    microphoneTestID = nil
   }
 
   public func pause(sessionId: String, reason: String? = nil) throws -> CaptureSnapshot {
@@ -577,6 +726,7 @@ public final class CaptureController {
   }
 
   private func teardown() {
+    stopMicrophoneTestLocked()
     diskMonitor?.stop()
     diskMonitor = nil
     if #available(macOS 14.2, *), let system = systemCapture as? CoreAudioProcessTapCapture { system.teardown() }
@@ -600,6 +750,10 @@ public final class CaptureController {
 
   private static func validSessionID(_ value: String) -> Bool {
     value.range(of: #"^session-[a-zA-Z0-9-]{12,120}$"#, options: .regularExpression) != nil
+  }
+
+  private static func validMicrophoneTestID(_ value: String) -> Bool {
+    value.range(of: #"^mic-test-[a-zA-Z0-9-]{12,120}$"#, options: .regularExpression) != nil
   }
 
   private static func rejectSymlinkAncestors(_ root: URL) throws {

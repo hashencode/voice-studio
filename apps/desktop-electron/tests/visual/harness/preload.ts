@@ -6,6 +6,7 @@ import type {
   Voice2TextFloatingApi,
 } from "../../../src/shared/contracts";
 import type { VisualRendererFixture } from "../fixtures/renderer-api";
+import { localModelSnapshot } from "../../fixtures/companion";
 
 const encodedFixture = process.env.VOICE2TEXT_VISUAL_FIXTURE;
 if (!encodedFixture) {
@@ -47,6 +48,9 @@ const api: Voice2TextDesktopApi = {
   },
   async retryProcessing() {
     throw new Error("retryProcessing is outside the visual fixture");
+  },
+  async startTranscription(audioId) {
+    return { protocolVersion: 2, jobId: audioId, state: "queued" };
   },
   async listProcessingTasks() {
     return [];
@@ -128,6 +132,15 @@ const api: Voice2TextDesktopApi = {
   onCaptionSnapshot() {
     return () => undefined;
   },
+  async startMicrophoneTest() {
+    return microphoneTestFixture("running");
+  },
+  async getMicrophoneTestSnapshot() {
+    return microphoneTestFixture("running");
+  },
+  async stopMicrophoneTest() {
+    return microphoneTestFixture("stopped");
+  },
   async getFloatingCapturePreference() {
     return { enabled: true };
   },
@@ -153,6 +166,18 @@ const api: Voice2TextDesktopApi = {
     return structuredClone(fixture.companion);
   },
   onCompanionSnapshot() {
+    return () => undefined;
+  },
+  async getLocalModelSnapshot() {
+    return structuredClone(localModelSnapshot);
+  },
+  async sendLocalModelIntent() {
+    return structuredClone(localModelSnapshot);
+  },
+  async changeLocalModelRoot() {
+    return structuredClone(localModelSnapshot);
+  },
+  onLocalModelSnapshot() {
     return () => undefined;
   },
   async getAiSettings() {
@@ -183,6 +208,18 @@ const api: Voice2TextDesktopApi = {
     return () => undefined;
   },
 };
+
+function microphoneTestFixture(state: "running" | "stopped") {
+  return {
+    testId: "mic-test-123456789012",
+    state,
+    elapsedMs: 0,
+    remainingMs: 30_000,
+    normalizedPeak: 0,
+    observedFrames: 0,
+    detectedInput: false,
+  };
+}
 
 contextBridge.exposeInMainWorld("voice2text", Object.freeze(api));
 

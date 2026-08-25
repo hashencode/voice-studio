@@ -42,7 +42,7 @@ describe("secure import to durable processing", () => {
         const normalizedSha256 = createHash("sha256")
           .update(Buffer.alloc(64, byte))
           .digest("hex");
-        domain.commitValidatedImport({
+        const imported = domain.commitValidatedImport({
           displayName: `Distinct ${index}.wav`,
           normalizedPath,
           normalizedSha256,
@@ -50,9 +50,15 @@ describe("secure import to durable processing", () => {
           normalizedSizeBytes: 64,
           durationMs: 1_000,
           receipt: { fixture: index },
+        });
+        domain.enqueueProcessingJob({
+          audioId: imported.audio.id,
+          idempotencyKey: `manual:${index}`,
+          operationId: "asr",
           resourceIdentity: "a".repeat(64),
           phase: "asr",
           protocolIdentity: "desktop-sherpa-worker/v1",
+          sourceSha256: normalizedSha256,
           modelSha256: "b".repeat(64),
           runtimeSha256: "c".repeat(64),
         });
@@ -139,34 +145,30 @@ describe("secure import to durable processing", () => {
     const first = await importing.commitValidatedImport({
       displayName: "第一次.wav",
       receipt: receipt(firstPath),
-      processing: {
-        operationId: "asr",
-        protocolIdentity: "desktop-sherpa-worker/v1",
-        modelSha256: "b".repeat(64),
-        runtimeSha256: "c".repeat(64),
-        resourceIdentity: "d".repeat(64),
-      },
     });
     const duplicate = await importing.commitValidatedImport({
       displayName: "重复.wav",
       receipt: receipt(duplicatePath),
-      processing: {
-        operationId: "asr",
-        protocolIdentity: "desktop-sherpa-worker/v1",
-        modelSha256: "b".repeat(64),
-        runtimeSha256: "c".repeat(64),
-        resourceIdentity: "d".repeat(64),
-      },
     });
 
     expect(duplicate).toEqual({ ...first, inserted: false });
     expect(discarded).toEqual([duplicatePath]);
     expect(readFileSync(firstPath)).toEqual(pcm);
     expect(repository.listMediaAuthorities()).toHaveLength(1);
-    expect(repository.listProcessingJobs()).toHaveLength(1);
+    expect(repository.listProcessingJobs()).toHaveLength(0);
+    domain.enqueueProcessingJob({
+      audioId: first.audioId,
+      idempotencyKey: `manual:${first.audioId}`,
+      operationId: "asr",
+      protocolIdentity: "desktop-sherpa-worker/v1",
+      sourceSha256: pcmHash,
+      modelSha256: "b".repeat(64),
+      runtimeSha256: "c".repeat(64),
+      resourceIdentity: "d".repeat(64),
+    });
     expect(repository.listProcessingJobs()[0]).toEqual(
       expect.objectContaining({
-        idempotencyKey: `processing:${pcmHash}`,
+        idempotencyKey: `manual:${first.audioId}`,
         operationId: "asr",
         state: "queued",
       }),
@@ -273,16 +275,9 @@ describe("secure import to durable processing", () => {
     const completedDuplicate = await importing.commitValidatedImport({
       displayName: "已完成重复.wav",
       receipt: receipt(completedDuplicatePath),
-      processing: {
-        operationId: "asr",
-        protocolIdentity: "desktop-sherpa-worker/v1",
-        modelSha256: "b".repeat(64),
-        runtimeSha256: "c".repeat(64),
-        resourceIdentity: "d".repeat(64),
-      },
     });
     expect(completedDuplicate).toEqual(
-      expect.objectContaining({ inserted: false, state: "completed" }),
+      expect.objectContaining({ inserted: false }),
     );
     initialized.database
       .prepare(
@@ -298,17 +293,8 @@ describe("secure import to durable processing", () => {
       importing.commitValidatedImport({
         displayName: "失败任务重复.wav",
         receipt: receipt(failedDuplicatePath),
-        processing: {
-          operationId: "asr",
-          protocolIdentity: "desktop-sherpa-worker/v1",
-          modelSha256: "b".repeat(64),
-          runtimeSha256: "c".repeat(64),
-          resourceIdentity: "d".repeat(64),
-        },
       }),
-    ).resolves.toEqual(
-      expect.objectContaining({ inserted: false, state: "failed" }),
-    );
+    ).resolves.toEqual(expect.objectContaining({ inserted: false }));
     initialized.database.close();
   });
 
@@ -347,13 +333,6 @@ describe("secure import to durable processing", () => {
         sampleRate: 16_000 as const,
         channels: 1 as const,
         encoding: "pcm_s16le_wav" as const,
-      },
-      processing: {
-        operationId: "asr" as const,
-        protocolIdentity: "desktop-sherpa-worker/v1",
-        modelSha256: "b".repeat(64),
-        runtimeSha256: "c".repeat(64),
-        resourceIdentity: "d".repeat(64),
       },
     };
 

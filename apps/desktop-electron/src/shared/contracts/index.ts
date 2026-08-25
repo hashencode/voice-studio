@@ -8,3 +8,4 @@ export * from "./ipc";
 export * from "./import_processing";
 export * from "./audio_workspace";
 export * from "./worker_protocol";
+export * from "./local_models";

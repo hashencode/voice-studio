@@ -10,6 +10,7 @@ export const audioWorkspaceLimits = Object.freeze({
 });
 
 export const audioProcessingStateSchema = z.enum([
+  "not-started",
   "queued",
   "running",
   "canceling",

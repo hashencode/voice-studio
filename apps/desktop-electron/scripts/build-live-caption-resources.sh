@@ -55,6 +55,7 @@ VOICE2TEXT_LIVE_CAPTION_ONLY=1 \
   "$sensevoice_lock"
 chmod 755 "$staging_root/bin/desktop_sensevoice_caption_worker"
 bun scripts/write-worker-manifest.ts "$staging_root"
+rm -rf -- "$staging_root/models"
 bun scripts/verify-worker-resources.ts "$staging_root"
 
 bash "$electron_root/scripts/publish-worker-resources.sh" \
