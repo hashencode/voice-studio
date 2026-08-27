@@ -172,6 +172,52 @@ it("creates processing only after the user explicitly starts transcription", asy
   expect(startTranscription).toHaveBeenCalledWith(audioA.audioId);
 });
 
+it("routes processing capability failures without exposing diagnostics", async () => {
+  const rawDiagnostic = "本地转写不可用：模型 /private/models/asr.bin 缺失";
+  const onProcessingUnavailable = vi.fn();
+  const untranscribed = {
+    ...workspace(audioA),
+    summary: {
+      ...audioA,
+      processingState: "not-started" as const,
+      generationId: null,
+      generationKind: null,
+      segmentCount: 0,
+    },
+    segments: [],
+  };
+  render(
+    <AudioRouteFeature
+      api={api({
+        openAudio: vi.fn(async () => untranscribed),
+        startTranscription: vi.fn(async () => {
+          throw new Error(rawDiagnostic);
+        }),
+      })}
+      tasks={[]}
+      pendingJobActions={new Map()}
+      writable
+      paneOpen
+      onProcessingUnavailable={onProcessingUnavailable}
+      onRecord={vi.fn()}
+      onImport={vi.fn()}
+      onCancel={vi.fn()}
+      onRetry={vi.fn()}
+    />,
+  );
+
+  await userEvent
+    .setup()
+    .click(await screen.findByRole("button", { name: /打开 音频 A/ }));
+  await userEvent
+    .setup()
+    .click(screen.getByRole("button", { name: "开始转写" }));
+
+  await waitFor(() => expect(onProcessingUnavailable).toHaveBeenCalledOnce());
+  expect(onProcessingUnavailable).toHaveBeenCalledWith();
+  expect(screen.queryByText(rawDiagnostic)).not.toBeInTheDocument();
+});
+
 it("disables the new recording action and announces an active recording", async () => {
   render(
     <AudioRouteFeature

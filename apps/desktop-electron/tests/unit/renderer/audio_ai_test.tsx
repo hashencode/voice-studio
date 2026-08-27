@@ -75,6 +75,24 @@ function api(overrides: Record<string, unknown> = {}) {
 }
 
 describe("per-generation audio AI consent", () => {
+  it("sanitizes an initial draft-load failure", async () => {
+    const rawDiagnostic = "ECONNRESET /private/audio-ai/draft.json";
+    render(
+      <AudioAiFeature
+        api={api({
+          getAudioAiSnapshot: vi.fn(async () => {
+            throw new Error(rawDiagnostic);
+          }),
+        })}
+        audioId={4}
+        generationId={9}
+      />,
+    );
+
+    expect(await screen.findByText("无法读取音频智能草稿")).toBeVisible();
+    expect(screen.queryByText(rawDiagnostic)).not.toBeInTheDocument();
+  });
+
   it("cancels with Escape, restores focus, and sends no transcript", async () => {
     const desktop = api();
     const user = userEvent.setup();

@@ -391,11 +391,10 @@ export function useAudioRouteController({
     try {
       await api.startTranscription(audioId);
     } catch (cause) {
-      const message = userFacingError(cause, "无法开始本地转写");
-      if (/模型|runtime|storage|本地转写不可用/i.test(message)) {
-        onProcessingUnavailable?.(message);
+      if (isProcessingUnavailableError(cause)) {
+        onProcessingUnavailable?.();
       } else {
-        setTransitionError(message);
+        setTransitionError(userFacingError(cause, "无法开始本地转写"));
       }
     } finally {
       setTransitionPending(false);
@@ -488,6 +487,13 @@ export function useAudioRouteController({
     onRetry: retryProcessing,
     startTranscription,
   };
+}
+
+function isProcessingUnavailableError(cause: unknown): boolean {
+  return (
+    cause instanceof Error &&
+    /模型|runtime|storage|本地转写不可用/i.test(cause.message)
+  );
 }
 
 export function AudioRouteFeature({

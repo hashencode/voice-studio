@@ -77,6 +77,25 @@ function api(overrides: Record<string, unknown> = {}) {
 }
 
 describe("cloud model settings", () => {
+  it("sanitizes an initial settings-load failure", async () => {
+    const rawDiagnostic = "EACCES /private/credentials/provider.json";
+    render(
+      <AiSettingsFeature
+        api={api({
+          getAiSettings: vi.fn(async () => {
+            throw new Error(rawDiagnostic);
+          }),
+        })}
+        settingsPage
+      />,
+    );
+
+    expect(
+      (await screen.findAllByText("无法读取云端模型设置"))[0],
+    ).toBeVisible();
+    expect(screen.queryByText(rawDiagnostic)).not.toBeInTheDocument();
+  });
+
   it("uses provider color for selection without locking the selected profile", async () => {
     render(<AiSettingsFeature api={api()} settingsPage />);
     expect(

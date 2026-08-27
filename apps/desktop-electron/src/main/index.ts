@@ -41,6 +41,10 @@ import {
   type FloatingCaptureWindowAction,
 } from "../shared/contracts";
 import { DesktopApplicationState } from "./application/application_state";
+import {
+  publishReadyLibrary,
+  runBootstrapTransaction,
+} from "./application/bootstrap_transaction";
 import { configureRuntimeIdentity } from "./application/runtime_identity";
 import {
   deriveFloatingCaptureSnapshot,
@@ -2767,13 +2771,64 @@ async function requestBootstrapAction() {
 
 async function bootstrapApplication(): Promise<void> {
   if (bootstrapPromise) return await bootstrapPromise;
-  if (profileDatabase) return;
-  bootstrapPromise = initializeApplication();
+  bootstrapPromise = runBootstrapTransaction({
+    isReady: () => applicationState.snapshot().profile.phase === "ready",
+    initialize: initializeApplication,
+    resetPartialInitialization: resetPartialApplicationInitialization,
+  });
   try {
     await bootstrapPromise;
   } finally {
     bootstrapPromise = null;
   }
+}
+
+async function resetPartialApplicationInitialization(): Promise<void> {
+  await processCoordinator?.shutdown().catch(() => undefined);
+  await processingLoop?.catch(() => undefined);
+  processingLoop = null;
+  processCoordinator = null;
+  await workerSupervisor?.shutdown().catch(() => undefined);
+  workerSupervisor = null;
+  await audioPlaybackService?.close().catch(() => undefined);
+  audioPlaybackService = null;
+  audioExportService = null;
+  audioWorkspaceService = null;
+  await audioAiService?.shutdown().catch(() => undefined);
+  audioAiService = null;
+  unsubscribeCompanion?.();
+  unsubscribeCompanion = null;
+  await companionService?.close().catch(() => undefined);
+  companionService = null;
+  await companionNativeAdapter?.close().catch(() => undefined);
+  companionNativeAdapter = null;
+  await liveCaptionService?.shutdown().catch(() => undefined);
+  liveCaptionService = null;
+  await microphoneTestService?.stopBeforeFormalCapture().catch(() => undefined);
+  microphoneTestService = null;
+  await captureNativeSession?.close().catch(() => undefined);
+  captureNativeSession = null;
+  captureService = null;
+  formalTranscriptHandoff = null;
+  try {
+    profileDatabase?.close();
+  } catch {
+    // The failed attempt is already unusable; continue clearing its globals.
+  }
+  profileDatabase = null;
+  profilePaths = null;
+  domainService = null;
+  desktopRepository = null;
+  transcriptRepository = null;
+  try {
+    localModelService?.close();
+  } catch {
+    // Continue resetting so the next recheck can create a fresh service.
+  }
+  localModelService = null;
+  modelLeaseCoordinator = null;
+  modelStorageAccess = null;
+  resourceCatalog = null;
 }
 
 async function initializeApplication(): Promise<void> {
@@ -3096,8 +3151,6 @@ async function initializeApplication(): Promise<void> {
     )
       throw error;
   }
-  applicationState.completeBootstrap(profile);
-  applicationState.setLibraryCount(desktopRepository.countAudios());
   if (captureSmokeRequest) {
     traceCaptureSmoke("capture-smoke-start");
     await runCaptureSmokeIfRequested();
@@ -3115,6 +3168,12 @@ async function initializeApplication(): Promise<void> {
     !companionSmokeRequest
   )
     await runBootstrapSmokeIfRequested();
+  publishReadyLibrary({
+    countAudios: () => desktopRepository!.countAudios(),
+    completeBootstrap: () => applicationState.completeBootstrap(profile),
+    setLibraryCount: (audioCount) =>
+      applicationState.setLibraryCount(audioCount),
+  });
 }
 
 async function initializeLocalModels(runtimeReady: boolean): Promise<void> {

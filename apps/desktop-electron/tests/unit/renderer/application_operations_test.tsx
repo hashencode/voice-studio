@@ -5,6 +5,7 @@ import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import App from "../../../src/renderer/App";
+import { useProcessingTasks } from "../../../src/renderer/features/processing/use-processing-tasks";
 import type {
   ApplicationSnapshot,
   OperationEvent,
@@ -144,6 +145,11 @@ function installOperationsApi(overrides: Partial<Voice2TextDesktopApi> = {}) {
   };
 }
 
+function ProcessingTasksErrorHarness() {
+  const { operationError } = useProcessingTasks(vi.fn(), true);
+  return <div>{operationError}</div>;
+}
+
 function testAiSettings() {
   return {
     revision: 1,
@@ -179,6 +185,20 @@ function testAiProfile() {
 }
 
 describe("renderer processing operation races", () => {
+  it("sanitizes an initial task refresh failure", async () => {
+    const rawDiagnostic = "SQLITE_IOERR /private/profile/audio.sqlite3";
+    installOperationsApi({
+      listProcessingTasks: vi.fn(async () => {
+        throw new Error(rawDiagnostic);
+      }),
+    });
+
+    render(<ProcessingTasksErrorHarness />);
+
+    expect(await screen.findByText("无法读取转写任务，请重试。")).toBeVisible();
+    expect(screen.queryByText(rawDiagnostic)).not.toBeInTheDocument();
+  });
+
   it("guards a double-clicked import and clears pending in finally", async () => {
     const request = deferred<never>();
     const importAudio = vi.fn(() => request.promise);
