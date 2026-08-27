@@ -3,7 +3,8 @@ import { fileURLToPath } from "node:url";
 
 import {
   bootstrapActionRequestSchema,
-  acknowledgeActivityRequestSchema,
+  markActivityReadRequestSchema,
+  markAllActivityReadRequestSchema,
   cancelProcessingRequestSchema,
   retryProcessingRequestSchema,
   startTranscriptionRequestSchema,
@@ -40,6 +41,7 @@ import {
   captureRecoveryActionRequestSchema,
   microphoneTestStartRequestSchema,
   microphoneTestControlRequestSchema,
+  microphoneSettingsOpenRequestSchema,
   type CapturePreflight,
   type CaptureSnapshot,
   type MicrophoneTestSnapshot,
@@ -64,18 +66,23 @@ import {
   type AudioWorkspaceSnapshot,
   type PlaybackAction,
   getAiSettingsRequestSchema,
-  saveAiSettingsRequestSchema,
-  replaceAiProviderSecretRequestSchema,
-  deleteAiProviderSecretRequestSchema,
+  createAiProviderProfileRequestSchema,
+  updateAiProviderProfileRequestSchema,
+  selectAiProviderProfileRequestSchema,
+  deleteAiProviderProfileRequestSchema,
   prepareAudioAiRequestSchema,
   getAudioAiSnapshotRequestSchema,
   generateAudioAiRequestSchema,
   retryAudioAiRequestSchema,
   type AiSettingsSnapshot,
+  type CreateAiProviderProfileRequest,
+  type DeleteAiProviderProfileRequest,
   type GenerateAudioAiRequest,
+  type SelectAiProviderProfileRequest,
   type AudioAiConsentPreview,
   type AudioAiSnapshot,
   type RetryAudioAiRequest,
+  type UpdateAiProviderProfileRequest,
   companionSnapshotRequestSchema,
   companionOptInRequestSchema,
   companionPairingInviteRequestSchema,
@@ -91,6 +98,7 @@ import {
   localModelSnapshotRequestSchema,
   localModelIntentSchema,
   changeLocalModelRootRequestSchema,
+  openLocalModelRootRequestSchema,
   type LocalModelIntent,
   type LocalModelSnapshot,
 } from "../../shared/contracts";
@@ -114,6 +122,7 @@ export interface DesktopIpcServices {
   changeLocalModelRoot(options: {
     expectedRevision: number;
   }): Promise<LocalModelSnapshot>;
+  openLocalModelRoot(): Promise<void>;
   onLocalModelSnapshot?(
     listener: (snapshot: LocalModelSnapshot) => void,
   ): () => void;
@@ -135,18 +144,18 @@ export interface DesktopIpcServices {
     listener: (snapshot: CompanionSnapshot) => void,
   ): () => void;
   getAiSettings(): Promise<AiSettingsSnapshot>;
-  saveAiSettings(options: {
-    providerId: "deepseek" | "openai-compatible";
-    modelId: string;
-    endpoint: string;
-  }): Promise<AiSettingsSnapshot>;
-  replaceAiProviderSecret(options: {
-    providerId: "deepseek" | "openai-compatible";
-    secret: string;
-  }): Promise<AiSettingsSnapshot>;
-  deleteAiProviderSecret(options: {
-    providerId: "deepseek" | "openai-compatible";
-  }): Promise<AiSettingsSnapshot>;
+  createAiProviderProfile(
+    options: CreateAiProviderProfileRequest,
+  ): Promise<AiSettingsSnapshot>;
+  updateAiProviderProfile(
+    options: UpdateAiProviderProfileRequest,
+  ): Promise<AiSettingsSnapshot>;
+  selectAiProviderProfile(
+    options: SelectAiProviderProfileRequest,
+  ): Promise<AiSettingsSnapshot>;
+  deleteAiProviderProfile(
+    options: DeleteAiProviderProfileRequest,
+  ): Promise<AiSettingsSnapshot>;
   prepareAudioAi(options: {
     audioId: number;
     generationId: number;
@@ -161,7 +170,8 @@ export interface DesktopIpcServices {
   applicationSnapshot(): ApplicationSnapshot;
   navigate(section: ShellSection): ApplicationSnapshot;
   requestBootstrapAction(action: BootstrapAction): Promise<ApplicationSnapshot>;
-  acknowledgeActivity?(throughId: string): ApplicationSnapshot;
+  markActivityRead(activityId: string): ApplicationSnapshot;
+  markAllActivityRead(): ApplicationSnapshot;
   onApplicationSnapshot?(
     listener: (snapshot: ApplicationSnapshot) => void,
   ): () => void;
@@ -203,10 +213,15 @@ export interface DesktopIpcServices {
     ownerId: number;
     testId: string;
   }): Promise<MicrophoneTestSnapshot>;
-  stopMicrophoneTest(options: {
+  finishMicrophoneTest(options: {
     ownerId: number;
     testId: string;
   }): Promise<MicrophoneTestSnapshot>;
+  cancelMicrophoneTest(options: {
+    ownerId: number;
+    testId: string;
+  }): Promise<MicrophoneTestSnapshot>;
+  openMicrophoneSettings(): Promise<{ state: "opened" | "failed" }>;
   stopMicrophoneTestForOwner?(ownerId: number): Promise<void>;
   floatingCaptureSnapshot?(): FloatingCaptureSnapshot;
   controlFloatingCapture?(
@@ -380,6 +395,13 @@ export function createDesktopIpcHandlers(options: {
       } as RegisteredHandler,
     ],
     [
+      ipcChannels.localModelsOpenRoot,
+      {
+        schema: openLocalModelRootRequestSchema,
+        invoke: async () => await options.services.openLocalModelRoot(),
+      },
+    ],
+    [
       ipcChannels.companionSnapshotGet,
       {
         schema: companionSnapshotRequestSchema,
@@ -434,30 +456,39 @@ export function createDesktopIpcHandlers(options: {
       },
     ],
     [
-      ipcChannels.aiSettingsSave,
+      ipcChannels.aiProviderProfileCreate,
       {
-        schema: saveAiSettingsRequestSchema,
+        schema: createAiProviderProfileRequestSchema,
         invoke: async (
-          payload: Parameters<DesktopIpcServices["saveAiSettings"]>[0],
-        ) => options.services.saveAiSettings(payload),
+          payload: Parameters<DesktopIpcServices["createAiProviderProfile"]>[0],
+        ) => options.services.createAiProviderProfile(payload),
       } as RegisteredHandler,
     ],
     [
-      ipcChannels.aiSecretReplace,
+      ipcChannels.aiProviderProfileUpdate,
       {
-        schema: replaceAiProviderSecretRequestSchema,
+        schema: updateAiProviderProfileRequestSchema,
         invoke: async (
-          payload: Parameters<DesktopIpcServices["replaceAiProviderSecret"]>[0],
-        ) => options.services.replaceAiProviderSecret(payload),
+          payload: Parameters<DesktopIpcServices["updateAiProviderProfile"]>[0],
+        ) => options.services.updateAiProviderProfile(payload),
       } as RegisteredHandler,
     ],
     [
-      ipcChannels.aiSecretDelete,
+      ipcChannels.aiProviderProfileSelect,
       {
-        schema: deleteAiProviderSecretRequestSchema,
+        schema: selectAiProviderProfileRequestSchema,
         invoke: async (
-          payload: Parameters<DesktopIpcServices["deleteAiProviderSecret"]>[0],
-        ) => options.services.deleteAiProviderSecret(payload),
+          payload: Parameters<DesktopIpcServices["selectAiProviderProfile"]>[0],
+        ) => options.services.selectAiProviderProfile(payload),
+      } as RegisteredHandler,
+    ],
+    [
+      ipcChannels.aiProviderProfileDelete,
+      {
+        schema: deleteAiProviderProfileRequestSchema,
+        invoke: async (
+          payload: Parameters<DesktopIpcServices["deleteAiProviderProfile"]>[0],
+        ) => options.services.deleteAiProviderProfile(payload),
       } as RegisteredHandler,
     ],
     [
@@ -518,15 +549,18 @@ export function createDesktopIpcHandlers(options: {
       } as RegisteredHandler,
     ],
     [
-      ipcChannels.applicationActivityAcknowledge,
+      ipcChannels.applicationActivityMarkRead,
       {
-        schema: acknowledgeActivityRequestSchema,
-        invoke: async (payload: { throughId: string }) => {
-          if (!options.services.acknowledgeActivity) {
-            throw new Error("activity acknowledgement is unavailable");
-          }
-          return options.services.acknowledgeActivity(payload.throughId);
-        },
+        schema: markActivityReadRequestSchema,
+        invoke: async (payload: { activityId: string }) =>
+          options.services.markActivityRead(payload.activityId),
+      } as RegisteredHandler,
+    ],
+    [
+      ipcChannels.applicationActivityMarkAllRead,
+      {
+        schema: markAllActivityReadRequestSchema,
+        invoke: async () => options.services.markAllActivityRead(),
       } as RegisteredHandler,
     ],
     [
@@ -642,17 +676,38 @@ export function createDesktopIpcHandlers(options: {
       } as RegisteredHandler,
     ],
     [
-      ipcChannels.microphoneTestStop,
+      ipcChannels.microphoneTestFinish,
       {
         schema: microphoneTestControlRequestSchema,
         invoke: async (
           payload: { testId: string },
           event: IpcInvocationContext,
         ) =>
-          await options.services.stopMicrophoneTest({
+          await options.services.finishMicrophoneTest({
             ...payload,
             ownerId: event.senderId,
           }),
+      } as RegisteredHandler,
+    ],
+    [
+      ipcChannels.microphoneTestCancel,
+      {
+        schema: microphoneTestControlRequestSchema,
+        invoke: async (
+          payload: { testId: string },
+          event: IpcInvocationContext,
+        ) =>
+          await options.services.cancelMicrophoneTest({
+            ...payload,
+            ownerId: event.senderId,
+          }),
+      } as RegisteredHandler,
+    ],
+    [
+      ipcChannels.microphoneSettingsOpen,
+      {
+        schema: microphoneSettingsOpenRequestSchema,
+        invoke: async () => await options.services.openMicrophoneSettings(),
       } as RegisteredHandler,
     ],
     [

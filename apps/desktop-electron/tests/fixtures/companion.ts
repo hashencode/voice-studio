@@ -52,10 +52,10 @@ const microphoneSnapshot = {
   testId: "mic-test-123456789012",
   state: "running" as const,
   elapsedMs: 0,
-  remainingMs: 30_000,
+  normalizedRMS: 0,
   normalizedPeak: 0,
   observedFrames: 0,
-  detectedInput: false,
+  observedSound: false,
 };
 
 export const disabledCompanionSnapshot: CompanionSnapshot = {
@@ -85,6 +85,7 @@ export function companionCommandStubs() {
     getLocalModelSnapshot: async () => localModelSnapshot,
     sendLocalModelIntent: async () => localModelSnapshot,
     changeLocalModelRoot: async () => localModelSnapshot,
+    openLocalModelRoot: async () => undefined,
     onLocalModelSnapshot: () => () => undefined,
     startTranscription: async (audioId: number) => ({
       protocolVersion: 2 as const,
@@ -93,10 +94,16 @@ export function companionCommandStubs() {
     }),
     startMicrophoneTest: async () => microphoneSnapshot,
     getMicrophoneTestSnapshot: async () => microphoneSnapshot,
-    stopMicrophoneTest: async () => ({
+    finishMicrophoneTest: async () => ({
       ...microphoneSnapshot,
-      state: "stopped" as const,
+      state: "finished" as const,
+      reason: "no-audio-frames" as const,
     }),
+    cancelMicrophoneTest: async () => ({
+      ...microphoneSnapshot,
+      state: "cancelled" as const,
+    }),
+    openMicrophoneSettings: async () => ({ state: "opened" as const }),
   } satisfies Pick<
     Voice2TextDesktopApi,
     | "getCompanionSnapshot"
@@ -108,11 +115,14 @@ export function companionCommandStubs() {
     | "getLocalModelSnapshot"
     | "sendLocalModelIntent"
     | "changeLocalModelRoot"
+    | "openLocalModelRoot"
     | "onLocalModelSnapshot"
     | "startTranscription"
     | "startMicrophoneTest"
     | "getMicrophoneTestSnapshot"
-    | "stopMicrophoneTest"
+    | "finishMicrophoneTest"
+    | "cancelMicrophoneTest"
+    | "openMicrophoneSettings"
   >;
 }
 

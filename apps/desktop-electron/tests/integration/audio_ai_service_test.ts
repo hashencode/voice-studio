@@ -30,6 +30,7 @@ describe("U10 audio AI vertical slice", () => {
     });
 
     expect(preview).toMatchObject({
+      profileId: "legacy-default",
       providerId: "deepseek",
       endpointOrigin: "https://api.deepseek.com",
       audioTitle: "Audio",
@@ -78,14 +79,15 @@ describe("U10 audio AI vertical slice", () => {
     expect(generate).not.toHaveBeenCalled();
 
     const completed = await service.generate(request);
-    new AiJobRepository(database).saveSettings(
-      {
-        providerId: "openai-compatible",
-        modelId: "another-model",
-        endpoint: "https://ai.example.com",
-      },
-      9_999,
-    );
+    new AiJobRepository(database).updateProfile({
+      profileId: "legacy-default",
+      displayName: "Changed provider",
+      protocol: "openai-compatible",
+      modelId: "another-model",
+      endpoint: "https://ai.example.com",
+      expectedRevision: 0,
+      nowMs: 9_999,
+    });
     const replay = await service.generate(request);
     expect(completed.state).toBe("completed");
     expect(completed.note?.items[0]?.body).toBe("ship");
@@ -352,11 +354,316 @@ describe("U10 audio AI vertical slice", () => {
       database.prepare("SELECT COUNT(*) AS count FROM ai_notes").get(),
     ).toEqual({ count: 1 });
   });
+
+  it("creates isolated profiles, normalizes names, and serializes stale mutations before Keychain access", async () => {
+    database = openAudioDatabase(":memory:");
+    const repository = new AiJobRepository(database);
+    const secrets = secretStore();
+    const identities = [
+      { profileId: "profile-a", secretRef: "secret-a" },
+      { profileId: "profile-b", secretRef: "secret-b" },
+      { profileId: "profile-c", secretRef: "secret-c" },
+    ];
+    const service = new AudioAiService(
+      repository,
+      secrets.port,
+      undefined,
+      increasingClock(),
+      () => identities.shift()!,
+    );
+
+    const first = await service.createProfile({
+      expectedRevision: 0,
+      displayName: "  Work AI  ",
+      protocol: "openai-compatible",
+      modelId: "model-a",
+      endpoint: "https://ai.example.com/v1",
+      secret: "secret-one",
+    });
+    expect(first.selectedProfileId).toBe("profile-a");
+    expect(first.profiles[0]).toMatchObject({
+      profileId: "profile-a",
+      displayName: "Work AI",
+      secretState: "available",
+    });
+    expect(secrets.replace).toHaveBeenCalledWith("secret-a", "secret-one");
+
+    const second = await service.createProfile({
+      expectedRevision: first.revision,
+      displayName: "Second",
+      protocol: "openai-compatible",
+      modelId: "model-b",
+      endpoint: "https://other.example.com/v1",
+      secret: "secret-two",
+    });
+    expect(second.selectedProfileId).toBe("profile-b");
+    expect(secrets.replace).toHaveBeenCalledWith("secret-b", "secret-two");
+    expect(
+      database
+        .prepare(
+          "SELECT profile_id, secret_ref FROM ai_provider_profiles ORDER BY profile_id",
+        )
+        .all(),
+    ).toEqual([
+      { profile_id: "profile-a", secret_ref: "secret-a" },
+      { profile_id: "profile-b", secret_ref: "secret-b" },
+    ]);
+
+    const selected = await service.selectProfile({
+      expectedRevision: second.revision,
+      profileId: "profile-a",
+    });
+    expect(selected.selectedProfileId).toBe("profile-a");
+
+    await expect(
+      service.createProfile({
+        expectedRevision: selected.revision,
+        displayName: "work ai",
+        protocol: "openai-compatible",
+        modelId: "model-b",
+        endpoint: "https://other.example.com/v1",
+        secret: "secret-two",
+      }),
+    ).rejects.toMatchObject({ code: "AI_INVALID_CONFIGURATION" });
+    expect(secrets.replace).toHaveBeenCalledTimes(2);
+
+    await expect(
+      service.createProfile({
+        expectedRevision: selected.revision,
+        displayName: "Invalid DeepSeek",
+        protocol: "deepseek",
+        modelId: "deepseek-chat",
+        endpoint: "https://other.example.com",
+        secret: "must-not-be-written",
+      }),
+    ).rejects.toMatchObject({ code: "AI_INVALID_CONFIGURATION" });
+    expect(secrets.replace).toHaveBeenCalledTimes(2);
+
+    const staleRevision = selected.revision;
+    const results = await Promise.allSettled([
+      service.updateProfile({
+        expectedRevision: staleRevision,
+        profileId: "profile-a",
+        displayName: "Work AI updated",
+        protocol: "openai-compatible",
+        modelId: "model-a2",
+        endpoint: "https://ai.example.com/v1",
+        secret: "replacement",
+      }),
+      service.createProfile({
+        expectedRevision: staleRevision,
+        displayName: "Third",
+        protocol: "openai-compatible",
+        modelId: "model-b",
+        endpoint: "https://other.example.com/v1",
+        secret: "secret-two",
+      }),
+    ]);
+    expect(
+      results.filter((result) => result.status === "fulfilled"),
+    ).toHaveLength(1);
+    expect(
+      results.filter((result) => result.status === "rejected"),
+    ).toHaveLength(1);
+    expect(secrets.replace).toHaveBeenCalledTimes(3);
+  });
+
+  it("keeps profiles on Keychain failure and treats a missing secret as a successful delete", async () => {
+    database = openAudioDatabase(":memory:");
+    const repository = new AiJobRepository(database);
+    repository.createProfile({
+      profileId: "older",
+      secretRef: "older-secret",
+      displayName: "Older",
+      protocol: "openai-compatible",
+      modelId: "old-model",
+      endpoint: "https://old.example.com",
+      expectedRevision: 0,
+      nowMs: 1,
+    });
+    repository.createProfile({
+      profileId: "active",
+      secretRef: "active-secret",
+      displayName: "Active",
+      protocol: "deepseek",
+      modelId: "deepseek-chat",
+      endpoint: "https://api.deepseek.com",
+      expectedRevision: 1,
+      nowMs: 2,
+    });
+    const secrets = secretStore();
+    secrets.delete
+      .mockResolvedValueOnce("denied")
+      .mockResolvedValueOnce("missing");
+    const service = new AudioAiService(repository, secrets.port);
+
+    await expect(
+      service.deleteProfile({ expectedRevision: 2, profileId: "active" }),
+    ).rejects.toMatchObject({ code: "AI_SECRET_DENIED" });
+    expect(repository.profile("active")).not.toBeNull();
+    expect(repository.selectedProfile()?.profileId).toBe("active");
+
+    const deleted = await service.deleteProfile({
+      expectedRevision: 2,
+      profileId: "active",
+    });
+    expect(deleted.selectedProfileId).toBe("older");
+    expect(repository.profile("active")).toBeNull();
+
+    const empty = await service.deleteProfile({
+      expectedRevision: deleted.revision,
+      profileId: "older",
+    });
+    expect(empty.selectedProfileId).toBeNull();
+    expect(empty.profiles).toEqual([]);
+  });
+
+  it("does not persist create or update configuration when the Keychain write fails", async () => {
+    database = openAudioDatabase(":memory:");
+    const repository = new AiJobRepository(database);
+    repository.createProfile({
+      profileId: "existing",
+      secretRef: "existing-secret",
+      displayName: "Existing",
+      protocol: "openai-compatible",
+      modelId: "old-model",
+      endpoint: "https://old.example.com",
+      expectedRevision: 0,
+      nowMs: 1,
+    });
+    const secrets = secretStore();
+    secrets.replace.mockRejectedValue(new Error("KEYCHAIN_UNAVAILABLE"));
+    const service = new AudioAiService(
+      repository,
+      secrets.port,
+      undefined,
+      increasingClock(),
+      () => ({ profileId: "new-profile", secretRef: "new-secret" }),
+    );
+
+    await expect(
+      service.createProfile({
+        expectedRevision: 1,
+        displayName: "New",
+        protocol: "openai-compatible",
+        modelId: "new-model",
+        endpoint: "https://new.example.com",
+        secret: "new-key",
+      }),
+    ).rejects.toThrow("KEYCHAIN_UNAVAILABLE");
+    expect(repository.profile("new-profile")).toBeNull();
+    expect(repository.settingsRevision()).toBe(1);
+
+    await expect(
+      service.updateProfile({
+        expectedRevision: 1,
+        profileId: "existing",
+        displayName: "Changed",
+        protocol: "openai-compatible",
+        modelId: "changed-model",
+        endpoint: "https://changed.example.com",
+        secret: "replacement",
+      }),
+    ).rejects.toThrow("KEYCHAIN_UNAVAILABLE");
+    expect(repository.profile("existing")).toMatchObject({
+      displayName: "Existing",
+      modelId: "old-model",
+      endpoint: "https://old.example.com",
+    });
+    expect(repository.settingsRevision()).toBe(1);
+  });
+
+  it("keeps queued execution identity after the source profile is edited or deleted", async () => {
+    database = openAudioDatabase(":memory:");
+    seedAudio(database);
+    const repository = new AiJobRepository(database);
+    const secrets = secretStore();
+    const configs: Array<Record<string, unknown>> = [];
+    const generate = vi
+      .fn()
+      .mockRejectedValueOnce(
+        new AiProviderFailure("AI_SERVICE_UNAVAILABLE", "down"),
+      )
+      .mockResolvedValueOnce(output());
+    const service = new AudioAiService(
+      repository,
+      secrets.port,
+      (config) => {
+        configs.push({ ...config });
+        return { id: config.providerId, generate };
+      },
+      increasingClock(),
+    );
+    const preview = service.prepare({
+      audioId: 1,
+      generationId: 1,
+      templateId: "default",
+    });
+    const failed = await service.generate({
+      audioId: 1,
+      generationId: 1,
+      templateId: "default",
+      idempotencyKey: "immutable-profile-generate",
+      consent: consent(preview),
+    });
+    repository.updateProfile({
+      profileId: "legacy-default",
+      displayName: "Changed",
+      protocol: "openai-compatible",
+      modelId: "changed-model",
+      endpoint: "https://changed.example.com",
+      expectedRevision: 0,
+      nowMs: 10_000,
+    });
+    repository.deleteProfile({
+      profileId: "legacy-default",
+      expectedRevision: 1,
+      nowMs: 10_001,
+    });
+
+    const completed = await service.retry({
+      jobId: failed.jobId,
+      expectedAttempt: failed.attempt,
+      idempotencyKey: "immutable-profile-retry",
+      consent: consent(preview),
+    });
+    expect(completed.state).toBe("completed");
+    expect(configs).toEqual([
+      expect.objectContaining({
+        providerId: "deepseek",
+        modelId: "deepseek-chat",
+        endpoint: "https://api.deepseek.com",
+        secretRef: "deepseek",
+      }),
+      expect.objectContaining({
+        providerId: "deepseek",
+        modelId: "deepseek-chat",
+        endpoint: "https://api.deepseek.com",
+        secretRef: "deepseek",
+      }),
+    ]);
+  });
+
+  it("fails prepare before network access when no profile is selected", () => {
+    database = openAudioDatabase(":memory:");
+    seedAudio(database, false);
+    const generate = vi.fn();
+    const service = new AudioAiService(
+      new AiJobRepository(database),
+      secretStore().port,
+      () => ({ id: "deepseek", generate }),
+    );
+    expect(() =>
+      service.prepare({ audioId: 1, generationId: 1, templateId: "default" }),
+    ).toThrowError(expect.objectContaining({ code: "AI_PROVIDER_MISSING" }));
+    expect(generate).not.toHaveBeenCalled();
+  });
 });
 
 function consent(preview: ReturnType<AudioAiService["prepare"]>) {
   return {
     version: 1 as const,
+    profileId: preview.profileId,
     providerId: preview.providerId,
     endpointOrigin: preview.endpointOrigin,
     endpointIdentitySha256: preview.endpointIdentitySha256,
@@ -386,12 +693,18 @@ function secretStore() {
     state: "available" as const,
     secret: "secret",
   }));
+  const replace = vi.fn(async () => undefined);
+  const deleteSecret = vi.fn<DesktopSecretStorePort["delete"]>(async () =>
+    Promise.resolve("deleted"),
+  );
   return {
     read,
+    replace,
+    delete: deleteSecret,
     port: {
       read,
-      replace: vi.fn(async () => undefined),
-      delete: vi.fn(async () => "deleted" as const),
+      replace,
+      delete: deleteSecret,
       fileVaultStatus: vi.fn(async () => "enabled" as const),
     } satisfies DesktopSecretStorePort,
   };
@@ -402,7 +715,7 @@ function increasingClock(): () => number {
   return () => ++now;
 }
 
-function seedAudio(database: DatabaseSync): void {
+function seedAudio(database: DatabaseSync, withProfile = true): void {
   database.exec(`
     INSERT INTO audio_items (
       id, idempotency_key, source_identity, display_name, media_path,
@@ -427,4 +740,17 @@ function seedAudio(database: DatabaseSync): void {
     ) VALUES (7, 1, 1, 'segment-7', 0, 'ship', 'ship', 'machine', 0, 1000,
       'reviewed', 'unknown', 'machine', 1, 1);
   `);
+  if (withProfile) {
+    database.exec(`
+      INSERT INTO ai_provider_profiles (
+        profile_id, kind, display_name, normalized_display_name, protocol,
+        model_id, endpoint, secret_ref, created_at_ms, updated_at_ms, revision
+      ) VALUES (
+        'legacy-default', 'custom', 'DeepSeek', 'deepseek', 'deepseek',
+        'deepseek-chat', 'https://api.deepseek.com', 'deepseek', 0, 0, 0
+      );
+      UPDATE ai_provider_selection
+        SET selected_profile_id = 'legacy-default' WHERE id = 1;
+    `);
+  }
 }

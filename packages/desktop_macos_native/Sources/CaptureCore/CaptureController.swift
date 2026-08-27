@@ -88,17 +88,19 @@ public struct CaptureSnapshot: Codable, Sendable {
 public struct MicrophoneTestSnapshot: Codable, Sendable {
   public let testId: String
   public let state: String
+  public let reason: String?
   public let elapsedMs: Int
-  public let remainingMs: Int
+  public let normalizedRMS: Double
   public let normalizedPeak: Double
   public let observedFrames: UInt64
-  public let detectedInput: Bool
+  public let observedSound: Bool
 }
 
-public protocol MicrophoneTestEngine: AnyObject {
+protocol MicrophoneTestEngine: AnyObject {
   func start() throws
   func stop()
-  func snapshot() -> (observedFrames: UInt64, normalizedPeak: Double)
+  func setHealthHandler(_ handler: ((String) -> Void)?)
+  func snapshot() -> MicrophoneCapture.MeterSnapshot
 }
 
 private final class NativeMicrophoneTestEngine: MicrophoneTestEngine {
@@ -110,10 +112,10 @@ private final class NativeMicrophoneTestEngine: MicrophoneTestEngine {
 
   func start() throws { try capture.start() }
   func stop() { capture.teardown() }
-  func snapshot() -> (observedFrames: UInt64, normalizedPeak: Double) {
-    let meter = capture.meterSnapshot()
-    return (meter.observedFrames, meter.normalizedPeak)
+  func setHealthHandler(_ handler: ((String) -> Void)?) {
+    capture.setHealthHandler(handler)
   }
+  func snapshot() -> MicrophoneCapture.MeterSnapshot { capture.meterSnapshot() }
 }
 
 /// Owns the native authority tracks for one helper process. The helper remains
@@ -140,23 +142,28 @@ public final class CaptureController {
   private var recordingSha256: String?
   private var journalSha256: String?
   private let microphoneTestFactory: (String?) -> MicrophoneTestEngine
+  private let nowNanoseconds: () -> UInt64
   private var microphoneTest: MicrophoneTestEngine?
   private var microphoneTestID: String?
-  private var microphoneTestStartedAt = DispatchTime.now()
+  private var microphoneTestStartedAt: UInt64 = 0
+  private var microphoneTestObservedFrames: UInt64 = 0
+  private var microphoneTestRMS: Double = 0
   private var microphoneTestPeak: Double = 0
-  private var microphoneTestTimer: DispatchSourceTimer?
+  private var microphoneTestObservedSound = false
   private var lastMicrophoneTestSnapshot: MicrophoneTestSnapshot?
 
   public convenience init(captureRootPath: String) throws {
     try self.init(
       captureRootPath: captureRootPath,
-      microphoneTestFactory: { NativeMicrophoneTestEngine(deviceId: $0) }
+      microphoneTestFactory: { NativeMicrophoneTestEngine(deviceId: $0) },
+      nowNanoseconds: { DispatchTime.now().uptimeNanoseconds }
     )
   }
 
   init(
     captureRootPath: String,
-    microphoneTestFactory: @escaping (String?) -> MicrophoneTestEngine
+    microphoneTestFactory: @escaping (String?) -> MicrophoneTestEngine,
+    nowNanoseconds: @escaping () -> UInt64 = { DispatchTime.now().uptimeNanoseconds }
   ) throws {
     let requestedRoot = URL(filePath: captureRootPath, directoryHint: .isDirectory)
       .standardizedFileURL
@@ -187,6 +194,7 @@ public final class CaptureController {
     captureRoot = root
     rootIdentity = (UInt64(info.st_dev), UInt64(info.st_ino))
     self.microphoneTestFactory = microphoneTestFactory
+    self.nowNanoseconds = nowNanoseconds
   }
 
   deinit { teardown() }
@@ -264,7 +272,7 @@ public final class CaptureController {
     minimumFreeBytes: Int64,
     microphoneDeviceId: String?
   ) throws -> CaptureSnapshot {
-    stopMicrophoneTestLocked()
+    cancelActiveMicrophoneTestLocked()
     try validateRootIdentity()
     guard Self.validSessionID(sessionId), state == "idle" || state == "completed" || state == "failed" else {
       throw CaptureFailure("CAPTURE_ILLEGAL_TRANSITION", "capture cannot start in the current state")
@@ -392,32 +400,37 @@ public final class CaptureController {
         throw CaptureFailure("MICROPHONE_TEST_BUSY", "a microphone test is already active")
       }
       let engine = microphoneTestFactory(microphoneDeviceId)
+      microphoneTest = engine
+      microphoneTestID = testId
+      microphoneTestStartedAt = nowNanoseconds()
+      microphoneTestObservedFrames = 0
+      microphoneTestRMS = 0
+      microphoneTestPeak = 0
+      microphoneTestObservedSound = false
+      lastMicrophoneTestSnapshot = nil
+      engine.setHealthHandler { [weak self] _ in
+        self?.stateQueue.async { [weak self] in
+          self?.failMicrophoneTestLocked(testId: testId, reason: "device-unavailable")
+        }
+      }
       do {
         try engine.start()
       } catch DesktopMicrophoneCaptureError.permissionDenied {
-        throw CaptureFailure("MICROPHONE_PERMISSION_DENIED", "microphone permission was denied")
+        return failMicrophoneTestLocked(testId: testId, reason: "permission-denied")
       } catch DesktopMicrophoneCaptureError.selectedInputUnavailable {
-        throw CaptureFailure("MICROPHONE_DEVICE_MISSING", "selected microphone is unavailable")
+        return failMicrophoneTestLocked(testId: testId, reason: "device-unavailable")
+      } catch DesktopMicrophoneCaptureError.noInputDevice {
+        return failMicrophoneTestLocked(testId: testId, reason: "device-unavailable")
       } catch DesktopMicrophoneCaptureError.invalidFormat {
-        throw CaptureFailure("MICROPHONE_FORMAT_INVALID", "microphone format is invalid")
+        return failMicrophoneTestLocked(testId: testId, reason: "unsupported-format")
+      } catch DesktopMicrophoneCaptureError.selectedInputFailed {
+        return failMicrophoneTestLocked(testId: testId, reason: "device-open-failed")
+      } catch DesktopMicrophoneCaptureError.engineStart {
+        return failMicrophoneTestLocked(testId: testId, reason: "device-open-failed")
       } catch {
-        throw CaptureFailure("MICROPHONE_OPEN_FAILED", "microphone could not be opened")
+        return failMicrophoneTestLocked(testId: testId, reason: "device-open-failed")
       }
-      microphoneTest = engine
-      microphoneTestID = testId
-      microphoneTestStartedAt = .now()
-      microphoneTestPeak = 0
-      lastMicrophoneTestSnapshot = nil
-      let timer = DispatchSource.makeTimerSource(queue: stateQueue)
-      timer.schedule(deadline: .now() + .seconds(30))
-      timer.setEventHandler { [weak self] in
-        guard let self else { return }
-        self.lastMicrophoneTestSnapshot = self.microphoneTestSnapshotLocked(state: "timed-out")
-        self.stopMicrophoneTestLocked()
-      }
-      microphoneTestTimer = timer
-      timer.resume()
-      return microphoneTestSnapshotLocked(state: "running")
+      return microphoneTestSnapshotLocked()
     }
   }
 
@@ -429,11 +442,11 @@ public final class CaptureController {
       guard microphoneTestID == testId, microphoneTest != nil else {
         throw CaptureFailure("MICROPHONE_TEST_NOT_ACTIVE", "microphone test is not active")
       }
-      return microphoneTestSnapshotLocked(state: "running")
+      return microphoneTestSnapshotLocked()
     }
   }
 
-  public func stopMicrophoneTest(testId: String) throws -> MicrophoneTestSnapshot {
+  public func finishMicrophoneTest(testId: String) throws -> MicrophoneTestSnapshot {
     try stateQueue.sync {
       if let terminal = lastMicrophoneTestSnapshot, terminal.testId == testId {
         return terminal
@@ -441,36 +454,104 @@ public final class CaptureController {
       guard microphoneTestID == testId, microphoneTest != nil else {
         throw CaptureFailure("MICROPHONE_TEST_NOT_ACTIVE", "microphone test is not active")
       }
-      let snapshot = microphoneTestSnapshotLocked(state: "stopped")
+      let running = microphoneTestSnapshotLocked()
+      if running.state == "failed" { return running }
+      let reason = microphoneTestObservedFrames == 0
+        ? "no-audio-frames"
+        : (microphoneTestObservedSound ? "detected" : "no-sound-observed")
+      let snapshot = makeMicrophoneTestSnapshot(state: "finished", reason: reason)
       lastMicrophoneTestSnapshot = snapshot
-      stopMicrophoneTestLocked()
+      releaseMicrophoneTestLocked()
       return snapshot
     }
   }
 
-  private func microphoneTestSnapshotLocked(state: String) -> MicrophoneTestSnapshot {
-    let elapsed = min(
-      30_000,
-      Int(DispatchTime.now().uptimeNanoseconds - microphoneTestStartedAt.uptimeNanoseconds) / 1_000_000
-    )
-    let meter = microphoneTest?.snapshot() ?? (
-      observedFrames: UInt64(0), normalizedPeak: 0.0
-    )
-    microphoneTestPeak = max(microphoneTestPeak, meter.normalizedPeak)
+  public func cancelMicrophoneTest(testId: String) throws -> MicrophoneTestSnapshot {
+    try stateQueue.sync {
+      if let terminal = lastMicrophoneTestSnapshot, terminal.testId == testId {
+        return terminal
+      }
+      guard microphoneTestID == testId, microphoneTest != nil else {
+        throw CaptureFailure("MICROPHONE_TEST_NOT_ACTIVE", "microphone test is not active")
+      }
+      let snapshot = makeMicrophoneTestSnapshot(state: "cancelled", reason: nil)
+      lastMicrophoneTestSnapshot = snapshot
+      releaseMicrophoneTestLocked()
+      return snapshot
+    }
+  }
+
+  private func microphoneTestSnapshotLocked() -> MicrophoneTestSnapshot {
+    guard let microphoneTest else {
+      return makeMicrophoneTestSnapshot(state: "cancelled", reason: nil)
+    }
+    let meter = microphoneTest.snapshot()
+    if meter.status == .unsupportedFormat {
+      return failMicrophoneTestLocked(
+        testId: microphoneTestID ?? "mic-test-unavailable",
+        reason: "unsupported-format"
+      )
+    }
+    microphoneTestObservedFrames = max(microphoneTestObservedFrames, meter.observedFrames)
+    microphoneTestRMS = min(1, max(0, meter.normalizedRMS))
+    microphoneTestPeak = min(1, max(0, meter.normalizedPeak))
+    let soundFloor = pow(10, -55.0 / 20.0)
+    if microphoneTestRMS >= soundFloor {
+      microphoneTestObservedSound = true
+    }
+    return makeMicrophoneTestSnapshot(state: "running", reason: nil)
+  }
+
+  @discardableResult
+  private func failMicrophoneTestLocked(
+    testId: String,
+    reason: String
+  ) -> MicrophoneTestSnapshot {
+    if let terminal = lastMicrophoneTestSnapshot, terminal.testId == testId {
+      return terminal
+    }
+    guard microphoneTestID == testId else {
+      return makeMicrophoneTestSnapshot(testId: testId, state: "failed", reason: reason)
+    }
+    let snapshot = makeMicrophoneTestSnapshot(state: "failed", reason: reason)
+    lastMicrophoneTestSnapshot = snapshot
+    releaseMicrophoneTestLocked()
+    return snapshot
+  }
+
+  private func makeMicrophoneTestSnapshot(
+    testId: String? = nil,
+    state: String,
+    reason: String?
+  ) -> MicrophoneTestSnapshot {
+    let now = nowNanoseconds()
+    let elapsed = now >= microphoneTestStartedAt
+      ? Int((now - microphoneTestStartedAt) / 1_000_000)
+      : 0
     return MicrophoneTestSnapshot(
-      testId: microphoneTestID ?? "mic-test-unavailable",
+      testId: testId ?? microphoneTestID ?? "mic-test-unavailable",
       state: state,
+      reason: reason,
       elapsedMs: elapsed,
-      remainingMs: max(0, 30_000 - elapsed),
-      normalizedPeak: min(1, max(0, meter.normalizedPeak)),
-      observedFrames: meter.observedFrames,
-      detectedInput: microphoneTestPeak >= 0.01
+      normalizedRMS: microphoneTestRMS,
+      normalizedPeak: microphoneTestPeak,
+      observedFrames: microphoneTestObservedFrames,
+      observedSound: microphoneTestObservedSound
     )
   }
 
-  private func stopMicrophoneTestLocked() {
-    microphoneTestTimer?.cancel()
-    microphoneTestTimer = nil
+  private func cancelActiveMicrophoneTestLocked() {
+    guard microphoneTest != nil, let testId = microphoneTestID else { return }
+    lastMicrophoneTestSnapshot = makeMicrophoneTestSnapshot(
+      testId: testId,
+      state: "cancelled",
+      reason: nil
+    )
+    releaseMicrophoneTestLocked()
+  }
+
+  private func releaseMicrophoneTestLocked() {
+    microphoneTest?.setHealthHandler(nil)
     microphoneTest?.stop()
     microphoneTest = nil
     microphoneTestID = nil
@@ -726,7 +807,7 @@ public final class CaptureController {
   }
 
   private func teardown() {
-    stopMicrophoneTestLocked()
+    cancelActiveMicrophoneTestLocked()
     diskMonitor?.stop()
     diskMonitor = nil
     if #available(macOS 14.2, *), let system = systemCapture as? CoreAudioProcessTapCapture { system.teardown() }

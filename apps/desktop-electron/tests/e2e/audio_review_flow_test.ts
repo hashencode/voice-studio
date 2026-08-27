@@ -135,6 +135,8 @@ it("reviews a completed audio through validated Main and Preload contracts witho
     applicationSnapshot: () => snapshot,
     navigate: () => snapshot,
     requestBootstrapAction: async () => snapshot,
+    markActivityRead: () => snapshot,
+    markAllActivityRead: () => snapshot,
     workerHealth: vi.fn(),
     cancelProcessing: vi.fn(),
     retryProcessing: vi.fn(),

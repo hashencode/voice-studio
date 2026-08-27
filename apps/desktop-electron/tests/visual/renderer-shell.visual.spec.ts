@@ -111,8 +111,8 @@ test.describe("sidebar-09 production Renderer", () => {
         };
       });
       expect(layout.paneHeaderHeight).toBeGreaterThan(58);
-      expect(layout.emptyCenterRatio).toBeGreaterThan(0.3);
-      expect(layout.emptyCenterRatio).toBeLessThan(0.37);
+      expect(layout.emptyCenterRatio).toBeGreaterThan(0.46);
+      expect(layout.emptyCenterRatio).toBeLessThan(0.54);
 
       await assertRuntimeContract(page, 1240, 820);
       await assertDockedGeometry(page, 1240, 820);
@@ -124,7 +124,7 @@ test.describe("sidebar-09 production Renderer", () => {
     await withVisualSession("settings", 1240, 820, async (session) => {
       const { page } = session;
       await expect(
-        page.getByRole("heading", { name: "通用", level: 1 }),
+        page.getByRole("heading", { name: "通用", level: 2 }),
       ).toBeVisible();
       await assertRuntimeContract(page, 1240, 820);
       await assertDockedGeometry(page, 1240, 820);

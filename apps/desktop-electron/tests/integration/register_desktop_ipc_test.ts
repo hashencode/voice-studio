@@ -37,6 +37,42 @@ describe("desktop IPC window registry", () => {
       }),
     ).resolves.toMatchObject({ protocolVersion: 2 });
     await expect(
+      ipc.invoke(ipcChannels.applicationActivityMarkRead, main.event, {
+        activityId: "activity-1",
+      }),
+    ).resolves.toMatchObject({ revision: 1 });
+    await expect(
+      ipc.invoke(ipcChannels.applicationActivityMarkAllRead, main.event, {}),
+    ).resolves.toMatchObject({ revision: 1 });
+    await expect(
+      ipc.invoke(ipcChannels.aiProviderProfileCreate, main.event, {
+        expectedRevision: 2,
+        displayName: "团队模型",
+        protocol: "openai-compatible",
+        modelId: "gpt-compatible",
+        endpoint: "https://ai.example.com/v1",
+        secret: "sk-create-secret",
+      }),
+    ).resolves.toEqual(aiSettingsSnapshot());
+    expect(services.createAiProviderProfile).toHaveBeenCalledWith({
+      expectedRevision: 2,
+      displayName: "团队模型",
+      protocol: "openai-compatible",
+      modelId: "gpt-compatible",
+      endpoint: "https://ai.example.com/v1",
+      secret: "sk-create-secret",
+    });
+    await expect(
+      ipc.invoke(ipcChannels.aiProviderProfileSelect, main.event, {
+        profileId: "profile-123",
+      }),
+    ).rejects.toMatchObject({ code: "INVALID_PAYLOAD" });
+    await expect(
+      ipc.invoke(ipcChannels.applicationActivityMarkRead, floating.event, {
+        activityId: "activity-1",
+      }),
+    ).rejects.toMatchObject({ code: "UNTRUSTED_SENDER" });
+    await expect(
       ipc.invoke(ipcChannels.captureControl, floating.event, {
         action: "pause",
         sessionId: "session-capture-123456",
@@ -246,8 +282,11 @@ function createServices() {
     ((snapshot: ReturnType<typeof floatingSnapshot>) => void) | undefined;
   const controlFloatingCapture = vi.fn(async () => floatingSnapshot());
   const floatingCaptureWindowAction = vi.fn(async () => floatingSnapshot());
+  const createAiProviderProfile = vi.fn(async () => aiSettingsSnapshot());
   const defined: Partial<DesktopIpcServices> = {
     applicationSnapshot: () => applicationSnapshot(1),
+    markActivityRead: vi.fn(() => applicationSnapshot(1)),
+    markAllActivityRead: vi.fn(() => applicationSnapshot(1)),
     controlCapture: vi.fn(async () => ({
       state: "paused" as const,
       sessionId: "session-capture-123456",
@@ -275,6 +314,7 @@ function createServices() {
     floatingCaptureSnapshot: () => floatingSnapshot(),
     controlFloatingCapture,
     floatingCaptureWindowAction,
+    createAiProviderProfile,
     onFloatingCaptureSnapshot: (listener) => {
       floatingListener = listener;
       return vi.fn();
@@ -294,6 +334,7 @@ function createServices() {
   return {
     controlCapture: defined.controlCapture,
     controlFloatingCapture,
+    createAiProviderProfile,
     floatingCaptureWindowAction,
     emitApplicationSnapshot(snapshot: ReturnType<typeof applicationSnapshot>) {
       applicationListener?.(snapshot);
@@ -314,6 +355,38 @@ function floatingSnapshot(): FloatingCaptureSnapshot {
     elapsedMs: 1_000,
     allowedActions: ["pause", "stop"],
     attention: false,
+  };
+}
+
+function aiSettingsSnapshot() {
+  return {
+    revision: 3,
+    profiles: [
+      {
+        profileId: "profile-123",
+        kind: "custom" as const,
+        displayName: "团队模型",
+        protocol: "openai-compatible" as const,
+        modelId: "gpt-compatible",
+        modelSummary: "gpt-compatible",
+        endpoint: "https://ai.example.com/v1",
+        endpointOrigin: "https://ai.example.com",
+        processingLocation: "cloudDirect" as const,
+        requiresConsent: true as const,
+        capabilities: {
+          selectable: true as const,
+          editable: true as const,
+          deletable: true as const,
+        },
+        secretState: "available" as const,
+      },
+    ],
+    selectedProfileId: "profile-123",
+    deviceSecurity: {
+      kind: "device-security" as const,
+      fileVaultState: "unknown" as const,
+      applicationLayerEncryption: "not-claimed" as const,
+    },
   };
 }
 

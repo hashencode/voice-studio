@@ -123,6 +123,10 @@ it("supports keyboard open, search, edit, playback, speaker and export with sema
   expect(
     await screen.findByRole("region", { name: "项目周会.wav 工作区" }),
   ).toBeVisible();
+  const commandDeck = screen.getByRole("region", { name: "音频控制台" });
+  const commandCard = commandDeck.querySelector('[data-slot="card"]');
+  expect(commandCard).toHaveClass("ring-1", "ring-foreground/10");
+  expect(commandCard).not.toHaveClass("shadow", "shadow-sm", "shadow-md");
 
   await user.type(
     screen.getByRole("searchbox", { name: "搜索音频转写" }),

@@ -18,10 +18,124 @@ struct CoreAudioInputDevice {
   let name: String
 }
 
+enum MicrophonePCMBufferMeterResult {
+  case noFrames
+  case samples(frames: UInt64, normalizedRMS: Double, normalizedPeak: Double)
+  case unsupportedFormat
+}
+
+enum MicrophoneMeterStatus {
+  case noFrames
+  case samples
+  case unsupportedFormat
+}
+
+enum MicrophonePCMBufferMeter {
+  static func measure(_ buffer: AVAudioPCMBuffer) -> MicrophonePCMBufferMeterResult {
+    let frameCount = Int(buffer.frameLength)
+    let channelCount = Int(buffer.format.channelCount)
+    guard frameCount > 0, channelCount > 0 else { return .noFrames }
+    guard
+      buffer.format.commonFormat == .pcmFormatFloat32
+        || buffer.format.commonFormat == .pcmFormatInt16
+        || buffer.format.commonFormat == .pcmFormatInt32
+    else {
+      return .unsupportedFormat
+    }
+
+    let audioBuffers = UnsafeMutableAudioBufferListPointer(buffer.mutableAudioBufferList)
+    let interleaved = buffer.format.isInterleaved
+    let stride = Int(buffer.stride)
+    guard stride > 0, audioBuffers.count >= (interleaved ? 1 : channelCount) else {
+      return .unsupportedFormat
+    }
+
+    var maximumRMS = 0.0
+    var maximumPeak = 0.0
+    for channel in 0..<channelCount {
+      let audioBuffer = audioBuffers[interleaved ? 0 : channel]
+      guard let data = audioBuffer.mData else { return .unsupportedFormat }
+      var sumOfSquares = 0.0
+      var channelPeak = 0.0
+      for frame in 0..<frameCount {
+        let offset = frame * stride + (interleaved ? channel : 0)
+        let sample: Double
+        switch buffer.format.commonFormat {
+        case .pcmFormatFloat32:
+          sample = Double(data.assumingMemoryBound(to: Float.self)[offset])
+        case .pcmFormatInt16:
+          sample = Double(data.assumingMemoryBound(to: Int16.self)[offset]) / 32_768.0
+        case .pcmFormatInt32:
+          sample = Double(data.assumingMemoryBound(to: Int32.self)[offset]) / 2_147_483_648.0
+        default:
+          return .unsupportedFormat
+        }
+        let normalized = min(1, max(-1, sample))
+        sumOfSquares += normalized * normalized
+        channelPeak = max(channelPeak, abs(normalized))
+      }
+      maximumRMS = max(maximumRMS, sqrt(sumOfSquares / Double(frameCount)))
+      maximumPeak = max(maximumPeak, channelPeak)
+    }
+    return .samples(
+      frames: UInt64(frameCount),
+      normalizedRMS: maximumRMS,
+      normalizedPeak: maximumPeak
+    )
+  }
+}
+
+struct MicrophoneMeterAccumulator {
+  private let retentionNanoseconds: UInt64
+  private var windowStartedAt: UInt64?
+  private var maximumRMS = 0.0
+  private var maximumPeak = 0.0
+
+  init(retentionNanoseconds: UInt64 = 250_000_000) {
+    self.retentionNanoseconds = retentionNanoseconds
+  }
+
+  mutating func record(
+    normalizedRMS: Double,
+    normalizedPeak: Double,
+    at timestamp: UInt64
+  ) {
+    if windowStartedAt == nil {
+      windowStartedAt = timestamp
+    }
+    maximumRMS = max(maximumRMS, min(1, max(0, normalizedRMS)))
+    maximumPeak = max(maximumPeak, min(1, max(0, normalizedPeak)))
+  }
+
+  mutating func consume(at timestamp: UInt64) -> (
+    normalizedRMS: Double,
+    normalizedPeak: Double
+  ) {
+    guard let windowStartedAt,
+      timestamp >= windowStartedAt,
+      timestamp - windowStartedAt <= retentionNanoseconds
+    else {
+      reset()
+      return (0, 0)
+    }
+    let result = (maximumRMS, maximumPeak)
+    reset()
+    return result
+  }
+
+  private mutating func reset() {
+    windowStartedAt = nil
+    maximumRMS = 0
+    maximumPeak = 0
+  }
+}
+
 final class MicrophoneCapture {
   struct MeterSnapshot {
     let observedFrames: UInt64
+    let normalizedRMS: Double
     let normalizedPeak: Double
+    let status: MicrophoneMeterStatus
   }
 
   private let engine = AVAudioEngine()
@@ -37,6 +151,8 @@ final class MicrophoneCapture {
   private var configurationObserver: NSObjectProtocol?
   private let selectedDeviceUniqueID: String?
   private let meterLock = NSLock()
+  private var meterAccumulator = MicrophoneMeterAccumulator()
+  private var meterStatus = MicrophoneMeterStatus.noFrames
 
   init(
     selectedDeviceUniqueID: String? = nil,
@@ -50,6 +166,10 @@ final class MicrophoneCapture {
 
   func setBufferHandler(_ handler: ((AVAudioPCMBuffer) -> Void)?) {
     bufferHandler = handler
+  }
+
+  func setHealthHandler(_ handler: ((String) -> Void)?) {
+    healthHandler = handler
   }
 
   static func permissionWireState() -> String {
@@ -113,8 +233,21 @@ final class MicrophoneCapture {
       ) { [weak self] buffer, _ in
         guard let self else { return }
         self.meterLock.lock()
-        self.observedFrames &+= UInt64(buffer.frameLength)
-        self.normalizedPeak = Self.peak(buffer)
+        switch MicrophonePCMBufferMeter.measure(buffer) {
+        case .noFrames:
+          self.meterStatus = .noFrames
+        case let .samples(frames, normalizedRMS, normalizedPeak):
+          self.observedFrames &+= frames
+          self.normalizedPeak = normalizedPeak
+          self.meterStatus = .samples
+          self.meterAccumulator.record(
+            normalizedRMS: normalizedRMS,
+            normalizedPeak: normalizedPeak,
+            at: DispatchTime.now().uptimeNanoseconds
+          )
+        case .unsupportedFormat:
+          self.meterStatus = .unsupportedFormat
+        }
         self.meterLock.unlock()
         guard let handler = self.bufferHandler,
           let copy = CaptureChunkJournal.clone(buffer)
@@ -154,9 +287,12 @@ final class MicrophoneCapture {
   func meterSnapshot() -> MeterSnapshot {
     meterLock.lock()
     defer { meterLock.unlock() }
+    let retained = meterAccumulator.consume(at: DispatchTime.now().uptimeNanoseconds)
     return MeterSnapshot(
       observedFrames: observedFrames,
-      normalizedPeak: normalizedPeak
+      normalizedRMS: retained.normalizedRMS,
+      normalizedPeak: retained.normalizedPeak,
+      status: meterStatus
     )
   }
 
@@ -329,34 +465,6 @@ final class MicrophoneCapture {
     }
     guard status == noErr else { return nil }
     return value as String
-  }
-
-  private static func peak(_ buffer: AVAudioPCMBuffer) -> Double {
-    let frameCount = Int(buffer.frameLength)
-    let channelCount = Int(buffer.format.channelCount)
-    guard frameCount > 0, channelCount > 0 else { return 0 }
-    var peak: Float = 0
-    if let channels = buffer.floatChannelData {
-      for channel in 0..<channelCount {
-        for frame in 0..<frameCount {
-          peak = max(peak, abs(channels[channel][frame]))
-        }
-      }
-      return min(1, max(0, Double(peak)))
-    }
-    if let channels = buffer.int16ChannelData {
-      var integerPeak: Int32 = 0
-      for channel in 0..<channelCount {
-        for frame in 0..<frameCount {
-          integerPeak = max(
-            integerPeak,
-            abs(Int32(channels[channel][frame]))
-          )
-        }
-      }
-      return min(1, Double(integerPeak) / Double(Int16.max))
-    }
-    return 0
   }
 
   func pause() {

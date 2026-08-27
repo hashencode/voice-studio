@@ -10,6 +10,7 @@ import type {
   ApplicationSnapshot,
   Voice2TextDesktopApi,
 } from "../../src/shared/contracts";
+import { companionRendererStubs } from "../fixtures/companion";
 
 const application: ApplicationSnapshot = {
   protocolVersion: 2,
@@ -98,6 +99,7 @@ function installApi() {
     },
   };
   const api = {
+    ...companionRendererStubs(),
     getApplicationSnapshot: vi.fn(async () => current),
     navigate: vi.fn(
       async (section: ApplicationSnapshot["navigation"]["section"]) => {
@@ -191,10 +193,10 @@ describe("audio AI Renderer e2e", () => {
     await user.click(
       within(
         screen.getByRole("complementary", { name: "设置上下文面板" }),
-      ).getByRole("button", { name: "音频智能" }),
+      ).getByRole("link", { name: "云端模型" }),
     );
     expect(
-      await screen.findByRole("heading", { name: "音频智能", level: 1 }),
+      await screen.findByRole("heading", { name: "云端模型", level: 2 }),
     ).toBeVisible();
     await waitFor(() => expect(api.getAiSettings).toHaveBeenCalledTimes(1));
     expect(api.generateAudioAi).toHaveBeenCalledTimes(1);

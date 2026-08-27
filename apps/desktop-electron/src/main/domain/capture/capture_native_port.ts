@@ -6,6 +6,16 @@ import type {
   MicrophoneTestSnapshot,
 } from "../../../shared/contracts";
 
+export class MicrophoneTestNativeError extends Error {
+  constructor(
+    readonly kind: "transport" | "response",
+    options?: ErrorOptions,
+  ) {
+    super(`microphone test native ${kind} failure`, options);
+    this.name = "MicrophoneTestNativeError";
+  }
+}
+
 export interface CaptureNativePort {
   preflight(command: {
     minimumFreeBytes: number;
@@ -26,5 +36,6 @@ export interface CaptureNativePort {
     microphoneDeviceId?: string,
   ): Promise<MicrophoneTestSnapshot>;
   microphoneTestSnapshot(testId: string): Promise<MicrophoneTestSnapshot>;
-  stopMicrophoneTest(testId: string): Promise<MicrophoneTestSnapshot>;
+  finishMicrophoneTest(testId: string): Promise<MicrophoneTestSnapshot>;
+  cancelMicrophoneTest(testId: string): Promise<MicrophoneTestSnapshot>;
 }

@@ -1,6 +1,7 @@
 import {
   applicationSnapshotSchema,
-  acknowledgeActivityRequestSchema,
+  markActivityReadRequestSchema,
+  markAllActivityReadRequestSchema,
   bootstrapActionSchema,
   cancelProcessingResponseSchema,
   retryProcessingResponseSchema,
@@ -44,6 +45,8 @@ import {
   microphoneTestStartRequestSchema,
   microphoneTestControlRequestSchema,
   microphoneTestSnapshotSchema,
+  microphoneSettingsOpenRequestSchema,
+  microphoneSettingsOpenResultSchema,
   floatingCapturePreferenceRequestSchema,
   floatingCapturePreferenceSchema,
   captionSnapshotRequestSchema,
@@ -51,9 +54,10 @@ import {
   captionSnapshotSchema,
   type CaptionSnapshot,
   getAiSettingsRequestSchema,
-  saveAiSettingsRequestSchema,
-  replaceAiProviderSecretRequestSchema,
-  deleteAiProviderSecretRequestSchema,
+  createAiProviderProfileRequestSchema,
+  updateAiProviderProfileRequestSchema,
+  selectAiProviderProfileRequestSchema,
+  deleteAiProviderProfileRequestSchema,
   prepareAudioAiRequestSchema,
   getAudioAiSnapshotRequestSchema,
   generateAudioAiRequestSchema,
@@ -74,6 +78,7 @@ import {
   localModelSnapshotSchema,
   localModelIntentSchema,
   changeLocalModelRootRequestSchema,
+  openLocalModelRootRequestSchema,
   type LocalModelSnapshot,
 } from "../shared/contracts";
 
@@ -122,6 +127,12 @@ export function createDesktopApi(
           ipcChannels.localModelsChangeRoot,
           changeLocalModelRootRequestSchema.parse(options),
         ),
+      );
+    },
+    async openLocalModelRoot() {
+      await bridge.invoke(
+        ipcChannels.localModelsOpenRoot,
+        openLocalModelRootRequestSchema.parse({}),
       );
     },
     onLocalModelSnapshot(listener: (snapshot: LocalModelSnapshot) => void) {
@@ -214,28 +225,36 @@ export function createDesktopApi(
         await bridge.invoke(ipcChannels.aiSettingsGet, payload),
       );
     },
-    async saveAiSettings(
-      options: Parameters<Voice2TextDesktopApi["saveAiSettings"]>[0],
+    async createAiProviderProfile(
+      options: Parameters<Voice2TextDesktopApi["createAiProviderProfile"]>[0],
     ) {
-      const payload = saveAiSettingsRequestSchema.parse(options);
+      const payload = createAiProviderProfileRequestSchema.parse(options);
       return aiSettingsSnapshotSchema.parse(
-        await bridge.invoke(ipcChannels.aiSettingsSave, payload),
+        await bridge.invoke(ipcChannels.aiProviderProfileCreate, payload),
       );
     },
-    async replaceAiProviderSecret(
-      options: Parameters<Voice2TextDesktopApi["replaceAiProviderSecret"]>[0],
+    async updateAiProviderProfile(
+      options: Parameters<Voice2TextDesktopApi["updateAiProviderProfile"]>[0],
     ) {
-      const payload = replaceAiProviderSecretRequestSchema.parse(options);
+      const payload = updateAiProviderProfileRequestSchema.parse(options);
       return aiSettingsSnapshotSchema.parse(
-        await bridge.invoke(ipcChannels.aiSecretReplace, payload),
+        await bridge.invoke(ipcChannels.aiProviderProfileUpdate, payload),
       );
     },
-    async deleteAiProviderSecret(
-      options: Parameters<Voice2TextDesktopApi["deleteAiProviderSecret"]>[0],
+    async selectAiProviderProfile(
+      options: Parameters<Voice2TextDesktopApi["selectAiProviderProfile"]>[0],
     ) {
-      const payload = deleteAiProviderSecretRequestSchema.parse(options);
+      const payload = selectAiProviderProfileRequestSchema.parse(options);
       return aiSettingsSnapshotSchema.parse(
-        await bridge.invoke(ipcChannels.aiSecretDelete, payload),
+        await bridge.invoke(ipcChannels.aiProviderProfileSelect, payload),
+      );
+    },
+    async deleteAiProviderProfile(
+      options: Parameters<Voice2TextDesktopApi["deleteAiProviderProfile"]>[0],
+    ) {
+      const payload = deleteAiProviderProfileRequestSchema.parse(options);
+      return aiSettingsSnapshotSchema.parse(
+        await bridge.invoke(ipcChannels.aiProviderProfileDelete, payload),
       );
     },
     async prepareAudioAi(
@@ -303,10 +322,17 @@ export function createDesktopApi(
       );
       return applicationSnapshotSchema.parse(response);
     },
-    async acknowledgeActivity(throughId: string) {
+    async markActivityRead(activityId: string) {
       const response = await bridge.invoke(
-        ipcChannels.applicationActivityAcknowledge,
-        acknowledgeActivityRequestSchema.parse({ throughId }),
+        ipcChannels.applicationActivityMarkRead,
+        markActivityReadRequestSchema.parse({ activityId }),
+      );
+      return applicationSnapshotSchema.parse(response);
+    },
+    async markAllActivityRead() {
+      const response = await bridge.invoke(
+        ipcChannels.applicationActivityMarkAllRead,
+        markAllActivityReadRequestSchema.parse({}),
       );
       return applicationSnapshotSchema.parse(response);
     },
@@ -441,11 +467,27 @@ export function createDesktopApi(
         ),
       );
     },
-    async stopMicrophoneTest(testId: string) {
+    async finishMicrophoneTest(testId: string) {
       return microphoneTestSnapshotSchema.parse(
         await bridge.invoke(
-          ipcChannels.microphoneTestStop,
+          ipcChannels.microphoneTestFinish,
           microphoneTestControlRequestSchema.parse({ testId }),
+        ),
+      );
+    },
+    async cancelMicrophoneTest(testId: string) {
+      return microphoneTestSnapshotSchema.parse(
+        await bridge.invoke(
+          ipcChannels.microphoneTestCancel,
+          microphoneTestControlRequestSchema.parse({ testId }),
+        ),
+      );
+    },
+    async openMicrophoneSettings() {
+      return microphoneSettingsOpenResultSchema.parse(
+        await bridge.invoke(
+          ipcChannels.microphoneSettingsOpen,
+          microphoneSettingsOpenRequestSchema.parse({}),
         ),
       );
     },

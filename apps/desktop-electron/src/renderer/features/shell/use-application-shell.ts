@@ -7,19 +7,33 @@ import type {
 } from "@shared/contracts";
 import { useProcessingTasks } from "@/features/processing/use-processing-tasks";
 import type { PersistedShellSection } from "@/features/shell/context-pane-contract";
+import { useModalCoordinator } from "@/components/ui/modal-coordinator";
 
 export function useApplicationShell() {
+  const { modalOpen } = useModalCoordinator();
   const [snapshot, setSnapshot] = React.useState<ApplicationSnapshot | null>(
     null,
   );
   const [loadError, setLoadError] = React.useState<string | null>(null);
   const deepLinkApplied = React.useRef(false);
+  const lastObservedNavigationSection = React.useRef<ShellSection | null>(null);
 
-  const accept = React.useCallback((next: ApplicationSnapshot) => {
-    setSnapshot((current) =>
-      !current || next.revision > current.revision ? next : current,
-    );
-  }, []);
+  const accept = React.useCallback(
+    (next: ApplicationSnapshot) => {
+      setSnapshot((current) => {
+        if (current && next.revision <= current.revision) return current;
+        const navigationChanged =
+          lastObservedNavigationSection.current !== next.navigation.section;
+        lastObservedNavigationSection.current = next.navigation.section;
+        if (!current) return next;
+        if (modalOpen || !navigationChanged) {
+          return { ...next, navigation: current.navigation };
+        }
+        return next;
+      });
+    },
+    [modalOpen],
+  );
   const processing = useProcessingTasks(
     accept,
     snapshot?.profile.phase === "ready",
@@ -67,7 +81,7 @@ export function useApplicationShell() {
     };
   }, [accept]);
 
-  const navigate = React.useCallback(
+  const navigateAuthorized = React.useCallback(
     async (section: PersistedShellSection) => {
       const applicationSection = toApplicationSection(section);
       if (
@@ -80,6 +94,13 @@ export function useApplicationShell() {
       accept(await window.voice2text.navigate(applicationSection));
     },
     [accept, snapshot],
+  );
+  const navigate = React.useCallback(
+    async (section: PersistedShellSection) => {
+      if (modalOpen) return;
+      await navigateAuthorized(section);
+    },
+    [modalOpen, navigateAuthorized],
   );
 
   const requestBootstrapAction = React.useCallback(
@@ -94,6 +115,7 @@ export function useApplicationShell() {
     loadError,
     ...processing,
     navigate,
+    navigateAuthorized,
     requestBootstrapAction,
   };
 }

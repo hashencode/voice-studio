@@ -3,6 +3,11 @@ import { z } from "zod";
 import { sha256Schema } from "./import_processing";
 
 export const aiProviderIdSchema = z.enum(["deepseek", "openai-compatible"]);
+export const aiProviderProfileIdSchema = z
+  .string()
+  .min(1)
+  .max(128)
+  .regex(/^[A-Za-z0-9][A-Za-z0-9._:-]*$/);
 export const aiSecretStateSchema = z.enum([
   "available",
   "missing",
@@ -38,23 +43,59 @@ export const audioAiErrorCodeSchema = z.enum([
   "AI_ATTEMPT_CONFLICT",
 ]);
 
-export const aiProviderConfigSchema = z
+const aiProviderCapabilitiesSchema = z
   .object({
-    providerId: aiProviderIdSchema,
-    displayName: z.string().min(1).max(128),
+    selectable: z.literal(true),
+    editable: z.boolean(),
+    deletable: z.boolean(),
+  })
+  .strict();
+
+export const customAiProviderProfileSchema = z
+  .object({
+    profileId: aiProviderProfileIdSchema,
+    kind: z.literal("custom"),
+    displayName: z.string().trim().min(1).max(128),
+    protocol: aiProviderIdSchema,
     modelId: z.string().trim().min(1).max(256),
+    modelSummary: z.string().trim().min(1).max(256),
     endpoint: z.string().url().max(2_048),
     endpointOrigin: z.string().url().max(2_048),
     processingLocation: z.literal("cloudDirect"),
     requiresConsent: z.literal(true),
+    capabilities: aiProviderCapabilitiesSchema.extend({
+      editable: z.literal(true),
+      deletable: z.literal(true),
+    }),
+    secretState: aiSecretStateSchema,
   })
   .strict();
+
+export const hostedAiProviderProfileSchema = z
+  .object({
+    profileId: aiProviderProfileIdSchema,
+    kind: z.literal("hosted"),
+    displayName: z.string().trim().min(1).max(128),
+    modelSummary: z.string().trim().min(1).max(256),
+    processingLocation: z.literal("cloudHosted"),
+    requiresConsent: z.literal(true),
+    capabilities: aiProviderCapabilitiesSchema.extend({
+      editable: z.literal(false),
+      deletable: z.literal(false),
+    }),
+  })
+  .strict();
+
+export const aiProviderProfileSchema = z.discriminatedUnion("kind", [
+  customAiProviderProfileSchema,
+  hostedAiProviderProfileSchema,
+]);
 
 export const aiSettingsSnapshotSchema = z
   .object({
     revision: z.number().int().nonnegative(),
-    config: aiProviderConfigSchema,
-    secretState: aiSecretStateSchema,
+    profiles: z.array(aiProviderProfileSchema).max(100),
+    selectedProfileId: aiProviderProfileIdSchema.nullable(),
     deviceSecurity: z
       .object({
         kind: z.literal("device-security"),
@@ -99,6 +140,7 @@ export const audioAiNoteSchema = z
 export const audioAiConsentIdentitySchema = z
   .object({
     version: z.literal(1),
+    profileId: aiProviderProfileIdSchema,
     providerId: aiProviderIdSchema,
     endpointOrigin: z.string().url().max(2_048),
     endpointIdentitySha256: sha256Schema,
@@ -110,6 +152,7 @@ export const audioAiConsentPreviewSchema = z
   .object({
     audioId: z.number().int().positive(),
     generationId: z.number().int().positive(),
+    profileId: aiProviderProfileIdSchema,
     providerId: aiProviderIdSchema,
     modelId: z.string().min(1).max(256),
     endpointOrigin: z.string().url().max(2_048),
@@ -142,21 +185,41 @@ export const audioAiSnapshotSchema = z
   .strict();
 
 export const getAiSettingsRequestSchema = z.object({}).strict();
-export const saveAiSettingsRequestSchema = z
+const customAiProviderInputShape = {
+  displayName: z.string().trim().min(1).max(128),
+  protocol: aiProviderIdSchema,
+  modelId: z.string().trim().min(1).max(256),
+  endpoint: z.string().trim().url().max(2_048),
+};
+const expectedAiSettingsRevisionSchema = z.number().int().nonnegative();
+const aiProviderSecretSchema = z.string().trim().min(1).max(4_096);
+
+export const createAiProviderProfileRequestSchema = z
   .object({
-    providerId: aiProviderIdSchema,
-    modelId: z.string().trim().min(1).max(256),
-    endpoint: z.string().trim().url().max(2_048),
+    expectedRevision: expectedAiSettingsRevisionSchema,
+    ...customAiProviderInputShape,
+    secret: aiProviderSecretSchema,
   })
   .strict();
-export const replaceAiProviderSecretRequestSchema = z
+export const updateAiProviderProfileRequestSchema = z
   .object({
-    providerId: aiProviderIdSchema,
-    secret: z.string().trim().min(1).max(4_096),
+    expectedRevision: expectedAiSettingsRevisionSchema,
+    profileId: aiProviderProfileIdSchema,
+    ...customAiProviderInputShape,
+    secret: aiProviderSecretSchema.optional(),
   })
   .strict();
-export const deleteAiProviderSecretRequestSchema = z
-  .object({ providerId: aiProviderIdSchema })
+export const selectAiProviderProfileRequestSchema = z
+  .object({
+    expectedRevision: expectedAiSettingsRevisionSchema,
+    profileId: aiProviderProfileIdSchema,
+  })
+  .strict();
+export const deleteAiProviderProfileRequestSchema = z
+  .object({
+    expectedRevision: expectedAiSettingsRevisionSchema,
+    profileId: aiProviderProfileIdSchema,
+  })
   .strict();
 export const prepareAudioAiRequestSchema = z
   .object({
@@ -192,6 +255,22 @@ export const retryAudioAiRequestSchema = z
   .strict();
 
 export type AiSettingsSnapshot = z.infer<typeof aiSettingsSnapshotSchema>;
+export type AiProviderProfile = z.infer<typeof aiProviderProfileSchema>;
+export type CustomAiProviderProfile = z.infer<
+  typeof customAiProviderProfileSchema
+>;
+export type CreateAiProviderProfileRequest = z.infer<
+  typeof createAiProviderProfileRequestSchema
+>;
+export type UpdateAiProviderProfileRequest = z.infer<
+  typeof updateAiProviderProfileRequestSchema
+>;
+export type SelectAiProviderProfileRequest = z.infer<
+  typeof selectAiProviderProfileRequestSchema
+>;
+export type DeleteAiProviderProfileRequest = z.infer<
+  typeof deleteAiProviderProfileRequestSchema
+>;
 export type AudioAiErrorCode = z.infer<typeof audioAiErrorCodeSchema>;
 export type AudioAiConsentPreview = z.infer<typeof audioAiConsentPreviewSchema>;
 export type AudioAiSnapshot = z.infer<typeof audioAiSnapshotSchema>;

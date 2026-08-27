@@ -9,6 +9,7 @@ final class CaptureControllerTests: XCTestCase {
     defer { try? FileManager.default.removeItem(at: root) }
     let engine = TestMicrophoneEngine()
     engine.frames = 1_024
+    engine.rms = 0.01
     engine.peak = 0.2
     let controller = try CaptureController(
       captureRootPath: root.path,
@@ -24,20 +25,24 @@ final class CaptureControllerTests: XCTestCase {
       testId: started.testId
     )
     XCTAssertEqual(running.observedFrames, 1_024)
-    XCTAssertTrue(running.detectedInput)
-    let stopped = try controller.stopMicrophoneTest(testId: started.testId)
-    XCTAssertEqual(stopped.state, "stopped")
+    XCTAssertTrue(running.observedSound)
+    XCTAssertEqual(running.normalizedRMS, 0.01)
+    let stopped = try controller.finishMicrophoneTest(testId: started.testId)
+    XCTAssertEqual(stopped.state, "finished")
+    XCTAssertEqual(stopped.reason, "detected")
     XCTAssertEqual(engine.stopCount, 1)
     XCTAssertEqual(try FileManager.default.contentsOfDirectory(atPath: root.path), [])
   }
 
-  func testMicrophoneTestRejectsConcurrentStartAndKeepsSilenceNonfatal() throws {
+  func testMicrophoneTestRejectsConcurrentStartAndKeepsSilenceRunningPastThirtySeconds() throws {
     let root = try temporaryRoot()
     defer { try? FileManager.default.removeItem(at: root) }
     let engine = TestMicrophoneEngine()
+    var now: UInt64 = 1_000_000_000
     let controller = try CaptureController(
       captureRootPath: root.path,
-      microphoneTestFactory: { _ in engine }
+      microphoneTestFactory: { _ in engine },
+      nowNanoseconds: { now }
     )
     let first = try controller.startMicrophoneTest(
       testId: "mic-test-silent-test-123456",
@@ -49,10 +54,115 @@ final class CaptureControllerTests: XCTestCase {
         microphoneDeviceId: nil
       )
     )
-    XCTAssertFalse(
-      try controller.microphoneTestSnapshot(testId: first.testId).detectedInput
+    now += 31_000_000_000
+    let running = try controller.microphoneTestSnapshot(testId: first.testId)
+    XCTAssertEqual(running.state, "running")
+    XCTAssertEqual(running.elapsedMs, 31_000)
+    XCTAssertFalse(running.observedSound)
+    XCTAssertNoThrow(try controller.cancelMicrophoneTest(testId: first.testId))
+  }
+
+  func testMicrophoneSoundUsesRMSFloorAndLatchesWithoutPeakClassification() throws {
+    let root = try temporaryRoot()
+    defer { try? FileManager.default.removeItem(at: root) }
+    let engine = TestMicrophoneEngine()
+    engine.frames = 1_024
+    engine.peak = 0.9
+    engine.rms = pow(10, -55.0 / 20.0) * 0.99
+    let controller = try CaptureController(
+      captureRootPath: root.path,
+      microphoneTestFactory: { _ in engine }
     )
-    XCTAssertNoThrow(try controller.stopMicrophoneTest(testId: first.testId))
+    let started = try controller.startMicrophoneTest(
+      testId: "mic-test-rms-floor-123456",
+      microphoneDeviceId: nil
+    )
+    XCTAssertFalse(started.observedSound)
+    XCTAssertFalse(
+      try controller.microphoneTestSnapshot(testId: started.testId).observedSound
+    )
+
+    engine.rms = pow(10, -55.0 / 20.0)
+    XCTAssertTrue(
+      try controller.microphoneTestSnapshot(testId: started.testId).observedSound
+    )
+    engine.rms = 0
+    engine.peak = 0
+    XCTAssertTrue(
+      try controller.microphoneTestSnapshot(testId: started.testId).observedSound
+    )
+  }
+
+  func testMicrophoneFinishDistinguishesNoFramesAndNoSound() throws {
+    let root = try temporaryRoot()
+    defer { try? FileManager.default.removeItem(at: root) }
+    let engines = [TestMicrophoneEngine(), TestMicrophoneEngine()]
+    engines[1].frames = 1_024
+    var index = 0
+    let controller = try CaptureController(
+      captureRootPath: root.path,
+      microphoneTestFactory: { _ in
+        defer { index += 1 }
+        return engines[index]
+      }
+    )
+
+    let empty = try controller.startMicrophoneTest(
+      testId: "mic-test-no-frames-123456",
+      microphoneDeviceId: nil
+    )
+    let emptyFinish = try controller.finishMicrophoneTest(testId: empty.testId)
+    XCTAssertEqual(emptyFinish.reason, "no-audio-frames")
+
+    let silent = try controller.startMicrophoneTest(
+      testId: "mic-test-no-sound-123456",
+      microphoneDeviceId: nil
+    )
+    let silentFinish = try controller.finishMicrophoneTest(testId: silent.testId)
+    XCTAssertEqual(silentFinish.reason, "no-sound-observed")
+  }
+
+  func testMicrophoneCancelAndRuntimeFailureAreIdempotent() throws {
+    let root = try temporaryRoot()
+    defer { try? FileManager.default.removeItem(at: root) }
+    let engine = TestMicrophoneEngine()
+    let controller = try CaptureController(
+      captureRootPath: root.path,
+      microphoneTestFactory: { _ in engine }
+    )
+    let started = try controller.startMicrophoneTest(
+      testId: "mic-test-runtime-health-123456",
+      microphoneDeviceId: nil
+    )
+    engine.reportHealthFailure("audio_engine_configuration_changed")
+    let failed = try controller.microphoneTestSnapshot(testId: started.testId)
+    XCTAssertEqual(failed.state, "failed")
+    XCTAssertEqual(failed.reason, "device-unavailable")
+    XCTAssertEqual(engine.stopCount, 1)
+    XCTAssertEqual(
+      try controller.cancelMicrophoneTest(testId: started.testId).reason,
+      "device-unavailable"
+    )
+    XCTAssertEqual(engine.stopCount, 1)
+
+    let nextEngine = TestMicrophoneEngine()
+    let nextController = try CaptureController(
+      captureRootPath: root.path,
+      microphoneTestFactory: { _ in nextEngine }
+    )
+    let next = try nextController.startMicrophoneTest(
+      testId: "mic-test-cancel-repeat-123456",
+      microphoneDeviceId: nil
+    )
+    XCTAssertEqual(
+      try nextController.cancelMicrophoneTest(testId: next.testId).state,
+      "cancelled"
+    )
+    XCTAssertEqual(
+      try nextController.cancelMicrophoneTest(testId: next.testId).state,
+      "cancelled"
+    )
+    XCTAssertEqual(nextEngine.stopCount, 1)
   }
 
   func testPreflightReportsEveryFrozenBranchWithoutBlockingOnOptionalCaptions() {
@@ -549,12 +659,26 @@ final class CaptureControllerTests: XCTestCase {
 
 private final class TestMicrophoneEngine: MicrophoneTestEngine {
   var frames: UInt64 = 0
+  var rms: Double = 0
   var peak: Double = 0
+  var status = MicrophoneMeterStatus.samples
   var stopCount = 0
+  private var healthHandler: ((String) -> Void)?
 
   func start() throws {}
   func stop() { stopCount += 1 }
-  func snapshot() -> (observedFrames: UInt64, normalizedPeak: Double) {
-    (frames, peak)
+  func setHealthHandler(_ handler: ((String) -> Void)?) {
+    healthHandler = handler
+  }
+  func snapshot() -> MicrophoneCapture.MeterSnapshot {
+    MicrophoneCapture.MeterSnapshot(
+      observedFrames: frames,
+      normalizedRMS: rms,
+      normalizedPeak: peak,
+      status: status
+    )
+  }
+  func reportHealthFailure(_ reason: String) {
+    healthHandler?(reason)
   }
 }

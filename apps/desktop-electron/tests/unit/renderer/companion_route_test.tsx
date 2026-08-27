@@ -75,13 +75,9 @@ describe("Companion route composition", () => {
     expect(
       await within(pane).findByRole("button", { name: /Alpha Phone/ }),
     ).toBeVisible();
-    const pairingAction = within(pane).getByRole("button", {
-      name: "添加或配对设备",
-    });
-    expect(pairingAction).toBeVisible();
     expect(
-      pairingAction.closest("[data-context-pane-fixed-header]"),
-    ).not.toBeNull();
+      within(pane).queryByRole("button", { name: "配对设备" }),
+    ).not.toBeInTheDocument();
     expect(
       within(pane).queryByText("选择只会切换查看内容，不会主动连接设备。"),
     ).not.toBeInTheDocument();
@@ -89,20 +85,27 @@ describe("Companion route composition", () => {
     expect(list).toHaveAttribute("data-flat-row-list", "true");
     const alphaRow = within(list).getByRole("button", { name: /Alpha Phone/ });
     expect(alphaRow).toHaveAttribute("data-flat-row", "true");
+    expect(alphaRow).toHaveAttribute("data-slot", "item");
     expect(alphaRow).not.toHaveClass("rounded-lg", "border");
     expect(
       within(pane).getByRole("button", { name: /Beta Phone/ }),
     ).toHaveTextContent("凭据缺失");
     expect(within(pane).queryByText("Revoked Phone")).not.toBeInTheDocument();
+    expect(screen.queryByRole("heading", { level: 1 })).not.toBeInTheDocument();
     expect(
-      screen.getByRole("heading", { name: "请选择设备", level: 1 }),
+      screen.getByRole("status", { name: "手机接收器已就绪" }),
     ).toBeVisible();
-    expect(screen.getByText(/多个已信任设备是正常状态/)).toBeVisible();
 
     await user.click(within(pane).getByRole("button", { name: /Alpha Phone/ }));
     expect(
       screen.getByRole("heading", { name: "Alpha Phone", level: 1 }),
     ).toBeVisible();
+    const pairingAction = within(pane).getByRole("button", {
+      name: "配对设备",
+    });
+    expect(
+      pairingAction.closest("[data-context-pane-fixed-footer]"),
+    ).not.toBeNull();
     expect(screen.getByText("Alpha.wav")).toBeVisible();
     expect(
       screen.getByRole("progressbar", {
@@ -145,8 +148,9 @@ describe("Companion route composition", () => {
       within(empty).getByRole("heading", { name: "没有已信任设备" }),
     ).toBeVisible();
     expect(within(pane).queryByText("Old Phone")).not.toBeInTheDocument();
+    expect(screen.queryByRole("heading", { level: 1 })).not.toBeInTheDocument();
     expect(
-      await screen.findByRole("heading", { name: "配对手机", level: 1 }),
+      screen.getByRole("status", { name: "手机接收器已就绪" }),
     ).toBeVisible();
     expect(screen.queryByText("历史录音.wav")).not.toBeInTheDocument();
 
@@ -158,7 +162,7 @@ describe("Companion route composition", () => {
     expect(screen.getByText("已签收，可由发送端删除原件")).toBeVisible();
   });
 
-  it("auto-selects one device and restores a still-valid viewed selection", async () => {
+  it("never auto-selects one device and restores a still-valid explicit selection", async () => {
     const first: CompanionSnapshot = {
       ...baseSnapshot,
       revision: 3,
@@ -168,9 +172,8 @@ describe("Companion route composition", () => {
     const user = userEvent.setup();
     render(<App />);
 
-    expect(
-      await screen.findByRole("heading", { name: "Alpha Phone", level: 1 }),
-    ).toBeVisible();
+    await screen.findByRole("button", { name: /Alpha Phone/ });
+    expect(screen.queryByRole("heading", { level: 1 })).not.toBeInTheDocument();
 
     act(() =>
       emitCompanion({
@@ -182,9 +185,7 @@ describe("Companion route composition", () => {
         ],
       }),
     );
-    expect(
-      screen.getByRole("heading", { name: "Alpha Phone", level: 1 }),
-    ).toBeVisible();
+    expect(screen.queryByRole("heading", { level: 1 })).not.toBeInTheDocument();
 
     const pane = screen.getByRole("complementary", { name: "互联上下文面板" });
     await user.click(within(pane).getByRole("button", { name: /Beta Phone/ }));

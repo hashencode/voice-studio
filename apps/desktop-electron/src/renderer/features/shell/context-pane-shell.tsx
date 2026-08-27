@@ -54,9 +54,9 @@ export function ContextPaneShell({
     >
       <SidebarHeader
         data-context-pane-fixed-header="true"
-        className="min-h-[58px] shrink-0 gap-2 border-b p-2"
+        className={`${header ? "min-h-[58px]" : "h-[58px]"} shrink-0 gap-2 border-b p-2`}
       >
-        <div className="flex min-h-[42px] min-w-0 items-center justify-between gap-2 px-2">
+        <div className="flex h-[42px] min-w-0 shrink-0 items-center justify-between gap-2 px-2">
           <h2 className="font-semibold">{label}</h2>
           {collapseControl}
         </div>

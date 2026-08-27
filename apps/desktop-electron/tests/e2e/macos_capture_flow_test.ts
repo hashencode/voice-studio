@@ -403,21 +403,28 @@ function nativeFixture() {
     microphoneTestSnapshot: vi.fn(async (testId: string) =>
       microphoneTestSnapshot(testId, "running"),
     ),
-    stopMicrophoneTest: vi.fn(async (testId: string) =>
-      microphoneTestSnapshot(testId, "stopped"),
+    finishMicrophoneTest: vi.fn(async (testId: string) =>
+      microphoneTestSnapshot(testId, "finished"),
+    ),
+    cancelMicrophoneTest: vi.fn(async (testId: string) =>
+      microphoneTestSnapshot(testId, "cancelled"),
     ),
   } satisfies CaptureNativePort;
 }
 
-function microphoneTestSnapshot(testId: string, state: "running" | "stopped") {
+function microphoneTestSnapshot(
+  testId: string,
+  state: "running" | "finished" | "cancelled",
+) {
   return {
     testId,
     state,
+    ...(state === "finished" ? { reason: "no-audio-frames" as const } : {}),
     elapsedMs: 0,
-    remainingMs: 30_000,
+    normalizedRMS: 0,
     normalizedPeak: 0,
     observedFrames: 0,
-    detectedInput: false,
+    observedSound: false,
   } as const;
 }
 

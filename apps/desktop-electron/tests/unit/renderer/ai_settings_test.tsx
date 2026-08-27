@@ -29,7 +29,23 @@ const configured = {
 function api(overrides: Record<string, unknown> = {}) {
   return {
     getAiSettings: vi.fn(async () => configured),
-    saveAiSettings: vi.fn(async () => configured),
+    saveAiSettings: vi.fn(
+      async (
+        options: Parameters<Voice2TextDesktopApi["saveAiSettings"]>[0],
+      ) => ({
+        ...configured,
+        revision: configured.revision + 1,
+        config: {
+          ...configured.config,
+          ...options,
+          displayName:
+            options.providerId === "deepseek"
+              ? "DeepSeek"
+              : "OpenAI-compatible",
+          endpointOrigin: new URL(options.endpoint).origin,
+        },
+      }),
+    ),
     replaceAiProviderSecret: vi.fn(async () => configured),
     deleteAiProviderSecret: vi.fn(async () => ({
       ...configured,
@@ -48,19 +64,61 @@ describe("AI settings security boundary", () => {
     render(<AiSettingsFeature api={desktop} />);
 
     expect(
-      await screen.findByRole("heading", { name: "可选音频智能" }),
+      await screen.findByRole("region", { name: "音频智能设置" }),
     ).toBeVisible();
+    expect(screen.queryByRole("heading", { name: "可选音频智能" })).toBeNull();
     expect(screen.getByText("DeepSeek · deepseek-chat")).toBeVisible();
+    const settingsRegion = screen.getByRole("region", {
+      name: "音频智能设置",
+    });
+    expect(within(settingsRegion).getAllByRole("list")).toHaveLength(1);
+    expect(settingsRegion.querySelectorAll('[data-slot="item"]')).toHaveLength(
+      1,
+    );
     expect(
-      screen.getByText(/每次生成都需要针对当前音频单独同意/),
-    ).toBeVisible();
+      settingsRegion.querySelectorAll('[data-slot="item-media"]'),
+    ).toHaveLength(0);
+    expect(
+      settingsRegion.querySelector('[data-slot="item-actions"]'),
+    ).not.toBeNull();
+    expect(
+      screen.getByRole("button", { name: "管理 AI 供应商" }),
+    ).toHaveAttribute("data-size", "sm");
+    expect(
+      settingsRegion.querySelectorAll('[data-slot="item-separator"]'),
+    ).toHaveLength(0);
+    expect(
+      within(settingsRegion).getAllByText(/DeepSeek · deepseek-chat/),
+    ).toHaveLength(1);
+    expect(
+      screen.queryByText("https://api.deepseek.com"),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByText(/每次生成都需要针对当前音频单独同意/),
+    ).not.toBeInTheDocument();
+    expect(
+      settingsRegion.querySelectorAll('[data-slot="item-description"]'),
+    ).toHaveLength(1);
 
-    await user.click(screen.getByRole("button", { name: "配置提供商" }));
-    const dialog = screen.getByRole("dialog", { name: "配置音频智能提供商" });
+    await user.click(screen.getByRole("button", { name: "管理 AI 供应商" }));
+    const dialog = screen.getByRole("dialog", { name: "AI 供应商设置" });
+    expect(dialog.querySelector('[data-slot="dialog-header"]')).not.toBeNull();
+    expect(dialog.querySelector('[data-slot="dialog-footer"]')).not.toBeNull();
+    expect(
+      within(dialog).getByRole("textbox", { name: "服务地址" }),
+    ).toHaveAttribute("readonly");
+    expect(within(dialog).getByLabelText("API 密钥")).toHaveAttribute(
+      "type",
+      "password",
+    );
     const provider = within(dialog).getByRole("combobox", {
       name: "音频智能提供商",
     });
     expect(provider).toHaveAttribute("data-slot", "select-trigger");
+    await user.type(
+      within(dialog).getByLabelText("API 密钥"),
+      "must-not-cross-providers",
+    );
     await user.click(provider);
     await user.click(
       await screen.findByRole("option", { name: "OpenAI-compatible" }),
@@ -75,7 +133,7 @@ describe("AI settings security boundary", () => {
       within(dialog).getByRole("textbox", { name: "服务地址" }),
       "https://ai.example.com",
     );
-    await user.click(within(dialog).getByRole("button", { name: "保存配置" }));
+    await user.click(within(dialog).getByRole("button", { name: "保存设置" }));
 
     await waitFor(() =>
       expect(desktop.saveAiSettings).toHaveBeenCalledWith({
@@ -84,6 +142,10 @@ describe("AI settings security boundary", () => {
         endpoint: "https://ai.example.com",
       }),
     );
+    expect(desktop.replaceAiProviderSecret).not.toHaveBeenCalled();
+    expect(
+      await screen.findByText("OpenAI-compatible · custom-model"),
+    ).toBeVisible();
     expect(desktop.generateAudioAi).not.toHaveBeenCalled();
     expect(desktop.retryAudioAi).not.toHaveBeenCalled();
   });
@@ -98,12 +160,15 @@ describe("AI settings security boundary", () => {
       const desktop = api({
         getAiSettings: vi.fn(async () => ({ ...configured, secretState })),
       });
+      const user = userEvent.setup();
       render(<AiSettingsFeature api={desktop} />);
 
+      const manage = await screen.findByRole("button", {
+        name: "管理 AI 供应商",
+      });
+      expect(manage).toBeEnabled();
+      await user.click(manage);
       expect(await screen.findByText(copy)).toBeVisible();
-      expect(
-        screen.getByRole("button", { name: /输入.*密钥|重新输入密钥/ }),
-      ).toBeEnabled();
     },
   );
 
@@ -117,12 +182,12 @@ describe("AI settings security boundary", () => {
     const user = userEvent.setup();
     render(<AiSettingsFeature api={desktop} />);
     const open = await screen.findByRole("button", {
-      name: "输入 DeepSeek 密钥",
+      name: "管理 AI 供应商",
     });
 
     open.focus();
     await user.keyboard("{Enter}");
-    const dialog = screen.getByRole("dialog", { name: "输入 DeepSeek 密钥" });
+    const dialog = screen.getByRole("dialog", { name: "AI 供应商设置" });
     const secret = within(dialog).getByLabelText("API 密钥");
     expect(secret).toHaveAttribute("type", "password");
     await user.type(secret, "never-render-this-secret");
@@ -134,6 +199,9 @@ describe("AI settings security boundary", () => {
       screen.queryByText("never-render-this-secret"),
     ).not.toBeInTheDocument();
     expect(desktop.replaceAiProviderSecret).not.toHaveBeenCalled();
+
+    await user.click(open);
+    expect(screen.getByLabelText("API 密钥")).toHaveValue("");
   });
 
   it("replaces a missing secret through the Keychain API without rendering it", async () => {
@@ -147,11 +215,11 @@ describe("AI settings security boundary", () => {
     render(<AiSettingsFeature api={desktop} />);
 
     await user.click(
-      await screen.findByRole("button", { name: "输入 DeepSeek 密钥" }),
+      await screen.findByRole("button", { name: "管理 AI 供应商" }),
     );
     const secret = screen.getByLabelText("API 密钥");
     await user.type(secret, "keychain-only-secret");
-    await user.click(screen.getByRole("button", { name: "保存到钥匙串" }));
+    await user.click(screen.getByRole("button", { name: "保存设置" }));
 
     await waitFor(() =>
       expect(desktop.replaceAiProviderSecret).toHaveBeenCalledWith({
@@ -159,36 +227,74 @@ describe("AI settings security boundary", () => {
         secret: "keychain-only-secret",
       }),
     );
+    expect(desktop.saveAiSettings).not.toHaveBeenCalled();
     expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
     expect(screen.queryByText("keychain-only-secret")).not.toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "管理 AI 供应商" }));
     expect(
-      screen.getByRole("button", { name: "替换 DeepSeek 密钥" }),
+      await screen.findByText("密钥已配置并可由 macOS 钥匙串读取"),
     ).toBeVisible();
   });
 
-  it.each([
-    ["enabled", "FileVault 磁盘加密已启用"],
-    ["disabled", "FileVault 磁盘加密未启用"],
-    ["unknown", "无法确认 FileVault 状态"],
-  ] as const)(
-    "describes FileVault %s without claiming app database encryption",
-    async (fileVault, title) => {
-      const desktop = api({
-        getAiSettings: vi.fn(async () => ({
-          ...configured,
-          deviceSecurity: {
-            ...configured.deviceSecurity,
-            fileVaultState: fileVault,
-          },
-        })),
-      });
-      render(<AiSettingsFeature api={desktop} />);
+  it("deletes the configured secret from the combined provider dialog", async () => {
+    const desktop = api();
+    const user = userEvent.setup();
+    render(<AiSettingsFeature api={desktop} />);
 
-      expect(await screen.findByText(title)).toBeVisible();
-      expect(
-        screen.getByText(/没有应用层整库加密|未宣称.*应用层.*加密/),
-      ).toBeVisible();
-      expect(screen.queryByText(/数据库已由应用加密/)).not.toBeInTheDocument();
-    },
-  );
+    await user.click(
+      await screen.findByRole("button", { name: "管理 AI 供应商" }),
+    );
+    const dialog = screen.getByRole("dialog", { name: "AI 供应商设置" });
+    await user.click(within(dialog).getByRole("button", { name: "删除密钥" }));
+
+    await waitFor(() =>
+      expect(desktop.deleteAiProviderSecret).toHaveBeenCalledWith({
+        providerId: "deepseek",
+      }),
+    );
+    expect(
+      await within(dialog).findByText("尚未在 macOS 钥匙串中配置密钥"),
+    ).toBeVisible();
+  });
+
+  it("keeps a saved provider change when the Keychain write fails", async () => {
+    const desktop = api({
+      replaceAiProviderSecret: vi.fn(async () => {
+        throw new Error("无法写入 macOS 钥匙串");
+      }),
+    });
+    const user = userEvent.setup();
+    render(<AiSettingsFeature api={desktop} />);
+
+    await user.click(
+      await screen.findByRole("button", { name: "管理 AI 供应商" }),
+    );
+    const dialog = screen.getByRole("dialog", { name: "AI 供应商设置" });
+    await user.click(
+      within(dialog).getByRole("combobox", { name: "音频智能提供商" }),
+    );
+    await user.click(
+      await screen.findByRole("option", { name: "OpenAI-compatible" }),
+    );
+    await user.type(
+      within(dialog).getByRole("textbox", { name: "模型 ID" }),
+      "custom-model",
+    );
+    await user.clear(within(dialog).getByRole("textbox", { name: "服务地址" }));
+    await user.type(
+      within(dialog).getByRole("textbox", { name: "服务地址" }),
+      "https://ai.example.com",
+    );
+    await user.type(
+      within(dialog).getByLabelText("API 密钥"),
+      "one-time-secret",
+    );
+    await user.click(within(dialog).getByRole("button", { name: "保存设置" }));
+
+    expect(await within(dialog).findByRole("alert")).toHaveTextContent(
+      "无法写入 macOS 钥匙串",
+    );
+    expect(screen.getByText("OpenAI-compatible · custom-model")).toBeVisible();
+    expect(within(dialog).getByLabelText("API 密钥")).toHaveValue("");
+  });
 });

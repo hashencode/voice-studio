@@ -27,6 +27,7 @@ function handlers() {
     state: "canceled" as const,
   }));
   const openAudio = vi.fn(async () => null);
+  const openLocalModelRoot = vi.fn(async () => undefined);
   return {
     cancelProcessing,
     handlers: createDesktopIpcHandlers({
@@ -37,6 +38,7 @@ function handlers() {
       },
       services: {
         ...companionCommandStubs(),
+        openLocalModelRoot,
         getCompanionSnapshot: vi.fn(),
         setCompanionOptIn: vi.fn(),
         createCompanionPairingInvite: vi.fn(),
@@ -57,6 +59,8 @@ function handlers() {
           navigation: { section },
         }),
         requestBootstrapAction: async () => applicationSnapshot(),
+        markActivityRead: vi.fn(() => applicationSnapshot()),
+        markAllActivityRead: vi.fn(() => applicationSnapshot()),
         workerHealth,
         cancelProcessing,
         retryProcessing: vi.fn(async (jobId: number) => ({
@@ -92,6 +96,7 @@ function handlers() {
     }),
     workerHealth,
     openAudio,
+    openLocalModelRoot,
   };
 }
 
@@ -207,6 +212,26 @@ describe("Main IPC validation", () => {
     ).resolves.toEqual({ protocolVersion: 2, tasks: [] });
   });
 
+  it("opens the local model root through the validated preload command", async () => {
+    const fixture = handlers();
+    const bridge = {
+      invoke: async (channel: string, payload: unknown) =>
+        await fixture.handlers.invoke(channel, trustedEvent, payload),
+      on: vi.fn(),
+      off: vi.fn(),
+    };
+
+    await expect(createDesktopApi(bridge).openLocalModelRoot()).resolves.toBe(
+      undefined,
+    );
+    expect(fixture.openLocalModelRoot).toHaveBeenCalledOnce();
+    await expect(
+      fixture.handlers.invoke(ipcChannels.localModelsOpenRoot, trustedEvent, {
+        path: "/tmp/renderer-controlled",
+      }),
+    ).rejects.toBeInstanceOf(IpcContractError);
+  });
+
   it("exposes only validated application snapshot and navigation commands", async () => {
     const fixture = handlers();
     await expect(
@@ -227,6 +252,34 @@ describe("Main IPC validation", () => {
       fixture.handlers.invoke(ipcChannels.applicationNavigate, trustedEvent, {
         section: "raw-filesystem",
       }),
+    ).rejects.toBeInstanceOf(IpcContractError);
+    await expect(
+      fixture.handlers.invoke(
+        ipcChannels.applicationActivityMarkRead,
+        trustedEvent,
+        { activityId: "activity-1" },
+      ),
+    ).resolves.toEqual(expect.objectContaining({ revision: 1 }));
+    await expect(
+      fixture.handlers.invoke(
+        ipcChannels.applicationActivityMarkAllRead,
+        trustedEvent,
+        {},
+      ),
+    ).resolves.toEqual(expect.objectContaining({ revision: 1 }));
+    await expect(
+      fixture.handlers.invoke(
+        ipcChannels.applicationActivityMarkRead,
+        trustedEvent,
+        {},
+      ),
+    ).rejects.toBeInstanceOf(IpcContractError);
+    await expect(
+      fixture.handlers.invoke(
+        ipcChannels.applicationActivityMarkAllRead,
+        trustedEvent,
+        { activityId: "activity-1" },
+      ),
     ).rejects.toBeInstanceOf(IpcContractError);
   });
 
@@ -266,6 +319,8 @@ describe("Main IPC validation", () => {
           navigation: { section },
         }),
         requestBootstrapAction: async () => applicationSnapshot(),
+        markActivityRead: vi.fn(() => applicationSnapshot()),
+        markAllActivityRead: vi.fn(() => applicationSnapshot()),
         workerHealth,
         cancelProcessing: vi.fn(),
         retryProcessing: vi.fn(),

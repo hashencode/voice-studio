@@ -1,10 +1,26 @@
 import * as React from "react";
-import { KeyRound, LoaderCircle, LockKeyhole, ShieldCheck } from "lucide-react";
-import { Dialog as DialogPrimitive } from "radix-ui";
+import { LoaderCircle } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
+import {
+  Item,
+  ItemActions,
+  ItemContent,
+  ItemDescription,
+  ItemTitle,
+} from "@/components/ui/item";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import {
+  Dialog,
+  DialogClose,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
 import {
   Select,
   SelectContent,
@@ -16,18 +32,27 @@ import type {
   AiSettingsSnapshot,
   Voice2TextDesktopApi,
 } from "@shared/contracts";
+import {
+  SettingsItemGroup,
+  SettingsListSkeleton,
+  SettingsPageSection,
+} from "@/features/settings/settings-page-section";
 
 type ProviderId = AiSettingsSnapshot["config"]["providerId"];
 
 const providerDefaults: Record<
   ProviderId,
-  Pick<AiSettingsSnapshot["config"], "modelId" | "endpoint">
+  Pick<AiSettingsSnapshot["config"], "modelId" | "endpoint"> & {
+    displayName: string;
+  }
 > = {
   deepseek: {
+    displayName: "DeepSeek",
     modelId: "deepseek-chat",
     endpoint: "https://api.deepseek.com",
   },
   "openai-compatible": {
+    displayName: "OpenAI-compatible",
     modelId: "",
     endpoint: "https://example.invalid",
   },
@@ -35,10 +60,10 @@ const providerDefaults: Record<
 
 export function AiSettingsFeature({
   api = window.voice2text,
-  view = "all",
+  settingsPage = false,
 }: {
   api?: Voice2TextDesktopApi;
-  view?: "all" | "provider" | "privacy";
+  settingsPage?: boolean;
 }) {
   const [settings, setSettings] = React.useState<AiSettingsSnapshot | null>(
     null,
@@ -77,6 +102,9 @@ export function AiSettingsFeature({
   }, [api]);
 
   if (!settings && pending) {
+    if (settingsPage) {
+      return renderSettingsPageSection(<SettingsListSkeleton />);
+    }
     return (
       <div
         role="status"
@@ -89,6 +117,15 @@ export function AiSettingsFeature({
   }
 
   if (!settings) {
+    if (settingsPage) {
+      return renderSettingsPageSection(
+        <AiSettingsUnavailable
+          title="无法读取云端模型设置"
+          error={error}
+          onRetry={() => void load()}
+        />,
+      );
+    }
     return (
       <section role="alert" className="rounded-xl border bg-card p-5">
         <h2 className="font-semibold">无法读取音频智能设置</h2>
@@ -101,95 +138,104 @@ export function AiSettingsFeature({
   }
 
   const providerName = settings.config.displayName;
-  if (view === "privacy") {
-    return <FileVaultStatus settings={settings} />;
+  const providerSettings = (
+    <ProviderSettings
+      settings={settings}
+      providerName={providerName}
+      api={api}
+      error={error}
+      onSaved={setSettings}
+    />
+  );
+  if (settingsPage) {
+    return renderSettingsPageSection(providerSettings);
   }
+  return <section aria-label="音频智能设置">{providerSettings}</section>;
+}
+
+function renderSettingsPageSection(cloudModels: React.ReactNode) {
   return (
-    <section aria-label="音频智能设置" className="space-y-4">
-      {view === "all" ? (
-        <h2 className="text-lg font-semibold">可选音频智能</h2>
-      ) : null}
-      <div className="flex flex-wrap items-start justify-between gap-3">
-        <div className="max-w-2xl">
-          <p className="text-sm text-muted-foreground">
-            本地设置检查不会发送音频数据，也不会创建远程处理同意。
-          </p>
-        </div>
-        <ProviderDialog settings={settings} api={api} onSaved={setSettings} />
-      </div>
-
-      {error ? (
-        <div role="alert" className="rounded-lg border px-4 py-3 text-sm">
-          {error}
-        </div>
-      ) : null}
-
-      <div className="grid border-y lg:grid-cols-2 lg:divide-x">
-        <section className="py-5 lg:pr-5">
-          <div className="flex items-start gap-3">
-            <ShieldCheck className="mt-0.5 size-5" aria-hidden="true" />
-            <div className="min-w-0">
-              <h3 className="font-semibold">
-                {providerName} · {settings.config.modelId}
-              </h3>
-              <p className="mt-1 break-all text-sm text-muted-foreground">
-                {settings.config.endpoint}
-              </p>
-            </div>
-          </div>
-          <p className="mt-4 text-sm">
-            云端直连；每次生成都需要针对当前音频单独同意，不自动切换提供商或重试。
-          </p>
-        </section>
-
-        <section className="border-t py-5 lg:border-t-0 lg:pl-5">
-          <div className="flex items-start gap-3">
-            <KeyRound className="mt-0.5 size-5" aria-hidden="true" />
-            <div className="min-w-0 flex-1">
-              <h3 className="font-semibold">macOS 钥匙串</h3>
-              <p className="mt-1 text-sm text-muted-foreground">
-                {secretStateCopy(settings.secretState)}
-              </p>
-            </div>
-          </div>
-          <div className="mt-4 flex flex-wrap gap-2">
-            <SecretDialog settings={settings} api={api} onSaved={setSettings} />
-            {settings.secretState === "available" ? (
-              <Button
-                type="button"
-                variant="destructive"
-                disabled={pending}
-                onClick={() => {
-                  setPending(true);
-                  setError(null);
-                  void api
-                    .deleteAiProviderSecret({
-                      providerId: settings.config.providerId,
-                    })
-                    .then(setSettings)
-                    .catch((cause: unknown) =>
-                      setError(errorMessage(cause, "无法删除钥匙串密钥")),
-                    )
-                    .finally(() => setPending(false));
-                }}
-              >
-                删除密钥
-              </Button>
-            ) : null}
-          </div>
-          <p className="mt-3 text-xs text-muted-foreground">
-            密钥只写入 macOS 钥匙串；保存后不会再次显示，也不会写入
-            SQLite、配置或诊断。
-          </p>
-        </section>
-      </div>
-
-      {view === "all" ? <FileVaultStatus settings={settings} /> : null}
+    <section aria-label="音频智能设置">
+      <SettingsPageSection section="cloud-models" title="云端模型">
+        {cloudModels}
+      </SettingsPageSection>
     </section>
   );
 }
 
-function ProviderDialog({
+function ProviderSettings({
+  settings,
+  providerName,
+  api,
+  error,
+  onSaved,
+}: {
+  settings: AiSettingsSnapshot;
+  providerName: string;
+  api: Voice2TextDesktopApi;
+  error: string | null;
+  onSaved: (settings: AiSettingsSnapshot) => void;
+}) {
+  return (
+    <>
+      {error ? (
+        <div
+          role="alert"
+          className="mb-3 rounded-xl border border-destructive/40 bg-destructive/5 p-4 text-sm"
+        >
+          {error}
+        </div>
+      ) : null}
+      <SettingsItemGroup>
+        <Item role="listitem" className="rounded-none">
+          <ItemContent>
+            <ItemTitle>AI 供应商</ItemTitle>
+            <ItemDescription>
+              {providerName} · {settings.config.modelId}
+            </ItemDescription>
+          </ItemContent>
+          <ItemActions>
+            <ProviderSettingsDialog
+              settings={settings}
+              api={api}
+              onSaved={onSaved}
+            />
+          </ItemActions>
+        </Item>
+      </SettingsItemGroup>
+    </>
+  );
+}
+
+function AiSettingsUnavailable({
+  title,
+  error,
+  onRetry,
+}: {
+  title: string;
+  error: string | null;
+  onRetry?: () => void;
+}) {
+  return (
+    <SettingsItemGroup>
+      <Item role="listitem" className="rounded-none">
+        <ItemContent>
+          <ItemTitle>{title}</ItemTitle>
+          <ItemDescription>{error ?? "设置暂不可用"}</ItemDescription>
+        </ItemContent>
+        {onRetry ? (
+          <ItemActions>
+            <Button type="button" variant="outline" size="sm" onClick={onRetry}>
+              重新读取
+            </Button>
+          </ItemActions>
+        ) : null}
+      </Item>
+    </SettingsItemGroup>
+  );
+}
+
+function ProviderSettingsDialog({
   settings,
   api,
   onSaved,
@@ -204,6 +250,7 @@ function ProviderDialog({
   );
   const [modelId, setModelId] = React.useState(settings.config.modelId);
   const [endpoint, setEndpoint] = React.useState(settings.config.endpoint);
+  const [secret, setSecret] = React.useState("");
   const [pending, setPending] = React.useState(false);
   const [error, setError] = React.useState<string | null>(null);
 
@@ -211,25 +258,36 @@ function ProviderDialog({
     setProviderId(settings.config.providerId);
     setModelId(settings.config.modelId);
     setEndpoint(settings.config.endpoint);
+    setSecret("");
     setError(null);
   };
+  const selectedProviderName = providerDefaults[providerId].displayName;
+  const editingConfiguredProvider = providerId === settings.config.providerId;
   return (
-    <DialogPrimitive.Root
+    <Dialog
       open={open}
       onOpenChange={(next) => {
         setOpen(next);
-        if (next) reset();
+        if (next) {
+          reset();
+        } else {
+          setSecret("");
+          setError(null);
+        }
       }}
     >
-      <DialogPrimitive.Trigger asChild>
-        <Button type="button" variant="outline">
-          配置提供商
+      <DialogTrigger asChild>
+        <Button type="button" variant="outline" size="sm">
+          管理 AI 供应商
         </Button>
-      </DialogPrimitive.Trigger>
-      <DialogSurface title="配置音频智能提供商">
-        <DialogPrimitive.Description className="text-sm text-muted-foreground">
-          选择只作用于后续任务；运行中的任务保留原提供商和模型快照。
-        </DialogPrimitive.Description>
+      </DialogTrigger>
+      <DialogContent className="max-h-[85vh] w-[min(32rem,calc(100vw-2rem))] overflow-auto sm:max-w-lg">
+        <DialogHeader>
+          <DialogTitle>AI 供应商设置</DialogTitle>
+          <DialogDescription>
+            配置只作用于后续任务；运行中的任务保留原设置。
+          </DialogDescription>
+        </DialogHeader>
         <div className="mt-4 space-y-2">
           <Label htmlFor="ai-provider">音频智能提供商</Label>
           <Select
@@ -239,15 +297,19 @@ function ProviderDialog({
               setProviderId(next);
               setModelId(providerDefaults[next].modelId);
               setEndpoint(providerDefaults[next].endpoint);
+              setSecret("");
+              setError(null);
             }}
           >
             <SelectTrigger id="ai-provider" className="w-full">
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="deepseek">DeepSeek</SelectItem>
+              <SelectItem value="deepseek">
+                {providerDefaults.deepseek.displayName}
+              </SelectItem>
               <SelectItem value="openai-compatible">
-                OpenAI-compatible
+                {providerDefaults["openai-compatible"].displayName}
               </SelectItem>
             </SelectContent>
           </Select>
@@ -268,83 +330,11 @@ function ProviderDialog({
             className="mt-2"
             aria-label="服务地址"
             maxLength={2048}
-            disabled={providerId === "deepseek"}
+            readOnly={providerId === "deepseek"}
             value={endpoint}
             onChange={(event) => setEndpoint(event.target.value)}
           />
         </label>
-        {error ? (
-          <p role="alert" className="mt-3 text-sm text-destructive">
-            {error}
-          </p>
-        ) : null}
-        <div className="mt-6 flex justify-end gap-2">
-          <DialogPrimitive.Close asChild>
-            <Button type="button" variant="outline" disabled={pending}>
-              取消
-            </Button>
-          </DialogPrimitive.Close>
-          <Button
-            type="button"
-            disabled={pending || !modelId.trim() || !endpoint.trim()}
-            onClick={() => {
-              setPending(true);
-              setError(null);
-              void api
-                .saveAiSettings({
-                  providerId,
-                  modelId: modelId.trim(),
-                  endpoint: endpoint.trim(),
-                })
-                .then((next) => {
-                  onSaved(next);
-                  setOpen(false);
-                })
-                .catch((cause: unknown) =>
-                  setError(errorMessage(cause, "提供商配置无效")),
-                )
-                .finally(() => setPending(false));
-            }}
-          >
-            保存配置
-          </Button>
-        </div>
-      </DialogSurface>
-    </DialogPrimitive.Root>
-  );
-}
-
-function SecretDialog({
-  settings,
-  api,
-  onSaved,
-}: {
-  settings: AiSettingsSnapshot;
-  api: Voice2TextDesktopApi;
-  onSaved: (settings: AiSettingsSnapshot) => void;
-}) {
-  const [open, setOpen] = React.useState(false);
-  const [secret, setSecret] = React.useState("");
-  const [pending, setPending] = React.useState(false);
-  const [error, setError] = React.useState<string | null>(null);
-  const providerName = settings.config.displayName;
-  const title = `${settings.secretState === "available" ? "替换" : "输入"} ${providerName} 密钥`;
-  return (
-    <DialogPrimitive.Root
-      open={open}
-      onOpenChange={(next) => {
-        setOpen(next);
-        setSecret("");
-        setError(null);
-      }}
-    >
-      <DialogPrimitive.Trigger asChild>
-        <Button type="button">{title}</Button>
-      </DialogPrimitive.Trigger>
-      <DialogSurface title={title}>
-        <DialogPrimitive.Description className="text-sm text-muted-foreground">
-          密钥写入 macOS 钥匙串；保存后不会再次显示。
-        </DialogPrimitive.Description>
         <label className="mt-4 block text-sm font-medium">
           API 密钥
           <Input
@@ -353,98 +343,106 @@ function SecretDialog({
             type="password"
             aria-label="API 密钥"
             maxLength={4096}
+            placeholder={
+              editingConfiguredProvider && settings.secretState === "available"
+                ? "已保存；留空表示不修改"
+                : `输入 ${selectedProviderName} API 密钥`
+            }
             value={secret}
             onChange={(event) => setSecret(event.target.value)}
           />
         </label>
+        <p className="mt-2 text-xs text-muted-foreground">
+          {editingConfiguredProvider
+            ? secretStateCopy(settings.secretState)
+            : "切换后将读取该供应商在 macOS 钥匙串中的密钥。"}
+        </p>
+        <p className="mt-1 text-xs text-muted-foreground">
+          密钥只写入 macOS 钥匙串，保存后不会再次显示。
+        </p>
         {error ? (
           <p role="alert" className="mt-3 text-sm text-destructive">
             {error}
           </p>
         ) : null}
-        <div className="mt-6 flex justify-end gap-2">
-          <DialogPrimitive.Close asChild>
+        <DialogFooter className="mt-6 flex-wrap">
+          {editingConfiguredProvider && settings.secretState === "available" ? (
+            <Button
+              type="button"
+              variant="destructive"
+              disabled={pending}
+              onClick={() => {
+                setPending(true);
+                setError(null);
+                void api
+                  .deleteAiProviderSecret({ providerId })
+                  .then((next) => {
+                    setSecret("");
+                    onSaved(next);
+                  })
+                  .catch((cause: unknown) =>
+                    setError(errorMessage(cause, "无法删除钥匙串密钥")),
+                  )
+                  .finally(() => setPending(false));
+              }}
+            >
+              删除密钥
+            </Button>
+          ) : null}
+          <DialogClose asChild>
             <Button type="button" variant="outline" disabled={pending}>
               取消
             </Button>
-          </DialogPrimitive.Close>
+          </DialogClose>
           <Button
             type="button"
-            disabled={pending || !secret.trim()}
+            disabled={pending || !modelId.trim() || !endpoint.trim()}
             onClick={() => {
-              const value = secret;
+              const secretValue = secret.trim();
+              const nextConfig = {
+                providerId,
+                modelId: modelId.trim(),
+                endpoint: endpoint.trim(),
+              };
+              const configChanged =
+                nextConfig.providerId !== settings.config.providerId ||
+                nextConfig.modelId !== settings.config.modelId ||
+                nextConfig.endpoint !== settings.config.endpoint;
               setPending(true);
               setError(null);
-              void api
-                .replaceAiProviderSecret({
-                  providerId: settings.config.providerId,
-                  secret: value,
-                })
-                .then((next) => {
-                  setSecret("");
-                  onSaved(next);
-                  setOpen(false);
-                })
+              void (async () => {
+                let next = settings;
+                try {
+                  if (configChanged) {
+                    next = await api.saveAiSettings(nextConfig);
+                  }
+                  if (secretValue) {
+                    next = await api.replaceAiProviderSecret({
+                      providerId,
+                      secret: secretValue,
+                    });
+                  }
+                } catch (cause) {
+                  if (next !== settings) onSaved(next);
+                  throw cause;
+                }
+                if (next !== settings) onSaved(next);
+                setSecret("");
+                setError(null);
+                setOpen(false);
+              })()
                 .catch((cause: unknown) => {
                   setSecret("");
-                  setError(errorMessage(cause, "无法写入 macOS 钥匙串"));
+                  setError(errorMessage(cause, "无法保存 AI 供应商设置"));
                 })
                 .finally(() => setPending(false));
             }}
           >
-            保存到钥匙串
+            保存设置
           </Button>
-        </div>
-      </DialogSurface>
-    </DialogPrimitive.Root>
-  );
-}
-
-function DialogSurface({
-  title,
-  children,
-}: React.PropsWithChildren<{ title: string }>) {
-  return (
-    <DialogPrimitive.Portal>
-      <DialogPrimitive.Overlay className="fixed inset-0 z-50 bg-black/50" />
-      <DialogPrimitive.Content className="fixed top-1/2 left-1/2 z-50 max-h-[85vh] w-[min(32rem,calc(100vw-2rem))] -translate-x-1/2 -translate-y-1/2 overflow-auto rounded-xl border bg-background p-6 shadow-lg outline-none">
-        <DialogPrimitive.Title className="text-lg font-semibold">
-          {title}
-        </DialogPrimitive.Title>
-        {children}
-      </DialogPrimitive.Content>
-    </DialogPrimitive.Portal>
-  );
-}
-
-function FileVaultStatus({ settings }: { settings: AiSettingsSnapshot }) {
-  const { title, description } = {
-    enabled: {
-      title: "FileVault 磁盘加密已启用",
-      description:
-        "FileVault 是设备磁盘保护。应用未宣称音频数据库或媒体文件具有应用层整库加密；API 密钥仍由 macOS 钥匙串保护。",
-    },
-    disabled: {
-      title: "FileVault 磁盘加密未启用",
-      description:
-        "音频数据库和媒体文件没有应用层整库加密。建议在系统设置中启用 FileVault；API 密钥仍由 macOS 钥匙串保护。",
-    },
-    unknown: {
-      title: "无法确认 FileVault 状态",
-      description:
-        "应用未宣称音频数据库或媒体文件具有应用层整库加密。请在系统设置中核对 FileVault；API 密钥仍由 macOS 钥匙串保护。",
-    },
-  }[settings.deviceSecurity.fileVaultState];
-  return (
-    <section className="border-y py-5">
-      <div className="flex items-start gap-3">
-        <LockKeyhole className="mt-0.5 size-5" aria-hidden="true" />
-        <div>
-          <h3 className="font-semibold">{title}</h3>
-          <p className="mt-1 text-sm text-muted-foreground">{description}</p>
-        </div>
-      </div>
-    </section>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   );
 }
 

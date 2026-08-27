@@ -122,14 +122,21 @@ export class DesktopApplicationState {
     });
   }
 
-  acknowledgeActivity(throughId: string): ApplicationSnapshot {
+  markActivityRead(activityId: string): ApplicationSnapshot {
     const currentActivity = this.current.activity ?? [];
-    const throughIndex = currentActivity.findIndex(
-      (item) => item.id === throughId,
+    const activity = currentActivity.map((item) =>
+      item.id === activityId && !item.read ? { ...item, read: true } : item,
     );
-    if (throughIndex < 0) return this.snapshot();
-    const activity = currentActivity.map((item, index) =>
-      index >= throughIndex && !item.read ? { ...item, read: true } : item,
+    if (activity.every((item, index) => item === currentActivity[index])) {
+      return this.snapshot();
+    }
+    return this.update({ activity });
+  }
+
+  markAllActivityRead(): ApplicationSnapshot {
+    const currentActivity = this.current.activity ?? [];
+    const activity = currentActivity.map((item) =>
+      item.read ? item : { ...item, read: true },
     );
     if (activity.every((item, index) => item === currentActivity[index])) {
       return this.snapshot();

@@ -26,14 +26,20 @@ describe("activity pages", () => {
     render(
       <ActivityContextPane items={[]} selectedId={null} onSelect={vi.fn()} />,
     );
-    expect(screen.getByRole("status", { name: "暂无消息" })).toBeVisible();
+    const empty = screen.getByRole("status", { name: "暂无消息" });
+    expect(empty).toBeVisible();
+    expect(empty).toHaveTextContent("暂无消息");
+    expect(empty.querySelector("svg.lucide-sprout")).not.toBeNull();
   });
 
   it("uses an empty state when no message is selected", () => {
     render(<ActivityMainWorkspace item={null} onOpenDetails={vi.fn()} />);
     expect(
       screen.getByRole("status", { name: "请选择消息" }),
-    ).toHaveTextContent("选择左侧消息后，可在这里查看完整信息");
+    ).toHaveTextContent("请选择消息");
+    expect(
+      screen.getByRole("status", { name: "请选择消息" }).querySelector("p"),
+    ).toBeNull();
   });
 
   it("selects a summary from the second column and renders full detail", async () => {
@@ -50,13 +56,65 @@ describe("activity pages", () => {
       </>,
     );
     const user = userEvent.setup();
-    await user.click(screen.getByRole("button", { name: /录制需要处理/ }));
+    const messageRow = screen.getByRole("button", { name: /录制需要处理/ });
+    expect(messageRow).toHaveAttribute("data-slot", "item");
+    expect(messageRow.querySelector('[data-slot="item-media"]')).not.toBeNull();
+    await user.click(messageRow);
     expect(select).toHaveBeenCalledWith(failed);
-    expect(screen.getByRole("region", { name: "消息详情" })).toHaveTextContent(
-      "这次录制未能正常完成",
-    );
+    const detail = screen.getByRole("region", { name: "消息详情" });
+    expect(detail).not.toHaveTextContent("录制需要处理");
+    expect(detail).not.toHaveTextContent("这次录制未能正常完成");
+    expect(detail).toHaveTextContent("需要处理");
     await user.click(screen.getByRole("button", { name: "打开录制详情" }));
     expect(openDetails).toHaveBeenCalledWith(failed);
+  });
+
+  it("filters titles locally without changing selection and marks all only from MailOpen", async () => {
+    const complete: ActivityItemView = {
+      ...failed,
+      id: "complete",
+      kind: "capture_completed",
+      title: "Project Alpha",
+      severity: "info",
+    };
+    const select = vi.fn();
+    const markAll = vi.fn();
+    render(
+      <ActivityContextPane
+        items={[failed, complete]}
+        selectedId="failed"
+        onSelect={select}
+        unreadCount={2}
+        onMarkAllRead={markAll}
+      />,
+    );
+    const user = userEvent.setup();
+    await user.type(
+      screen.getByRole("searchbox", { name: "搜索消息" }),
+      "ALPHA",
+    );
+    expect(screen.queryByText("录制需要处理")).not.toBeInTheDocument();
+    expect(screen.getByText("Project Alpha")).toBeVisible();
+    expect(select).not.toHaveBeenCalled();
+    await user.clear(screen.getByRole("searchbox", { name: "搜索消息" }));
+    await user.click(screen.getByRole("button", { name: "全部标记为已读" }));
+    expect(markAll).toHaveBeenCalledOnce();
+  });
+
+  it("keeps the all-read action disabled without unread items and exposes failures", () => {
+    render(
+      <ActivityContextPane
+        items={[{ ...failed, read: true }]}
+        selectedId="failed"
+        onSelect={vi.fn()}
+        unreadCount={0}
+        operationError="操作失败，请重试"
+      />,
+    );
+    expect(
+      screen.getByRole("button", { name: "全部标记为已读" }),
+    ).toBeDisabled();
+    expect(screen.getByRole("alert")).toHaveTextContent("操作失败，请重试");
   });
 
   it("shows failed capture information in a modal", async () => {

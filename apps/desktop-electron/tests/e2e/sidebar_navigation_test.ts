@@ -76,6 +76,8 @@ function applicationApi(
     getApplicationSnapshot: vi.fn(async () => snapshot),
     navigate,
     requestBootstrapAction: vi.fn(async () => snapshot),
+    markActivityRead: vi.fn(async () => snapshot),
+    markAllActivityRead: vi.fn(async () => snapshot),
     onApplicationSnapshot: vi.fn(() => () => undefined),
     ...overrides,
   };
@@ -304,7 +306,8 @@ describe("sidebar navigation e2e", () => {
       value: 880,
       writable: true,
     });
-    const acknowledgeActivity = vi.fn(async () => restored);
+    const markActivityRead = vi.fn(async () => restored);
+    const markAllActivityRead = vi.fn(async () => restored);
     applicationApi(
       {
         ...restored,
@@ -333,7 +336,7 @@ describe("sidebar navigation e2e", () => {
           },
         ],
       },
-      { acknowledgeActivity },
+      { markActivityRead, markAllActivityRead },
     );
     const user = userEvent.setup();
     render(createElement(App));
@@ -341,7 +344,7 @@ describe("sidebar navigation e2e", () => {
     await user.click(
       await screen.findByRole("button", { name: "消息，2 条未读" }),
     );
-    expect(acknowledgeActivity).toHaveBeenCalledWith("complete");
+    expect(markActivityRead).toHaveBeenCalledWith("complete");
     await user.click(screen.getByRole("button", { name: /录制已保存/ }));
     expect(
       screen.getByRole("complementary", { name: "消息上下文面板" }),
@@ -355,7 +358,7 @@ describe("sidebar navigation e2e", () => {
       document.querySelector('[aria-label="消息上下文面板"]'),
     ).not.toBeNull();
     expect(screen.getByRole("dialog", { name: "录制失败" })).toBeVisible();
-    expect(acknowledgeActivity).toHaveBeenCalledWith("failed");
+    expect(markActivityRead).toHaveBeenCalledWith("failed");
   });
 
   it("closes audio playback once when sidebar navigation unmounts the workspace", async () => {
@@ -410,7 +413,7 @@ describe("sidebar navigation e2e", () => {
 
     await user.click(screen.getByRole("button", { name: "互联" }));
     expect(
-      await screen.findByRole("heading", { name: "配对手机", level: 1 }),
+      await screen.findByRole("status", { name: "手机接收当前关闭" }),
     ).toBeVisible();
     await waitFor(() =>
       expect(controlAudioPlayback).toHaveBeenCalledWith(4, {

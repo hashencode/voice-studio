@@ -81,6 +81,8 @@ function installOperationsApi(overrides: Partial<Voice2TextDesktopApi> = {}) {
   const unsubscribeOperation = vi.fn();
   const api: Voice2TextDesktopApi = {
     ...companionRendererStubs(),
+    markActivityRead: vi.fn(async () => tasksSnapshot),
+    markAllActivityRead: vi.fn(async () => tasksSnapshot),
     getAiSettings: vi.fn(async () => testAiSettings()),
     saveAiSettings: vi.fn(async () => testAiSettings()),
     replaceAiProviderSecret: vi.fn(async () => testAiSettings()),

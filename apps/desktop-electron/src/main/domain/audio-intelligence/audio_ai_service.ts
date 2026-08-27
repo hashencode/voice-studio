@@ -1,16 +1,21 @@
-import { createHash } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
 
 import type {
   AiSettingsSnapshot,
+  CreateAiProviderProfileRequest,
+  DeleteAiProviderProfileRequest,
   GenerateAudioAiRequest,
+  SelectAiProviderProfileRequest,
   AudioAiConsentPreview,
   AudioAiSnapshot,
   RetryAudioAiRequest,
+  UpdateAiProviderProfileRequest,
 } from "../../../shared/contracts";
 import type { DesktopSecretStorePort } from "../../features/secrets/secret_store_port";
 import { assertProviderSecretInput } from "../../features/secrets/secret_store_port";
 import type {
   AiJobRecord,
+  AiProviderProfileRecord,
   AiProviderSettingsRecord,
 } from "../../storage/repositories/ai_job_repository";
 import { AiJobRepository } from "../../storage/repositories/ai_job_repository";
@@ -34,6 +39,7 @@ export class AudioAiService {
   private readonly listeners = new Set<(snapshot: AudioAiSnapshot) => void>();
   private readonly activeProviders = new Set<AudioAiProvider>();
   private readonly activeRuns = new Set<Promise<AudioAiSnapshot>>();
+  private mutationTail: Promise<void> = Promise.resolve();
 
   constructor(
     private readonly repository: AiJobRepository,
@@ -44,26 +50,51 @@ export class AudioAiService {
     ) => AudioAiProvider = (settings, store) =>
       new OpenAiCompatibleProvider(settings, store),
     private readonly now: () => number = Date.now,
+    private readonly createIdentity: () => {
+      profileId: string;
+      secretRef: string;
+    } = () => ({
+      profileId: `profile-${randomUUID()}`,
+      secretRef: `secret-${randomUUID()}`,
+    }),
   ) {}
 
   async getSettings(): Promise<AiSettingsSnapshot> {
-    const settings = this.repository.loadSettings();
-    const endpoint = parseRemoteAiEndpoint(settings.endpoint);
-    const secret = await this.secrets.read(settings.providerId);
-    const fileVaultState = await this.secrets.fileVaultStatus();
+    const profiles = this.repository.profiles();
+    const revision = this.repository.settingsRevision();
+    const selectedProfileId =
+      this.repository.selectedProfile()?.profileId ?? null;
+    const [profileSnapshots, fileVaultState] = await Promise.all([
+      Promise.all(
+        profiles.map(async (profile) => {
+          const endpoint = parseRemoteAiEndpoint(profile.endpoint);
+          const secret = await this.secrets.read(profile.secretRef);
+          return {
+            profileId: profile.profileId,
+            kind: "custom" as const,
+            displayName: profile.displayName,
+            protocol: profile.protocol,
+            modelId: profile.modelId,
+            modelSummary: profile.modelId,
+            endpoint: endpoint.baseUrl,
+            endpointOrigin: endpoint.origin,
+            processingLocation: "cloudDirect" as const,
+            requiresConsent: true as const,
+            capabilities: {
+              selectable: true as const,
+              editable: true as const,
+              deletable: true as const,
+            },
+            secretState: secret.state,
+          };
+        }),
+      ),
+      this.secrets.fileVaultStatus(),
+    ]);
     return {
-      revision: this.repository.settingsRevision(),
-      config: {
-        providerId: settings.providerId,
-        displayName:
-          settings.providerId === "deepseek" ? "DeepSeek" : "OpenAI-compatible",
-        modelId: settings.modelId,
-        endpoint: endpoint.baseUrl,
-        endpointOrigin: endpoint.origin,
-        processingLocation: "cloudDirect",
-        requiresConsent: true,
-      },
-      secretState: secret.state,
+      revision,
+      profiles: profileSnapshots,
+      selectedProfileId,
       deviceSecurity: {
         kind: "device-security",
         fileVaultState,
@@ -72,26 +103,109 @@ export class AudioAiService {
     };
   }
 
-  async saveSettings(
-    settings: AiProviderSettingsRecord,
+  async createProfile(
+    request: CreateAiProviderProfileRequest,
   ): Promise<AiSettingsSnapshot> {
-    this.repository.saveSettings(settings, this.now());
-    return await this.getSettings();
+    return await this.serializeMutation(async () => {
+      this.assertExpectedRevision(request.expectedRevision);
+      this.assertProfileInput(request);
+      if (this.repository.profiles().length >= 100) {
+        throw new AiProviderFailure(
+          "AI_INVALID_CONFIGURATION",
+          "AI provider profile limit was reached",
+        );
+      }
+      const identity = this.nextIdentity();
+      assertProviderSecretInput(identity.secretRef, request.secret);
+      await this.secrets.replace(identity.secretRef, request.secret.trim());
+      try {
+        this.repository.createProfile({
+          ...request,
+          ...identity,
+          nowMs: this.now(),
+        });
+      } catch (error) {
+        await this.secrets.delete(identity.secretRef).catch(() => undefined);
+        throw error;
+      }
+      return await this.getSettings();
+    });
   }
 
-  async replaceSecret(
-    providerId: string,
-    secret: string,
+  async updateProfile(
+    request: UpdateAiProviderProfileRequest,
   ): Promise<AiSettingsSnapshot> {
-    assertProviderSecretInput(providerId, secret);
-    await this.secrets.replace(providerId, secret.trim());
-    return await this.getSettings();
+    return await this.serializeMutation(async () => {
+      this.assertExpectedRevision(request.expectedRevision);
+      const current = this.requireProfile(request.profileId);
+      this.assertProfileInput(request, request.profileId);
+      const previousSecret = request.secret
+        ? await this.secrets.read(current.secretRef)
+        : null;
+      if (request.secret) {
+        assertProviderSecretInput(current.secretRef, request.secret);
+        await this.secrets.replace(current.secretRef, request.secret.trim());
+      }
+      try {
+        this.repository.updateProfile({
+          ...request,
+          nowMs: this.now(),
+        });
+      } catch (error) {
+        if (request.secret) {
+          if (previousSecret?.state === "available") {
+            await this.secrets
+              .replace(current.secretRef, previousSecret.secret)
+              .catch(() => undefined);
+          } else if (previousSecret?.state === "missing") {
+            await this.secrets.delete(current.secretRef).catch(() => undefined);
+          }
+        }
+        throw error;
+      }
+      return await this.getSettings();
+    });
   }
 
-  async deleteSecret(providerId: string): Promise<AiSettingsSnapshot> {
-    assertProviderSecretInput(providerId);
-    await this.secrets.delete(providerId);
-    return await this.getSettings();
+  async selectProfile(
+    request: SelectAiProviderProfileRequest,
+  ): Promise<AiSettingsSnapshot> {
+    return await this.serializeMutation(async () => {
+      this.assertExpectedRevision(request.expectedRevision);
+      this.repository.selectProfile(request);
+      return await this.getSettings();
+    });
+  }
+
+  async deleteProfile(
+    request: DeleteAiProviderProfileRequest,
+  ): Promise<AiSettingsSnapshot> {
+    return await this.serializeMutation(async () => {
+      this.assertExpectedRevision(request.expectedRevision);
+      const current = this.requireProfile(request.profileId);
+      const previousSecret = await this.secrets.read(current.secretRef);
+      const deletion = await this.secrets.delete(current.secretRef);
+      if (deletion === "denied") {
+        throw new AiProviderFailure(
+          "AI_SECRET_DENIED",
+          "provider secret could not be deleted",
+        );
+      }
+      try {
+        this.repository.deleteProfile({
+          ...request,
+          nowMs: this.now(),
+        });
+      } catch (error) {
+        if (previousSecret.state === "available") {
+          await this.secrets
+            .replace(current.secretRef, previousSecret.secret)
+            .catch(() => undefined);
+        }
+        throw error;
+      }
+      return await this.getSettings();
+    });
   }
 
   prepare(options: {
@@ -99,13 +213,20 @@ export class AudioAiService {
     generationId: number;
     templateId: string;
   }): AudioAiConsentPreview {
-    const settings = this.repository.loadSettings();
+    const settings = this.repository.selectedProfile();
+    if (!settings) {
+      throw new AiProviderFailure(
+        "AI_PROVIDER_MISSING",
+        "selected AI provider is unavailable",
+      );
+    }
     const endpoint = parseRemoteAiEndpoint(settings.endpoint);
     const scope = this.transcriptScope(options.audioId, options.generationId);
     return {
       audioId: options.audioId,
       generationId: options.generationId,
-      providerId: settings.providerId,
+      profileId: settings.profileId,
+      providerId: settings.protocol,
       modelId: settings.modelId,
       endpointOrigin: endpoint.origin,
       endpointIdentitySha256: sha256(endpoint.baseUrl),
@@ -130,6 +251,7 @@ export class AudioAiService {
         replay.audioId !== request.audioId ||
         replay.generationId !== request.generationId ||
         replay.templateId !== request.templateId ||
+        replay.profileId !== request.consent.profileId ||
         replay.providerId !== request.consent.providerId ||
         replay.endpointOrigin !== request.consent.endpointOrigin ||
         replay.endpointIdentitySha256 !==
@@ -147,11 +269,13 @@ export class AudioAiService {
     }
     const preview = this.prepare(request);
     this.assertConsent(preview, request.consent);
-    const settings = this.repository.loadSettings();
+    const settings = this.requireProfile(preview.profileId);
     const job = this.repository.enqueue(
       {
         audioId: request.audioId,
         generationId: request.generationId,
+        profileId: settings.profileId,
+        secretRef: settings.secretRef,
         providerId: preview.providerId,
         modelId: preview.modelId,
         endpoint: settings.endpoint,
@@ -178,6 +302,7 @@ export class AudioAiService {
       );
     this.assertConsent(
       {
+        profileId: existing.profileId,
         providerId: existing.providerId as "deepseek" | "openai-compatible",
         endpointOrigin: existing.endpointOrigin,
         endpointIdentitySha256: existing.endpointIdentitySha256,
@@ -251,6 +376,7 @@ export class AudioAiService {
             providerId: running.providerId as "deepseek" | "openai-compatible",
             modelId: running.modelId,
             endpoint: running.endpoint,
+            secretRef: running.secretRef,
           },
           this.secrets,
         ),
@@ -335,6 +461,7 @@ export class AudioAiService {
   private assertConsent(
     preview: Pick<
       AudioAiConsentPreview,
+      | "profileId"
       | "providerId"
       | "endpointOrigin"
       | "endpointIdentitySha256"
@@ -344,6 +471,7 @@ export class AudioAiService {
   ): void {
     if (
       consent.version !== 1 ||
+      consent.profileId !== preview.profileId ||
       consent.providerId !== preview.providerId ||
       consent.endpointOrigin !== preview.endpointOrigin ||
       consent.endpointIdentitySha256 !== preview.endpointIdentitySha256 ||
@@ -378,8 +506,111 @@ export class AudioAiService {
   private publish(snapshot: AudioAiSnapshot): void {
     for (const listener of this.listeners) listener(snapshot);
   }
+
+  private serializeMutation<T>(operation: () => Promise<T>): Promise<T> {
+    const result = this.mutationTail.then(operation, operation);
+    this.mutationTail = result.then(
+      () => undefined,
+      () => undefined,
+    );
+    return result;
+  }
+
+  private assertExpectedRevision(expectedRevision: number): void {
+    if (this.repository.settingsRevision() !== expectedRevision) {
+      throw new AiProviderFailure(
+        "AI_ATTEMPT_CONFLICT",
+        "AI settings revision is stale",
+      );
+    }
+  }
+
+  private nextIdentity(): { profileId: string; secretRef: string } {
+    const existing = this.repository.profiles();
+    for (let attempt = 0; attempt < 10; attempt += 1) {
+      const identity = this.createIdentity();
+      if (
+        !existing.some(
+          (profile) =>
+            profile.profileId === identity.profileId ||
+            profile.secretRef === identity.secretRef,
+        )
+      ) {
+        return identity;
+      }
+    }
+    throw new AiProviderFailure(
+      "AI_SERVICE_UNAVAILABLE",
+      "AI provider identity could not be allocated",
+    );
+  }
+
+  private requireProfile(profileId: string): AiProviderProfileRecord {
+    const profile = this.repository.profile(profileId);
+    if (!profile) {
+      throw new AiProviderFailure(
+        "AI_PROVIDER_MISSING",
+        "AI provider profile is unavailable",
+      );
+    }
+    return profile;
+  }
+
+  private assertProfileInput(
+    input: {
+      displayName: string;
+      protocol: "deepseek" | "openai-compatible";
+      modelId: string;
+      endpoint: string;
+    },
+    excludingProfileId?: string,
+  ): void {
+    const displayName = normalizeDisplayName(input.displayName);
+    const modelId = input.modelId.trim();
+    if (
+      displayName.length === 0 ||
+      [...displayName].length > 128 ||
+      modelId.length === 0 ||
+      [...modelId].length > 256
+    ) {
+      throw new AiProviderFailure(
+        "AI_INVALID_CONFIGURATION",
+        "AI provider profile is invalid",
+      );
+    }
+    if (
+      this.repository
+        .profiles()
+        .some(
+          (profile) =>
+            profile.profileId !== excludingProfileId &&
+            profile.normalizedDisplayName ===
+              displayName.toLocaleLowerCase("en-US"),
+        )
+    ) {
+      throw new AiProviderFailure(
+        "AI_INVALID_CONFIGURATION",
+        "AI provider display name is already in use",
+      );
+    }
+    const endpoint = parseRemoteAiEndpoint(input.endpoint);
+    if (
+      input.protocol === "deepseek" &&
+      (endpoint.origin !== "https://api.deepseek.com" ||
+        endpoint.baseUrl !== "https://api.deepseek.com")
+    ) {
+      throw new AiProviderFailure(
+        "AI_INVALID_CONFIGURATION",
+        "DeepSeek endpoint cannot be changed",
+      );
+    }
+  }
 }
 
 function sha256(value: string): string {
   return createHash("sha256").update(value, "utf8").digest("hex");
+}
+
+function normalizeDisplayName(value: string): string {
+  return value.trim().replace(/\s+/gu, " ");
 }
