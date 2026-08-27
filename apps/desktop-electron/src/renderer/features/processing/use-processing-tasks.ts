@@ -109,11 +109,9 @@ export function useProcessingTasks(
           }
           publishTasks(next);
         })
-        .catch((error: unknown) => {
+        .catch(() => {
           if (mountedRef.current && generation === mountGenerationRef.current) {
-            setOperationError(
-              error instanceof Error ? error.message : "无法读取转写任务",
-            );
+            setOperationError("无法读取转写任务，请重试。");
           }
         })
         .finally(() => {
@@ -192,9 +190,8 @@ export function useProcessingTasks(
       if (result.state === "imported") {
         acceptSnapshot(await window.voice2text.getApplicationSnapshot());
       }
-    } catch (error) {
-      if (mountedRef.current)
-        setOperationError(error instanceof Error ? error.message : "导入失败");
+    } catch {
+      if (mountedRef.current) setOperationError("无法导入音频，请重试。");
     } finally {
       importPendingRef.current = false;
       if (mountedRef.current) setImportPending(false);
@@ -208,11 +205,8 @@ export function useProcessingTasks(
       try {
         await window.voice2text.cancelProcessing(jobId);
         await requestReconcile({ queueIfBusy: false });
-      } catch (error) {
-        if (mountedRef.current)
-          setOperationError(
-            error instanceof Error ? error.message : "取消失败",
-          );
+      } catch {
+        if (mountedRef.current) setOperationError("无法取消处理，请重试。");
       } finally {
         finishPending(jobId);
       }
@@ -229,11 +223,8 @@ export function useProcessingTasks(
         await requestReconcile({
           allowTerminalResetJobIds: new Set([jobId]),
         });
-      } catch (error) {
-        if (mountedRef.current)
-          setOperationError(
-            error instanceof Error ? error.message : "重试失败",
-          );
+      } catch {
+        if (mountedRef.current) setOperationError("无法重试处理，请重试。");
       } finally {
         finishPending(jobId);
       }

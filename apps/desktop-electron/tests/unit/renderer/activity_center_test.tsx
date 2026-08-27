@@ -129,7 +129,7 @@ describe("activity pages", () => {
     );
     expect(screen.getByRole("dialog", { name: "录制需要处理" })).toBeVisible();
     expect(screen.getByLabelText("错误信息")).toHaveTextContent(
-      "这次录制未能正常完成",
+      "这次录制未完成",
     );
     await userEvent
       .setup()

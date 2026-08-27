@@ -89,7 +89,7 @@ describe("Companion route composition", () => {
     expect(alphaRow).not.toHaveClass("rounded-lg", "border");
     expect(
       within(pane).getByRole("button", { name: /Beta Phone/ }),
-    ).toHaveTextContent("凭据缺失");
+    ).toHaveTextContent("需要重新配对");
     expect(within(pane).queryByText("Revoked Phone")).not.toBeInTheDocument();
     expect(screen.queryByRole("heading", { level: 1 })).not.toBeInTheDocument();
     expect(
@@ -109,7 +109,7 @@ describe("Companion route composition", () => {
     expect(screen.getByText("Alpha.wav")).toBeVisible();
     expect(
       screen.getByRole("progressbar", {
-        name: "Alpha.wav 接收进度：40%，还缺 3 个待验证分块",
+        name: "Alpha.wav 接收进度 40%",
       }),
     ).toBeVisible();
     expect(screen.queryByText("Beta.wav")).not.toBeInTheDocument();
@@ -119,7 +119,7 @@ describe("Companion route composition", () => {
     expect(
       screen.getByRole("heading", { name: "Beta Phone", level: 1 }),
     ).toBeVisible();
-    expect(screen.getByText("配对凭据缺失 · 必须重新配对")).toBeVisible();
+    expect(screen.getAllByText("需要重新配对")).toHaveLength(2);
     expect(screen.getByText("Beta.wav")).toBeVisible();
     expect(screen.queryByText("Alpha.wav")).not.toBeInTheDocument();
     expect(connectCompanionPeer).not.toHaveBeenCalled();

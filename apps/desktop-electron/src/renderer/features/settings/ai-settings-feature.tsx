@@ -44,6 +44,7 @@ import {
   SettingsListSkeleton,
   SettingsPageSection,
 } from "@/features/settings/settings-page-section";
+import { userFacingError } from "@/lib/user-facing-error";
 import type {
   AiProviderProfile,
   AiSettingsSnapshot,
@@ -92,7 +93,7 @@ export function AiSettingsFeature({
       setSettings(next);
       return next;
     } catch (cause) {
-      setError(errorMessage(cause, "无法读取云端模型设置"));
+      setError(userFacingError(cause, "无法读取云端模型设置"));
       return null;
     } finally {
       setPending(false);
@@ -107,7 +108,7 @@ export function AiSettingsFeature({
         if (active) setSettings(next);
       })
       .catch((cause: unknown) => {
-        if (active) setError(errorMessage(cause, "无法读取云端模型设置"));
+        if (active) setError(userFacingError(cause, "无法读取云端模型设置"));
       })
       .finally(() => {
         if (active) setPending(false);
@@ -241,7 +242,7 @@ function ProviderProfileList({
           await onReload();
           onError("设置已更新，请重试");
         } else {
-          onError(errorMessage(cause, "无法切换模型"));
+          onError(userFacingError(cause, "无法切换模型"));
         }
       })
       .finally(() => onPendingChange(false));
@@ -774,14 +775,10 @@ function mutationErrorMessage(cause: unknown, fallback: string): string {
   if (message.includes("AI_PROFILE_IN_USE")) {
     return "该模型正在被任务使用，无法修改配置。";
   }
-  return message || fallback;
+  return fallback;
 }
 
 function isStaleRevision(cause: unknown): boolean {
   const message = cause instanceof Error ? cause.message.toLowerCase() : "";
   return message.includes("stale") || message.includes("revision is stale");
-}
-
-function errorMessage(cause: unknown, fallback: string): string {
-  return cause instanceof Error && cause.message ? cause.message : fallback;
 }

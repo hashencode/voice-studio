@@ -134,9 +134,7 @@ describe("live caption and formal handoff Renderer flow", () => {
         errorCode: "FORMAL_WORKER_EXITED",
       },
     });
-    expect(await screen.findByRole("alert")).toHaveTextContent(
-      "实时草稿仍保留且未被覆盖",
-    );
+    expect(await screen.findByRole("alert")).toHaveTextContent("实时草稿仍在");
 
     await userEvent
       .setup()
@@ -147,8 +145,6 @@ describe("live caption and formal handoff Renderer flow", () => {
         expectedAttempt: 1,
       }),
     );
-    expect(
-      await screen.findByText("正式转写已排队 · 第 2 次尝试"),
-    ).toBeVisible();
+    expect(await screen.findByText("正式转写已排队")).toBeVisible();
   });
 });

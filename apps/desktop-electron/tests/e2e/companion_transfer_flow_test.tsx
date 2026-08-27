@@ -74,7 +74,7 @@ describe("companion Renderer flow", () => {
     });
     expect(getCompanionSnapshot).toHaveBeenCalledTimes(1);
     expect(setCompanionOptIn).not.toHaveBeenCalled();
-    expect(screen.getByText(/只有启用后才会开始局域网广播/)).toBeVisible();
+    expect(screen.getByText(/启用后才会请求局域网权限/)).toBeVisible();
 
     enable.focus();
     await user.keyboard("{Enter}");
@@ -312,12 +312,14 @@ describe("companion Renderer flow", () => {
       await screen.findByRole("button", { name: "查看传输历史" }),
     );
     const progress = await screen.findByRole("progressbar", {
-      name: "访谈.wav 接收进度：40%，还缺 3 个待验证分块",
+      name: "访谈.wav 接收进度 40%",
     });
     expect(progress).toHaveValue(40);
     expect(screen.getAllByText("发送端必须保留原件")).toHaveLength(2);
     expect(screen.getByText("已签收，可由发送端删除原件")).toBeVisible();
-    expect(screen.getByText(/recording 42/)).toBeVisible();
+    expect(screen.getByText("已接收并保存")).toBeVisible();
+    expect(screen.queryByText(/receipt|recording|APP_RESTARTED/i)).toBeNull();
+    expect(screen.queryByText(/KiB|MiB|10,000|8,000/)).toBeNull();
 
     const cancel = screen.getByRole("button", { name: "取消接收 访谈.wav" });
     cancel.focus();

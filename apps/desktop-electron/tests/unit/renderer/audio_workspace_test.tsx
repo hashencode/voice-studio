@@ -222,11 +222,13 @@ it("clamps ten-second seek controls to the audio boundaries", async () => {
 it("shows a recoverable list error and then the explicit empty state", async () => {
   const listAudios = vi
     .fn()
-    .mockRejectedValueOnce(new Error("数据库暂时忙碌"))
+    .mockRejectedValueOnce(new Error("raw /private/database busy"))
     .mockResolvedValueOnce([]);
   render(<AudioWorkspaceFeature api={api({ listAudios })} />);
 
-  expect(await screen.findByRole("alert")).toHaveTextContent("数据库暂时忙碌");
+  expect(await screen.findByRole("alert")).toHaveTextContent(
+    "无法载入音频资料库",
+  );
   await userEvent
     .setup()
     .click(screen.getByRole("button", { name: "重新载入" }));
@@ -320,7 +322,7 @@ it("closes playback once on workspace back and keeps close failures visible", as
   let closeAttempts = 0;
   const controlAudioPlayback = vi.fn(async (_audioId, command) => {
     if (command.action === "close" && closeAttempts++ === 0)
-      throw new Error("无法关闭私有音频");
+      throw new Error("raw /private/audio close failure");
     return {
       audioId: 4,
       initialized: command.action !== "close",
@@ -340,9 +342,7 @@ it("closes playback once on workspace back and keeps close failures visible", as
   await user.click(screen.getByRole("button", { name: "播放音频" }));
 
   await user.click(screen.getByRole("button", { name: "返回音频列表" }));
-  expect(await screen.findByRole("alert")).toHaveTextContent(
-    "无法关闭私有音频",
-  );
+  expect(await screen.findByRole("alert")).toHaveTextContent("音频关闭未完成");
   expect(
     screen.getByRole("region", { name: "项目周会.wav 工作区" }),
   ).toBeVisible();

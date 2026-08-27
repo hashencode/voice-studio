@@ -15,6 +15,10 @@ describe("capture lifecycle policy", () => {
     expect(activeCaptureQuitDialog.buttons.join(" ")).not.toMatch(
       /丢弃|discard/i,
     );
+    expect(activeCaptureQuitDialog.detail).toBe(
+      "选择停止后，应用会先保存当前录制再退出。",
+    );
+    expect(activeCaptureQuitDialog.detail).not.toMatch(/日志|哈希|hash/i);
   });
 
   it("confirms active and paused sessions but not finalized partial authority", () => {

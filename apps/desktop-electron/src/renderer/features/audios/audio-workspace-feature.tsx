@@ -33,6 +33,7 @@ import {
 import { Slider } from "@/components/ui/slider";
 import { Textarea } from "@/components/ui/textarea";
 import { AudioAiFeature } from "@/features/audio-ai/audio-ai-feature";
+import { userFacingError } from "@/lib/user-facing-error";
 import type {
   AudioExportFormat,
   AudioPlaybackSnapshot,
@@ -79,7 +80,7 @@ export function AudioWorkspaceFeature({
           next.length === 0 ? "音频资料库为空" : `已载入 ${next.length} 个音频`,
         );
       } catch (cause) {
-        setError(message(cause, "无法载入音频资料库"));
+        setError(userFacingError(cause, "无法载入音频资料库"));
       } finally {
         pendingRef.current = false;
         setPending(false);
@@ -100,7 +101,7 @@ export function AudioWorkspaceFeature({
         );
       })
       .catch((cause: unknown) => {
-        if (active) setError(message(cause, "无法载入音频资料库"));
+        if (active) setError(userFacingError(cause, "无法载入音频资料库"));
       });
     return () => {
       active = false;
@@ -118,7 +119,7 @@ export function AudioWorkspaceFeature({
       setWorkspace(next);
       setStatus(`已打开 ${next.summary.displayName}`);
     } catch (cause) {
-      setError(message(cause, "无法打开音频"));
+      setError(userFacingError(cause, "无法打开音频"));
     } finally {
       pendingRef.current = false;
       setPending(false);
@@ -322,7 +323,7 @@ function WorkspaceView({
       setPlayback(null);
       onBack();
     } catch (cause) {
-      const detail = message(cause, "音频关闭未完成");
+      const detail = userFacingError(cause, "音频关闭未完成");
       setError(detail);
       setStatus(`音频关闭失败：${detail}`);
     } finally {
@@ -352,7 +353,7 @@ function WorkspaceView({
       setWorkspace(await action());
       setStatus(success);
     } catch (cause) {
-      setError(message(cause, "音频修改未完成，请重新载入"));
+      setError(userFacingError(cause, "音频修改未完成，请重新载入"));
     } finally {
       operationPendingRef.current = false;
       setPending(false);
@@ -380,7 +381,7 @@ function WorkspaceView({
       setPlayback(next);
       setStatus(playbackStatus(next));
     } catch (cause) {
-      setError(message(cause, "音频操作未完成"));
+      setError(userFacingError(cause, "音频操作未完成"));
     } finally {
       operationPendingRef.current = false;
       setPending(false);
@@ -401,7 +402,7 @@ function WorkspaceView({
         setStatus(`音频导出失败：${result.message}`);
       }
     } catch (cause) {
-      setError(message(cause, "音频导出未完成"));
+      setError(userFacingError(cause, "音频导出未完成"));
     } finally {
       operationPendingRef.current = false;
       setPending(false);
@@ -499,7 +500,9 @@ function WorkspaceView({
                       : `搜索结果 1 / ${identities.length}，片段 ${identities[0]!.sequenceId + 1}`,
                   );
                 })
-                .catch((cause) => setError(message(cause, "搜索未完成")))
+                .catch((cause) =>
+                  setError(userFacingError(cause, "搜索未完成")),
+                )
                 .finally(() => {
                   operationPendingRef.current = false;
                   setPending(false);
@@ -1173,9 +1176,7 @@ function AudioLoading() {
     >
       <div>
         <h1 className="text-xl font-semibold">正在载入音频资料库</h1>
-        <p className="mt-2 text-sm text-muted-foreground">
-          正在读取 Electron 本机音频 authority。
-        </p>
+        <p className="mt-2 text-sm text-muted-foreground">正在读取本机音频。</p>
       </div>
     </section>
   );
@@ -1261,10 +1262,4 @@ function playbackStatus(snapshot: AudioPlaybackSnapshot): string {
   return snapshot.playing
     ? `正在播放，速度 ${snapshot.speed} 倍`
     : `已暂停在 ${clock(snapshot.positionMs)}`;
-}
-
-function message(cause: unknown, fallback: string): string {
-  return cause instanceof Error && cause.message.trim().length > 0
-    ? cause.message
-    : fallback;
 }

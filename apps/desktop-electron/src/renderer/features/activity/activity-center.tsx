@@ -247,10 +247,10 @@ function ActivityIcon({
 function activityDescription(item: ActivityItemView): string {
   switch (item.kind) {
     case "capture_failed":
-      return "这次录制未能正常完成，需要打开详情选择恢复或保留现有音频。";
+      return "这次录制未完成。请打开详情选择恢复方式。";
     case "capture_partial":
-      return "这次录制只保存了部分音频，需要打开详情确认内容是否完整。";
+      return "只保存了部分音频。请打开详情检查。";
     case "capture_completed":
-      return "这次录制已经安全保存，可以打开详情继续复核或处理转写结果。";
+      return "录制已保存。";
   }
 }

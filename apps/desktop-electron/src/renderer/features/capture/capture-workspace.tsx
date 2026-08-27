@@ -20,6 +20,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { CaptionWorkspace } from "@/features/captions/caption-workspace";
+import { userFacingError } from "@/lib/user-facing-error";
 import type {
   ApplicationSnapshot,
   CapturePreflight,
@@ -118,7 +119,7 @@ export function CaptureWorkspace({
       .catch((reason: unknown) => {
         if (active) {
           setLoadedRecoveryTarget(loadTarget);
-          setError(errorMessage(reason, "无法检查可恢复录制"));
+          setError(userFacingError(reason, "无法检查可恢复录制"));
         }
       });
     return () => {
@@ -155,7 +156,7 @@ export function CaptureWorkspace({
       try {
         await operation();
       } catch (reason: unknown) {
-        setError(errorMessage(reason, "录制操作未完成"));
+        setError(userFacingError(reason, "录制操作未完成"));
       } finally {
         pendingRef.current.delete(identity);
         setPendingAction((current) => (current === identity ? null : current));
@@ -808,7 +809,7 @@ function RecoverySurface({
           发现可恢复录制
         </h2>
         <p className="mt-1 text-sm text-muted-foreground">
-          Renderer 关闭或重新载入不会删除已完成分块。
+          应用关闭或重新载入不会删除已保存的录音。
         </p>
       </div>
       <div className="divide-y border-y">
@@ -816,8 +817,7 @@ function RecoverySurface({
           <div key={item.sessionId} className="py-3 text-sm">
             <p className="font-medium">中断的音频录制</p>
             <p className="mt-1 text-muted-foreground">
-              {formatCaptureElapsed(item.captureTimelineMs)} ·{" "}
-              {item.finalizedChunkCount} 个已完成分块 · {item.gapCount}{" "}
+              {formatCaptureElapsed(item.captureTimelineMs)} · {item.gapCount}{" "}
               个时间缺口
             </p>
             <div className="mt-3 flex flex-wrap justify-end gap-2">
@@ -892,8 +892,4 @@ function capturePhaseLabel(
 function commandKey(action: string): string {
   commandSequence += 1;
   return `${action}-renderer-${Date.now()}-${commandSequence}`;
-}
-
-function errorMessage(reason: unknown, fallback: string): string {
-  return reason instanceof Error && reason.message ? reason.message : fallback;
 }

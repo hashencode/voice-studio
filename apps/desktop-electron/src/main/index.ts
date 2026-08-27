@@ -31,7 +31,6 @@ import {
 import {
   desktopProtocolVersion,
   ipcChannels,
-  type BootstrapAction,
   type ImportAudioResponse,
   type OperationEvent,
   type CaptureSnapshot,
@@ -2233,7 +2232,7 @@ function bindDesktopIpc(window: BrowserWindow): void {
           cancelId: 0,
           title: "迁移本地模型",
           message: "要把全部本地模型迁移到新位置吗？",
-          detail: `迁移约 ${Math.ceil(current.storage.usedBytes / 1024 ** 2)} MB。完成复制、校验和加载探测前，原位置不会被删除。`,
+          detail: "迁移期间会保留原位置，完成后再清理。",
         });
         if (confirmation.response !== 1) return current;
       }
@@ -2350,8 +2349,7 @@ function bindDesktopIpc(window: BrowserWindow): void {
     },
     applicationSnapshot: () => applicationState.snapshot(),
     navigate: (section) => applicationState.navigate(section),
-    requestBootstrapAction: async (action) =>
-      await requestBootstrapAction(action),
+    requestBootstrapAction: async () => await requestBootstrapAction(),
     markActivityRead: (activityId) =>
       applicationState.markActivityRead(activityId),
     markAllActivityRead: () => applicationState.markAllActivityRead(),
@@ -2646,7 +2644,7 @@ async function chooseAndImportAudio(): Promise<ImportAudioResponse> {
     throw new Error("Electron profile is not ready for import");
   }
   const selection = await dialog.showOpenDialog(mainWindow, {
-    title: "安全导入音频",
+    title: "导入音频",
     properties: ["openFile"],
     filters: [
       {
@@ -2762,7 +2760,7 @@ async function importAudioFromSource(
   }
 }
 
-async function requestBootstrapAction(_action: BootstrapAction) {
+async function requestBootstrapAction() {
   await bootstrapApplication();
   return applicationState.snapshot();
 }
@@ -3076,7 +3074,7 @@ async function initializeApplication(): Promise<void> {
     applicationState.setProcessingCapability(
       resourceCatalog.processingPipelineIdentities()
         ? undefined
-        : "本地 ASR 模型资源尚未安装，无法创建处理任务",
+        : "请先安装本地转写模型。",
     );
     await cleanupNativeImportArtifacts(profile.profile, desktopRepository);
     if (processingSmokeRequest) {
@@ -3088,7 +3086,7 @@ async function initializeApplication(): Promise<void> {
   } catch (error) {
     await initializeLocalModels(false);
     applicationState.setProcessingCapability(
-      error instanceof Error ? error.message : "本地处理运行时不可用",
+      "本地处理暂不可用，请检查本地模型设置。",
     );
     if (
       bootstrapSmokeRequest ||
@@ -3133,8 +3131,8 @@ async function initializeLocalModels(runtimeReady: boolean): Promise<void> {
     runtime: {
       state: runtimeReady ? "ready" : "damaged",
       message: runtimeReady
-        ? "Worker Runtime 正常"
-        : "应用运行组件损坏，请重新安装或修复应用",
+        ? "本地处理组件可用"
+        : "本地处理组件不可用，请重新安装应用。",
       identity: runtimeReady ? (resourceCatalog?.identity ?? null) : null,
     },
     probeStore: async () => {
@@ -3174,13 +3172,13 @@ async function refreshResourceModelAuthorities(): Promise<void> {
   applicationState.setProcessingCapability(
     resourceCatalog.processingPipelineIdentities()
       ? undefined
-      : "本地转写模型尚未安装",
+      : "请先安装本地转写模型。",
   );
 }
 
 async function probeCurrentModelAuthorities(): Promise<void> {
   await refreshResourceModelAuthorities();
-  if (!resourceCatalog) throw new Error("Worker Runtime 不可用");
+  if (!resourceCatalog) throw new Error("local processing runtime unavailable");
   for (const operation of ["asr", "diarization", "live-caption"]) {
     try {
       await assertAuthorizedResourceCommand(

@@ -11,6 +11,7 @@ import {
   DialogDescription,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { userFacingError } from "@/lib/user-facing-error";
 import type {
   AudioAiConsentPreview,
   AudioAiSnapshot,
@@ -64,7 +65,7 @@ export function AudioAiFeature({
         if (active && next) accept(next);
       })
       .catch((cause: unknown) => {
-        if (active) setError(errorMessage(cause, "无法读取音频智能草稿"));
+        if (active) setError(userFacingError(cause, "无法读取音频智能草稿"));
       });
     return () => {
       active = false;
@@ -176,10 +177,7 @@ export function AudioAiFeature({
       {snapshot?.state === "queued" || snapshot?.state === "running" ? (
         <div role="status" className="mt-4 flex items-center gap-2 text-sm">
           <LoaderCircle className="size-4 animate-spin" aria-hidden="true" />
-          {snapshot.state === "queued"
-            ? "云端草稿已排队"
-            : "正在生成云端草稿"}{" "}
-          · 第 {Math.max(1, snapshot.attempt)} 次尝试
+          {snapshot.state === "queued" ? "云端草稿已排队" : "正在生成云端草稿"}
         </div>
       ) : null}
 
@@ -190,9 +188,6 @@ export function AudioAiFeature({
       {canRetry ? (
         <div role="alert" className="mt-4 rounded-lg border px-3 py-3 text-sm">
           <p>{snapshot.state === "interrupted" ? "生成已中断" : "生成失败"}</p>
-          {snapshot.errorCode ? (
-            <p className="mt-1 text-muted-foreground">{snapshot.errorCode}</p>
-          ) : null}
         </div>
       ) : null}
 
@@ -287,10 +282,9 @@ function ConsentDialog({
         {preview ? (
           <>
             <DialogDescription className="mt-2 text-sm text-muted-foreground">
-              将音频标题“{preview.audioTitle}”以及本次音频的{" "}
-              {preview.segmentCount} 个转写片段、时间范围和匿名说话人状态发送给{" "}
-              {preview.providerDisplayName} · {preview.modelId}。
-              不会发送音频、密钥、声纹或其他音频。
+              将音频标题“{preview.audioTitle}”和本次转写内容发送给{" "}
+              {preview.providerDisplayName} · {preview.modelId}
+              。不会发送原始音频、密钥或声纹。
             </DialogDescription>
             <dl className="mt-4 grid gap-2 rounded-lg bg-muted p-3 text-sm">
               <div>
@@ -389,11 +383,7 @@ function aiErrorMessage(cause: unknown, fallback: string): string {
     return "无法读取 macOS 钥匙串，请到设置重新输入密钥";
   if (code.includes("SECRET_CORRUPT"))
     return "macOS 钥匙串中的密钥无法使用，请到设置重新输入";
-  return errorMessage(cause, fallback);
-}
-
-function errorMessage(cause: unknown, fallback: string): string {
-  return cause instanceof Error && cause.message ? cause.message : fallback;
+  return userFacingError(cause, fallback);
 }
 
 function requestIdentity(prefix: string): string {

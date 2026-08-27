@@ -144,6 +144,22 @@ function testAiProfile() {
 }
 
 describe("application shell", () => {
+  it("keeps raw load failures out of the shell error surface", async () => {
+    installApi(readySnapshot, {
+      getApplicationSnapshot: vi.fn(async () => {
+        throw new Error("raw /private/application-state failure");
+      }),
+    });
+
+    render(<App />);
+
+    expect(
+      await screen.findByRole("heading", { name: "无法载入工作台" }),
+    ).toBeVisible();
+    expect(screen.getByText("请重新打开应用。")).toBeVisible();
+    expect(screen.queryByText(/private\/application-state/)).toBeNull();
+  });
+
   it("keeps the context pane docked when the window width changes", async () => {
     Object.defineProperty(window, "innerWidth", {
       configurable: true,
@@ -937,7 +953,9 @@ describe("application shell", () => {
       value: first,
     });
     render(<App />);
-    expect(await screen.findByRole("alert")).toHaveTextContent("读取失败");
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      "无法载入音频列表",
+    );
     expect(screen.getByRole("button", { name: "重新载入" })).toBeEnabled();
   });
 

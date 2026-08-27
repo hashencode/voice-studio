@@ -110,9 +110,7 @@ describe("caption workspace", () => {
       />,
     );
 
-    expect(
-      await screen.findByText("正式转写已排队 · 第 1 次尝试"),
-    ).toBeVisible();
+    expect(await screen.findByText("正式转写已排队")).toBeVisible();
     expect(screen.queryByText("实时草稿 · 可能变化")).not.toBeInTheDocument();
     expect(
       screen.queryByRole("button", { name: "复制字幕" }),
@@ -355,7 +353,7 @@ describe("caption workspace", () => {
 
     const alert = await screen.findByRole("alert");
     expect(alert).toHaveTextContent("实时草稿已降级");
-    expect(alert).toHaveTextContent("录音继续且权威音频不受影响");
+    expect(alert).toHaveTextContent("录音会继续保存");
     expect(
       screen.getByRole("progressbar", { name: "实时草稿积压" }),
     ).toHaveAttribute("aria-valuetext", expect.stringContaining("积压"));
@@ -368,7 +366,8 @@ describe("caption workspace", () => {
     expect(
       screen.getByRole("progressbar", { name: "实时草稿积压" }),
     ).toHaveAttribute("aria-valuemax", "960000");
-    expect(screen.getByText(/700,000 字节/)).toBeVisible();
+    expect(screen.getByText("处理积压较多")).toBeVisible();
+    expect(screen.queryByText(/700,000|字节/)).not.toBeInTheDocument();
   });
 
   it("labels draft, formal, and manual authority and retries formal once with a new attempt", async () => {
@@ -396,10 +395,10 @@ describe("caption workspace", () => {
     );
 
     expect(await screen.findByText("实时草稿 · 可能变化")).toBeVisible();
-    expect(screen.getByText("正式转写 · Qwen3")).toBeVisible();
-    expect(screen.getByText("人工修订 · 独立保留")).toBeVisible();
+    expect(screen.getByText("正式转写")).toBeVisible();
+    expect(screen.getByText("人工修订")).toBeVisible();
     expect(screen.getByRole("alert")).toHaveTextContent(
-      "正式转写失败；实时草稿仍保留且未被覆盖",
+      "正式转写失败，实时草稿仍在",
     );
 
     const retry = screen.getByRole("button", { name: "重试正式转写" });
@@ -425,11 +424,11 @@ describe("caption workspace", () => {
       },
     });
     await waitFor(() =>
-      expect(screen.getByText("正式转写已排队 · 第 3 次尝试")).toBeVisible(),
+      expect(screen.getByText("正式转写已排队")).toBeVisible(),
     );
 
     bridge.emit(failed);
-    expect(screen.getByText("正式转写已排队 · 第 3 次尝试")).toBeVisible();
+    expect(screen.getByText("正式转写已排队")).toBeVisible();
   });
 
   it("surfaces a temporarily unavailable formal retry and releases the pending guard", async () => {
@@ -460,9 +459,10 @@ describe("caption workspace", () => {
       name: "重试正式转写",
     });
     await user.click(retry);
+    expect(await screen.findByText("无法重试正式转写")).toBeVisible();
     expect(
-      await screen.findByText("formal transcript retry is unavailable"),
-    ).toBeVisible();
+      screen.queryByText("formal transcript retry is unavailable"),
+    ).not.toBeInTheDocument();
     await waitFor(() => expect(retry).toBeEnabled());
 
     await user.click(retry);

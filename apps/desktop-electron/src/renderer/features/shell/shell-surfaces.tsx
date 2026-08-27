@@ -122,9 +122,7 @@ export function CapabilityUnavailableDialog({
           <DialogTitle>本地处理不可用</DialogTitle>
           <DialogDescription>{reason}</DialogDescription>
         </DialogHeader>
-        <p className="text-sm">
-          录音和导入仍可使用。安装对应模型后，可再次主动发起转写或实时字幕。
-        </p>
+        <p className="text-sm">录音和导入仍可使用。</p>
         <div className="flex justify-end gap-2 pt-2">
           <Button type="button" variant="outline" onClick={onOpenLocalModels}>
             前往本地模型

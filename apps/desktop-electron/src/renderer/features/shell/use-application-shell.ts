@@ -101,11 +101,9 @@ export function useApplicationShell() {
           );
         }
       })
-      .catch((error: unknown) => {
+      .catch(() => {
         if (active) {
-          setLoadError(
-            error instanceof Error ? error.message : "无法载入工作台状态",
-          );
+          setLoadError("请重新打开应用。");
         }
       });
     return () => {

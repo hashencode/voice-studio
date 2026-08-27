@@ -4,7 +4,7 @@ export const activeCaptureQuitDialog = Object.freeze({
   type: "warning" as const,
   title: "录制仍在进行",
   message: "要继续录制，还是停止并安全保存后退出？",
-  detail: "默认会继续录制。停止后会先提交录制日志与哈希，再退出应用。",
+  detail: "选择停止后，应用会先保存当前录制再退出。",
   buttons: ["继续录制", "停止并保存后退出"],
   defaultId: 0,
   cancelId: 0,

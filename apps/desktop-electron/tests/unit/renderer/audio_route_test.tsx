@@ -706,7 +706,7 @@ it("keeps A on failed A-to-B transition and keys detail after success", async ()
   const controlAudioPlayback = vi.fn(async (audioId, command) => {
     if (command.action === "close" && audioId === 1 && rejectClose) {
       rejectClose = false;
-      throw new Error("无法关闭 A");
+      throw new Error("raw /private/audio-a playback failure");
     }
     return playback(audioId, command.action !== "close");
   });
@@ -721,7 +721,9 @@ it("keeps A on failed A-to-B transition and keys detail after success", async ()
     "A 状态",
   );
   await user.click(screen.getByRole("button", { name: /打开 音频 B/ }));
-  expect(await screen.findByRole("alert")).toHaveTextContent("无法关闭 A");
+  expect(await screen.findByRole("alert")).toHaveTextContent(
+    "无法切换音频，请重试",
+  );
   expect(
     screen.getByRole("region", { name: "音频 A.wav 工作区" }),
   ).toBeVisible();
@@ -776,7 +778,7 @@ it("closes A again after a successful close is followed by a failed B open", asy
     openAudio: vi.fn(async (audioId) => {
       if (audioId === 2 && failB) {
         failB = false;
-        throw new Error("无法打开 B");
+        throw new Error("raw /private/audio-b open failure");
       }
       return workspace([audioA, audioB, audioC][audioId - 1]!);
     }),
@@ -787,7 +789,7 @@ it("closes A again after a successful close is followed by a failed B open", asy
   await user.click(await screen.findByRole("button", { name: /打开 音频 A/ }));
   await screen.findByRole("region", { name: "音频 A.wav 工作区" });
   await user.click(screen.getByRole("button", { name: /打开 音频 B/ }));
-  expect(await screen.findByRole("alert")).toHaveTextContent("无法打开 B");
+  expect(await screen.findByRole("alert")).toHaveTextContent("无法打开音频");
   await user.click(screen.getByRole("button", { name: /打开 音频 B/ }));
 
   expect(
@@ -924,12 +926,12 @@ it("refreshes the list for structural task changes but not progress-only updates
 it("recovers a failed Audio list through the visible retry action", async () => {
   const listAudios = vi
     .fn()
-    .mockRejectedValueOnce(new Error("列表暂时不可用"))
+    .mockRejectedValueOnce(new Error("raw /private/library database failure"))
     .mockResolvedValueOnce([audioA]);
   renderRoute(api({ listAudios }));
 
   const alert = await screen.findByRole("alert");
-  expect(alert).toHaveTextContent("列表暂时不可用");
+  expect(alert).toHaveTextContent("无法载入音频列表");
   const retry = within(alert).getByRole("button", { name: "重新载入" });
   expect(retry).toBeEnabled();
   await userEvent.setup().click(retry);
@@ -938,7 +940,7 @@ it("recovers a failed Audio list through the visible retry action", async () => 
     await screen.findByRole("button", { name: /打开 音频 A/ }),
   ).toBeVisible();
   expect(listAudios).toHaveBeenCalledTimes(2);
-  expect(screen.queryByText("列表暂时不可用")).not.toBeInTheDocument();
+  expect(screen.queryByText(/private\/library/)).not.toBeInTheDocument();
 });
 
 it("ignores an Audio mutation response after a newer selection", async () => {

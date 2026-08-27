@@ -520,7 +520,11 @@ describe("capture workspace", () => {
     expect(
       await screen.findByRole("heading", { name: "发现可恢复录制" }),
     ).toBeVisible();
-    expect(screen.getByText(/3 个已完成分块/)).toBeVisible();
+    expect(
+      screen.getByText("应用关闭或重新载入不会删除已保存的录音。"),
+    ).toBeVisible();
+    expect(screen.getByText(/00:15 · 1 个时间缺口/)).toBeVisible();
+    expect(screen.queryByText(/Renderer|分块/)).not.toBeInTheDocument();
     expect(
       screen.queryByRole("button", { name: /丢弃/ }),
     ).not.toBeInTheDocument();
@@ -555,7 +559,7 @@ describe("capture workspace", () => {
     installCaptureApi({
       controlCapture: vi
         .fn()
-        .mockRejectedValueOnce(new Error("录制服务暂时不可用"))
+        .mockRejectedValueOnce(new Error("raw /private/capture service"))
         .mockResolvedValueOnce(recording),
     });
     const user = userEvent.setup();
@@ -573,7 +577,7 @@ describe("capture workspace", () => {
 
     await user.click(screen.getByRole("button", { name: "继续录制" }));
     expect(await screen.findByRole("alert")).toHaveTextContent(
-      "录制服务暂时不可用",
+      "录制操作未完成",
     );
     await waitFor(() =>
       expect(screen.getByRole("button", { name: "继续录制" })).toBeEnabled(),
@@ -643,14 +647,14 @@ describe("capture workspace", () => {
     };
     const listCaptureRecoveries = vi
       .fn<Voice2TextDesktopApi["listCaptureRecoveries"]>()
-      .mockRejectedValueOnce(new Error("capture bootstrap unavailable"))
+      .mockRejectedValueOnce(new Error("raw /private/capture bootstrap"))
       .mockResolvedValueOnce([recoverable]);
     installCaptureApi({ listCaptureRecoveries });
     const view = render(
       <CaptureWorkspace capture={idle} applicationRevision={1} />,
     );
     expect(await screen.findByRole("alert")).toHaveTextContent(
-      "capture bootstrap unavailable",
+      "无法检查可恢复录制",
     );
 
     view.rerender(
@@ -667,9 +671,7 @@ describe("capture workspace", () => {
     expect(
       await screen.findByRole("heading", { name: "发现可恢复录制" }),
     ).toBeVisible();
-    expect(
-      screen.queryByText("capture bootstrap unavailable"),
-    ).not.toBeInTheDocument();
+    expect(screen.queryByText(/private\/capture/)).not.toBeInTheDocument();
     expect(listCaptureRecoveries).toHaveBeenCalledTimes(2);
   });
 

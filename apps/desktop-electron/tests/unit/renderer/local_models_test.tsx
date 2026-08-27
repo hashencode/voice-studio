@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 
 import { act, render, screen } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { afterEach, expect, it, vi } from "vitest";
 
 import { LocalModelsFeature } from "../../../src/renderer/features/settings/local-models-feature";
@@ -60,7 +61,7 @@ it("shows Runtime and both bundles without exposing file-location or unavailable
   expect(screen.queryByRole("heading", { name: "本地模型" })).toBeNull();
   expect(screen.queryByText(localModelSnapshot.storage.displayPath)).toBeNull();
   expect(screen.queryByText("本地模型文件所在位置")).toBeNull();
-  expect(screen.getByText("Worker Runtime")).toBeVisible();
+  expect(screen.getByText("本地处理组件")).toBeVisible();
   expect(screen.getByText("本地转写")).toBeVisible();
   expect(screen.getByText("实时字幕")).toBeVisible();
   const list = screen.getByRole("list");
@@ -95,4 +96,60 @@ it("shows Runtime and both bundles without exposing file-location or unavailable
   for (const status of screen.getAllByText("未安装")) {
     expect(status.closest('[data-slot="item-actions"]')).not.toBeNull();
   }
+});
+
+it("keeps raw local-model failures out of the rendered settings", async () => {
+  const api = {
+    ...companionRendererStubs(),
+    getLocalModelSnapshot: vi.fn(async () => {
+      throw new Error("raw /private/models failure");
+    }),
+  } as unknown as Voice2TextDesktopApi;
+  Object.defineProperty(window, "voice2text", {
+    configurable: true,
+    value: api,
+  });
+
+  render(<LocalModelsFeature />);
+
+  expect(await screen.findByRole("alert")).toHaveTextContent(
+    "无法读取本地模型，请重试。",
+  );
+  expect(screen.queryByText(/private\/models/)).not.toBeInTheDocument();
+});
+
+it("uses an operation-specific fallback without exposing mutation errors", async () => {
+  const installed = {
+    ...localModelSnapshot,
+    bundles: localModelSnapshot.bundles.map((bundle, index) =>
+      index === 0
+        ? {
+            ...bundle,
+            state: "installed" as const,
+            version: "1.0.0",
+          }
+        : bundle,
+    ),
+  };
+  const api = {
+    ...companionRendererStubs(),
+    getLocalModelSnapshot: vi.fn(async () => installed),
+    sendLocalModelIntent: vi.fn(async () => {
+      throw new Error("raw /private/models mutation failure");
+    }),
+  } as unknown as Voice2TextDesktopApi;
+  Object.defineProperty(window, "voice2text", {
+    configurable: true,
+    value: api,
+  });
+
+  render(<LocalModelsFeature />);
+  await userEvent
+    .setup()
+    .click(await screen.findByRole("button", { name: "删除" }));
+
+  expect(await screen.findByRole("alert")).toHaveTextContent(
+    "本地模型操作未完成，请重试。",
+  );
+  expect(screen.queryByText(/private\/models/)).not.toBeInTheDocument();
 });

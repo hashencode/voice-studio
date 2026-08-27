@@ -333,10 +333,12 @@ function App() {
     onImport: importAudio,
     onProcessingUnavailable: (reason) => {
       setProcessingUnavailableReason(
-        reason ??
-          (snapshot?.capability.processing === "unavailable"
-            ? snapshot.capability.reason
-            : "本地转写模型暂不可用"),
+        processingUnavailableMessage(
+          reason ??
+            (snapshot?.capability.processing === "unavailable"
+              ? snapshot.capability.reason
+              : null),
+        ),
       );
     },
     onCancel: cancelProcessing,
@@ -388,11 +390,18 @@ function App() {
   ]);
   React.useEffect(() => {
     if (!applicationBlocked) return;
-    pendingSettingsTargetRef.current = null;
-    setActivityError(null);
-    setProcessingUnavailableReason(null);
-    setCaptureDetailOpen(false);
-    setCaptureDetailSessionId(null);
+    let active = true;
+    queueMicrotask(() => {
+      if (!active) return;
+      pendingSettingsTargetRef.current = null;
+      setActivityError(null);
+      setProcessingUnavailableReason(null);
+      setCaptureDetailOpen(false);
+      setCaptureDetailSessionId(null);
+    });
+    return () => {
+      active = false;
+    };
   }, [applicationBlocked]);
   React.useEffect(() => {
     if (current !== "settings" || !pendingSettingsTargetRef.current) return;
@@ -706,7 +715,7 @@ function ShellContent({
         <div>
           <h1 className="text-xl font-semibold">正在初始化本机资料库</h1>
           <p className="mt-2 text-sm text-muted-foreground">
-            创建 Electron 专属目录、数据库与安全边界。
+            正在准备本机资料库。
           </p>
         </div>
       </section>
@@ -722,7 +731,7 @@ function ShellContent({
         <div>
           <h1 className="text-xl font-semibold">正在核对启动状态</h1>
           <p className="mt-2 text-sm text-muted-foreground">
-            中断任务只会标记为待确认，不会自动重试。
+            中断的任务会保留，稍后由你确认。
           </p>
         </div>
       </section>
@@ -763,6 +772,12 @@ function ShellContent({
       break;
   }
   return <div className="flex min-h-full w-full flex-col gap-4">{section}</div>;
+}
+
+function processingUnavailableMessage(reason: string | null): string {
+  return reason?.includes("安装")
+    ? "请先安装本地转写模型。"
+    : "请检查本地模型设置后重试。";
 }
 
 function SettingsContextPane({

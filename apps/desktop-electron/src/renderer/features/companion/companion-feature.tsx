@@ -18,6 +18,7 @@ import {
 } from "@/components/ui/item";
 import { Progress } from "@/components/ui/progress";
 import { SidebarGroup, SidebarGroupContent } from "@/components/ui/sidebar";
+import { userFacingError } from "@/lib/user-facing-error";
 import type {
   CompanionSnapshot,
   Voice2TextDesktopApi,
@@ -95,7 +96,7 @@ export function useCompanionRouteController({
         if (active) accept(next);
       })
       .catch((cause: unknown) => {
-        if (active) setError(errorMessage(cause, "无法读取手机接收状态"));
+        if (active) setError(userFacingError(cause, "无法读取手机接收状态"));
       });
     return () => {
       active = false;
@@ -117,7 +118,7 @@ export function useCompanionRouteController({
       try {
         accept(await operation());
       } catch (cause) {
-        setError(errorMessage(cause, "手机接收操作未完成"));
+        setError(userFacingError(cause, "手机接收操作未完成"));
       } finally {
         pendingActionRef.current = false;
         setPendingAction(null);
@@ -252,8 +253,8 @@ export function CompanionContextPane({
                       <ItemTitle>{peer.displayName}</ItemTitle>
                       <ItemDescription>
                         {peer.trustState === "credential-missing"
-                          ? "凭据缺失 · 需要重新配对"
-                          : "已信任 · 在线状态未知"}
+                          ? "需要重新配对"
+                          : "已配对"}
                       </ItemDescription>
                     </ItemContent>
                   </button>
@@ -374,8 +375,7 @@ function PairingWorkspace({
           <section className="rounded-xl border p-4">
             <h3 className="font-semibold">手机接收当前关闭</h3>
             <p className="mt-1 text-sm text-muted-foreground">
-              只有启用后才会开始局域网广播、请求系统权限或接受手机连接；已有
-              durable receipt 与历史不会被删除。
+              启用后才会请求局域网权限并接受手机连接。已有接收历史会保留。
             </p>
           </section>
         ) : (
@@ -428,8 +428,7 @@ function ReadinessWorkspace({
         <section className="border-y py-5">
           <h2 className="font-semibold">手机接收当前关闭</h2>
           <p className="mt-1 text-sm text-muted-foreground">
-            只有启用后才会开始局域网广播、请求系统权限或接受手机连接；已有
-            durable receipt 与历史不会被删除。
+            启用后才会请求局域网权限并接受手机连接。已有接收历史会保留。
           </p>
           <Button
             type="button"
@@ -469,9 +468,7 @@ function DeviceWorkspace({
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div className="min-w-0">
             <p className="mt-1 text-sm text-muted-foreground">
-              {credentialMissing
-                ? "配对凭据缺失 · 必须重新配对"
-                : "已信任 · 在线状态未知"}
+              {credentialMissing ? "需要重新配对" : "已配对"}
             </p>
             <p className="mt-2 break-all text-xs text-muted-foreground">
               身份指纹 {peer.identityFingerprint}
@@ -629,11 +626,6 @@ function ReceiverStatus({ snapshot }: { snapshot: CompanionSnapshot }) {
           <p className="mt-1 text-sm text-muted-foreground">
             {status.description}
           </p>
-          {discovery.errorCode ? (
-            <p className="mt-1 text-xs text-muted-foreground">
-              {discovery.errorCode}
-            </p>
-          ) : null}
         </div>
       </div>
     </section>
@@ -708,11 +700,6 @@ function PairingPanel({
             {" "}
             · {pairing.description}
           </span>
-          {snapshot.pairing.errorCode ? (
-            <span className="block text-xs text-muted-foreground">
-              {snapshot.pairing.errorCode}
-            </span>
-          ) : null}
         </div>
       ) : null}
 
@@ -783,7 +770,7 @@ function TransfersPanel({
   pendingAction,
   onCancel,
   onRetry,
-  title = "接收历史与 receipt",
+  title = "接收历史",
 }: {
   transfers: CompanionSnapshot["transfers"];
   pendingAction: string | null;
@@ -833,7 +820,7 @@ function TransferItem({
   onRetry: (transfer: Transfer) => void;
 }) {
   const progress = transferProgress(transfer);
-  const progressLabel = `${transfer.displayName} 接收进度：${progress}%，还缺 ${transfer.missingChunkCount} 个待验证分块`;
+  const progressLabel = `${transfer.displayName} 接收进度 ${progress}%`;
   const receiptAuthorizesDeletion =
     transfer.receipt !== null && transfer.senderDeleteAllowed;
   const canCancel = [
@@ -851,9 +838,7 @@ function TransferItem({
         <div className="min-w-0">
           <h3 className="font-medium">{transfer.displayName}</h3>
           <p className="mt-1 text-sm text-muted-foreground">
-            {transferStateCopy(transfer.state)} ·{" "}
-            {formatBytes(transfer.receivedBytes)} /{" "}
-            {formatBytes(transfer.sizeBytes)}
+            {transferStateCopy(transfer.state)}
           </p>
         </div>
         <span className="rounded-full border px-2.5 py-1 text-xs font-medium">
@@ -870,17 +855,10 @@ function TransferItem({
         </div>
       ) : null}
 
-      {transfer.errorCode ? (
-        <p role="alert" className="mt-2 text-sm">
-          {transfer.errorCode}
-        </p>
-      ) : null}
-
       {transfer.receipt ? (
         <div className="mt-3 rounded-lg border p-3 text-xs text-muted-foreground">
-          <p>receipt {transfer.receipt.receiptId}</p>
-          <p>recording {transfer.receipt.desktopRecordingId}</p>
-          <p>本机提交时间 {formatTimestamp(transfer.receipt.committedAtMs)}</p>
+          <p>本机保存完成</p>
+          <p>保存时间 {formatTimestamp(transfer.receipt.committedAtMs)}</p>
         </div>
       ) : null}
 
@@ -1009,30 +987,24 @@ function transferProgress(transfer: Transfer): number {
 function transferStateCopy(state: Transfer["state"]): string {
   switch (state) {
     case "awaiting":
-      return "等待发送端";
+      return "等待发送";
     case "transferring":
-      return "正在接收并校验分块";
+      return "正在接收";
     case "verifying":
-      return "正在校验完整文件";
+      return "正在确认文件完整";
     case "importing":
-      return "正在安全导入";
+      return "正在保存";
     case "committed":
-      return "已完成 durable import commit";
+      return "已接收并保存";
     case "canceled":
       return "已取消";
     case "failed":
-      return "接收失败，可重试";
+      return "接收失败，请重试";
     case "interrupted":
-      return "应用重启后已中断，可重试";
+      return "接收已中断，请重试";
     case "expired":
-      return "checkpoint 已按七天规则过期";
+      return "记录已过期";
   }
-}
-
-function formatBytes(value: number): string {
-  if (value < 1_024) return `${value} B`;
-  if (value < 1_024 * 1_024) return `${(value / 1_024).toFixed(1)} KiB`;
-  return `${(value / (1_024 * 1_024)).toFixed(1)} MiB`;
 }
 
 const timestampFormatter = new Intl.DateTimeFormat("zh-CN", {
@@ -1047,8 +1019,4 @@ function formatTimestamp(value: number): string {
 function requestIdentity(prefix: string): string {
   requestSequence += 1;
   return `${prefix}:${Date.now()}:${requestSequence}`;
-}
-
-function errorMessage(cause: unknown, fallback: string): string {
-  return cause instanceof Error && cause.message ? cause.message : fallback;
 }

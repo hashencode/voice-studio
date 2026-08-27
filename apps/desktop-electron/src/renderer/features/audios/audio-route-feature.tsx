@@ -49,6 +49,7 @@ import {
 } from "@/components/ui/tooltip";
 import { AudioDetailWorkspace } from "@/features/audios/audio-workspace-feature";
 import type { PendingJobAction } from "@/features/processing/use-processing-tasks";
+import { userFacingError } from "@/lib/user-facing-error";
 import type {
   AudioSummary,
   AudioWorkspaceSnapshot,
@@ -190,7 +191,7 @@ export function useAudioRouteController({
         await requestPlaybackClose(current.summary.audioId);
       } catch (cause) {
         setTransitionError(
-          errorMessage(cause, "音频已移除，但播放资源未能正常关闭"),
+          userFacingError(cause, "音频已移除，但播放未能关闭"),
         );
       }
       workspaceRef.current = null;
@@ -211,7 +212,7 @@ export function useAudioRouteController({
       await clearRemovedSelection(next);
     } catch (cause) {
       if (intent === listIntentRef.current) {
-        setListError(errorMessage(cause, "无法载入音频列表"));
+        setListError(userFacingError(cause, "无法载入音频列表"));
       }
     } finally {
       if (intent === listIntentRef.current) setListPending(false);
@@ -265,7 +266,9 @@ export function useAudioRouteController({
       })
       .catch((cause: unknown) => {
         if (selectionIntent === selectionIntentRef.current) {
-          setTransitionError(errorMessage(cause, "处理完成后无法刷新音频转写"));
+          setTransitionError(
+            userFacingError(cause, "处理完成后无法刷新音频转写"),
+          );
         }
       });
   }, [api, enabled, setWorkspace, tasksByAudioId]);
@@ -288,7 +291,9 @@ export function useAudioRouteController({
     const current = workspaceRef.current;
     if (wasActive && !active && current) {
       void requestPlaybackClose(current.summary.audioId).catch((cause) => {
-        setTransitionError(errorMessage(cause, "离开音频工作区时无法关闭播放"));
+        setTransitionError(
+          userFacingError(cause, "离开音频工作区时无法关闭播放"),
+        );
       });
     } else if (!wasActive && active) {
       closeRef.current = null;
@@ -308,7 +313,18 @@ export function useAudioRouteController({
       setTransitionPending(true);
       setTransitionError(null);
       try {
-        if (current) await requestPlaybackClose(current.summary.audioId);
+        if (current) {
+          try {
+            await requestPlaybackClose(current.summary.audioId);
+          } catch (cause) {
+            if (intent === selectionIntentRef.current) {
+              setTransitionError(
+                userFacingError(cause, "无法切换音频，请重试"),
+              );
+            }
+            return;
+          }
+        }
         if (intent !== selectionIntentRef.current) return;
         const next = await api.openAudio(audioId);
         if (intent !== selectionIntentRef.current) return;
@@ -319,7 +335,7 @@ export function useAudioRouteController({
         onAudioSelected?.();
       } catch (cause) {
         if (intent === selectionIntentRef.current) {
-          setTransitionError(errorMessage(cause, "无法打开音频"));
+          setTransitionError(userFacingError(cause, "无法打开音频"));
         }
       } finally {
         transitionCountRef.current = Math.max(
@@ -345,7 +361,7 @@ export function useAudioRouteController({
     try {
       await onImport();
     } catch (cause) {
-      setImportError(errorMessage(cause, "导入音频失败"));
+      setImportError(userFacingError(cause, "导入音频失败"));
     } finally {
       importPendingRef.current = false;
       setImportPending(false);
@@ -375,7 +391,7 @@ export function useAudioRouteController({
     try {
       await api.startTranscription(audioId);
     } catch (cause) {
-      const message = errorMessage(cause, "无法开始本地转写");
+      const message = userFacingError(cause, "无法开始本地转写");
       if (/模型|runtime|storage|本地转写不可用/i.test(message)) {
         onProcessingUnavailable?.(message);
       } else {
@@ -1170,7 +1186,7 @@ function AudioProcessingDetail({
         <div>
           <h2 className="font-semibold">{taskStateLabel(task.state)}</h2>
           <p className="mt-1 text-sm text-muted-foreground">
-            {phaseLabel(task.phase)} · 第 {Math.max(1, task.attempt)} 次尝试
+            {phaseLabel(task.phase)}
           </p>
         </div>
         {cancelable ? (
@@ -1207,11 +1223,6 @@ function AudioProcessingDetail({
         aria-label={`${task.displayName} 处理进度`}
       />
       <p className="mt-2 text-sm">{Math.round(task.progressFraction * 100)}%</p>
-      {task.errorCode ? (
-        <p className="mt-2 text-sm text-destructive">
-          错误代码：{task.errorCode}
-        </p>
-      ) : null}
     </section>
   );
 }
@@ -1368,8 +1379,4 @@ function AudioOperationError({ message }: { message: string }) {
       操作未完成：{message}
     </div>
   );
-}
-
-function errorMessage(cause: unknown, fallback: string): string {
-  return cause instanceof Error ? cause.message : fallback;
 }

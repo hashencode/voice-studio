@@ -9,7 +9,7 @@ export const localModelSnapshot: LocalModelSnapshot = {
   revision: 1,
   runtime: {
     state: "ready",
-    message: "Worker Runtime 正常",
+    message: "本地处理组件可用",
     identity: "runtime",
   },
   storage: {

@@ -21,6 +21,7 @@ import {
   SettingsListBlock,
   SettingsListSkeleton,
 } from "@/features/settings/settings-page-section";
+import { userFacingError } from "@/lib/user-facing-error";
 
 const STATE_LABELS: Record<LocalModelBundleSnapshot["state"], string> = {
   "not-installed": "未安装",
@@ -61,7 +62,8 @@ export function LocalModelsFeature() {
         if (active) setSnapshot(next);
       })
       .catch((cause: unknown) => {
-        if (active) setError(errorMessage(cause));
+        if (active)
+          setError(userFacingError(cause, "无法读取本地模型，请重试。"));
       });
     const unsubscribe = window.voice2text.onLocalModelSnapshot((next) => {
       if (active) setSnapshot(next);
@@ -85,7 +87,7 @@ export function LocalModelsFeature() {
           } as LocalModelIntent),
         );
       } catch (cause) {
-        setError(errorMessage(cause));
+        setError(userFacingError(cause, "本地模型操作未完成，请重试。"));
       } finally {
         setPending(false);
       }
@@ -109,6 +111,10 @@ export function LocalModelsFeature() {
   }
 
   const operation = snapshot.operation;
+  const operationProgress =
+    operation && operation.totalBytes > 0
+      ? Math.round((operation.copiedBytes / operation.totalBytes) * 100)
+      : null;
   return (
     <section aria-label="本地模型设置" className="w-full">
       {error ? (
@@ -132,11 +138,8 @@ export function LocalModelsFeature() {
                       ? PHASE_LABELS[operation.phase]
                       : (operation.message ?? "正在处理模型")}
                   </span>
-                  {operation.totalBytes > 0 ? (
-                    <span>
-                      {formatBytes(operation.copiedBytes)} /{" "}
-                      {formatBytes(operation.totalBytes)}
-                    </span>
+                  {operationProgress !== null ? (
+                    <span>{operationProgress}%</span>
                   ) : null}
                 </div>
                 {operation.totalBytes > 0 ? (
@@ -206,7 +209,7 @@ export function LocalModelsFeature() {
         ) : null}
 
         <ModelRow
-          name="Worker Runtime"
+          name="本地处理组件"
           state={snapshot.runtime.state === "ready" ? "正常" : "已损坏"}
           detail={snapshot.runtime.message}
         />
@@ -302,15 +305,4 @@ function ModelRow({
       </ItemActions>
     </Item>
   );
-}
-
-function formatBytes(bytes: number): string {
-  if (bytes < 1024) return `${bytes} B`;
-  if (bytes < 1024 ** 2) return `${(bytes / 1024).toFixed(1)} KB`;
-  if (bytes < 1024 ** 3) return `${(bytes / 1024 ** 2).toFixed(1)} MB`;
-  return `${(bytes / 1024 ** 3).toFixed(1)} GB`;
-}
-
-function errorMessage(cause: unknown): string {
-  return cause instanceof Error ? cause.message : "本地模型操作失败";
 }

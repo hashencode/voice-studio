@@ -198,8 +198,11 @@ describe("renderer processing operation races", () => {
       "true",
     );
 
-    request.reject(new Error("导入失败"));
-    expect(await screen.findByRole("alert")).toHaveTextContent("导入失败");
+    request.reject(new Error("raw /private/import/path"));
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      "无法导入音频，请重试。",
+    );
+    expect(screen.queryByText(/private\/import/)).not.toBeInTheDocument();
     expect(screen.getByRole("button", { name: "导入音频" })).toBeEnabled();
   });
 
@@ -210,7 +213,7 @@ describe("renderer processing operation races", () => {
       button: "取消 项目周会.wav",
       pending: "正在取消 项目周会.wav",
       method: "cancelProcessing" as const,
-      error: "取消失败",
+      error: "无法取消处理，请重试。",
     },
     {
       name: "retry",
@@ -218,7 +221,7 @@ describe("renderer processing operation races", () => {
       button: "重试 项目周会.wav",
       pending: "正在重试 项目周会.wav",
       method: "retryProcessing" as const,
-      error: "重试失败",
+      error: "无法重试处理，请重试。",
     },
   ])(
     "guards a double-clicked $name per job and clears pending in finally",
@@ -241,7 +244,7 @@ describe("renderer processing operation races", () => {
       expect(api[method]).toHaveBeenCalledTimes(1);
       expect(screen.getByRole("button", { name: pending })).toBeDisabled();
 
-      request.reject(new Error(error));
+      request.reject(new Error("raw internal operation failure"));
       expect(await screen.findByRole("alert")).toHaveTextContent(error);
       expect(screen.getByRole("button", { name: button })).toBeEnabled();
     },
