@@ -9,7 +9,7 @@ export const shellSectionSchema = z.enum([
   "settings",
 ]);
 
-export const bootstrapActionSchema = z.enum(["retry", "repair-guidance"]);
+export const bootstrapActionSchema = z.literal("recheck");
 
 const profileStateSchema = z.discriminatedUnion("phase", [
   z.object({ phase: z.literal("initializing") }).strict(),

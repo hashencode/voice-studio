@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 
 import {
+  act,
   fireEvent,
   render,
   screen,
@@ -796,7 +797,7 @@ describe("application shell", () => {
     );
   });
 
-  it("blocks writable actions while profile repair is required", async () => {
+  it("keeps a profile blocker latched through recheck failure", async () => {
     const blocked: ApplicationSnapshot = {
       ...readySnapshot,
       profile: {
@@ -807,19 +808,31 @@ describe("application shell", () => {
       },
       capture: { phase: "idle" },
     };
-    const api = installApi(blocked);
+    const requestBootstrapAction = vi.fn(async () => {
+      throw new Error("raw /private/profile/path failure");
+    });
+    const api = installApi(blocked, { requestBootstrapAction });
     const user = userEvent.setup();
     render(<App />);
 
-    expect(await screen.findByRole("alert")).toHaveTextContent("可用空间不足");
-    expect(screen.getByRole("button", { name: "导入音频" })).toBeDisabled();
-    await user.click(screen.getByRole("button", { name: "重试初始化" }));
-    expect(api.requestBootstrapAction).toHaveBeenCalledWith("retry");
-    await user.click(screen.getByRole("button", { name: "查看修复建议" }));
-    expect(api.requestBootstrapAction).toHaveBeenCalledWith("repair-guidance");
+    const blocker = await screen.findByRole("dialog", {
+      name: "本机资料库暂不可用",
+    });
+    expect(blocker).toHaveTextContent("请释放一些磁盘空间，然后重新检查。");
+    expect(screen.queryByText("查看修复建议")).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("navigation", { name: "工作站主导航" }),
+    ).not.toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: "重新检查" }));
+    expect(api.requestBootstrapAction).toHaveBeenCalledWith("recheck");
+    expect(blocker).toBeInTheDocument();
+    expect(await screen.findByText("无法重新检查，请重试。")).toBeVisible();
+    expect(screen.queryByText(/private\/profile/)).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "重新检查" })).toBeEnabled();
   });
 
-  it("loads Audio only after a blocked profile becomes ready", async () => {
+  it("keeps one blocker mounted until a newer ready snapshot", async () => {
     const blocked: ApplicationSnapshot = {
       ...readySnapshot,
       profile: {
@@ -830,24 +843,78 @@ describe("application shell", () => {
       },
       capture: { phase: "idle" },
     };
-    const ready: ApplicationSnapshot = {
+    const initializing: ApplicationSnapshot = {
       ...readySnapshot,
       revision: blocked.revision + 1,
+      profile: { phase: "initializing" },
+      capture: { phase: "idle" },
+    };
+    const blockedAgain: ApplicationSnapshot = {
+      ...blocked,
+      revision: initializing.revision + 1,
+      profile: {
+        phase: "blocked",
+        code: "filesystem_unavailable",
+        message: "raw path detail",
+        repairable: true,
+      },
+    };
+    const ready: ApplicationSnapshot = {
+      ...readySnapshot,
+      revision: blockedAgain.revision + 1,
       capture: { phase: "idle" },
     };
     const listAudios = vi.fn(async () => []);
-    const requestBootstrapAction = vi.fn(async () => ready);
-    installApi(blocked, { listAudios, requestBootstrapAction });
+    let publish: ((snapshot: ApplicationSnapshot) => void) | undefined;
+    let resolveRecheck: ((snapshot: ApplicationSnapshot) => void) | undefined;
+    const requestBootstrapAction = vi.fn(
+      async () =>
+        await new Promise<ApplicationSnapshot>((resolve) => {
+          resolveRecheck = resolve;
+        }),
+    );
+    const api = installApi(blocked, {
+      listAudios,
+      requestBootstrapAction,
+      onApplicationSnapshot: vi.fn((listener) => {
+        publish = listener;
+        return () => undefined;
+      }),
+    });
+    window.history.replaceState(null, "", "/#/settings");
     render(<App />);
 
-    expect(await screen.findByRole("alert")).toHaveTextContent("可用空间不足");
+    const blocker = await screen.findByRole("dialog", {
+      name: "本机资料库暂不可用",
+    });
     expect(listAudios).not.toHaveBeenCalled();
-    await userEvent
-      .setup()
-      .click(screen.getByRole("button", { name: "重试初始化" }));
+    expect(api.navigate).not.toHaveBeenCalled();
+    expect(window.location.hash).toBe("#/audio");
+
+    const user = userEvent.setup();
+    await user.click(screen.getByRole("button", { name: "重新检查" }));
+    await user.click(screen.getByRole("button", { name: "正在检查" }));
+    expect(requestBootstrapAction).toHaveBeenCalledTimes(1);
+    expect(screen.getByRole("button", { name: "正在检查" })).toBeDisabled();
+
+    act(() => publish?.(initializing));
+    expect(blocker).toBeInTheDocument();
+    act(() => publish?.(blockedAgain));
+    expect(blocker).toBeInTheDocument();
+    expect(blocker).toHaveTextContent(
+      "请检查本机存储和文件权限，然后重新检查。",
+    );
+
+    act(() => publish?.({ ...ready, revision: blockedAgain.revision }));
+    expect(blocker).toBeInTheDocument();
+    await act(async () => resolveRecheck?.(blockedAgain));
+    expect(screen.getByRole("button", { name: "重新检查" })).toBeEnabled();
+
+    act(() => publish?.(ready));
 
     expect(await screen.findByText("还没有音频")).toBeVisible();
     expect(listAudios).toHaveBeenCalledTimes(1);
+    expect(api.navigate).not.toHaveBeenCalled();
   });
 
   it("renders route-local Audio loading and recoverable error states", async () => {

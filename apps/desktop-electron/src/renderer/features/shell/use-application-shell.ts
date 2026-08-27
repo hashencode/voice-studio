@@ -14,23 +14,51 @@ export function useApplicationShell() {
   const [snapshot, setSnapshot] = React.useState<ApplicationSnapshot | null>(
     null,
   );
+  const snapshotRef = React.useRef<ApplicationSnapshot | null>(null);
+  const [profileBlocker, setProfileBlocker] = React.useState<{
+    profile: Extract<ApplicationSnapshot["profile"], { phase: "blocked" }>;
+    revision: number;
+  } | null>(null);
+  const profileBlockerRef = React.useRef(profileBlocker);
+  const [bootstrapPending, setBootstrapPending] = React.useState(false);
+  const [bootstrapError, setBootstrapError] = React.useState<string | null>(
+    null,
+  );
+  const bootstrapRequestRef = React.useRef<Promise<void> | null>(null);
   const [loadError, setLoadError] = React.useState<string | null>(null);
   const deepLinkApplied = React.useRef(false);
   const lastObservedNavigationSection = React.useRef<ShellSection | null>(null);
 
   const accept = React.useCallback(
     (next: ApplicationSnapshot) => {
-      setSnapshot((current) => {
-        if (current && next.revision <= current.revision) return current;
-        const navigationChanged =
-          lastObservedNavigationSection.current !== next.navigation.section;
-        lastObservedNavigationSection.current = next.navigation.section;
-        if (!current) return next;
-        if (modalOpen || !navigationChanged) {
-          return { ...next, navigation: current.navigation };
-        }
-        return next;
-      });
+      const current = snapshotRef.current;
+      if (current && next.revision <= current.revision) return;
+
+      const retainedBlocker = profileBlockerRef.current;
+      const wasApplicationBlocked = retainedBlocker !== null;
+      if (next.profile.phase === "blocked") {
+        const blocker = { profile: next.profile, revision: next.revision };
+        profileBlockerRef.current = blocker;
+        setProfileBlocker(blocker);
+      } else if (
+        retainedBlocker &&
+        next.profile.phase === "ready" &&
+        next.revision > retainedBlocker.revision
+      ) {
+        profileBlockerRef.current = null;
+        setProfileBlocker(null);
+        setBootstrapError(null);
+      }
+
+      const navigationChanged =
+        lastObservedNavigationSection.current !== next.navigation.section;
+      lastObservedNavigationSection.current = next.navigation.section;
+      const accepted =
+        current && (modalOpen || wasApplicationBlocked || !navigationChanged)
+          ? { ...next, navigation: current.navigation }
+          : next;
+      snapshotRef.current = accepted;
+      setSnapshot(accepted);
     },
     [modalOpen],
   );
@@ -56,6 +84,11 @@ export function useApplicationShell() {
         const restoredSection = normalizeRendererSection(
           restored.navigation.section,
         );
+        if (restored.profile.phase !== "ready") {
+          deepLinkApplied.current = true;
+          window.history.replaceState(null, "", `#/${restoredSection}`);
+          return;
+        }
         if (
           ((deepLink && deepLink !== restoredSection) ||
             restored.navigation.section === "tasks") &&
@@ -83,6 +116,11 @@ export function useApplicationShell() {
 
   const navigateAuthorized = React.useCallback(
     async (section: PersistedShellSection) => {
+      if (
+        profileBlockerRef.current ||
+        snapshotRef.current?.profile.phase !== "ready"
+      )
+        return;
       const applicationSection = toApplicationSection(section);
       if (
         snapshot &&
@@ -97,7 +135,7 @@ export function useApplicationShell() {
   );
   const navigate = React.useCallback(
     async (section: PersistedShellSection) => {
-      if (modalOpen) return;
+      if (modalOpen || profileBlockerRef.current) return;
       await navigateAuthorized(section);
     },
     [modalOpen, navigateAuthorized],
@@ -105,13 +143,33 @@ export function useApplicationShell() {
 
   const requestBootstrapAction = React.useCallback(
     async (action: BootstrapAction) => {
-      accept(await window.voice2text.requestBootstrapAction(action));
+      if (bootstrapRequestRef.current) {
+        await bootstrapRequestRef.current;
+        return;
+      }
+      setBootstrapError(null);
+      setBootstrapPending(true);
+      const request = (async () => {
+        try {
+          accept(await window.voice2text.requestBootstrapAction(action));
+        } catch {
+          setBootstrapError("无法重新检查，请重试。");
+        } finally {
+          setBootstrapPending(false);
+          bootstrapRequestRef.current = null;
+        }
+      })();
+      bootstrapRequestRef.current = request;
+      await request;
     },
     [accept],
   );
 
   return {
     snapshot,
+    profileBlocker,
+    bootstrapPending,
+    bootstrapError,
     loadError,
     ...processing,
     navigate,

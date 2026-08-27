@@ -45,6 +45,12 @@ describe("desktop IPC window registry", () => {
       ipc.invoke(ipcChannels.applicationActivityMarkAllRead, main.event, {}),
     ).resolves.toMatchObject({ revision: 1 });
     await expect(
+      ipc.invoke(ipcChannels.applicationBootstrapAction, main.event, {
+        action: "recheck",
+      }),
+    ).resolves.toMatchObject({ revision: 1 });
+    expect(services.requestBootstrapAction).toHaveBeenCalledWith("recheck");
+    await expect(
       ipc.invoke(ipcChannels.aiProviderProfileCreate, main.event, {
         expectedRevision: 2,
         protocol: "openai-compatible",
@@ -281,8 +287,10 @@ function createServices() {
   const controlFloatingCapture = vi.fn(async () => floatingSnapshot());
   const floatingCaptureWindowAction = vi.fn(async () => floatingSnapshot());
   const createAiProviderProfile = vi.fn(async () => aiSettingsSnapshot());
+  const requestBootstrapAction = vi.fn(async () => applicationSnapshot(1));
   const defined: Partial<DesktopIpcServices> = {
     applicationSnapshot: () => applicationSnapshot(1),
+    requestBootstrapAction,
     markActivityRead: vi.fn(() => applicationSnapshot(1)),
     markAllActivityRead: vi.fn(() => applicationSnapshot(1)),
     controlCapture: vi.fn(async () => ({
@@ -334,6 +342,7 @@ function createServices() {
     controlFloatingCapture,
     createAiProviderProfile,
     floatingCaptureWindowAction,
+    requestBootstrapAction,
     emitApplicationSnapshot(snapshot: ReturnType<typeof applicationSnapshot>) {
       applicationListener?.(snapshot);
     },

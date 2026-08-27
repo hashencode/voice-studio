@@ -107,6 +107,9 @@ function App() {
   const { modalOpen, requestNavigationAfterModals } = useModalCoordinator();
   const {
     snapshot,
+    profileBlocker,
+    bootstrapPending,
+    bootstrapError,
     loadError,
     operationError,
     tasks,
@@ -118,6 +121,7 @@ function App() {
     cancelProcessing,
     retryProcessing,
   } = useApplicationShell();
+  const applicationBlocked = profileBlocker !== null;
   const [messagesOpen, setMessagesOpen] = React.useState(false);
   const persistedSection = snapshot
     ? normalizeRendererSection(snapshot.navigation.section)
@@ -204,7 +208,7 @@ function App() {
     null;
   const navigatePrimary = React.useCallback(
     (section: RendererShellSection) => {
-      if (modalOpen) return;
+      if (applicationBlocked || modalOpen) return;
       captureInvokerRef.current = null;
       setCaptureDetailOpen(false);
       setCaptureDetailSessionId(null);
@@ -218,10 +222,18 @@ function App() {
       setMessagesOpen(false);
       navigate(section);
     },
-    [activityItems, markActivityRead, modalOpen, navigate, selectedActivity],
+    [
+      activityItems,
+      applicationBlocked,
+      markActivityRead,
+      modalOpen,
+      navigate,
+      selectedActivity,
+    ],
   );
   const changeCaptureDetail = React.useCallback(
     (open: boolean, sessionId: string | null = null) => {
+      if (open && applicationBlocked) return;
       if (restoreFocusFrameRef.current !== null) {
         window.cancelAnimationFrame(restoreFocusFrameRef.current);
         restoreFocusFrameRef.current = null;
@@ -246,10 +258,11 @@ function App() {
         if (invoker?.isConnected) invoker.focus();
       });
     },
-    [],
+    [applicationBlocked],
   );
   const openActivityDetails = React.useCallback(
     (item: ActivityItemView) => {
+      if (applicationBlocked) return;
       void markActivityRead(item);
       setActivityError(null);
       const navigateToDetails = () => {
@@ -261,6 +274,7 @@ function App() {
     },
     [
       changeCaptureDetail,
+      applicationBlocked,
       markActivityRead,
       modalOpen,
       requestNavigationAfterModals,
@@ -279,9 +293,9 @@ function App() {
   React.useEffect(
     () =>
       window.voice2text.onCaptureDetailsRequested?.(() => {
-        if (!modalOpen) changeCaptureDetail(true);
+        if (!applicationBlocked && !modalOpen) changeCaptureDetail(true);
       }),
-    [changeCaptureDetail, modalOpen],
+    [applicationBlocked, changeCaptureDetail, modalOpen],
   );
   React.useEffect(
     () => () => {
@@ -334,29 +348,30 @@ function App() {
   });
   const persistPaneClose = pane.requestClose;
   const requestPaneClose = React.useCallback(() => {
-    if (modalOpen) return;
+    if (applicationBlocked || modalOpen) return;
     paneTriggerFocusPendingRef.current = true;
     persistPaneClose();
-  }, [modalOpen, persistPaneClose]);
+  }, [applicationBlocked, modalOpen, persistPaneClose]);
   const requestPaneToggle = React.useCallback(() => {
-    if (modalOpen) return;
+    if (applicationBlocked || modalOpen) return;
     if (pane.open) paneTriggerFocusPendingRef.current = true;
     pane.toggle();
-  }, [modalOpen, pane]);
+  }, [applicationBlocked, modalOpen, pane]);
   const openPane = React.useCallback(() => {
-    if (!modalOpen) pane.openPane();
-  }, [modalOpen, pane]);
+    if (!applicationBlocked && !modalOpen) pane.openPane();
+  }, [applicationBlocked, modalOpen, pane]);
   const navigateSettingsSection = React.useCallback(
     (value: SettingsSection) => {
-      if (modalOpen) return;
+      if (applicationBlocked || modalOpen) return;
       setSettingsSection(value);
       window.requestAnimationFrame(() => {
         scrollSettingsSectionIntoView(value);
       });
     },
-    [modalOpen],
+    [applicationBlocked, modalOpen],
   );
   const openLocalModels = React.useCallback(() => {
+    if (applicationBlocked) return;
     const navigateToLocalModels = () => {
       pendingSettingsTargetRef.current = "local-models";
       setSettingsSection("local-models");
@@ -365,7 +380,20 @@ function App() {
     };
     if (modalOpen) requestNavigationAfterModals(navigateToLocalModels);
     else navigateToLocalModels();
-  }, [modalOpen, navigateAuthorized, requestNavigationAfterModals]);
+  }, [
+    applicationBlocked,
+    modalOpen,
+    navigateAuthorized,
+    requestNavigationAfterModals,
+  ]);
+  React.useEffect(() => {
+    if (!applicationBlocked) return;
+    pendingSettingsTargetRef.current = null;
+    setActivityError(null);
+    setProcessingUnavailableReason(null);
+    setCaptureDetailOpen(false);
+    setCaptureDetailSessionId(null);
+  }, [applicationBlocked]);
   React.useEffect(() => {
     if (current !== "settings" || !pendingSettingsTargetRef.current) return;
     const target = pendingSettingsTargetRef.current;
@@ -558,7 +586,6 @@ function App() {
           {!captureDetailVisible && presentation.renderContent ? (
             <ShellContent
               snapshot={snapshot}
-              onBootstrapAction={requestBootstrapAction}
               operationError={operationError}
               audio={audio}
               companion={companion}
@@ -600,6 +627,14 @@ function App() {
               openLocalModels();
             }}
           />
+          {profileBlocker ? (
+            <ProfileBlocker
+              profile={profileBlocker.profile}
+              pending={bootstrapPending}
+              error={bootstrapError}
+              onRecheck={requestBootstrapAction}
+            />
+          ) : null}
         </div>
       </SidebarInset>
     </SidebarProvider>
@@ -644,7 +679,6 @@ function hasCaptureDetail(
 
 function ShellContent({
   snapshot,
-  onBootstrapAction,
   operationError,
   audio,
   companion,
@@ -654,7 +688,6 @@ function ShellContent({
   onOpenActivityDetails,
 }: {
   snapshot: ApplicationSnapshot;
-  onBootstrapAction: Parameters<typeof ProfileBlocker>[0]["onAction"];
   operationError: string | null;
   audio: AudioRouteController;
   companion: CompanionRouteController;
@@ -695,11 +728,7 @@ function ShellContent({
       </section>
     );
   }
-  if (snapshot.profile.phase === "blocked") {
-    return (
-      <ProfileBlocker profile={snapshot.profile} onAction={onBootstrapAction} />
-    );
-  }
+  if (snapshot.profile.phase === "blocked") return null;
   let section: React.ReactNode;
   switch (current) {
     case "audio":

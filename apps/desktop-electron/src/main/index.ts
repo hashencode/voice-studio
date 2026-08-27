@@ -2762,8 +2762,7 @@ async function importAudioFromSource(
   }
 }
 
-async function requestBootstrapAction(action: BootstrapAction) {
-  if (action === "repair-guidance") return applicationState.snapshot();
+async function requestBootstrapAction(_action: BootstrapAction) {
   await bootstrapApplication();
   return applicationState.snapshot();
 }
@@ -2905,8 +2904,6 @@ async function initializeApplication(): Promise<void> {
       }
     },
   );
-  applicationState.completeBootstrap(profile);
-  applicationState.setLibraryCount(desktopRepository.countAudios());
   const attemptsRoot = path.join(
     profile.profile.workspaceDirectory,
     "attempts",
@@ -3101,6 +3098,8 @@ async function initializeApplication(): Promise<void> {
     )
       throw error;
   }
+  applicationState.completeBootstrap(profile);
+  applicationState.setLibraryCount(desktopRepository.countAudios());
   if (captureSmokeRequest) {
     traceCaptureSmoke("capture-smoke-start");
     await runCaptureSmokeIfRequested();

@@ -10,6 +10,7 @@ import {
   audioAiConsentIdentitySchema,
   audioAiConsentPreviewSchema,
   audioAiSnapshotSchema,
+  bootstrapActionRequestSchema,
   cancelProcessingRequestSchema,
   createAiProviderProfileRequestSchema,
   deleteAiProviderProfileRequestSchema,
@@ -27,6 +28,18 @@ import {
 import { createDesktopApi } from "../../src/preload/api";
 
 describe("shared IPC contracts", () => {
+  it("exposes recheck as the only application bootstrap action", () => {
+    expect(bootstrapActionRequestSchema.parse({ action: "recheck" })).toEqual({
+      action: "recheck",
+    });
+    expect(() =>
+      bootstrapActionRequestSchema.parse({ action: "repair-guidance" }),
+    ).toThrow();
+    expect(() =>
+      bootstrapActionRequestSchema.parse({ action: "retry" }),
+    ).toThrow();
+  });
+
   it("strictly validates custom and reserved hosted provider profiles", () => {
     const custom = {
       profileId: "profile-deepseek",

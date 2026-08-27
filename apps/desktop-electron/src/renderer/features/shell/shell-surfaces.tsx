@@ -1,12 +1,6 @@
-import {
-  AlertTriangle,
-  CloudOff,
-  LoaderCircle,
-  RefreshCw,
-  ShieldAlert,
-  Wrench,
-} from "lucide-react";
+import { AlertTriangle, CloudOff, LoaderCircle, RefreshCw } from "lucide-react";
 
+import { ApplicationBlocker } from "@/components/application-blocker";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -52,29 +46,49 @@ export function ShellLoadError({ message }: { message: string }) {
 
 export function ProfileBlocker({
   profile,
-  onAction,
+  pending,
+  error,
+  onRecheck,
 }: {
   profile: Extract<ApplicationSnapshot["profile"], { phase: "blocked" }>;
-  onAction: (action: BootstrapAction) => void;
+  pending: boolean;
+  error: string | null;
+  onRecheck: (action: BootstrapAction) => void;
 }) {
   return (
-    <section role="alert" className="mx-auto max-w-2xl border-y py-6">
-      <ShieldAlert className="size-8 text-destructive" aria-hidden="true" />
-      <h1 className="mt-4 text-xl font-semibold">本机资料库需要修复</h1>
-      <p className="mt-2 text-sm text-muted-foreground">{profile.message}</p>
-      <p className="mt-3 text-sm">修复前，导入和创建音频等写入操作保持禁用。</p>
-      <div className="mt-5 flex flex-wrap gap-2">
-        <Button onClick={() => onAction("retry")}>
+    <ApplicationBlocker
+      open
+      title="本机资料库暂不可用"
+      description={profileBlockerDescription(profile.code)}
+    >
+      {error ? <p className="text-sm text-destructive">{error}</p> : null}
+      <div className="flex justify-end pt-2">
+        <Button
+          type="button"
+          disabled={pending}
+          onClick={() => onRecheck("recheck")}
+        >
           <RefreshCw aria-hidden="true" />
-          重试初始化
-        </Button>
-        <Button variant="outline" onClick={() => onAction("repair-guidance")}>
-          <Wrench aria-hidden="true" />
-          查看修复建议
+          {pending ? "正在检查" : "重新检查"}
         </Button>
       </div>
-    </section>
+    </ApplicationBlocker>
   );
+}
+
+function profileBlockerDescription(
+  code: Extract<ApplicationSnapshot["profile"], { phase: "blocked" }>["code"],
+): string {
+  switch (code) {
+    case "insufficient_space":
+      return "请释放一些磁盘空间，然后重新检查。";
+    case "filesystem_unavailable":
+    case "legacy_archive_failed":
+      return "请检查本机存储和文件权限，然后重新检查。";
+    case "path_escape":
+    case "schema_invalid":
+      return "请确认应用数据可正常访问，然后重新检查。";
+  }
 }
 
 export function OfflineBanner() {

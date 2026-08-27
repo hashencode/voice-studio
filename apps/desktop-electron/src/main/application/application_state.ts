@@ -76,6 +76,7 @@ export class DesktopApplicationState {
   }
 
   navigate(section: ShellSection): ApplicationSnapshot {
+    if (this.current.profile.phase !== "ready") return this.snapshot();
     if (this.current.navigation.section === section) return this.snapshot();
     return this.update({ navigation: { section } });
   }

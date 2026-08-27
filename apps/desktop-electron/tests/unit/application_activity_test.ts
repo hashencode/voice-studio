@@ -21,6 +21,22 @@ function completedCapture(index: number): CaptureSnapshot {
 }
 
 describe("application capture activity", () => {
+  it("discards navigation until the application profile is ready", () => {
+    const state = new DesktopApplicationState();
+    const initial = state.snapshot();
+
+    expect(state.navigate("settings")).toEqual(initial);
+    state.completeBootstrap({
+      status: "blocked",
+      code: "filesystem_unavailable",
+      message: "blocked",
+      repairable: true,
+    });
+    const blocked = state.snapshot();
+    expect(state.navigate("companion")).toEqual(blocked);
+    expect(state.snapshot().navigation.section).toBe("library");
+  });
+
   it("adds one privacy-safe item for the first durable terminal transition", () => {
     const state = new DesktopApplicationState();
     const completed = completedCapture(1);
