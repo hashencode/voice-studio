@@ -34,6 +34,38 @@ Electron renderer.
   layout such as width, direction, alignment, and contextual density, but must
   not duplicate surface, radius, shadow, or interaction-state styling.
 
+## Electron accessibility guidance
+
+- Use the local shadcn components and their existing Radix primitives as the
+  default authority for standard roles, keyboard interaction, modal focus
+  containment, and ordinary trigger focus restoration. Preserve those APIs and
+  behaviors instead of reimplementing them in feature code.
+- Renderer features still own meaningful visible text, accessible names for
+  icon-only controls, labels for form controls, Dialog titles, and concise
+  descriptions. Prefer native HTML semantics and existing primitive parts
+  before adding ARIA attributes or custom keyboard handlers.
+- Add custom accessibility behavior only for an explicit product requirement or
+  a reproducible gap in the composed component. A review suggestion or a
+  hypothetical assistive-technology benefit is not sufficient evidence by
+  itself.
+- Do not add hidden live regions, duplicate `role="status"` / `role="alert"`
+  announcements, global announcers, or multi-state screen-reader protocols when
+  the same decision-relevant state is already conveyed by the current title,
+  description, visible status, or focused control.
+- Override Radix open/close autofocus only when its default target is invalid or
+  no longer exists, such as after deleting the trigger or completing a route
+  transition. Keep the fallback local and deterministic; do not create a global
+  focus state machine for a feature-level problem.
+- Accessibility fixes must not silently expand into unrelated navigation,
+  layout, styling, copy, component migration, or cross-platform work. Audit and
+  remove historical custom behavior only when current code evidence shows that
+  it duplicates primitives, has no remaining product requirement, or causes a
+  concrete regression.
+- Test application-owned semantics and deliberate deviations at the nearest
+  stable interaction boundary. Do not duplicate the primitive library's full
+  accessibility test suite or require assistive-technology/visual execution
+  without the explicit authorization required by this file.
+
 ## Visual styling guidance
 
 - Default to shadowless UI. Do not add shadows unless the user explicitly requests them or an existing platform contract requires them.
