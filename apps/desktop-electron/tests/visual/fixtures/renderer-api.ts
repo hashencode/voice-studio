@@ -121,7 +121,6 @@ export function buildVisualFixture(
         {
           profileId: "profile-deepseek",
           kind: "custom",
-          configurationName: null,
           displayName: "DeepSeek",
           protocol: "deepseek",
           modelId: "deepseek-chat",

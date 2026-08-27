@@ -7,13 +7,27 @@ const deepSeekIconUrl = new URL(
 
 export function ModelProviderIcon({
   protocol,
+  active = false,
 }: {
   protocol: "deepseek" | "openai-compatible";
+  active?: boolean;
 }) {
   if (protocol === "deepseek") {
     return (
-      <img alt="" aria-hidden="true" className="size-5" src={deepSeekIconUrl} />
+      <img
+        alt=""
+        aria-hidden="true"
+        className={active ? "size-5" : "size-5 grayscale opacity-50"}
+        src={deepSeekIconUrl}
+      />
     );
   }
-  return <Cloud aria-hidden="true" className="size-5" />;
+  return (
+    <Cloud
+      aria-hidden="true"
+      className={
+        active ? "size-5 text-primary" : "size-5 text-muted-foreground"
+      }
+    />
+  );
 }

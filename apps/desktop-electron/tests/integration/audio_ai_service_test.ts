@@ -30,7 +30,7 @@ describe("U10 audio AI vertical slice", () => {
     });
 
     expect(preview).toMatchObject({
-      profileId: "legacy-default",
+      profileId: "profile-deepseek",
       providerDisplayName: "deepseek-chat",
       providerId: "deepseek",
       endpointOrigin: "https://api.deepseek.com",
@@ -79,8 +79,7 @@ describe("U10 audio AI vertical slice", () => {
 
     const completed = await service.generate(request);
     new AiJobRepository(database).updateProfile({
-      profileId: "legacy-default",
-      configurationName: "Changed provider",
+      profileId: "profile-deepseek",
       protocol: "openai-compatible",
       modelId: "another-model",
       endpoint: "https://ai.example.com",
@@ -367,7 +366,6 @@ describe("U10 audio AI vertical slice", () => {
 
     const first = await service.createProfile({
       expectedRevision: 0,
-      configurationName: "  Work AI  ",
       protocol: "openai-compatible",
       modelId: "model-a",
       endpoint: "https://ai.example.com/v1",
@@ -376,7 +374,6 @@ describe("U10 audio AI vertical slice", () => {
     expect(first.selectedProfileId).toBe("profile-a");
     expect(first.profiles[0]).toMatchObject({
       profileId: "profile-a",
-      configurationName: "Work AI",
       displayName: "model-a",
       secretState: "available",
     });
@@ -384,7 +381,6 @@ describe("U10 audio AI vertical slice", () => {
 
     const second = await service.createProfile({
       expectedRevision: first.revision,
-      configurationName: "Second",
       protocol: "openai-compatible",
       modelId: "model-b",
       endpoint: "https://other.example.com/v1",
@@ -408,7 +404,6 @@ describe("U10 audio AI vertical slice", () => {
     await expect(
       service.createProfile({
         expectedRevision: selected.revision,
-        configurationName: "work ai",
         protocol: "openai-compatible",
         modelId: "model-b",
         endpoint: "https://other.example.com/v1",
@@ -420,7 +415,6 @@ describe("U10 audio AI vertical slice", () => {
     await expect(
       service.createProfile({
         expectedRevision: selected.revision,
-        configurationName: "Invalid DeepSeek",
         protocol: "deepseek",
         modelId: "deepseek-chat",
         endpoint: "https://other.example.com",
@@ -434,7 +428,6 @@ describe("U10 audio AI vertical slice", () => {
       service.updateProfile({
         expectedRevision: staleRevision,
         profileId: "profile-a",
-        configurationName: "Work AI updated",
         protocol: "openai-compatible",
         modelId: "model-a2",
         endpoint: "https://ai.example.com/v1",
@@ -442,7 +435,6 @@ describe("U10 audio AI vertical slice", () => {
       }),
       service.createProfile({
         expectedRevision: staleRevision,
-        configurationName: "Third",
         protocol: "openai-compatible",
         modelId: "model-b",
         endpoint: "https://other.example.com/v1",
@@ -464,7 +456,6 @@ describe("U10 audio AI vertical slice", () => {
     repository.createProfile({
       profileId: "older",
       secretRef: "older-secret",
-      configurationName: "Older",
       protocol: "openai-compatible",
       modelId: "old-model",
       endpoint: "https://old.example.com",
@@ -474,7 +465,6 @@ describe("U10 audio AI vertical slice", () => {
     repository.createProfile({
       profileId: "active",
       secretRef: "active-secret",
-      configurationName: "Active",
       protocol: "deepseek",
       modelId: "deepseek-chat",
       endpoint: "https://api.deepseek.com",
@@ -508,29 +498,88 @@ describe("U10 audio AI vertical slice", () => {
     expect(repository.secretCleanup.pending()).toEqual([]);
   });
 
-  it("rejects edits and deletion for the selected profile", async () => {
+  it("allows edits and deletion for an idle selected profile", async () => {
     database = openAudioDatabase(":memory:");
     seedAudio(database);
     const repository = new AiJobRepository(database);
     const secrets = secretStore();
     const service = new AudioAiService(repository, secrets.port);
+    const updated = await service.updateProfile({
+      expectedRevision: 0,
+      profileId: "profile-deepseek",
+      protocol: "deepseek",
+      modelId: "deepseek-reasoner",
+      endpoint: "https://api.deepseek.com",
+    });
+    expect(updated.selectedProfileId).toBe("profile-deepseek");
+    expect(updated.profiles).toContainEqual(
+      expect.objectContaining({
+        kind: "custom",
+        profileId: "profile-deepseek",
+        modelId: "deepseek-reasoner",
+      }),
+    );
+    const deleted = await service.deleteProfile({
+      expectedRevision: updated.revision,
+      profileId: "profile-deepseek",
+    });
+    expect(deleted.selectedProfileId).toBeNull();
+    expect(deleted.profiles).toEqual([]);
+    expect(secrets.delete).toHaveBeenCalledWith("deepseek");
+  });
+
+  it("rejects edits and deletion only while the profile has a running task", async () => {
+    database = openAudioDatabase(":memory:");
+    seedAudio(database);
+    const repository = new AiJobRepository(database);
+    const secrets = secretStore();
+    let release!: () => void;
+    const pending = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    const generate = vi.fn(async () => {
+      await pending;
+      return output();
+    });
+    const service = new AudioAiService(
+      repository,
+      secrets.port,
+      () => ({ id: "deepseek", generate }),
+      increasingClock(),
+    );
+    const preview = service.prepare({
+      audioId: 1,
+      generationId: 1,
+      templateId: "default",
+    });
+    const running = service.generate({
+      preparationId: preview.preparationId,
+      idempotencyKey: "running-profile-lock-0001",
+      consent: consent(preview),
+    });
+    await vi.waitFor(() => expect(generate).toHaveBeenCalledTimes(1));
+    const settings = await service.getSettings();
+    expect(settings.profiles[0]?.capabilities).toMatchObject({
+      editable: false,
+      deletable: false,
+    });
     await expect(
       service.updateProfile({
-        expectedRevision: 0,
-        profileId: "legacy-default",
-        configurationName: null,
+        expectedRevision: settings.revision,
+        profileId: "profile-deepseek",
         protocol: "deepseek",
-        modelId: "deepseek-chat",
+        modelId: "deepseek-reasoner",
         endpoint: "https://api.deepseek.com",
       }),
     ).rejects.toMatchObject({ code: "AI_PROFILE_IN_USE" });
     await expect(
       service.deleteProfile({
-        expectedRevision: 0,
-        profileId: "legacy-default",
+        expectedRevision: settings.revision,
+        profileId: "profile-deepseek",
       }),
     ).rejects.toMatchObject({ code: "AI_PROFILE_IN_USE" });
-    expect(secrets.delete).not.toHaveBeenCalled();
+    release();
+    await running;
   });
 
   it("does not persist create or update configuration when the Keychain write fails", async () => {
@@ -539,7 +588,6 @@ describe("U10 audio AI vertical slice", () => {
     repository.createProfile({
       profileId: "existing",
       secretRef: "existing-secret",
-      configurationName: "Existing",
       protocol: "openai-compatible",
       modelId: "old-model",
       endpoint: "https://old.example.com",
@@ -559,7 +607,6 @@ describe("U10 audio AI vertical slice", () => {
     await expect(
       service.createProfile({
         expectedRevision: 1,
-        configurationName: "New",
         protocol: "openai-compatible",
         modelId: "new-model",
         endpoint: "https://new.example.com",
@@ -577,7 +624,6 @@ describe("U10 audio AI vertical slice", () => {
       service.updateProfile({
         expectedRevision: 1,
         profileId: "existing",
-        configurationName: "Changed",
         protocol: "openai-compatible",
         modelId: "changed-model",
         endpoint: "https://changed.example.com",
@@ -585,7 +631,6 @@ describe("U10 audio AI vertical slice", () => {
       }),
     ).rejects.toThrow("KEYCHAIN_UNAVAILABLE");
     expect(repository.profile("existing")).toMatchObject({
-      configurationName: "Existing",
       modelId: "old-model",
       endpoint: "https://old.example.com",
     });
@@ -598,7 +643,6 @@ describe("U10 audio AI vertical slice", () => {
     repository.createProfile({
       profileId: "existing",
       secretRef: "existing-secret",
-      configurationName: "Existing",
       protocol: "openai-compatible",
       modelId: "old-model",
       endpoint: "https://old.example.com",
@@ -620,7 +664,6 @@ describe("U10 audio AI vertical slice", () => {
     await expect(
       service.createProfile({
         expectedRevision: 1,
-        configurationName: "New",
         protocol: "openai-compatible",
         modelId: "new-model",
         endpoint: "https://new.example.com",
@@ -643,7 +686,6 @@ describe("U10 audio AI vertical slice", () => {
       service.updateProfile({
         expectedRevision: 1,
         profileId: "existing",
-        configurationName: "Changed",
         protocol: "openai-compatible",
         modelId: "changed-model",
         endpoint: "https://changed.example.com",
@@ -653,12 +695,11 @@ describe("U10 audio AI vertical slice", () => {
     expect(secrets.replace.mock.calls).toEqual([["new-secret", "replacement"]]);
     expect(secrets.delete).toHaveBeenCalledWith("new-secret");
     expect(repository.profile("existing")).toMatchObject({
-      configurationName: "Existing",
       modelId: "old-model",
     });
   });
 
-  it("blocks secret mutation while retryable work exists and preserves history after completion", async () => {
+  it("allows idle profile changes while retryable work keeps its immutable snapshot", async () => {
     database = openAudioDatabase(":memory:");
     seedAudio(database);
     const repository = new AiJobRepository(database);
@@ -691,23 +732,19 @@ describe("U10 audio AI vertical slice", () => {
     });
     const current = await service.createProfile({
       expectedRevision: 0,
-      configurationName: "Current",
       protocol: "openai-compatible",
       modelId: "current-model",
       endpoint: "https://current.example.com",
       secret: "current-secret",
     });
-    await expect(
-      service.updateProfile({
-        profileId: "legacy-default",
-        configurationName: "Changed",
-        protocol: "openai-compatible",
-        modelId: "changed-model",
-        endpoint: "https://changed.example.com",
-        expectedRevision: current.revision,
-        secret: "changed-secret",
-      }),
-    ).rejects.toMatchObject({ code: "AI_SECRET_IN_USE" });
+    const updated = await service.updateProfile({
+      profileId: "profile-deepseek",
+      protocol: "openai-compatible",
+      modelId: "changed-model",
+      endpoint: "https://changed.example.com",
+      expectedRevision: current.revision,
+      secret: "changed-secret",
+    });
 
     const completed = await service.retry({
       jobId: failed.jobId,
@@ -717,17 +754,8 @@ describe("U10 audio AI vertical slice", () => {
     });
     expect(completed.state).toBe("completed");
     expect(completed.providerDisplayName).toBe("deepseek-chat");
-    const updated = await service.updateProfile({
-      profileId: "legacy-default",
-      configurationName: "Changed",
-      protocol: "openai-compatible",
-      modelId: "changed-model",
-      endpoint: "https://changed.example.com",
-      expectedRevision: current.revision,
-      secret: "changed-secret",
-    });
     await service.deleteProfile({
-      profileId: "legacy-default",
+      profileId: "profile-deepseek",
       expectedRevision: updated.revision,
     });
     expect(service.snapshot(1)?.providerDisplayName).toBe("deepseek-chat");
@@ -846,14 +874,14 @@ function seedAudio(database: DatabaseSync, withProfile = true): void {
   if (withProfile) {
     database.exec(`
       INSERT INTO ai_provider_profiles (
-        profile_id, kind, configuration_name, protocol,
+        profile_id, kind, protocol,
         model_id, endpoint, secret_ref, created_at_ms, updated_at_ms, revision
       ) VALUES (
-        'legacy-default', 'custom', 'DeepSeek', 'deepseek',
+        'profile-deepseek', 'custom', 'deepseek',
         'deepseek-chat', 'https://api.deepseek.com', 'deepseek', 0, 0, 0
       );
       UPDATE ai_provider_selection
-        SET selected_profile_id = 'legacy-default' WHERE id = 1;
+        SET selected_profile_id = 'profile-deepseek' WHERE id = 1;
     `);
   }
 }

@@ -19,7 +19,6 @@ export interface AiProviderSettingsRecord {
 export interface AiProviderProfileRecord {
   profileId: string;
   kind: "custom";
-  configurationName: string | null;
   displayName: string;
   protocol: "deepseek" | "openai-compatible";
   modelId: string;
@@ -92,7 +91,6 @@ export interface AiTranscriptScopeSource {
 
 interface ProfileWriteCommand {
   profileId: string;
-  configurationName: string | null;
   protocol: "deepseek" | "openai-compatible";
   modelId: string;
   endpoint: string;
@@ -144,13 +142,12 @@ export class AiJobRepository {
       this.database
         .prepare(
           `INSERT INTO ai_provider_profiles (
-             profile_id, kind, configuration_name, protocol,
+             profile_id, kind, protocol,
              model_id, endpoint, secret_ref, created_at_ms, updated_at_ms, revision
-           ) VALUES (?, 'custom', ?, ?, ?, ?, ?, ?, ?, 0)`,
+           ) VALUES (?, 'custom', ?, ?, ?, ?, ?, ?, 0)`,
         )
         .run(
           command.profileId,
-          profile.configurationName,
           profile.protocol,
           profile.modelId,
           profile.endpoint,
@@ -172,13 +169,12 @@ export class AiJobRepository {
         this.database
           .prepare(
             `UPDATE ai_provider_profiles
-             SET configuration_name = ?, protocol = ?,
-                 model_id = ?, endpoint = ?, secret_ref = COALESCE(?, secret_ref),
+             SET protocol = ?, model_id = ?, endpoint = ?,
+                 secret_ref = COALESCE(?, secret_ref),
                  updated_at_ms = ?, revision = revision + 1
              WHERE profile_id = ?`,
           )
           .run(
-            profile.configurationName,
             profile.protocol,
             profile.modelId,
             profile.endpoint,
@@ -231,6 +227,19 @@ export class AiJobRepository {
             LIMIT 1`,
         )
         .get(secretRef),
+    );
+  }
+
+  activeJobUsesProfileId(profileId: string): boolean {
+    return Boolean(
+      this.database
+        .prepare(
+          `SELECT 1 FROM ai_jobs
+            WHERE profile_id = ?
+              AND state IN ('queued', 'running')
+            LIMIT 1`,
+        )
+        .get(profileId),
     );
   }
 
@@ -871,8 +880,6 @@ function mapProfile(row: Record<string, unknown>): AiProviderProfileRecord {
   return {
     profileId: String(row.profile_id),
     kind: "custom",
-    configurationName:
-      row.configuration_name == null ? null : String(row.configuration_name),
     displayName: projectAiModelDisplayName(modelId),
     protocol: String(row.protocol) as AiProviderProfileRecord["protocol"],
     modelId,
@@ -889,14 +896,9 @@ function mapJob(row: Record<string, unknown>): AiJobRecord {
     id: Number(row.id),
     audioId: Number(row.audio_id),
     generationId: Number(row.generation_id),
-    profileId:
-      row.profile_id == null ? "legacy-default" : String(row.profile_id),
-    secretRef:
-      row.secret_ref == null ? String(row.provider_id) : String(row.secret_ref),
-    providerDisplayName:
-      row.provider_display_name == null
-        ? legacyProviderDisplayName(String(row.provider_id))
-        : String(row.provider_display_name),
+    profileId: String(row.profile_id),
+    secretRef: String(row.secret_ref),
+    providerDisplayName: String(row.provider_display_name),
     providerId: String(row.provider_id),
     modelId: String(row.model_id),
     endpoint: String(row.endpoint),
@@ -909,8 +911,4 @@ function mapJob(row: Record<string, unknown>): AiJobRecord {
     revision: Number(row.revision),
     errorCode: row.error_code == null ? null : String(row.error_code),
   };
-}
-
-function legacyProviderDisplayName(providerId: string): string {
-  return providerId === "deepseek" ? "DeepSeek" : "OpenAI Compatible";
 }

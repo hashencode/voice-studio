@@ -1,12 +1,5 @@
 import * as React from "react";
-import {
-  CheckCircle2,
-  Circle,
-  LoaderCircle,
-  Pencil,
-  Plus,
-  Trash2,
-} from "lucide-react";
+import { LoaderCircle, Pencil, Plus, Trash2 } from "lucide-react";
 
 import {
   AlertDialog,
@@ -65,15 +58,13 @@ type DialogMode =
 
 const providerDefaults: Record<
   ProviderProtocol,
-  { configurationName: string; modelId: string; endpoint: string }
+  { modelId: string; endpoint: string }
 > = {
   deepseek: {
-    configurationName: "",
     modelId: "deepseek-chat",
     endpoint: "https://api.deepseek.com",
   },
   "openai-compatible": {
-    configurationName: "",
     modelId: "",
     endpoint: "https://example.com",
   },
@@ -325,37 +316,28 @@ function ProviderProfileList({
                 >
                   <ItemMedia aria-hidden="true">
                     {custom ? (
-                      <ModelProviderIcon protocol={custom.protocol} />
+                      <ModelProviderIcon
+                        protocol={custom.protocol}
+                        active={selected}
+                      />
                     ) : null}
                   </ItemMedia>
                   <ItemContent>
                     <ItemTitle>{profile.modelSummary}</ItemTitle>
-                    <ItemDescription>
-                      {custom
-                        ? [custom.configurationName, interfaceSummary(custom)]
-                            .filter(Boolean)
-                            .join(" · ")
-                        : profile.displayName}
+                    <ItemDescription
+                      title={custom ? interfaceSummary(custom) : undefined}
+                    >
+                      {custom ? interfaceSummary(custom) : profile.displayName}
                     </ItemDescription>
                   </ItemContent>
                 </div>
                 {custom ? (
                   <ItemActions>
-                    <span
-                      aria-label={selected ? "当前模型" : "未选择"}
-                      title={selected ? "当前模型" : undefined}
-                    >
-                      {selected ? (
-                        <CheckCircle2 className="size-4 text-primary" />
-                      ) : (
-                        <Circle className="size-4 text-muted-foreground" />
-                      )}
-                    </span>
                     <ProviderProfileDialog
                       mode={{ kind: "edit", profile: custom }}
                       settings={settings}
                       api={api}
-                      disabled={mutationPending || selected}
+                      disabled={mutationPending}
                       onPendingChange={onPendingChange}
                       onSaved={onSaved}
                       onReload={onReload}
@@ -401,7 +383,6 @@ function ProviderProfileDialog({
   const profile = mode.kind === "edit" ? mode.profile : null;
   const [open, setOpen] = React.useState(false);
   const [protocol, setProtocol] = React.useState<ProviderProtocol>("deepseek");
-  const [configurationName, setConfigurationName] = React.useState("");
   const [endpoint, setEndpoint] = React.useState(
     providerDefaults.deepseek.endpoint,
   );
@@ -412,14 +393,12 @@ function ProviderProfileDialog({
   const [pending, setPending] = React.useState(false);
   const [error, setError] = React.useState<string | null>(null);
   const [deleteOpen, setDeleteOpen] = React.useState(false);
+  const readOnly = Boolean(profile && !profile.capabilities.editable);
 
   const reset = React.useCallback(() => {
     const initialProtocol = profile?.protocol ?? "deepseek";
     const defaults = providerDefaults[initialProtocol];
     setProtocol(initialProtocol);
-    setConfigurationName(
-      profile?.configurationName ?? defaults.configurationName,
-    );
     setEndpoint(profile?.endpoint ?? defaults.endpoint);
     setModelId(profile?.modelId ?? defaults.modelId);
     setSecret("");
@@ -450,11 +429,6 @@ function ProviderProfileDialog({
           aria-label={profile ? `编辑 ${profile.modelId}` : "新增云端模型"}
           data-add-model={profile ? undefined : "true"}
           data-profile-edit={profile?.profileId}
-          title={
-            profile && !profile.capabilities.editable
-              ? "当前模型正在使用，请先切换到其他模型。"
-              : undefined
-          }
         >
           {profile ? <Pencil /> : <Plus />}
         </Button>
@@ -462,28 +436,28 @@ function ProviderProfileDialog({
       <DialogContent className="max-h-[85vh] w-[min(32rem,calc(100vw-2rem))] overflow-auto sm:max-w-lg">
         <DialogHeader>
           <DialogTitle>{title}</DialogTitle>
-          <DialogDescription className="sr-only">
-            填写云端模型信息
+          <DialogDescription className={readOnly ? undefined : "sr-only"}>
+            {readOnly
+              ? "该模型正在被任务使用，无法修改配置。"
+              : "填写云端模型信息"}
           </DialogDescription>
         </DialogHeader>
         <ProviderFields
           protocol={protocol}
-          configurationName={configurationName}
           endpoint={endpoint}
           modelId={modelId}
           secret={secret}
           editing={Boolean(profile)}
           pending={pending}
+          readOnly={readOnly}
           onProtocolChange={(next) => {
             const defaults = providerDefaults[next];
             setProtocol(next);
-            setConfigurationName(defaults.configurationName);
             setEndpoint(defaults.endpoint);
             setModelId(defaults.modelId);
             setSecret("");
             setError(null);
           }}
-          onConfigurationNameChange={setConfigurationName}
           onEndpointChange={setEndpoint}
           onModelIdChange={setModelId}
           onSecretChange={setSecret}
@@ -493,154 +467,159 @@ function ProviderProfileDialog({
             {error}
           </p>
         ) : null}
-        <DialogFooter className="sm:justify-between">
-          <div>
-            {profile ? (
-              <AlertDialog
-                open={deleteOpen}
-                onOpenChange={(next) => !pending && setDeleteOpen(next)}
-              >
-                <AlertDialogTrigger asChild>
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    className="text-destructive hover:bg-destructive/10 hover:text-destructive"
-                    disabled={pending}
-                  >
-                    <Trash2 />
-                    删除模型
-                  </Button>
-                </AlertDialogTrigger>
-                <AlertDialogContent>
-                  <AlertDialogHeader>
-                    <AlertDialogTitle>{`删除 ${profile.modelId}？`}</AlertDialogTitle>
-                    <AlertDialogDescription>
-                      {`确定要删除“${profile.modelId}”吗？`}
-                    </AlertDialogDescription>
-                  </AlertDialogHeader>
-                  <AlertDialogFooter>
-                    <AlertDialogCancel asChild>
-                      <Button
-                        type="button"
-                        variant="outline"
-                        disabled={pending}
-                      >
-                        取消
-                      </Button>
-                    </AlertDialogCancel>
+        <DialogFooter className={readOnly ? undefined : "sm:justify-between"}>
+          {readOnly ? null : (
+            <div>
+              {profile ? (
+                <AlertDialog
+                  open={deleteOpen}
+                  onOpenChange={(next) => !pending && setDeleteOpen(next)}
+                >
+                  <AlertDialogTrigger asChild>
                     <Button
                       type="button"
-                      variant="destructive"
-                      disabled={pending}
-                      onClick={() => {
-                        setPending(true);
-                        onPendingChange(true);
-                        setError(null);
-                        void api
-                          .deleteAiProviderProfile({
-                            profileId: profile.profileId,
-                            expectedRevision: settings.revision,
-                          })
-                          .then((next) => {
-                            setSecret("");
-                            setDeleteOpen(false);
-                            setOpen(false);
-                            onDeleted?.(profile.profileId, next);
-                          })
-                          .catch(async (cause: unknown) => {
-                            setSecret("");
-                            if (isStaleRevision(cause)) {
-                              const next = await onReload();
-                              const refreshed = next?.profiles.find(
-                                (candidate) =>
-                                  candidate.kind === "custom" &&
-                                  candidate.profileId === profile.profileId,
-                              );
-                              if (!refreshed || refreshed.kind !== "custom") {
-                                setDeleteOpen(false);
-                                setOpen(false);
-                              }
-                              setError("设置已更新，请重试");
-                            } else {
-                              setError(
-                                mutationErrorMessage(cause, "无法删除模型"),
-                              );
-                            }
-                          })
-                          .finally(() => {
-                            setPending(false);
-                            onPendingChange(false);
-                          });
-                      }}
+                      variant="ghost"
+                      size="icon-sm"
+                      className="text-destructive hover:bg-destructive/10 hover:text-destructive"
+                      disabled={pending || !profile.capabilities.deletable}
+                      aria-label="删除模型"
+                      title="删除模型"
                     >
-                      删除
+                      <Trash2 />
                     </Button>
-                  </AlertDialogFooter>
-                </AlertDialogContent>
-              </AlertDialog>
-            ) : null}
-          </div>
+                  </AlertDialogTrigger>
+                  <AlertDialogContent>
+                    <AlertDialogHeader>
+                      <AlertDialogTitle>{`删除 ${profile.modelId}？`}</AlertDialogTitle>
+                      <AlertDialogDescription>
+                        {`确定要删除“${profile.modelId}”吗？`}
+                      </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                      <AlertDialogCancel asChild>
+                        <Button
+                          type="button"
+                          variant="outline"
+                          disabled={pending}
+                        >
+                          取消
+                        </Button>
+                      </AlertDialogCancel>
+                      <Button
+                        type="button"
+                        variant="destructive"
+                        disabled={pending}
+                        onClick={() => {
+                          setPending(true);
+                          onPendingChange(true);
+                          setError(null);
+                          void api
+                            .deleteAiProviderProfile({
+                              profileId: profile.profileId,
+                              expectedRevision: settings.revision,
+                            })
+                            .then((next) => {
+                              setSecret("");
+                              setDeleteOpen(false);
+                              setOpen(false);
+                              onDeleted?.(profile.profileId, next);
+                            })
+                            .catch(async (cause: unknown) => {
+                              setSecret("");
+                              if (isStaleRevision(cause)) {
+                                const next = await onReload();
+                                const refreshed = next?.profiles.find(
+                                  (candidate) =>
+                                    candidate.kind === "custom" &&
+                                    candidate.profileId === profile.profileId,
+                                );
+                                if (!refreshed || refreshed.kind !== "custom") {
+                                  setDeleteOpen(false);
+                                  setOpen(false);
+                                }
+                                setError("设置已更新，请重试");
+                              } else {
+                                setError(
+                                  mutationErrorMessage(cause, "无法删除模型"),
+                                );
+                              }
+                            })
+                            .finally(() => {
+                              setPending(false);
+                              onPendingChange(false);
+                            });
+                        }}
+                      >
+                        删除
+                      </Button>
+                    </AlertDialogFooter>
+                  </AlertDialogContent>
+                </AlertDialog>
+              ) : null}
+            </div>
+          )}
           <div className="flex justify-end gap-2">
             <DialogClose asChild>
               <Button type="button" variant="outline" disabled={pending}>
                 取消
               </Button>
             </DialogClose>
-            <Button
-              type="button"
-              disabled={
-                pending ||
-                !endpoint.trim() ||
-                !modelId.trim() ||
-                (protocol === "deepseek" &&
-                  !modelId.trim().startsWith("deepseek-")) ||
-                (!profile && !secret.trim())
-              }
-              onClick={() => {
-                const secretValue = secret.trim();
-                const common = {
-                  expectedRevision: settings.revision,
-                  configurationName: configurationName.trim() || null,
-                  protocol,
-                  endpoint: endpoint.trim(),
-                  modelId: modelId.trim(),
-                };
-                setPending(true);
-                onPendingChange(true);
-                setError(null);
-                const request = profile
-                  ? api.updateAiProviderProfile({
-                      ...common,
-                      profileId: profile.profileId,
-                      ...(secretValue ? { secret: secretValue } : {}),
+            {readOnly ? null : (
+              <Button
+                type="button"
+                disabled={
+                  pending ||
+                  !endpoint.trim() ||
+                  !modelId.trim() ||
+                  (protocol === "deepseek" &&
+                    !modelId.trim().startsWith("deepseek-")) ||
+                  (!profile && !secret.trim())
+                }
+                onClick={() => {
+                  const secretValue = secret.trim();
+                  const common = {
+                    expectedRevision: settings.revision,
+                    protocol,
+                    endpoint: endpoint.trim(),
+                    modelId: modelId.trim(),
+                  };
+                  setPending(true);
+                  onPendingChange(true);
+                  setError(null);
+                  const request = profile
+                    ? api.updateAiProviderProfile({
+                        ...common,
+                        profileId: profile.profileId,
+                        ...(secretValue ? { secret: secretValue } : {}),
+                      })
+                    : api.createAiProviderProfile({
+                        ...common,
+                        secret: secretValue,
+                      });
+                  void request
+                    .then((next) => {
+                      setSecret("");
+                      onSaved(next);
+                      setOpen(false);
                     })
-                  : api.createAiProviderProfile({
-                      ...common,
-                      secret: secretValue,
+                    .catch(async (cause: unknown) => {
+                      setSecret("");
+                      if (isStaleRevision(cause)) {
+                        await onReload();
+                        setError("设置已更新，请重试");
+                      } else {
+                        setError(mutationErrorMessage(cause, "无法保存模型"));
+                      }
+                    })
+                    .finally(() => {
+                      setPending(false);
+                      onPendingChange(false);
                     });
-                void request
-                  .then((next) => {
-                    setSecret("");
-                    onSaved(next);
-                    setOpen(false);
-                  })
-                  .catch(async (cause: unknown) => {
-                    setSecret("");
-                    if (isStaleRevision(cause)) {
-                      await onReload();
-                      setError("设置已更新，请重试");
-                    } else {
-                      setError(mutationErrorMessage(cause, "无法保存模型"));
-                    }
-                  })
-                  .finally(() => {
-                    setPending(false);
-                    onPendingChange(false);
-                  });
-              }}
-            >
-              {profile ? "保存" : "新增"}
-            </Button>
+                }}
+              >
+                {profile ? "保存" : "新增"}
+              </Button>
+            )}
           </div>
         </DialogFooter>
       </DialogContent>
@@ -650,27 +629,25 @@ function ProviderProfileDialog({
 
 function ProviderFields({
   protocol,
-  configurationName,
   endpoint,
   modelId,
   secret,
   editing,
   pending,
+  readOnly,
   onProtocolChange,
-  onConfigurationNameChange,
   onEndpointChange,
   onModelIdChange,
   onSecretChange,
 }: {
   protocol: ProviderProtocol;
-  configurationName: string;
   endpoint: string;
   modelId: string;
   secret: string;
   editing: boolean;
   pending: boolean;
+  readOnly: boolean;
   onProtocolChange: (protocol: ProviderProtocol) => void;
-  onConfigurationNameChange: (value: string) => void;
   onEndpointChange: (value: string) => void;
   onModelIdChange: (value: string) => void;
   onSecretChange: (value: string) => void;
@@ -681,13 +658,17 @@ function ProviderFields({
         <Label htmlFor="ai-provider-protocol">接口类型</Label>
         <Select
           value={protocol}
+          open={readOnly ? false : undefined}
           disabled={pending}
-          onValueChange={(value) => onProtocolChange(value as ProviderProtocol)}
+          onValueChange={(value) => {
+            if (!readOnly) onProtocolChange(value as ProviderProtocol);
+          }}
         >
           <SelectTrigger
             id="ai-provider-protocol"
             className="w-full"
             aria-label="接口类型"
+            aria-readonly={readOnly || undefined}
           >
             <SelectValue />
           </SelectTrigger>
@@ -703,6 +684,7 @@ function ProviderFields({
         value={modelId}
         maxLength={256}
         disabled={pending}
+        readOnly={readOnly}
         onChange={onModelIdChange}
       />
       {protocol === "deepseek" && !modelId.startsWith("deepseek-") ? (
@@ -714,16 +696,8 @@ function ProviderFields({
         value={endpoint}
         maxLength={2048}
         disabled={pending}
-        readOnly={protocol === "deepseek"}
+        readOnly={readOnly || protocol === "deepseek"}
         onChange={onEndpointChange}
-      />
-      <LabeledInput
-        id="ai-provider-name"
-        label="配置名称（可选）"
-        value={configurationName}
-        maxLength={128}
-        disabled={pending}
-        onChange={onConfigurationNameChange}
       />
       <LabeledInput
         id="ai-provider-secret"
@@ -731,6 +705,7 @@ function ProviderFields({
         value={secret}
         maxLength={4096}
         disabled={pending}
+        readOnly={readOnly}
         type="password"
         autoComplete="off"
         placeholder={editing ? "留空表示不修改" : "请输入 API 密钥"}
@@ -769,7 +744,7 @@ function LabeledInput({
 function interfaceSummary(profile: CustomAiProviderProfile): string {
   const type =
     profile.protocol === "deepseek" ? "DeepSeek" : "OpenAI-compatible";
-  return `${type} · ${profile.endpointOrigin}`;
+  return `${type} · ${profile.endpoint}`;
 }
 
 function focusAfterProfileDeletion(
@@ -797,10 +772,7 @@ function focusAfterProfileDeletion(
 function mutationErrorMessage(cause: unknown, fallback: string): string {
   const message = cause instanceof Error ? cause.message : "";
   if (message.includes("AI_PROFILE_IN_USE")) {
-    return "当前模型正在使用，请先切换到其他模型。";
-  }
-  if (message.includes("AI_SECRET_IN_USE")) {
-    return "当前密钥正被任务使用，暂时无法更换密钥或删除模型。";
+    return "该模型正在被任务使用，无法修改配置。";
   }
   return message || fallback;
 }

@@ -14,7 +14,6 @@ import type {
 const deepseekProfile: CustomAiProviderProfile = {
   profileId: "profile-deepseek",
   kind: "custom",
-  configurationName: null,
   displayName: "deepseek-chat",
   protocol: "deepseek",
   modelId: "deepseek-chat",
@@ -23,19 +22,18 @@ const deepseekProfile: CustomAiProviderProfile = {
   endpointOrigin: "https://api.deepseek.com",
   processingLocation: "cloudDirect",
   requiresConsent: true,
-  capabilities: { selectable: true, editable: false, deletable: false },
+  capabilities: { selectable: true, editable: true, deletable: true },
   secretState: "available",
 };
 
 const teamProfile: CustomAiProviderProfile = {
   profileId: "profile-team",
   kind: "custom",
-  configurationName: "团队模型",
   displayName: "team-chat",
   protocol: "openai-compatible",
   modelId: "team-chat",
   modelSummary: "team-chat",
-  endpoint: "https://ai.example.com",
+  endpoint: "https://ai.example.com/v1",
   endpointOrigin: "https://ai.example.com",
   processingLocation: "cloudDirect",
   requiresConsent: true,
@@ -64,15 +62,7 @@ function api(overrides: Record<string, unknown> = {}) {
     createAiProviderProfile: vi.fn(async () =>
       changed({ selectedProfileId: "profile-new" }),
     ),
-    updateAiProviderProfile: vi.fn(async () =>
-      changed({
-        profiles: configured.profiles.map((profile) =>
-          profile.profileId === teamProfile.profileId
-            ? { ...profile, configurationName: "团队新模型" }
-            : profile,
-        ),
-      }),
-    ),
+    updateAiProviderProfile: vi.fn(async () => changed({})),
     selectAiProviderProfile: vi.fn(async () =>
       changed({ selectedProfileId: teamProfile.profileId }),
     ),
@@ -87,7 +77,7 @@ function api(overrides: Record<string, unknown> = {}) {
 }
 
 describe("cloud model settings", () => {
-  it("separates branding, model identity, selection, and edit state", async () => {
+  it("uses provider color for selection without locking the selected profile", async () => {
     render(<AiSettingsFeature api={api()} settingsPage />);
     expect(
       await screen.findByRole("heading", { name: "云端模型" }),
@@ -95,24 +85,72 @@ describe("cloud model settings", () => {
     expect(screen.getByRole("button", { name: "新增云端模型" })).toBeVisible();
     expect(screen.getByText("deepseek-chat")).toBeVisible();
     expect(screen.getByText("team-chat")).toBeVisible();
-    expect(screen.getByText(/团队模型 · OpenAI-compatible/)).toBeVisible();
+    expect(
+      screen.getByText("OpenAI-compatible · https://ai.example.com/v1"),
+    ).toHaveAttribute("title", "OpenAI-compatible · https://ai.example.com/v1");
+    expect(
+      screen.getByText("DeepSeek · https://api.deepseek.com"),
+    ).toBeVisible();
+    expect(screen.queryByText("团队模型")).toBeNull();
     const radios = screen.getAllByRole("radio");
     expect(radios[0]).toHaveAttribute("aria-checked", "true");
-    expect(radios[0]?.querySelector("img")).not.toBeNull();
-    expect(radios[1]?.querySelector("img")).toBeNull();
+    expect(radios[0]?.querySelector("img")).toHaveClass("size-5");
+    expect(radios[0]?.querySelector("img")).not.toHaveClass("grayscale");
+    expect(radios[1]?.querySelector("svg")).toHaveClass(
+      "text-muted-foreground",
+    );
+    expect(screen.queryByLabelText("当前模型")).toBeNull();
+    expect(screen.queryByLabelText("未选择")).toBeNull();
     const selectedEdit = screen.getByRole("button", {
       name: "编辑 deepseek-chat",
     });
-    expect(selectedEdit).toBeDisabled();
-    expect(selectedEdit).toHaveAttribute(
-      "title",
-      "当前模型正在使用，请先切换到其他模型。",
-    );
+    expect(selectedEdit).toBeEnabled();
     expect(
       screen.getByRole("button", { name: "编辑 team-chat" }),
     ).toBeEnabled();
     expect(screen.queryByRole("button", { name: /删除/ })).toBeNull();
     expect(screen.queryByText(/钥匙串|FileVault/)).toBeNull();
+  });
+
+  it("shows task-locked profiles as read-only with only cancel available", async () => {
+    const lockedProfile = {
+      ...deepseekProfile,
+      capabilities: {
+        ...deepseekProfile.capabilities,
+        editable: false,
+        deletable: false,
+      },
+    };
+    const desktop = api({
+      getAiSettings: vi.fn(async () => ({
+        ...configured,
+        profiles: [lockedProfile],
+      })),
+    });
+    const user = userEvent.setup();
+    render(<AiSettingsFeature api={desktop} settingsPage />);
+    await user.click(
+      await screen.findByRole("button", { name: "编辑 deepseek-chat" }),
+    );
+    const dialog = screen.getByRole("dialog", { name: "编辑 deepseek-chat" });
+    expect(
+      within(dialog).getByText("该模型正在被任务使用，无法修改配置。"),
+    ).toBeVisible();
+    expect(within(dialog).getByLabelText("接口类型")).toHaveAttribute(
+      "aria-readonly",
+      "true",
+    );
+    for (const label of ["模型 ID", "API 地址", "API 密钥"]) {
+      const field = within(dialog).getByLabelText(label);
+      expect(field).not.toBeDisabled();
+      expect(field).toHaveAttribute("readonly");
+    }
+    expect(within(dialog).queryByRole("button", { name: "保存" })).toBeNull();
+    expect(
+      within(dialog).queryByRole("button", { name: "删除模型" }),
+    ).toBeNull();
+    expect(within(dialog).getAllByRole("button")).toHaveLength(2);
+    expect(within(dialog).getByRole("button", { name: "取消" })).toBeVisible();
   });
 
   it("keeps click, Space, and arrow-key radio selection", async () => {
@@ -124,6 +162,13 @@ describe("cloud model settings", () => {
     expect(desktop.selectAiProviderProfile).toHaveBeenLastCalledWith({
       profileId: teamProfile.profileId,
       expectedRevision: 4,
+    });
+    await waitFor(() => {
+      expect(radios[0]?.querySelector("img")).toHaveClass(
+        "grayscale",
+        "opacity-50",
+      );
+      expect(radios[1]?.querySelector("svg")).toHaveClass("text-primary");
     });
     desktop.selectAiProviderProfile.mockClear();
     radios[0]!.focus();
@@ -144,6 +189,7 @@ describe("cloud model settings", () => {
     );
     const edit = screen.getByRole("dialog", { name: "编辑 team-chat" });
     const remove = within(edit).getByRole("button", { name: "删除模型" });
+    expect(remove).not.toHaveTextContent("删除模型");
     remove.focus();
     await user.click(remove);
     let alert = screen.getByRole("alertdialog", { name: "删除 team-chat？" });
@@ -163,7 +209,7 @@ describe("cloud model settings", () => {
     await waitFor(() => expect(screen.getByRole("radio")).toHaveFocus());
   });
 
-  it("creates with ordered fields, an optional name, and an ephemeral key", async () => {
+  it("creates with only operational fields and an ephemeral key", async () => {
     const desktop = api();
     const user = userEvent.setup();
     render(<AiSettingsFeature api={desktop} settingsPage />);
@@ -172,14 +218,13 @@ describe("cloud model settings", () => {
     );
     const dialog = screen.getByRole("dialog", { name: "新增云端模型" });
     expect(
-      ["接口类型", "模型 ID", "API 地址", "配置名称（可选）", "API 密钥"].map(
+      ["接口类型", "模型 ID", "API 地址", "API 密钥"].map(
         (label) => within(dialog).getByLabelText(label).id,
       ),
     ).toEqual([
       "ai-provider-protocol",
       "ai-provider-model",
       "ai-provider-endpoint",
-      "ai-provider-name",
       "ai-provider-secret",
     ]);
     await user.click(
@@ -200,7 +245,6 @@ describe("cloud model settings", () => {
     await waitFor(() =>
       expect(desktop.createAiProviderProfile).toHaveBeenCalledWith({
         expectedRevision: 4,
-        configurationName: null,
         protocol: "openai-compatible",
         endpoint: "https://personal.example.com",
         modelId: "personal-chat",
@@ -208,49 +252,6 @@ describe("cloud model settings", () => {
       }),
     );
     expect(screen.queryByText("create-secret")).toBeNull();
-  });
-
-  it("edits optional context without resending the saved key", async () => {
-    const desktop = api();
-    const user = userEvent.setup();
-    render(<AiSettingsFeature api={desktop} settingsPage />);
-    await user.click(
-      await screen.findByRole("button", { name: "编辑 team-chat" }),
-    );
-    const dialog = screen.getByRole("dialog", { name: "编辑 team-chat" });
-    await user.clear(within(dialog).getByLabelText("配置名称（可选）"));
-    await user.click(within(dialog).getByRole("button", { name: "保存" }));
-    await waitFor(() =>
-      expect(desktop.updateAiProviderProfile).toHaveBeenCalledWith({
-        expectedRevision: 4,
-        profileId: teamProfile.profileId,
-        configurationName: null,
-        protocol: "openai-compatible",
-        endpoint: "https://ai.example.com",
-        modelId: "team-chat",
-      }),
-    );
-  });
-
-  it("shows concise mutation blocks and clears replacement keys", async () => {
-    const desktop = api({
-      updateAiProviderProfile: vi
-        .fn()
-        .mockRejectedValueOnce(new Error("AI_SECRET_IN_USE")),
-    });
-    const user = userEvent.setup();
-    render(<AiSettingsFeature api={desktop} settingsPage />);
-    await user.click(
-      await screen.findByRole("button", { name: "编辑 team-chat" }),
-    );
-    const dialog = screen.getByRole("dialog", { name: "编辑 team-chat" });
-    await user.type(within(dialog).getByLabelText("API 密钥"), "replacement");
-    await user.click(within(dialog).getByRole("button", { name: "保存" }));
-    expect(await within(dialog).findByRole("alert")).toHaveTextContent(
-      "当前密钥正被任务使用，暂时无法更换密钥或删除模型。",
-    );
-    expect(within(dialog).getByLabelText("API 密钥")).toHaveValue("");
-    expect(screen.queryByText("replacement")).toBeNull();
   });
 
   it("keeps the empty state concise and clears secrets on Escape", async () => {

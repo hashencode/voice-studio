@@ -47,7 +47,6 @@ describe("desktop IPC window registry", () => {
     await expect(
       ipc.invoke(ipcChannels.aiProviderProfileCreate, main.event, {
         expectedRevision: 2,
-        configurationName: "团队模型",
         protocol: "openai-compatible",
         modelId: "gpt-compatible",
         endpoint: "https://ai.example.com/v1",
@@ -56,7 +55,6 @@ describe("desktop IPC window registry", () => {
     ).resolves.toEqual(aiSettingsSnapshot());
     expect(services.createAiProviderProfile).toHaveBeenCalledWith({
       expectedRevision: 2,
-      configurationName: "团队模型",
       protocol: "openai-compatible",
       modelId: "gpt-compatible",
       endpoint: "https://ai.example.com/v1",
@@ -365,7 +363,6 @@ function aiSettingsSnapshot() {
       {
         profileId: "profile-123",
         kind: "custom" as const,
-        configurationName: null,
         displayName: "团队模型",
         protocol: "openai-compatible" as const,
         modelId: "gpt-compatible",

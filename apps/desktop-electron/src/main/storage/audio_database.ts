@@ -10,16 +10,9 @@ import {
 import {
   AUDIO_APPLICATION_ID,
   AUDIO_SCHEMA_VERSION,
-  createAudioSchemaV3,
+  createAudioSchema,
   REQUIRED_AUDIO_SCHEMA_TABLES,
-  REQUIRED_AUDIO_SCHEMA_TABLES_V1,
-  REQUIRED_AUDIO_SCHEMA_TABLES_V2,
 } from "./audio_schema";
-import { migrateAudioSchemaV1ToV2 } from "./audio_migrations/v1_to_v2";
-import {
-  AudioSchemaMigrationConflictError,
-  migrateAudioSchemaV2ToV3,
-} from "./audio_migrations/v2_to_v3";
 
 export { AUDIO_APPLICATION_ID, AUDIO_SCHEMA_VERSION } from "./audio_schema";
 
@@ -56,9 +49,7 @@ export function openAudioDatabase(databasePath: string): DatabaseSync {
     databasePath === ":memory:" ? databasePath : resolve(databasePath);
   const existing =
     resolvedPath !== ":memory:" && hasNonEmptyDatabase(resolvedPath);
-  const existingVersion = existing
-    ? inspectExistingDatabase(resolvedPath)
-    : null;
+  if (existing) inspectExistingDatabase(resolvedPath);
   if (resolvedPath !== ":memory:") {
     mkdirSync(dirname(resolvedPath), { recursive: true, mode: 0o700 });
   }
@@ -70,33 +61,13 @@ export function openAudioDatabase(databasePath: string): DatabaseSync {
     if (!existing) {
       database.exec("BEGIN IMMEDIATE");
       try {
-        createAudioSchemaV3(database);
+        createAudioSchema(database);
         database.exec(`PRAGMA application_id = ${AUDIO_APPLICATION_ID}`);
         database.exec(`PRAGMA user_version = ${AUDIO_SCHEMA_VERSION}`);
         database.exec("COMMIT");
       } catch (error) {
         database.exec("ROLLBACK");
         throw error;
-      }
-    } else if (existingVersion === 1 || existingVersion === 2) {
-      const migratingDatabase = database;
-      migratingDatabase.exec("PRAGMA foreign_keys = OFF");
-      try {
-        withTransaction(migratingDatabase, () => {
-          if (existingVersion === 1) {
-            migrateAudioSchemaV1ToV2(migratingDatabase);
-            migratingDatabase.exec("PRAGMA user_version = 2");
-            validateAudioSchema(migratingDatabase, 2);
-          }
-          migrateAudioSchemaV2ToV3(migratingDatabase);
-          migratingDatabase.exec(
-            `PRAGMA user_version = ${AUDIO_SCHEMA_VERSION}`,
-          );
-          validateAudioSchema(migratingDatabase, AUDIO_SCHEMA_VERSION);
-        });
-      } finally {
-        migratingDatabase.exec("PRAGMA legacy_alter_table = OFF");
-        migratingDatabase.exec("PRAGMA foreign_keys = ON");
       }
     }
     validateAudioSchema(database, AUDIO_SCHEMA_VERSION);
@@ -108,9 +79,6 @@ export function openAudioDatabase(databasePath: string): DatabaseSync {
       // Preserve the original failure.
     }
     if (error instanceof AudioStorageError) throw error;
-    if (error instanceof AudioSchemaMigrationConflictError) {
-      throw new AudioStorageCompatibilityError(error.message);
-    }
     throw new AudioStorageCorruptionError(
       "Audio database could not be created or validated",
       { cause: error },
@@ -145,7 +113,7 @@ function inspectExistingDatabase(path: string): number {
         "Existing database does not belong to the Audio store",
       );
     }
-    if (version !== 1 && version !== 2 && version !== AUDIO_SCHEMA_VERSION) {
+    if (version !== AUDIO_SCHEMA_VERSION) {
       throw new AudioStorageCompatibilityError(
         `Audio database schema version ${version} is unsupported`,
       );
@@ -201,21 +169,15 @@ function validateAudioSchema(
       .all()
       .map((row) => String(row.name)),
   );
-  const requiredTables =
-    expectedVersion === 1
-      ? REQUIRED_AUDIO_SCHEMA_TABLES_V1
-      : expectedVersion === 2
-        ? REQUIRED_AUDIO_SCHEMA_TABLES_V2
-        : REQUIRED_AUDIO_SCHEMA_TABLES;
-  const missing = requiredTables.filter((table) => !tables.has(table));
+  const missing = REQUIRED_AUDIO_SCHEMA_TABLES.filter(
+    (table) => !tables.has(table),
+  );
   if (missing.length > 0) {
     throw new AudioStorageCorruptionError(
       `Audio database is missing schema tables: ${missing.join(", ")}`,
     );
   }
-  if (expectedVersion >= 2) {
-    assertProviderProfileSchema(database, expectedVersion);
-  }
+  assertProviderProfileSchema(database);
   if (database.prepare("PRAGMA foreign_key_check").all().length > 0) {
     throw new AudioStorageCorruptionError(
       "Audio database has foreign-key damage",
@@ -224,56 +186,33 @@ function validateAudioSchema(
   assertIntegrity(database);
 }
 
-function assertProviderProfileSchema(
-  database: DatabaseSync,
-  expectedVersion: number,
-): void {
+function assertProviderProfileSchema(database: DatabaseSync): void {
   const profileColumns = database
     .prepare("PRAGMA table_info(ai_provider_profiles)")
     .all();
-  const expectedProfileColumns =
-    expectedVersion === 2
-      ? [
-          "profile_id",
-          "kind",
-          "display_name",
-          "normalized_display_name",
-          "protocol",
-          "model_id",
-          "endpoint",
-          "secret_ref",
-          "created_at_ms",
-          "updated_at_ms",
-          "revision",
-        ]
-      : [
-          "profile_id",
-          "kind",
-          "configuration_name",
-          "protocol",
-          "model_id",
-          "endpoint",
-          "secret_ref",
-          "created_at_ms",
-          "updated_at_ms",
-          "revision",
-        ];
+  const expectedProfileColumns = [
+    "profile_id",
+    "kind",
+    "protocol",
+    "model_id",
+    "endpoint",
+    "secret_ref",
+    "created_at_ms",
+    "updated_at_ms",
+    "revision",
+  ];
   if (!hasExactColumns(profileColumns, expectedProfileColumns)) {
     throw new AudioStorageCorruptionError(
-      `Audio database profile schema does not match v${expectedVersion}`,
+      `Audio database profile schema does not match v${AUDIO_SCHEMA_VERSION}`,
     );
   }
-  const requiredIndex =
-    expectedVersion === 2
-      ? "ai_provider_profiles_normalized_name"
-      : "ai_provider_profiles_model_id_unique";
   const index = database
     .prepare("PRAGMA index_list(ai_provider_profiles)")
     .all()
-    .find((row) => String(row.name) === requiredIndex);
+    .find((row) => String(row.name) === "ai_provider_profiles_model_id_unique");
   if (!index || Number(index.unique) !== 1) {
     throw new AudioStorageCorruptionError(
-      `Audio database profile indexes do not match v${expectedVersion}`,
+      `Audio database profile indexes do not match v${AUDIO_SCHEMA_VERSION}`,
     );
   }
   const selectionForeignKey = database
@@ -287,10 +226,10 @@ function assertProviderProfileSchema(
     String(selectionForeignKey.on_delete).toUpperCase() !== "SET NULL"
   ) {
     throw new AudioStorageCorruptionError(
-      `Audio database profile selection does not match v${expectedVersion}`,
+      `Audio database profile selection does not match v${AUDIO_SCHEMA_VERSION}`,
     );
   }
-  if (expectedVersion >= 3) assertSecretCleanupSchema(database);
+  assertSecretCleanupSchema(database);
 }
 
 function assertSecretCleanupSchema(database: DatabaseSync): void {
@@ -309,7 +248,7 @@ function assertSecretCleanupSchema(database: DatabaseSync): void {
     Number(columns.find((row) => row.name === "secret_ref")?.pk) !== 1
   ) {
     throw new AudioStorageCorruptionError(
-      "Audio database secret cleanup schema does not match v3",
+      `Audio database secret cleanup schema does not match v${AUDIO_SCHEMA_VERSION}`,
     );
   }
 }

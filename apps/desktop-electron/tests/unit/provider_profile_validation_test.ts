@@ -9,7 +9,6 @@ describe("AI provider profile validation", () => {
   it("requires the DeepSeek model ID prefix without rewriting the ID", () => {
     expect(() =>
       validateAiProviderProfileInput({
-        configurationName: null,
         protocol: "deepseek",
         modelId: "chat",
         endpoint: "https://api.deepseek.com",
@@ -18,7 +17,6 @@ describe("AI provider profile validation", () => {
 
     expect(
       validateAiProviderProfileInput({
-        configurationName: null,
         protocol: "deepseek",
         modelId: "deepseek-chat",
         endpoint: "https://api.deepseek.com",

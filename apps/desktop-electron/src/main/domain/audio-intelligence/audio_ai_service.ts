@@ -96,10 +96,12 @@ export class AudioAiService {
         profiles.map(async (profile) => {
           const endpoint = parseRemoteAiEndpoint(profile.endpoint);
           const secret = await this.secrets.read(profile.secretRef);
+          const active = this.repository.activeJobUsesProfileId(
+            profile.profileId,
+          );
           return {
             profileId: profile.profileId,
             kind: "custom" as const,
-            configurationName: profile.configurationName,
             displayName: profile.displayName,
             protocol: profile.protocol,
             modelId: profile.modelId,
@@ -110,8 +112,8 @@ export class AudioAiService {
             requiresConsent: true as const,
             capabilities: {
               selectable: true as const,
-              editable: profile.profileId !== selectedProfileId,
-              deletable: profile.profileId !== selectedProfileId,
+              editable: !active,
+              deletable: !active,
             },
             secretState: secret.state,
           };
@@ -177,7 +179,6 @@ export class AudioAiService {
         ? this.nextSecretRef()
         : undefined;
       if (request.secret) {
-        this.assertSecretMutable(current.secretRef);
         assertProviderSecretInput(replacementSecretRef!, request.secret);
         await this.secrets.replace(
           replacementSecretRef!,
@@ -223,14 +224,24 @@ export class AudioAiService {
       this.assertExpectedRevision(request.expectedRevision);
       const current = this.requireProfile(request.profileId);
       this.assertProfileMutable(current);
-      this.assertSecretMutable(current.secretRef);
+      const secretNeededForRetry = this.repository.blockingJobUsesSecretRef(
+        current.secretRef,
+      );
       this.deletingProfileIds.add(current.profileId);
       try {
         this.repository.deleteProfile({
           ...request,
           nowMs: this.now(),
         });
-        await this.cleanupSecret(current.secretRef);
+        if (secretNeededForRetry) {
+          this.repository.secretCleanup.enqueue(
+            current.secretRef,
+            this.now(),
+            null,
+          );
+        } else {
+          await this.cleanupSecret(current.secretRef);
+        }
       } finally {
         this.deletingProfileIds.delete(current.profileId);
       }
@@ -611,19 +622,10 @@ export class AudioAiService {
   }
 
   private assertProfileMutable(profile: AiProviderProfileRecord): void {
-    if (this.repository.selectedProfile()?.profileId === profile.profileId) {
+    if (this.repository.activeJobUsesProfileId(profile.profileId)) {
       throw new AiProviderFailure(
         "AI_PROFILE_IN_USE",
-        "selected AI profile cannot be changed",
-      );
-    }
-  }
-
-  private assertSecretMutable(secretRef: string): void {
-    if (this.repository.blockingJobUsesSecretRef(secretRef)) {
-      throw new AiProviderFailure(
-        "AI_SECRET_IN_USE",
-        "AI secret is referenced by unfinished work",
+        "AI profile used by an active task cannot be changed",
       );
     }
   }

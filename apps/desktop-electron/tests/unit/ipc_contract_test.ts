@@ -29,9 +29,8 @@ import { createDesktopApi } from "../../src/preload/api";
 describe("shared IPC contracts", () => {
   it("strictly validates custom and reserved hosted provider profiles", () => {
     const custom = {
-      profileId: "legacy-default",
+      profileId: "profile-deepseek",
       kind: "custom" as const,
-      configurationName: null,
       displayName: "DeepSeek",
       protocol: "deepseek" as const,
       modelId: "deepseek-chat",
@@ -59,7 +58,9 @@ describe("shared IPC contracts", () => {
           applicationLayerEncryption: "not-claimed",
         },
       }),
-    ).toEqual(expect.objectContaining({ selectedProfileId: "legacy-default" }));
+    ).toEqual(
+      expect.objectContaining({ selectedProfileId: "profile-deepseek" }),
+    );
     expect(() =>
       aiProviderProfileSchema.parse({ ...custom, secretRef: "deepseek" }),
     ).toThrow();
@@ -98,7 +99,6 @@ describe("shared IPC contracts", () => {
   it("validates revision-checked provider profile mutations", () => {
     const create = {
       expectedRevision: 0,
-      configurationName: "团队模型",
       protocol: "openai-compatible" as const,
       modelId: "gpt-compatible",
       endpoint: "https://ai.example.com/v1",
@@ -108,7 +108,7 @@ describe("shared IPC contracts", () => {
     expect(() =>
       createAiProviderProfileRequestSchema.parse({
         ...create,
-        configurationName: "   ",
+        unknownField: true,
       }),
     ).toThrow();
     expect(() =>
@@ -140,7 +140,6 @@ describe("shared IPC contracts", () => {
     ).toHaveProperty("secret", undefined);
     expect(
       updateAiProviderProfileRequestSchema.parse({
-        configurationName: create.configurationName,
         protocol: create.protocol,
         modelId: create.modelId,
         endpoint: create.endpoint,
@@ -238,7 +237,6 @@ describe("shared IPC contracts", () => {
         {
           profileId: "profile-123",
           kind: "custom" as const,
-          configurationName: null,
           displayName: "团队模型",
           protocol: "openai-compatible" as const,
           modelId: "gpt-compatible",

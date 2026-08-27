@@ -46,7 +46,6 @@ function installApi() {
         {
           profileId: "profile-deepseek",
           kind: "custom" as const,
-          configurationName: null,
           displayName: "DeepSeek",
           protocol: "deepseek" as const,
           modelId: "deepseek-chat",

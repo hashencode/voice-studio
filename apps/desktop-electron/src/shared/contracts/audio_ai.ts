@@ -42,7 +42,6 @@ export const audioAiErrorCodeSchema = z.enum([
   "AI_PROCESS_INTERRUPTED",
   "AI_ATTEMPT_CONFLICT",
   "AI_PROFILE_IN_USE",
-  "AI_SECRET_IN_USE",
   "AI_PREPARATION_STALE",
 ]);
 
@@ -58,7 +57,6 @@ export const customAiProviderProfileSchema = z
   .object({
     profileId: aiProviderProfileIdSchema,
     kind: z.literal("custom"),
-    configurationName: z.string().trim().min(1).max(128).nullable(),
     displayName: z.string().trim().min(1).max(128),
     protocol: aiProviderIdSchema,
     modelId: z.string().trim().min(1).max(256),
@@ -194,7 +192,6 @@ export const audioAiSnapshotSchema = z
 
 export const getAiSettingsRequestSchema = z.object({}).strict();
 const customAiProviderInputShape = {
-  configurationName: z.string().trim().min(1).max(128).nullable(),
   protocol: aiProviderIdSchema,
   modelId: z.string().trim().min(1).max(256),
   endpoint: z.string().trim().url().max(2_048),

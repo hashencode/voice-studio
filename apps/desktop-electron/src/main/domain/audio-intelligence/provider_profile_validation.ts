@@ -1,29 +1,18 @@
 import { AiProviderFailure, parseRemoteAiEndpoint } from "./provider_security";
 
 export interface AiProviderProfileInput {
-  configurationName: string | null;
   protocol: "deepseek" | "openai-compatible";
   modelId: string;
   endpoint: string;
 }
 
 export function validateAiProviderProfileInput(input: AiProviderProfileInput): {
-  configurationName: string | null;
   protocol: AiProviderProfileInput["protocol"];
   modelId: string;
   endpoint: string;
 } {
-  const configurationName = input.configurationName
-    ? input.configurationName.trim().replace(/\s+/gu, " ")
-    : null;
   const modelId = input.modelId.trim();
-  if (
-    (configurationName !== null &&
-      (configurationName.length === 0 ||
-        [...configurationName].length > 128)) ||
-    modelId.length === 0 ||
-    [...modelId].length > 256
-  ) {
+  if (modelId.length === 0 || [...modelId].length > 256) {
     throw new AiProviderFailure(
       "AI_INVALID_CONFIGURATION",
       "AI provider profile is invalid",
@@ -47,7 +36,6 @@ export function validateAiProviderProfileInput(input: AiProviderProfileInput): {
     );
   }
   return {
-    configurationName,
     protocol: input.protocol,
     modelId,
     endpoint: endpoint.baseUrl,
