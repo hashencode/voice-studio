@@ -5,190 +5,272 @@ import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
 
 import { AiSettingsFeature } from "../../../src/renderer/features/settings/ai-settings-feature";
-import type { Voice2TextDesktopApi } from "../../../src/shared/contracts";
+import type {
+  AiSettingsSnapshot,
+  CustomAiProviderProfile,
+  Voice2TextDesktopApi,
+} from "../../../src/shared/contracts";
 
-const configured = {
-  revision: 1,
-  config: {
-    providerId: "deepseek" as const,
-    displayName: "DeepSeek",
-    modelId: "deepseek-chat",
-    endpoint: "https://api.deepseek.com",
-    endpointOrigin: "https://api.deepseek.com",
-    processingLocation: "cloudDirect" as const,
-    requiresConsent: true as const,
-  },
-  secretState: "available" as const,
+const deepseekProfile: CustomAiProviderProfile = {
+  profileId: "profile-deepseek",
+  kind: "custom",
+  configurationName: null,
+  displayName: "deepseek-chat",
+  protocol: "deepseek",
+  modelId: "deepseek-chat",
+  modelSummary: "deepseek-chat",
+  endpoint: "https://api.deepseek.com",
+  endpointOrigin: "https://api.deepseek.com",
+  processingLocation: "cloudDirect",
+  requiresConsent: true,
+  capabilities: { selectable: true, editable: false, deletable: false },
+  secretState: "available",
+};
+
+const teamProfile: CustomAiProviderProfile = {
+  profileId: "profile-team",
+  kind: "custom",
+  configurationName: "团队模型",
+  displayName: "team-chat",
+  protocol: "openai-compatible",
+  modelId: "team-chat",
+  modelSummary: "team-chat",
+  endpoint: "https://ai.example.com",
+  endpointOrigin: "https://ai.example.com",
+  processingLocation: "cloudDirect",
+  requiresConsent: true,
+  capabilities: { selectable: true, editable: true, deletable: true },
+  secretState: "missing",
+};
+
+const configured: AiSettingsSnapshot = {
+  revision: 4,
+  profiles: [deepseekProfile, teamProfile],
+  selectedProfileId: deepseekProfile.profileId,
   deviceSecurity: {
-    kind: "device-security" as const,
-    fileVaultState: "enabled" as const,
-    applicationLayerEncryption: "not-claimed" as const,
+    kind: "device-security",
+    fileVaultState: "enabled",
+    applicationLayerEncryption: "not-claimed",
   },
 };
 
+function changed(changes: Partial<AiSettingsSnapshot>): AiSettingsSnapshot {
+  return { ...configured, revision: 5, ...changes };
+}
+
 function api(overrides: Record<string, unknown> = {}) {
-  return {
+  const desktop = {
     getAiSettings: vi.fn(async () => configured),
-    saveAiSettings: vi.fn(async () => configured),
-    replaceAiProviderSecret: vi.fn(async () => configured),
-    deleteAiProviderSecret: vi.fn(async () => ({
-      ...configured,
-      secretState: "missing",
-    })),
+    createAiProviderProfile: vi.fn(async () =>
+      changed({ selectedProfileId: "profile-new" }),
+    ),
+    updateAiProviderProfile: vi.fn(async () =>
+      changed({
+        profiles: configured.profiles.map((profile) =>
+          profile.profileId === teamProfile.profileId
+            ? { ...profile, configurationName: "团队新模型" }
+            : profile,
+        ),
+      }),
+    ),
+    selectAiProviderProfile: vi.fn(async () =>
+      changed({ selectedProfileId: teamProfile.profileId }),
+    ),
+    deleteAiProviderProfile: vi.fn(async () =>
+      changed({ profiles: [deepseekProfile] }),
+    ),
     generateAudioAi: vi.fn(),
     retryAudioAi: vi.fn(),
     ...overrides,
-  } as unknown as Voice2TextDesktopApi;
+  };
+  return desktop as typeof desktop & Voice2TextDesktopApi;
 }
 
-describe("AI settings security boundary", () => {
-  it("loads and saves local configuration without consent or generation calls", async () => {
+describe("cloud model settings", () => {
+  it("separates branding, model identity, selection, and edit state", async () => {
+    render(<AiSettingsFeature api={api()} settingsPage />);
+    expect(
+      await screen.findByRole("heading", { name: "云端模型" }),
+    ).toBeVisible();
+    expect(screen.getByRole("button", { name: "新增云端模型" })).toBeVisible();
+    expect(screen.getByText("deepseek-chat")).toBeVisible();
+    expect(screen.getByText("team-chat")).toBeVisible();
+    expect(screen.getByText(/团队模型 · OpenAI-compatible/)).toBeVisible();
+    const radios = screen.getAllByRole("radio");
+    expect(radios[0]).toHaveAttribute("aria-checked", "true");
+    expect(radios[0]?.querySelector("img")).not.toBeNull();
+    expect(radios[1]?.querySelector("img")).toBeNull();
+    const selectedEdit = screen.getByRole("button", {
+      name: "编辑 deepseek-chat",
+    });
+    expect(selectedEdit).toBeDisabled();
+    expect(selectedEdit).toHaveAttribute(
+      "title",
+      "当前模型正在使用，请先切换到其他模型。",
+    );
+    expect(
+      screen.getByRole("button", { name: "编辑 team-chat" }),
+    ).toBeEnabled();
+    expect(screen.queryByRole("button", { name: /删除/ })).toBeNull();
+    expect(screen.queryByText(/钥匙串|FileVault/)).toBeNull();
+  });
+
+  it("keeps click, Space, and arrow-key radio selection", async () => {
     const desktop = api();
     const user = userEvent.setup();
-    render(<AiSettingsFeature api={desktop} />);
-
-    expect(
-      await screen.findByRole("heading", { name: "可选音频智能" }),
-    ).toBeVisible();
-    expect(screen.getByText("DeepSeek · deepseek-chat")).toBeVisible();
-    expect(
-      screen.getByText(/每次生成都需要针对当前音频单独同意/),
-    ).toBeVisible();
-
-    await user.click(screen.getByRole("button", { name: "配置提供商" }));
-    const dialog = screen.getByRole("dialog", { name: "配置音频智能提供商" });
-    const provider = within(dialog).getByRole("combobox", {
-      name: "音频智能提供商",
+    render(<AiSettingsFeature api={desktop} settingsPage />);
+    const radios = await screen.findAllByRole("radio");
+    await user.click(radios[1]!);
+    expect(desktop.selectAiProviderProfile).toHaveBeenLastCalledWith({
+      profileId: teamProfile.profileId,
+      expectedRevision: 4,
     });
-    expect(provider).toHaveAttribute("data-slot", "select-trigger");
-    await user.click(provider);
+    desktop.selectAiProviderProfile.mockClear();
+    radios[0]!.focus();
+    await user.keyboard("{ArrowDown}");
+    expect(radios[1]).toHaveFocus();
+    expect(desktop.selectAiProviderProfile).toHaveBeenCalledTimes(1);
+    desktop.selectAiProviderProfile.mockClear();
+    await user.keyboard(" ");
+    expect(desktop.selectAiProviderProfile).toHaveBeenCalledTimes(1);
+  });
+
+  it("shows deletion only in edit mode and restores focus after cancel", async () => {
+    const desktop = api();
+    const user = userEvent.setup();
+    render(<AiSettingsFeature api={desktop} settingsPage />);
+    await user.click(
+      await screen.findByRole("button", { name: "编辑 team-chat" }),
+    );
+    const edit = screen.getByRole("dialog", { name: "编辑 team-chat" });
+    const remove = within(edit).getByRole("button", { name: "删除模型" });
+    remove.focus();
+    await user.click(remove);
+    let alert = screen.getByRole("alertdialog", { name: "删除 team-chat？" });
+    expect(within(alert).getByText("确定要删除“team-chat”吗？")).toBeVisible();
+    await user.click(within(alert).getByRole("button", { name: "取消" }));
+    expect(remove).toHaveFocus();
+    expect(desktop.deleteAiProviderProfile).not.toHaveBeenCalled();
+    await user.click(remove);
+    alert = screen.getByRole("alertdialog", { name: "删除 team-chat？" });
+    await user.click(within(alert).getByRole("button", { name: "删除" }));
+    await waitFor(() =>
+      expect(desktop.deleteAiProviderProfile).toHaveBeenCalledWith({
+        profileId: teamProfile.profileId,
+        expectedRevision: 4,
+      }),
+    );
+    await waitFor(() => expect(screen.getByRole("radio")).toHaveFocus());
+  });
+
+  it("creates with ordered fields, an optional name, and an ephemeral key", async () => {
+    const desktop = api();
+    const user = userEvent.setup();
+    render(<AiSettingsFeature api={desktop} settingsPage />);
+    await user.click(
+      await screen.findByRole("button", { name: "新增云端模型" }),
+    );
+    const dialog = screen.getByRole("dialog", { name: "新增云端模型" });
+    expect(
+      ["接口类型", "模型 ID", "API 地址", "配置名称（可选）", "API 密钥"].map(
+        (label) => within(dialog).getByLabelText(label).id,
+      ),
+    ).toEqual([
+      "ai-provider-protocol",
+      "ai-provider-model",
+      "ai-provider-endpoint",
+      "ai-provider-name",
+      "ai-provider-secret",
+    ]);
+    await user.click(
+      within(dialog).getByRole("combobox", { name: "接口类型" }),
+    );
     await user.click(
       await screen.findByRole("option", { name: "OpenAI-compatible" }),
     );
-    await user.clear(within(dialog).getByRole("textbox", { name: "模型 ID" }));
+    await user.clear(within(dialog).getByLabelText("模型 ID"));
+    await user.type(within(dialog).getByLabelText("模型 ID"), "personal-chat");
+    await user.clear(within(dialog).getByLabelText("API 地址"));
     await user.type(
-      within(dialog).getByRole("textbox", { name: "模型 ID" }),
-      "custom-model",
+      within(dialog).getByLabelText("API 地址"),
+      "https://personal.example.com",
     );
-    await user.clear(within(dialog).getByRole("textbox", { name: "服务地址" }));
-    await user.type(
-      within(dialog).getByRole("textbox", { name: "服务地址" }),
-      "https://ai.example.com",
-    );
-    await user.click(within(dialog).getByRole("button", { name: "保存配置" }));
-
+    await user.type(within(dialog).getByLabelText("API 密钥"), "create-secret");
+    await user.click(within(dialog).getByRole("button", { name: "新增" }));
     await waitFor(() =>
-      expect(desktop.saveAiSettings).toHaveBeenCalledWith({
-        providerId: "openai-compatible",
-        modelId: "custom-model",
-        endpoint: "https://ai.example.com",
+      expect(desktop.createAiProviderProfile).toHaveBeenCalledWith({
+        expectedRevision: 4,
+        configurationName: null,
+        protocol: "openai-compatible",
+        endpoint: "https://personal.example.com",
+        modelId: "personal-chat",
+        secret: "create-secret",
       }),
     );
-    expect(desktop.generateAudioAi).not.toHaveBeenCalled();
-    expect(desktop.retryAudioAi).not.toHaveBeenCalled();
+    expect(screen.queryByText("create-secret")).toBeNull();
   });
 
-  it.each([
-    ["missing", "尚未在 macOS 钥匙串中配置密钥"],
-    ["denied", "无法读取 macOS 钥匙串中的密钥"],
-    ["corrupt", "macOS 钥匙串中的密钥无法使用"],
-  ] as const)(
-    "prompts for entry when the secret state is %s",
-    async (secretState, copy) => {
-      const desktop = api({
-        getAiSettings: vi.fn(async () => ({ ...configured, secretState })),
-      });
-      render(<AiSettingsFeature api={desktop} />);
-
-      expect(await screen.findByText(copy)).toBeVisible();
-      expect(
-        screen.getByRole("button", { name: /输入.*密钥|重新输入密钥/ }),
-      ).toBeEnabled();
-    },
-  );
-
-  it("keeps secrets out of rendered state and restores focus after keyboard cancel", async () => {
-    const desktop = api({
-      getAiSettings: vi.fn(async () => ({
-        ...configured,
-        secretState: "missing",
-      })),
-    });
+  it("edits optional context without resending the saved key", async () => {
+    const desktop = api();
     const user = userEvent.setup();
-    render(<AiSettingsFeature api={desktop} />);
-    const open = await screen.findByRole("button", {
-      name: "输入 DeepSeek 密钥",
-    });
-
-    open.focus();
-    await user.keyboard("{Enter}");
-    const dialog = screen.getByRole("dialog", { name: "输入 DeepSeek 密钥" });
-    const secret = within(dialog).getByLabelText("API 密钥");
-    expect(secret).toHaveAttribute("type", "password");
-    await user.type(secret, "never-render-this-secret");
-    await user.keyboard("{Escape}");
-
-    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
-    expect(open).toHaveFocus();
-    expect(
-      screen.queryByText("never-render-this-secret"),
-    ).not.toBeInTheDocument();
-    expect(desktop.replaceAiProviderSecret).not.toHaveBeenCalled();
-  });
-
-  it("replaces a missing secret through the Keychain API without rendering it", async () => {
-    const desktop = api({
-      getAiSettings: vi.fn(async () => ({
-        ...configured,
-        secretState: "missing",
-      })),
-    });
-    const user = userEvent.setup();
-    render(<AiSettingsFeature api={desktop} />);
-
+    render(<AiSettingsFeature api={desktop} settingsPage />);
     await user.click(
-      await screen.findByRole("button", { name: "输入 DeepSeek 密钥" }),
+      await screen.findByRole("button", { name: "编辑 team-chat" }),
     );
-    const secret = screen.getByLabelText("API 密钥");
-    await user.type(secret, "keychain-only-secret");
-    await user.click(screen.getByRole("button", { name: "保存到钥匙串" }));
-
+    const dialog = screen.getByRole("dialog", { name: "编辑 team-chat" });
+    await user.clear(within(dialog).getByLabelText("配置名称（可选）"));
+    await user.click(within(dialog).getByRole("button", { name: "保存" }));
     await waitFor(() =>
-      expect(desktop.replaceAiProviderSecret).toHaveBeenCalledWith({
-        providerId: "deepseek",
-        secret: "keychain-only-secret",
+      expect(desktop.updateAiProviderProfile).toHaveBeenCalledWith({
+        expectedRevision: 4,
+        profileId: teamProfile.profileId,
+        configurationName: null,
+        protocol: "openai-compatible",
+        endpoint: "https://ai.example.com",
+        modelId: "team-chat",
       }),
     );
-    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
-    expect(screen.queryByText("keychain-only-secret")).not.toBeInTheDocument();
-    expect(
-      screen.getByRole("button", { name: "替换 DeepSeek 密钥" }),
-    ).toBeVisible();
   });
 
-  it.each([
-    ["enabled", "FileVault 磁盘加密已启用"],
-    ["disabled", "FileVault 磁盘加密未启用"],
-    ["unknown", "无法确认 FileVault 状态"],
-  ] as const)(
-    "describes FileVault %s without claiming app database encryption",
-    async (fileVault, title) => {
-      const desktop = api({
-        getAiSettings: vi.fn(async () => ({
-          ...configured,
-          deviceSecurity: {
-            ...configured.deviceSecurity,
-            fileVaultState: fileVault,
-          },
-        })),
-      });
-      render(<AiSettingsFeature api={desktop} />);
+  it("shows concise mutation blocks and clears replacement keys", async () => {
+    const desktop = api({
+      updateAiProviderProfile: vi
+        .fn()
+        .mockRejectedValueOnce(new Error("AI_SECRET_IN_USE")),
+    });
+    const user = userEvent.setup();
+    render(<AiSettingsFeature api={desktop} settingsPage />);
+    await user.click(
+      await screen.findByRole("button", { name: "编辑 team-chat" }),
+    );
+    const dialog = screen.getByRole("dialog", { name: "编辑 team-chat" });
+    await user.type(within(dialog).getByLabelText("API 密钥"), "replacement");
+    await user.click(within(dialog).getByRole("button", { name: "保存" }));
+    expect(await within(dialog).findByRole("alert")).toHaveTextContent(
+      "当前密钥正被任务使用，暂时无法更换密钥或删除模型。",
+    );
+    expect(within(dialog).getByLabelText("API 密钥")).toHaveValue("");
+    expect(screen.queryByText("replacement")).toBeNull();
+  });
 
-      expect(await screen.findByText(title)).toBeVisible();
-      expect(
-        screen.getByText(/没有应用层整库加密|未宣称.*应用层.*加密/),
-      ).toBeVisible();
-      expect(screen.queryByText(/数据库已由应用加密/)).not.toBeInTheDocument();
-    },
-  );
+  it("keeps the empty state concise and clears secrets on Escape", async () => {
+    const desktop = api({
+      getAiSettings: vi.fn(async () => ({
+        ...configured,
+        profiles: [],
+        selectedProfileId: null,
+      })),
+    });
+    const user = userEvent.setup();
+    render(<AiSettingsFeature api={desktop} settingsPage />);
+    expect(await screen.findByText("还没有云端模型")).toBeVisible();
+    const add = screen.getByRole("button", { name: "新增云端模型" });
+    add.focus();
+    await user.keyboard("{Enter}");
+    await user.type(screen.getByLabelText("API 密钥"), "discard-me");
+    await user.keyboard("{Escape}");
+    expect(screen.queryByRole("dialog")).toBeNull();
+    expect(screen.queryByText("discard-me")).toBeNull();
+    expect(add).toHaveFocus();
+  });
 });

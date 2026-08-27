@@ -41,7 +41,7 @@ describe("application capture activity", () => {
     );
   });
 
-  it("retains the newest 20 items and acknowledges only through the target", () => {
+  it("retains the newest 20 items and marks exactly one item read", () => {
     const state = new DesktopApplicationState();
     for (let index = 0; index < 22; index += 1) {
       state.setCapture(completedCapture(index));
@@ -53,15 +53,32 @@ describe("application capture activity", () => {
     expect(activity.at(-1)!.captureSessionId).toBe("session-activity-0002");
 
     const revision = state.snapshot().revision;
-    state.acknowledgeActivity(activity[1]!.id);
+    state.markActivityRead(activity[1]!.id);
     expect(
       state
         .snapshot()
         .activity!.map((item) => item.read)
         .slice(0, 3),
-    ).toEqual([false, true, true]);
+    ).toEqual([false, true, false]);
     expect(state.snapshot().revision).toBe(revision + 1);
-    state.acknowledgeActivity(activity[1]!.id);
+    state.markActivityRead(activity[1]!.id);
+    state.markActivityRead("unknown-activity");
+    expect(state.snapshot().revision).toBe(revision + 1);
+  });
+
+  it("marks all activity read idempotently without changing order", () => {
+    const state = new DesktopApplicationState();
+    for (let index = 0; index < 3; index += 1) {
+      state.setCapture(completedCapture(index));
+    }
+    const before = state.snapshot().activity!.map((item) => item.id);
+    const revision = state.snapshot().revision;
+
+    state.markAllActivityRead();
+    expect(state.snapshot().activity!.every((item) => item.read)).toBe(true);
+    expect(state.snapshot().activity!.map((item) => item.id)).toEqual(before);
+    expect(state.snapshot().revision).toBe(revision + 1);
+    state.markAllActivityRead();
     expect(state.snapshot().revision).toBe(revision + 1);
   });
 

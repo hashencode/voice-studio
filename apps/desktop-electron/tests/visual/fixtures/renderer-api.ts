@@ -117,16 +117,28 @@ export function buildVisualFixture(
     },
     aiSettings: {
       revision: 8,
-      config: {
-        providerId: "deepseek",
-        displayName: "DeepSeek",
-        modelId: "deepseek-chat",
-        endpoint: "https://api.deepseek.com",
-        endpointOrigin: "https://api.deepseek.com",
-        processingLocation: "cloudDirect",
-        requiresConsent: true,
-      },
-      secretState: "available",
+      profiles: [
+        {
+          profileId: "profile-deepseek",
+          kind: "custom",
+          configurationName: null,
+          displayName: "DeepSeek",
+          protocol: "deepseek",
+          modelId: "deepseek-chat",
+          modelSummary: "deepseek-chat",
+          endpoint: "https://api.deepseek.com",
+          endpointOrigin: "https://api.deepseek.com",
+          processingLocation: "cloudDirect",
+          requiresConsent: true,
+          capabilities: {
+            selectable: true,
+            editable: true,
+            deletable: true,
+          },
+          secretState: "available",
+        },
+      ],
+      selectedProfileId: "profile-deepseek",
       deviceSecurity: {
         kind: "device-security",
         fileVaultState: "enabled",

@@ -252,6 +252,11 @@ export class LocalModelService {
     });
   }
 
+  rootPath(): string {
+    if (!this.activeStore) throw new Error("本地模型位置不可用");
+    return this.activeStore.root;
+  }
+
   async capability(bundleId: LocalModelBundleId): Promise<
     | {
         available: true;

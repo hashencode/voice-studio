@@ -37,6 +37,12 @@ const api: Voice2TextDesktopApi = {
   async requestBootstrapAction() {
     return structuredClone(application);
   },
+  async markActivityRead() {
+    return structuredClone(application);
+  },
+  async markAllActivityRead() {
+    return structuredClone(application);
+  },
   onApplicationSnapshot() {
     return () => undefined;
   },
@@ -138,8 +144,14 @@ const api: Voice2TextDesktopApi = {
   async getMicrophoneTestSnapshot() {
     return microphoneTestFixture("running");
   },
-  async stopMicrophoneTest() {
-    return microphoneTestFixture("stopped");
+  async finishMicrophoneTest() {
+    return microphoneTestFixture("finished");
+  },
+  async cancelMicrophoneTest() {
+    return microphoneTestFixture("cancelled");
+  },
+  async openMicrophoneSettings() {
+    return { state: "opened" as const };
   },
   async getFloatingCapturePreference() {
     return { enabled: true };
@@ -177,19 +189,23 @@ const api: Voice2TextDesktopApi = {
   async changeLocalModelRoot() {
     return structuredClone(localModelSnapshot);
   },
+  async openLocalModelRoot() {},
   onLocalModelSnapshot() {
     return () => undefined;
   },
   async getAiSettings() {
     return structuredClone(fixture.aiSettings);
   },
-  async saveAiSettings() {
+  async createAiProviderProfile() {
     return structuredClone(fixture.aiSettings);
   },
-  async replaceAiProviderSecret() {
+  async updateAiProviderProfile() {
     return structuredClone(fixture.aiSettings);
   },
-  async deleteAiProviderSecret() {
+  async selectAiProviderProfile() {
+    return structuredClone(fixture.aiSettings);
+  },
+  async deleteAiProviderProfile() {
     return structuredClone(fixture.aiSettings);
   },
   async prepareAudioAi() {
@@ -209,15 +225,16 @@ const api: Voice2TextDesktopApi = {
   },
 };
 
-function microphoneTestFixture(state: "running" | "stopped") {
+function microphoneTestFixture(state: "running" | "finished" | "cancelled") {
   return {
     testId: "mic-test-123456789012",
     state,
+    ...(state === "finished" ? { reason: "no-audio-frames" as const } : {}),
     elapsedMs: 0,
-    remainingMs: 30_000,
+    normalizedRMS: 0,
     normalizedPeak: 0,
     observedFrames: 0,
-    detectedInput: false,
+    observedSound: false,
   };
 }
 

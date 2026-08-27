@@ -135,6 +135,7 @@ export const localModelIntentSchema = z
 export const changeLocalModelRootRequestSchema = z
   .object({ expectedRevision: z.number().int().nonnegative().safe() })
   .strict();
+export const openLocalModelRootRequestSchema = z.object({}).strict();
 export const localModelSnapshotRequestSchema = z.object({}).strict();
 
 export const localModelCapabilityReasonSchema = z.enum([

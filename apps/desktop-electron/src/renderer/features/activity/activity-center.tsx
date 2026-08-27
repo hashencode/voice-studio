@@ -1,4 +1,5 @@
-import { BellOff, CheckCircle2, TriangleAlert } from "lucide-react";
+import * as React from "react";
+import { CheckCircle2, MailOpen, Search, TriangleAlert } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import {
@@ -10,6 +11,21 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { EmptyState } from "@/components/ui/empty-state";
+import {
+  Item,
+  ItemActions,
+  ItemContent,
+  ItemDescription,
+  ItemMedia,
+  ItemTitle,
+} from "@/components/ui/item";
+import { SidebarInput } from "@/components/ui/sidebar";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 import type { ActivityItem } from "@shared/contracts";
 
 export type ActivityItemView = Pick<
@@ -34,51 +50,117 @@ export function ActivityContextPane({
   items,
   selectedId,
   onSelect,
+  unreadCount = 0,
+  markAllPending = false,
+  operationError = null,
+  onMarkAllRead = () => undefined,
 }: {
   items: ActivityItemView[];
   selectedId: string | null;
   onSelect: (item: ActivityItemView) => void;
+  unreadCount?: number;
+  markAllPending?: boolean;
+  operationError?: string | null;
+  onMarkAllRead?: () => void;
 }) {
-  if (items.length === 0) {
-    return (
-      <EmptyState
-        icon={BellOff}
-        title="暂无消息"
-        description="录制完成、异常和需要处理的状态会显示在这里。"
-        compact
-      />
-    );
-  }
+  const [query, setQuery] = React.useState("");
+  const normalizedQuery = query.trim().toLocaleLowerCase("zh-CN");
+  const visibleItems = normalizedQuery
+    ? items.filter((item) =>
+        item.title.toLocaleLowerCase("zh-CN").includes(normalizedQuery),
+      )
+    : items;
   return (
-    <ul className="divide-y" aria-label="消息列表" data-flat-row-list="true">
-      {items.map((item) => (
-        <li key={item.id}>
-          <button
-            type="button"
-            aria-current={selectedId === item.id ? "true" : undefined}
-            data-flat-row="true"
-            className="flex w-full items-start gap-3 px-4 py-3 text-left outline-none hover:bg-accent focus-visible:bg-accent aria-current:bg-accent"
-            onClick={() => onSelect(item)}
-          >
-            <ActivityIcon severity={item.severity} />
-            <span className="min-w-0 flex-1">
-              <span className="block truncate text-sm font-medium">
-                {item.title}
-              </span>
-              <span className="mt-1 block text-xs text-muted-foreground">
-                {formatter.format(item.createdAt)}
-              </span>
-            </span>
-            {!item.read ? (
-              <span
-                className="mt-1.5 size-2 rounded-full bg-primary"
-                aria-label="未读"
-              />
-            ) : null}
-          </button>
-        </li>
-      ))}
-    </ul>
+    <div className="flex min-h-0 flex-1 flex-col">
+      <div className="flex shrink-0 items-center gap-2 p-2">
+        <div className="relative min-w-0 flex-1">
+          <Search
+            aria-hidden="true"
+            className="pointer-events-none absolute top-2 left-2.5 size-4 text-muted-foreground"
+          />
+          <SidebarInput
+            type="search"
+            aria-label="搜索消息"
+            value={query}
+            onChange={(event) => setQuery(event.currentTarget.value)}
+            className="pl-8"
+          />
+        </div>
+        <TooltipProvider>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                type="button"
+                size="icon-sm"
+                variant="ghost"
+                aria-label="全部标记为已读"
+                aria-busy={markAllPending}
+                disabled={unreadCount === 0 || markAllPending}
+                onClick={onMarkAllRead}
+              >
+                <MailOpen aria-hidden="true" />
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent side="bottom">全部标记为已读</TooltipContent>
+          </Tooltip>
+        </TooltipProvider>
+      </div>
+      {operationError ? (
+        <p role="alert" className="border-b px-3 py-2 text-sm">
+          {operationError}
+        </p>
+      ) : null}
+      {visibleItems.length === 0 ? (
+        <EmptyState
+          title={items.length === 0 ? "暂无消息" : "没有匹配的消息"}
+          compact
+          className="min-h-0 flex-1"
+        />
+      ) : (
+        <ul
+          className="divide-y"
+          aria-label="消息列表"
+          data-flat-row-list="true"
+        >
+          {visibleItems.map((item) => (
+            <li key={item.id}>
+              <Item
+                asChild
+                size="sm"
+                className="w-full rounded-none border-0 text-left hover:bg-accent aria-current:bg-muted"
+              >
+                <button
+                  type="button"
+                  aria-current={selectedId === item.id ? "true" : undefined}
+                  data-flat-row="true"
+                  onClick={() => onSelect(item)}
+                >
+                  <ItemMedia variant="icon">
+                    <ActivityIcon severity={item.severity} />
+                  </ItemMedia>
+                  <ItemContent>
+                    <ItemTitle className="max-w-full truncate">
+                      {item.title}
+                    </ItemTitle>
+                    <ItemDescription>
+                      {formatter.format(item.createdAt)}
+                    </ItemDescription>
+                  </ItemContent>
+                  {!item.read ? (
+                    <ItemActions>
+                      <span
+                        className="size-2 rounded-full bg-primary"
+                        aria-label="未读"
+                      />
+                    </ItemActions>
+                  ) : null}
+                </button>
+              </Item>
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
   );
 }
 
@@ -90,22 +172,12 @@ export function ActivityMainWorkspace({
   onOpenDetails: (item: ActivityItemView) => void;
 }) {
   if (!item) {
-    return (
-      <EmptyState
-        icon={BellOff}
-        title="请选择消息"
-        description="选择左侧消息后，可在这里查看完整信息。"
-      />
-    );
+    return <EmptyState title="请选择消息" className="min-h-0 flex-1" />;
   }
   return (
     <section aria-label="消息详情" className="mx-auto max-w-2xl py-8">
       <ActivityIcon severity={item.severity} large />
-      <h2 className="mt-4 text-xl font-semibold">{item.title}</h2>
-      <p className="mt-2 text-sm text-muted-foreground">
-        {activityDescription(item)}
-      </p>
-      <dl className="mt-6 grid grid-cols-[auto_1fr] gap-x-4 gap-y-3 border-y py-4 text-sm">
+      <dl className="mt-4 grid grid-cols-[auto_1fr] gap-x-4 gap-y-3 border-y py-4 text-sm">
         <dt className="text-muted-foreground">时间</dt>
         <dd>{formatter.format(item.createdAt)}</dd>
         <dt className="text-muted-foreground">状态</dt>

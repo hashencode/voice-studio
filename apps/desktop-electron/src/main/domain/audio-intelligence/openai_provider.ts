@@ -39,6 +39,7 @@ export class OpenAiCompatibleProvider {
       providerId: "deepseek" | "openai-compatible";
       modelId: string;
       endpoint: string;
+      secretRef: string;
     },
     private readonly secrets: DesktopSecretStorePort,
     client?: BoundedOpenAiClient,
@@ -52,7 +53,7 @@ export class OpenAiCompatibleProvider {
   }
 
   async generate(request: AudioAiProviderRequest): Promise<AudioAiOutput> {
-    const secret = await this.secrets.read(this.config.providerId);
+    const secret = await this.secrets.read(this.config.secretRef);
     if (secret.state !== "available") {
       const code =
         secret.state === "denied"

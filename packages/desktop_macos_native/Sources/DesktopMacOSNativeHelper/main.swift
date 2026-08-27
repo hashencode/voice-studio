@@ -4,6 +4,8 @@ import NativeSecurity
 import SecureImport
 
 private let protocolIdentity = "voice2text-macos-helper/v1"
+// Advance this identity for any semantic microphone command, response, or snapshot change.
+private let microphoneTestContractIdentity = "continuous-manual/v1"
 private let encoder = JSONEncoder()
 private let decoder = JSONDecoder()
 
@@ -146,6 +148,7 @@ emit([
   "schemaVersion": 1,
   "type": "ready",
   "protocol": protocolIdentity,
+  "microphoneTestContract": microphoneTestContractIdentity,
   "transport": "inherited-stdio",
   "helperNonce": helperNonce,
   "clientNonce": handshake.clientNonce,
@@ -241,7 +244,8 @@ let captureCommands: Set<String> = [
   "capture-preflight", "capture-start", "capture-pause", "capture-resume",
   "capture-stop", "capture-snapshot", "capture-recover", "capture-discard",
   "capture-system-sleep", "capture-system-wake",
-  "microphone-test-start", "microphone-test-snapshot", "microphone-test-stop",
+  "microphone-test-start", "microphone-test-snapshot", "microphone-test-finish",
+  "microphone-test-cancel",
 ]
 let securityCommands: Set<String> = [
   "secret-read", "secret-replace", "secret-delete", "filevault-status",
@@ -400,9 +404,13 @@ while let commandData = readLine() {
       let request = try decodeRequest(MicrophoneTestControlRequest.self, from: object)
       let value = try captureController!.microphoneTestSnapshot(testId: request.testId)
       emitSession(["type": "result", "command": command, "microphoneTest": try encodedObject(value)])
-    case "microphone-test-stop":
+    case "microphone-test-finish":
       let request = try decodeRequest(MicrophoneTestControlRequest.self, from: object)
-      let value = try captureController!.stopMicrophoneTest(testId: request.testId)
+      let value = try captureController!.finishMicrophoneTest(testId: request.testId)
+      emitSession(["type": "result", "command": command, "microphoneTest": try encodedObject(value)])
+    case "microphone-test-cancel":
+      let request = try decodeRequest(MicrophoneTestControlRequest.self, from: object)
+      let value = try captureController!.cancelMicrophoneTest(testId: request.testId)
       emitSession(["type": "result", "command": command, "microphoneTest": try encodedObject(value)])
     case "secret-read":
       let request = try decodeSecurityRequest(SecretProviderRequest.self, from: object)

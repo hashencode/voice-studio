@@ -2,8 +2,14 @@ import type {
   CaptureControlCommand,
   CaptureStartCommand,
 } from "../../../shared/contracts";
-import type { MacOSNativeHelperSession } from "../../features/importing/macos_native_helper_client";
-import type { CaptureNativePort } from "./capture_native_port";
+import {
+  NativeHelperTransportError,
+  type MacOSNativeHelperSession,
+} from "../../features/importing/macos_native_helper_client";
+import {
+  MicrophoneTestNativeError,
+  type CaptureNativePort,
+} from "./capture_native_port";
 
 export class MacOSCaptureNativePort implements CaptureNativePort {
   constructor(private readonly session: MacOSNativeHelperSession) {}
@@ -56,15 +62,38 @@ export class MacOSCaptureNativePort implements CaptureNativePort {
     return this.session.captureDiscard(sessionId, idempotencyKey);
   }
 
-  startMicrophoneTest(testId: string, microphoneDeviceId?: string) {
-    return this.session.startMicrophoneTest(testId, microphoneDeviceId);
+  async startMicrophoneTest(testId: string, microphoneDeviceId?: string) {
+    return await this.microphoneCommand(() =>
+      this.session.startMicrophoneTest(testId, microphoneDeviceId),
+    );
   }
 
-  microphoneTestSnapshot(testId: string) {
-    return this.session.microphoneTestSnapshot(testId);
+  async microphoneTestSnapshot(testId: string) {
+    return await this.microphoneCommand(() =>
+      this.session.microphoneTestSnapshot(testId),
+    );
   }
 
-  stopMicrophoneTest(testId: string) {
-    return this.session.stopMicrophoneTest(testId);
+  async finishMicrophoneTest(testId: string) {
+    return await this.microphoneCommand(() =>
+      this.session.finishMicrophoneTest(testId),
+    );
+  }
+
+  async cancelMicrophoneTest(testId: string) {
+    return await this.microphoneCommand(() =>
+      this.session.cancelMicrophoneTest(testId),
+    );
+  }
+
+  private async microphoneCommand<T>(operation: () => Promise<T>): Promise<T> {
+    try {
+      return await operation();
+    } catch (error) {
+      throw new MicrophoneTestNativeError(
+        error instanceof NativeHelperTransportError ? "transport" : "response",
+        { cause: error },
+      );
+    }
   }
 }

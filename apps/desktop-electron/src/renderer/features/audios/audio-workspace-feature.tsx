@@ -12,6 +12,7 @@ import {
 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
+import { EmptyState } from "@/components/ui/empty-state";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
@@ -165,14 +166,7 @@ export function AudioWorkspaceFeature({
             onRetry={() => void loadAudios(libraryQuery)}
           />
         ) : audios?.length === 0 ? (
-          <div className="grid min-h-52 place-items-center border-y py-8 text-center">
-            <div>
-              <h2 className="text-lg font-semibold">还没有可复核的音频</h2>
-              <p className="mt-2 text-sm text-muted-foreground">
-                导入并完成本地处理后，音频会出现在这里。
-              </p>
-            </div>
-          </div>
+          <EmptyState title="还没有可复核的音频" className="border-b" />
         ) : (
           <ul
             aria-label="音频列表"
@@ -570,14 +564,7 @@ function WorkspaceView({
             </div>
           ) : null}
           {workspace.segments.length === 0 ? (
-            <div className="grid min-h-64 place-items-center border-y py-8 text-center">
-              <div>
-                <h2 className="font-semibold">转写尚未就绪</h2>
-                <p className="mt-2 text-sm text-muted-foreground">
-                  音频仍由本机保留；处理完成后可在这里复核。
-                </p>
-              </div>
-            </div>
+            <EmptyState title="转写尚未就绪" className="border-b" />
           ) : (
             <VirtualTranscript
               workspace={workspace}

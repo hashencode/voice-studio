@@ -9,8 +9,12 @@ import type { Voice2TextDesktopApi } from "../../../src/shared/contracts";
 import type { AudioAiSnapshot } from "../../../src/shared/contracts";
 
 const preview = {
+  preparationId: "123e4567-e89b-12d3-a456-426614174000",
+  expiresAtMs: 10_000,
   audioId: 4,
   generationId: 9,
+  profileId: "profile-deepseek",
+  providerDisplayName: "团队模型",
   providerId: "deepseek" as const,
   modelId: "deepseek-chat",
   audioTitle: "项目周会",
@@ -28,6 +32,7 @@ const completed: AudioAiSnapshot = {
   jobId: 41,
   audioId: 4,
   generationId: 9,
+  providerDisplayName: "团队模型",
   providerId: "deepseek" as const,
   modelId: "deepseek-chat",
   endpointOrigin: "https://api.deepseek.com",
@@ -90,6 +95,7 @@ describe("per-generation audio AI consent", () => {
     });
     expect(dialog).toHaveTextContent("2 个转写片段");
     expect(dialog).toHaveTextContent("音频标题“项目周会”");
+    expect(dialog).toHaveTextContent("团队模型 · deepseek-chat");
     expect(dialog).toHaveTextContent("https://api.deepseek.com");
     expect(
       within(dialog).getByRole("button", { name: "同意并生成草稿" }),
@@ -124,11 +130,10 @@ describe("per-generation audio AI consent", () => {
     await waitFor(() =>
       expect(desktop.generateAudioAi).toHaveBeenCalledWith(
         expect.objectContaining({
-          audioId: 4,
-          generationId: 9,
-          templateId: "default",
+          preparationId: preview.preparationId,
           consent: {
             version: 1,
+            profileId: "profile-deepseek",
             providerId: "deepseek",
             endpointOrigin: "https://api.deepseek.com",
             endpointIdentitySha256: "c".repeat(64),
@@ -138,6 +143,9 @@ describe("per-generation audio AI consent", () => {
       ),
     );
     expect(await screen.findByText("准备发布清单")).toBeVisible();
+    expect(
+      screen.getByText("团队模型 · deepseek-chat · 需要人工核对"),
+    ).toBeVisible();
 
     await user.click(
       screen.getByRole("button", { name: "重新生成云端音频草稿" }),
@@ -217,6 +225,7 @@ describe("per-generation audio AI consent", () => {
           jobId: 41,
           expectedAttempt: 1,
           consent: expect.objectContaining({
+            profileId: "profile-deepseek",
             transcriptScopeSha256: "a".repeat(64),
           }),
         }),
@@ -256,7 +265,7 @@ describe("per-generation audio AI consent", () => {
 
     await waitFor(() =>
       expect(desktop.generateAudioAi).toHaveBeenCalledWith(
-        expect.objectContaining({ audioId: 4, generationId: 9 }),
+        expect.objectContaining({ preparationId: preview.preparationId }),
       ),
     );
     expect(desktop.retryAudioAi).not.toHaveBeenCalled();

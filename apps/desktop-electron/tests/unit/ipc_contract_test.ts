@@ -2,20 +2,362 @@ import { readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 import {
+  aiProviderProfileSchema,
+  aiSettingsSnapshotSchema,
+  audioAiConsentIdentitySchema,
+  audioAiConsentPreviewSchema,
+  audioAiSnapshotSchema,
   cancelProcessingRequestSchema,
+  createAiProviderProfileRequestSchema,
+  deleteAiProviderProfileRequestSchema,
   desktopErrorSchema,
   desktopProtocolVersion,
   importAudioResponseSchema,
   ipcChannels,
+  microphoneSettingsOpenRequestSchema,
+  microphoneTestSnapshotSchema,
   operationEventSchema,
+  selectAiProviderProfileRequestSchema,
+  updateAiProviderProfileRequestSchema,
   workerHealthRequestSchema,
 } from "../../src/shared/contracts/index";
 import { createDesktopApi } from "../../src/preload/api";
 
 describe("shared IPC contracts", () => {
+  it("strictly validates custom and reserved hosted provider profiles", () => {
+    const custom = {
+      profileId: "legacy-default",
+      kind: "custom" as const,
+      configurationName: null,
+      displayName: "DeepSeek",
+      protocol: "deepseek" as const,
+      modelId: "deepseek-chat",
+      modelSummary: "deepseek-chat",
+      endpoint: "https://api.deepseek.com/v1",
+      endpointOrigin: "https://api.deepseek.com",
+      processingLocation: "cloudDirect" as const,
+      requiresConsent: true as const,
+      capabilities: {
+        selectable: true as const,
+        editable: true as const,
+        deletable: true as const,
+      },
+      secretState: "available" as const,
+    };
+    expect(aiProviderProfileSchema.parse(custom)).toEqual(custom);
+    expect(
+      aiSettingsSnapshotSchema.parse({
+        revision: 3,
+        profiles: [custom],
+        selectedProfileId: custom.profileId,
+        deviceSecurity: {
+          kind: "device-security",
+          fileVaultState: "unknown",
+          applicationLayerEncryption: "not-claimed",
+        },
+      }),
+    ).toEqual(expect.objectContaining({ selectedProfileId: "legacy-default" }));
+    expect(() =>
+      aiProviderProfileSchema.parse({ ...custom, secretRef: "deepseek" }),
+    ).toThrow();
+    expect(() =>
+      aiProviderProfileSchema.parse({ ...custom, secret: "sk-response-leak" }),
+    ).toThrow();
+
+    const hosted = {
+      profileId: "hosted-default",
+      kind: "hosted" as const,
+      displayName: "内置模型",
+      modelSummary: "会员云端模型",
+      processingLocation: "cloudHosted" as const,
+      requiresConsent: true as const,
+      capabilities: {
+        selectable: true as const,
+        editable: false as const,
+        deletable: false as const,
+      },
+    };
+    expect(aiProviderProfileSchema.parse(hosted)).toEqual(hosted);
+    expect(() =>
+      aiProviderProfileSchema.parse({
+        ...hosted,
+        modelId: "private-upstream-model",
+      }),
+    ).toThrow();
+    expect(() =>
+      aiProviderProfileSchema.parse({
+        ...hosted,
+        endpoint: "https://platform.invalid/v1",
+      }),
+    ).toThrow();
+  });
+
+  it("validates revision-checked provider profile mutations", () => {
+    const create = {
+      expectedRevision: 0,
+      configurationName: "团队模型",
+      protocol: "openai-compatible" as const,
+      modelId: "gpt-compatible",
+      endpoint: "https://ai.example.com/v1",
+      secret: "sk-create-secret",
+    };
+    expect(createAiProviderProfileRequestSchema.parse(create)).toEqual(create);
+    expect(() =>
+      createAiProviderProfileRequestSchema.parse({
+        ...create,
+        configurationName: "   ",
+      }),
+    ).toThrow();
+    expect(() =>
+      createAiProviderProfileRequestSchema.parse({
+        ...create,
+        modelId: "   ",
+      }),
+    ).toThrow();
+    expect(() =>
+      createAiProviderProfileRequestSchema.parse({
+        ...create,
+        endpoint: "not-a-url",
+      }),
+    ).toThrow();
+    expect(() =>
+      createAiProviderProfileRequestSchema.parse({
+        ...create,
+        expectedRevision: undefined,
+      }),
+    ).toThrow();
+
+    expect(
+      updateAiProviderProfileRequestSchema.parse({
+        ...create,
+        expectedRevision: 1,
+        profileId: "profile-123",
+        secret: undefined,
+      }),
+    ).toHaveProperty("secret", undefined);
+    expect(
+      updateAiProviderProfileRequestSchema.parse({
+        configurationName: create.configurationName,
+        protocol: create.protocol,
+        modelId: create.modelId,
+        endpoint: create.endpoint,
+        expectedRevision: 1,
+        profileId: "profile-123",
+      }),
+    ).not.toHaveProperty("secret");
+    expect(() =>
+      selectAiProviderProfileRequestSchema.parse({
+        profileId: "contains space",
+        expectedRevision: 1,
+      }),
+    ).toThrow();
+    expect(() =>
+      deleteAiProviderProfileRequestSchema.parse({
+        profileId: "profile-123",
+      }),
+    ).toThrow();
+  });
+
+  it("binds AI consent to the stable provider profile identity", () => {
+    const consent = {
+      version: 1 as const,
+      profileId: "profile-123",
+      providerId: "openai-compatible" as const,
+      endpointOrigin: "https://ai.example.com",
+      endpointIdentitySha256: "a".repeat(64),
+      transcriptScopeSha256: "b".repeat(64),
+    };
+    expect(audioAiConsentIdentitySchema.parse(consent)).toEqual(consent);
+    expect(() =>
+      audioAiConsentIdentitySchema.parse({
+        ...consent,
+        profileId: undefined,
+      }),
+    ).toThrow();
+  });
+
+  it("requires a bounded provider display snapshot outside consent identity", () => {
+    const identity = {
+      providerId: "openai-compatible" as const,
+      endpointOrigin: "https://ai.example.com",
+      endpointIdentitySha256: "a".repeat(64),
+      transcriptScopeSha256: "b".repeat(64),
+    };
+    const preview = {
+      preparationId: "123e4567-e89b-12d3-a456-426614174000",
+      expiresAtMs: 10_000,
+      audioId: 1,
+      generationId: 2,
+      profileId: "profile-123",
+      providerDisplayName: "团队模型",
+      ...identity,
+      modelId: "team-chat",
+      audioTitle: "周会",
+      segmentCount: 1,
+      inputStartMs: 0,
+      inputEndMs: 1_000,
+      requiresConsent: true as const,
+    };
+    expect(audioAiConsentPreviewSchema.parse(preview)).toEqual(preview);
+    expect(() =>
+      audioAiConsentPreviewSchema.parse({
+        ...preview,
+        providerDisplayName: " ",
+      }),
+    ).toThrow();
+
+    const snapshot = {
+      revision: 1,
+      jobId: 3,
+      audioId: preview.audioId,
+      generationId: preview.generationId,
+      providerDisplayName: preview.providerDisplayName,
+      ...identity,
+      modelId: preview.modelId,
+      attempt: 0,
+      state: "queued" as const,
+      errorCode: null,
+      note: null,
+    };
+    expect(audioAiSnapshotSchema.parse(snapshot)).toEqual(snapshot);
+    expect(() =>
+      audioAiSnapshotSchema.parse({
+        ...snapshot,
+        providerDisplayName: "x".repeat(129),
+      }),
+    ).toThrow();
+  });
+
+  it("validates profile requests and responses at the preload boundary", async () => {
+    const snapshot = {
+      revision: 1,
+      profiles: [
+        {
+          profileId: "profile-123",
+          kind: "custom" as const,
+          configurationName: null,
+          displayName: "团队模型",
+          protocol: "openai-compatible" as const,
+          modelId: "gpt-compatible",
+          modelSummary: "gpt-compatible",
+          endpoint: "https://ai.example.com/v1",
+          endpointOrigin: "https://ai.example.com",
+          processingLocation: "cloudDirect" as const,
+          requiresConsent: true as const,
+          capabilities: {
+            selectable: true as const,
+            editable: true as const,
+            deletable: true as const,
+          },
+          secretState: "available" as const,
+        },
+      ],
+      selectedProfileId: "profile-123",
+      deviceSecurity: {
+        kind: "device-security" as const,
+        fileVaultState: "enabled" as const,
+        applicationLayerEncryption: "not-claimed" as const,
+      },
+    };
+    const invoke = vi.fn(async () => snapshot);
+    const api = createDesktopApi({
+      invoke,
+      on: vi.fn(),
+      off: vi.fn(),
+    });
+
+    await expect(
+      api.selectAiProviderProfile({
+        profileId: "profile-123",
+        expectedRevision: 0,
+      }),
+    ).resolves.toEqual(snapshot);
+    expect(invoke).toHaveBeenLastCalledWith(
+      ipcChannels.aiProviderProfileSelect,
+      { profileId: "profile-123", expectedRevision: 0 },
+    );
+
+    invoke.mockResolvedValueOnce({
+      ...snapshot,
+      profiles: [{ ...snapshot.profiles[0], secret: "sk-response-leak" }],
+    } as unknown as typeof snapshot);
+    await expect(api.getAiSettings()).rejects.toThrow();
+  });
+
+  it("keeps continuous microphone outcomes typed without a renderer URL", () => {
+    expect(
+      microphoneTestSnapshotSchema.parse({
+        testId: "mic-test-contract-123456",
+        state: "running",
+        elapsedMs: 31_000,
+        normalizedRMS: 0.01,
+        normalizedPeak: 0.5,
+        observedFrames: 1_024,
+        observedSound: true,
+      }),
+    ).toEqual(expect.objectContaining({ state: "running", elapsedMs: 31_000 }));
+    expect(() =>
+      microphoneTestSnapshotSchema.parse({
+        testId: "mic-test-contract-123456",
+        state: "unknown",
+        elapsedMs: 30_000,
+        normalizedRMS: 0,
+        normalizedPeak: 0,
+        observedFrames: 0,
+        observedSound: false,
+      }),
+    ).toThrow();
+    expect(
+      microphoneTestSnapshotSchema.parse({
+        testId: "mic-test-contract-123456",
+        state: "failed",
+        reason: "device-unavailable",
+        diagnostic: "selected_device_inactive",
+        elapsedMs: 1_000,
+        normalizedRMS: 0,
+        normalizedPeak: 0,
+        observedFrames: 0,
+        observedSound: false,
+      }),
+    ).toEqual(
+      expect.objectContaining({ diagnostic: "selected_device_inactive" }),
+    );
+    expect(() =>
+      microphoneTestSnapshotSchema.parse({
+        testId: "mic-test-contract-123456",
+        state: "failed",
+        reason: "device-unavailable",
+        diagnostic: "CoreAudio device /private/path uid=secret",
+        elapsedMs: 1_000,
+        normalizedRMS: 0,
+        normalizedPeak: 0,
+        observedFrames: 0,
+        observedSound: false,
+      }),
+    ).toThrow();
+    expect(() =>
+      microphoneTestSnapshotSchema.parse({
+        testId: "mic-test-contract-123456",
+        state: "running",
+        diagnostic: "recovery_restart_failed",
+        elapsedMs: 1_000,
+        normalizedRMS: 0,
+        normalizedPeak: 0,
+        observedFrames: 0,
+        observedSound: false,
+      }),
+    ).toThrow();
+    expect(microphoneSettingsOpenRequestSchema.parse({})).toEqual({});
+    expect(() =>
+      microphoneSettingsOpenRequestSchema.parse({
+        url: "https://example.invalid",
+      }),
+    ).toThrow();
+  });
+
   it("stay runtime validated and independent of Electron and Node", () => {
     expect(
       workerHealthRequestSchema.parse({

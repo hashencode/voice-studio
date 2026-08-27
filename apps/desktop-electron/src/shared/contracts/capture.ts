@@ -133,20 +133,71 @@ export const captureRecoveryListRequestSchema = z.object({}).strict();
 
 export const microphoneTestStateSchema = z.enum([
   "running",
-  "stopped",
-  "timed-out",
+  "finished",
+  "failed",
+  "cancelled",
+]);
+export const microphoneTestReasonSchema = z.enum([
+  "detected",
+  "no-audio-frames",
+  "no-sound-observed",
+  "permission-denied",
+  "device-unavailable",
+  "device-open-failed",
+  "unsupported-format",
+  "native-helper-failed",
+  "snapshot-failed",
+]);
+export const microphoneTestDiagnosticSchema = z.enum([
+  "permission_denied",
+  "selected_uid_unavailable",
+  "selected_device_inactive",
+  "audio_unit_selection_failed",
+  "initial_engine_start_failed",
+  "recovery_restart_failed",
+  "unsupported_format",
 ]);
 export const microphoneTestSnapshotSchema = z
   .object({
     testId: z.string().regex(/^mic-test-[a-zA-Z0-9-]{12,120}$/),
     state: microphoneTestStateSchema,
-    elapsedMs: z.number().int().nonnegative().max(30_000),
-    remainingMs: z.number().int().nonnegative().max(30_000),
+    reason: microphoneTestReasonSchema.optional(),
+    diagnostic: microphoneTestDiagnosticSchema.optional(),
+    elapsedMs: z.number().int().nonnegative().safe(),
+    normalizedRMS: z.number().min(0).max(1),
     normalizedPeak: z.number().min(0).max(1),
     observedFrames: z.number().int().nonnegative().safe(),
-    detectedInput: z.boolean(),
+    observedSound: z.boolean(),
   })
-  .strict();
+  .strict()
+  .superRefine((snapshot, context) => {
+    const reason = snapshot.reason;
+    const valid =
+      (snapshot.state === "running" && reason === undefined) ||
+      (snapshot.state === "cancelled" && reason === undefined) ||
+      (snapshot.state === "finished" &&
+        reason !== undefined &&
+        ["detected", "no-audio-frames", "no-sound-observed"].includes(
+          reason,
+        )) ||
+      (snapshot.state === "failed" &&
+        reason !== undefined &&
+        !["detected", "no-audio-frames", "no-sound-observed"].includes(reason));
+    if (!valid) {
+      context.addIssue({
+        code: "custom",
+        message: "microphone test state and reason are inconsistent",
+        path: ["reason"],
+      });
+    }
+    if (snapshot.diagnostic !== undefined && snapshot.state !== "failed") {
+      context.addIssue({
+        code: "custom",
+        message: "microphone test diagnostic is only valid for failures",
+        path: ["diagnostic"],
+      });
+    }
+  });
 export const microphoneTestStartRequestSchema = z
   .object({
     microphoneDeviceId: z.string().min(1).max(512).optional(),
@@ -156,6 +207,10 @@ export const microphoneTestControlRequestSchema = z
   .object({
     testId: z.string().regex(/^mic-test-[a-zA-Z0-9-]{12,120}$/),
   })
+  .strict();
+export const microphoneSettingsOpenRequestSchema = z.object({}).strict();
+export const microphoneSettingsOpenResultSchema = z
+  .object({ state: z.enum(["opened", "failed"]) })
   .strict();
 
 export const desktopCaptureParitySchema = z

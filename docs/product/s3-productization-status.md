@@ -30,6 +30,26 @@ macOS 严格先行；Windows 在 macOS closure 前保持
 | 多语言/中英混说 | `DEFERRED_NOT_IMPLEMENTED` | 不在第一产品化增量中 |
 | 完整 S3 | `BLOCKED` | 不能用云端直连和纪要闭环的 PASS 覆盖说话人、PC 和多语言缺口 |
 
+## 桌面自定义云端模型增量
+
+桌面端源码已实现多个自定义 BYOK 云端模型：列表使用本地图标、全局唯一的模型 ID、
+可选配置名称和独立选择状态。删除仅位于编辑弹窗左侧；当前选中的模型不可编辑或删除，
+需先切换模型。DeepSeek 模型 ID 必须以 `deepseek-` 开头，执行时不改写用户保存的值。
+
+应用生成内部 profile ID 与独立 Keychain secret reference。未完成或可重试任务仍引用
+当前密钥时，不允许更换密钥或删除模型；失败的 Keychain 清理只记录无原始密钥的最小
+Main 进程重试条目。AI 执行使用一次性短期准备凭证，配置或转写范围变化后必须重新确认，
+已入队任务仍保留创建时的模型、endpoint 与 secret-reference identity。
+
+共享契约已预留不可编辑、不可删除的 `hosted` profile 类型，但本阶段不展示或启用
+内置平台模型。内置模型、账号认证、会员权益、配额、计费、服务端代理、平台密钥和
+服务端提示词保护均属于下一阶段，不能据此标记为已完成。自定义模型仍由桌面端直连，
+因此不承诺客户端提示词保密。
+
+设置页不再展示“隐私与安全”模块或 FileVault 条目；后端 FileVault 探测与
+`deviceSecurity` 快照仍保留，API key 继续由 macOS Keychain 保护。本次未获得视觉
+验证授权，上述状态不构成发布验收，也不改变整体 `NOT RELEASE-READY` 结论。
+
 ## 说话人门禁
 
 Paraformer 本身不返回说话人。再准入在 Xiaomi M2102J2SC

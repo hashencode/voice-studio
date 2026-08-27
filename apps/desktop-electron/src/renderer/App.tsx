@@ -1,5 +1,5 @@
 import * as React from "react";
-import { BrainCircuit, HardDrive, Settings2, ShieldCheck } from "lucide-react";
+import { Cloud, HardDrive, Settings2 } from "lucide-react";
 
 import { AppSidebar } from "@/components/app-sidebar";
 import {
@@ -13,9 +13,11 @@ import {
   SidebarProvider,
   SidebarGroup,
   SidebarGroupContent,
+  SidebarMenu,
+  SidebarMenuButton,
+  SidebarMenuItem,
   SidebarTrigger,
 } from "@/components/ui/sidebar";
-import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import {
   AudioContextPane,
@@ -30,7 +32,7 @@ import {
 } from "@/features/capture/capture-workspace";
 import {
   CompanionContextPane,
-  CompanionContextPaneHeader,
+  CompanionContextPaneFooter,
   CompanionMainWorkspace,
   type CompanionRouteController,
   useCompanionRouteController,
@@ -55,18 +57,54 @@ import {
 } from "@/features/shell/use-application-shell";
 import { AiSettingsFeature } from "@/features/settings/ai-settings-feature";
 import { LocalModelsFeature } from "@/features/settings/local-models-feature";
+import {
+  SettingsListBlock,
+  SettingsPageSection,
+} from "@/features/settings/settings-page-section";
+import {
+  isSettingsSection,
+  settingsSectionHeadingId,
+  type SettingsSection,
+} from "@/features/settings/settings-section-contract";
 import type { ApplicationSnapshot } from "@shared/contracts";
+import {
+  ModalCoordinatorProvider,
+  useModalCoordinator,
+} from "@/components/ui/modal-coordinator";
 
 const SETTINGS_SECTIONS = [
   { value: "general", label: "通用", icon: Settings2 },
   { value: "local-models", label: "本地模型", icon: HardDrive },
-  { value: "intelligence", label: "音频智能", icon: BrainCircuit },
-  { value: "privacy", label: "隐私与安全", icon: ShieldCheck },
+  { value: "cloud-models", label: "云端模型", icon: Cloud },
 ] as const;
-type SettingsSection = (typeof SETTINGS_SECTIONS)[number]["value"];
 const EMPTY_ACTIVITY_ITEMS: ActivityItemView[] = [];
 
-export default function App() {
+function scrollSettingsSectionIntoView(
+  section: SettingsSection,
+  focus = false,
+): boolean {
+  const heading = document.getElementById(settingsSectionHeadingId(section));
+  if (!heading) return false;
+  heading.scrollIntoView({
+    behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches
+      ? "auto"
+      : "smooth",
+    block: "start",
+  });
+  if (focus) heading.focus({ preventScroll: true });
+  return true;
+}
+
+export default function AppRoot() {
+  return (
+    <ModalCoordinatorProvider>
+      <App />
+    </ModalCoordinatorProvider>
+  );
+}
+
+function App() {
+  const { modalOpen, requestNavigationAfterModals } = useModalCoordinator();
   const {
     snapshot,
     loadError,
@@ -74,6 +112,7 @@ export default function App() {
     tasks,
     pendingJobActions,
     navigate,
+    navigateAuthorized,
     requestBootstrapAction,
     importAudio,
     cancelProcessing,
@@ -90,6 +129,8 @@ export default function App() {
   const paneTriggerRef = React.useRef<HTMLButtonElement>(null);
   const paneTriggerFocusPendingRef = React.useRef(false);
   const contentTitleRef = React.useRef<HTMLHeadingElement>(null);
+  const mainContentRef = React.useRef<HTMLDivElement>(null);
+  const pendingSettingsTargetRef = React.useRef<SettingsSection | null>(null);
   const captureInvokerRef = React.useRef<HTMLElement | null>(null);
   const restoreFocusFrameRef = React.useRef<number | null>(null);
   const [recordRequest, setRecordRequest] = React.useState(0);
@@ -110,6 +151,13 @@ export default function App() {
   >(null);
   const [activityError, setActivityError] =
     React.useState<ActivityItemView | null>(null);
+  const [activityOperationError, setActivityOperationError] = React.useState<
+    string | null
+  >(null);
+  const [markAllActivityPending, setMarkAllActivityPending] =
+    React.useState(false);
+  const exactReadPendingRef = React.useRef<Set<string>>(new Set());
+  const markAllReadPendingRef = React.useRef(false);
   const automaticCaptureDetailSessionId =
     snapshot?.capture && snapshot.capture.phase !== "idle"
       ? snapshot.capture.sessionId
@@ -124,28 +172,53 @@ export default function App() {
     () => activityItems.filter((item) => !item.read),
     [activityItems],
   );
+  const markActivityRead = React.useCallback(async (item: ActivityItemView) => {
+    if (item.read || exactReadPendingRef.current.has(item.id)) return;
+    exactReadPendingRef.current.add(item.id);
+    setActivityOperationError(null);
+    try {
+      await window.voice2text.markActivityRead(item.id);
+    } catch {
+      setActivityOperationError("操作失败，请重试");
+    } finally {
+      exactReadPendingRef.current.delete(item.id);
+    }
+  }, []);
+  const markAllActivityRead = React.useCallback(async () => {
+    if (markAllReadPendingRef.current) return;
+    markAllReadPendingRef.current = true;
+    setMarkAllActivityPending(true);
+    setActivityOperationError(null);
+    try {
+      await window.voice2text.markAllActivityRead();
+    } catch {
+      setActivityOperationError("操作失败，请重试");
+    } finally {
+      markAllReadPendingRef.current = false;
+      setMarkAllActivityPending(false);
+    }
+  }, []);
   const selectedActivity =
     activityItems.find((item) => item.id === selectedActivityId) ??
     activityItems[0] ??
     null;
   const navigatePrimary = React.useCallback(
     (section: RendererShellSection) => {
+      if (modalOpen) return;
       captureInvokerRef.current = null;
       setCaptureDetailOpen(false);
       setCaptureDetailSessionId(null);
       if (section === "messages") {
         setMessagesOpen(true);
-        setSelectedActivityId(activityItems[0]?.id ?? null);
-        const newestUnread = unreadActivityItems[0];
-        if (newestUnread) {
-          void window.voice2text.acknowledgeActivity?.(newestUnread.id);
-        }
+        const nextSelection = selectedActivity ?? activityItems[0] ?? null;
+        setSelectedActivityId(nextSelection?.id ?? null);
+        if (nextSelection) void markActivityRead(nextSelection);
         return;
       }
       setMessagesOpen(false);
       navigate(section);
     },
-    [activityItems, navigate, unreadActivityItems],
+    [activityItems, markActivityRead, modalOpen, navigate, selectedActivity],
   );
   const changeCaptureDetail = React.useCallback(
     (open: boolean, sessionId: string | null = null) => {
@@ -177,18 +250,38 @@ export default function App() {
   );
   const openActivityDetails = React.useCallback(
     (item: ActivityItemView) => {
-      void window.voice2text.acknowledgeActivity?.(item.id);
+      void markActivityRead(item);
       setActivityError(null);
-      changeCaptureDetail(true, item.captureSessionId);
+      const navigateToDetails = () => {
+        changeCaptureDetail(true, item.captureSessionId);
+        window.requestAnimationFrame(() => contentTitleRef.current?.focus());
+      };
+      if (modalOpen) requestNavigationAfterModals(navigateToDetails);
+      else navigateToDetails();
     },
-    [changeCaptureDetail],
+    [
+      changeCaptureDetail,
+      markActivityRead,
+      modalOpen,
+      requestNavigationAfterModals,
+    ],
   );
+  const lastAutoReadActivityIdRef = React.useRef<string | null>(null);
+  React.useEffect(() => {
+    if (current !== "messages" || !selectedActivity) {
+      lastAutoReadActivityIdRef.current = null;
+      return;
+    }
+    if (lastAutoReadActivityIdRef.current === selectedActivity.id) return;
+    lastAutoReadActivityIdRef.current = selectedActivity.id;
+    void markActivityRead(selectedActivity);
+  }, [current, markActivityRead, selectedActivity]);
   React.useEffect(
     () =>
-      window.voice2text.onCaptureDetailsRequested?.(() =>
-        changeCaptureDetail(true),
-      ),
-    [changeCaptureDetail],
+      window.voice2text.onCaptureDetailsRequested?.(() => {
+        if (!modalOpen) changeCaptureDetail(true);
+      }),
+    [changeCaptureDetail, modalOpen],
   );
   React.useEffect(
     () => () => {
@@ -241,13 +334,90 @@ export default function App() {
   });
   const persistPaneClose = pane.requestClose;
   const requestPaneClose = React.useCallback(() => {
+    if (modalOpen) return;
     paneTriggerFocusPendingRef.current = true;
     persistPaneClose();
-  }, [persistPaneClose]);
+  }, [modalOpen, persistPaneClose]);
   const requestPaneToggle = React.useCallback(() => {
+    if (modalOpen) return;
     if (pane.open) paneTriggerFocusPendingRef.current = true;
     pane.toggle();
-  }, [pane]);
+  }, [modalOpen, pane]);
+  const openPane = React.useCallback(() => {
+    if (!modalOpen) pane.openPane();
+  }, [modalOpen, pane]);
+  const navigateSettingsSection = React.useCallback(
+    (value: SettingsSection) => {
+      if (modalOpen) return;
+      setSettingsSection(value);
+      window.requestAnimationFrame(() => {
+        scrollSettingsSectionIntoView(value);
+      });
+    },
+    [modalOpen],
+  );
+  const openLocalModels = React.useCallback(() => {
+    const navigateToLocalModels = () => {
+      pendingSettingsTargetRef.current = "local-models";
+      setSettingsSection("local-models");
+      setMessagesOpen(false);
+      void navigateAuthorized("settings");
+    };
+    if (modalOpen) requestNavigationAfterModals(navigateToLocalModels);
+    else navigateToLocalModels();
+  }, [modalOpen, navigateAuthorized, requestNavigationAfterModals]);
+  React.useEffect(() => {
+    if (current !== "settings" || !pendingSettingsTargetRef.current) return;
+    const target = pendingSettingsTargetRef.current;
+    const frame = window.requestAnimationFrame(() => {
+      if (!scrollSettingsSectionIntoView(target, true)) return;
+      pendingSettingsTargetRef.current = null;
+    });
+    return () => window.cancelAnimationFrame(frame);
+  }, [current]);
+  React.useEffect(() => {
+    if (current !== "settings") return;
+    const container = mainContentRef.current;
+    if (!container) return;
+    const sections = Array.from(
+      container.querySelectorAll<HTMLElement>("[data-settings-section]"),
+    ).flatMap((element) => {
+      const section = element.dataset.settingsSection;
+      return isSettingsSection(section) ? [{ element, section }] : [];
+    });
+    if (sections.length === 0) return;
+    let frame: number | null = null;
+    const updateActiveSection = () => {
+      if (frame !== null) return;
+      frame = window.requestAnimationFrame(() => {
+        frame = null;
+        const marker = container.getBoundingClientRect().top + 32;
+        let next = sections[0]!.section;
+        for (const candidate of sections) {
+          if (candidate.element.getBoundingClientRect().top > marker) break;
+          next = candidate.section;
+        }
+        if (
+          container.scrollHeight -
+            container.scrollTop -
+            container.clientHeight <=
+          2
+        ) {
+          next = sections.at(-1)!.section;
+        }
+        setSettingsSection((currentSection) =>
+          currentSection === next ? currentSection : next,
+        );
+      });
+    };
+    container.addEventListener("scroll", updateActiveSection, {
+      passive: true,
+    });
+    return () => {
+      container.removeEventListener("scroll", updateActiveSection);
+      if (frame !== null) window.cancelAnimationFrame(frame);
+    };
+  }, [current]);
   React.useEffect(() => {
     if (pane.open || !paneTriggerFocusPendingRef.current) return;
     paneTriggerFocusPendingRef.current = false;
@@ -257,9 +427,15 @@ export default function App() {
   if (loadError) return <ShellLoadError message={loadError} />;
   if (!snapshot) return <LoadingShell />;
 
-  const contentHeaderVisible =
-    captureDetailVisible || current !== "audio" || audio.workspace !== null;
-  const standalonePaneTriggerVisible = !pane.open && !contentHeaderVisible;
+  const presentation = deriveContentPresentation({
+    captureDetailVisible,
+    current,
+    audio,
+    companion,
+    selectedActivity,
+    activityItems,
+  });
+  const standalonePaneTriggerVisible = !pane.open && !presentation.title;
 
   return (
     <SidebarProvider
@@ -289,14 +465,12 @@ export default function App() {
               className="max-[349px]:mr-[calc(var(--sidebar-width)-100vw)]"
             />
           }
-          header={
-            pane.paneSection === "companion" ? (
-              <CompanionContextPaneHeader controller={companion} />
-            ) : null
-          }
           footer={
             pane.paneSection === "audio" && audio.workspace !== null ? (
               <AudioContextPaneHeader controller={audio} />
+            ) : pane.paneSection === "companion" &&
+              companion.view.kind === "device" ? (
+              <CompanionContextPaneFooter controller={companion} />
             ) : null
           }
         >
@@ -310,16 +484,20 @@ export default function App() {
               selectedId={selectedActivity?.id ?? null}
               onSelect={(item) => {
                 setSelectedActivityId(item.id);
-                void window.voice2text.acknowledgeActivity?.(item.id);
+                void markActivityRead(item);
                 if (item.kind === "capture_failed") {
                   setActivityError(item);
                 }
               }}
+              unreadCount={unreadActivityItems.length}
+              markAllPending={markAllActivityPending}
+              operationError={activityOperationError}
+              onMarkAllRead={() => void markAllActivityRead()}
             />
           ) : (
             <SettingsContextPane
               value={settingsSection}
-              onValueChange={setSettingsSection}
+              onValueChange={navigateSettingsSection}
             />
           )}
         </ContextPaneShell>
@@ -331,8 +509,13 @@ export default function App() {
             : ""
         }`}
       >
-        {contentHeaderVisible ? (
-          <header className="sticky top-0 z-10 flex min-h-[58px] shrink-0 items-center gap-3 border-b bg-background px-4 py-2">
+        {presentation.title ? (
+          <header
+            className={cn(
+              "sticky top-0 z-10 flex h-[58px] shrink-0 items-center gap-3 bg-background px-4 py-2",
+              presentation.headerDivider && "border-b",
+            )}
+          >
             {!pane.open ? (
               <ContextPaneTrigger
                 ref={paneTriggerRef}
@@ -347,9 +530,7 @@ export default function App() {
               className="truncate text-sm font-medium"
               data-slot="content-title"
             >
-              {captureDetailVisible
-                ? "录制详情"
-                : contentTitle(current, audio, companion, settingsSection)}
+              {presentation.title}
             </h1>
           </header>
         ) : null}
@@ -364,19 +545,24 @@ export default function App() {
         ) : null}
         {snapshot.connectivity === "offline" ? <OfflineBanner /> : null}
         <div
+          ref={mainContentRef}
           id="main-content"
           data-context-pane-background="true"
-          className="flex min-h-0 flex-1 flex-col overflow-auto p-4 sm:p-6"
+          className={cn(
+            "flex min-h-0 flex-1 flex-col overflow-auto",
+            presentation.contentMode === "padded" && "p-4 sm:p-6",
+            current === "settings" && "bg-muted/20",
+            current === "settings" && standalonePaneTriggerVisible && "pt-12",
+          )}
         >
-          {!captureDetailVisible ? (
+          {!captureDetailVisible && presentation.renderContent ? (
             <ShellContent
               snapshot={snapshot}
               onBootstrapAction={requestBootstrapAction}
               operationError={operationError}
               audio={audio}
               companion={companion}
-              onOpenCompanionPane={pane.openPane}
-              settingsSection={settingsSection}
+              onOpenCompanionPane={openPane}
               current={current}
               selectedActivity={selectedActivity}
               onOpenActivityDetails={openActivityDetails}
@@ -392,8 +578,7 @@ export default function App() {
             onPreflightResolved={audio.acceptCapturePreflight}
             onDetailOpenChange={changeCaptureDetail}
             onOpenLocalModels={() => {
-              setSettingsSection("local-models");
-              navigatePrimary("settings");
+              openLocalModels();
             }}
           />
           <ActivityErrorDialog
@@ -412,8 +597,7 @@ export default function App() {
             }}
             onOpenLocalModels={() => {
               setProcessingUnavailableReason(null);
-              setSettingsSection("local-models");
-              navigatePrimary("settings");
+              openLocalModels();
             }}
           />
         </div>
@@ -465,7 +649,6 @@ function ShellContent({
   audio,
   companion,
   onOpenCompanionPane,
-  settingsSection,
   current,
   selectedActivity,
   onOpenActivityDetails,
@@ -476,7 +659,6 @@ function ShellContent({
   audio: AudioRouteController;
   companion: CompanionRouteController;
   onOpenCompanionPane: () => void;
-  settingsSection: SettingsSection;
   current: RendererShellSection;
   selectedActivity: ActivityItemView | null;
   onOpenActivityDetails: (item: ActivityItemView) => void;
@@ -540,7 +722,7 @@ function ShellContent({
       );
       break;
     case "settings":
-      section = <SettingsContent section={settingsSection} />;
+      section = <SettingsContent />;
       break;
     case "messages":
       section = (
@@ -565,42 +747,53 @@ function SettingsContextPane({
     <SidebarGroup className="p-2">
       <SidebarGroupContent>
         <nav aria-label="设置分类">
-          <ul className="space-y-1">
+          <SidebarMenu>
             {SETTINGS_SECTIONS.map((item) => {
               const Icon = item.icon;
               return (
-                <li key={item.value}>
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    aria-current={value === item.value ? "page" : undefined}
-                    className="w-full justify-start aria-current:bg-sidebar-accent"
-                    onClick={() => {
-                      onValueChange(item.value);
-                    }}
-                  >
-                    <Icon aria-hidden="true" />
-                    {item.label}
-                  </Button>
-                </li>
+                <SidebarMenuItem key={item.value}>
+                  <SidebarMenuButton asChild isActive={value === item.value}>
+                    <a
+                      href={`#${settingsSectionHeadingId(item.value)}`}
+                      aria-current={
+                        value === item.value ? "location" : undefined
+                      }
+                      onClick={(event) => {
+                        event.preventDefault();
+                        onValueChange(item.value);
+                      }}
+                    >
+                      <Icon aria-hidden="true" />
+                      {item.label}
+                    </a>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
               );
             })}
-          </ul>
+          </SidebarMenu>
         </nav>
       </SidebarGroupContent>
     </SidebarGroup>
   );
 }
 
-function SettingsContent({ section }: { section: SettingsSection }) {
-  if (section === "general") {
-    return <FloatingCapturePreferenceSetting className="border-y py-4" />;
-  }
-  if (section === "local-models") return <LocalModelsFeature />;
+const SettingsContent = React.memo(function SettingsContent() {
   return (
-    <AiSettingsFeature view={section === "privacy" ? "privacy" : "provider"} />
+    <div data-settings-page="true" className="min-h-full bg-muted/20">
+      <div className="mx-auto w-full max-w-4xl space-y-8 px-4 py-6 sm:px-6 lg:px-10">
+        <SettingsPageSection section="general" title="通用">
+          <SettingsListBlock>
+            <FloatingCapturePreferenceSetting className="p-4" />
+          </SettingsListBlock>
+        </SettingsPageSection>
+        <SettingsPageSection section="local-models" title="本地模型">
+          <LocalModelsFeature />
+        </SettingsPageSection>
+        <AiSettingsFeature settingsPage />
+      </div>
+    </div>
   );
-}
+});
 
 const ContextPaneTrigger = React.forwardRef<
   HTMLButtonElement,
@@ -626,24 +819,88 @@ const ContextPaneTrigger = React.forwardRef<
   );
 });
 
-function contentTitle(
-  section: RendererShellSection,
-  audio: AudioRouteController,
-  companion: CompanionRouteController,
-  settingsSection: SettingsSection,
-): string {
-  if (section === "audio") {
-    return audio.workspace?.summary.displayName ?? "请选择音频";
+type ContentPresentation = {
+  title: string | null;
+  contentMode: "padded" | "edge-to-edge";
+  headerDivider: boolean;
+  renderContent: boolean;
+};
+
+function deriveContentPresentation({
+  captureDetailVisible,
+  current,
+  audio,
+  companion,
+  selectedActivity,
+  activityItems,
+}: {
+  captureDetailVisible: boolean;
+  current: RendererShellSection;
+  audio: AudioRouteController;
+  companion: CompanionRouteController;
+  selectedActivity: ActivityItemView | null;
+  activityItems: ActivityItemView[];
+}): ContentPresentation {
+  if (captureDetailVisible) {
+    return {
+      title: "录制详情",
+      contentMode: "padded",
+      headerDivider: true,
+      renderContent: true,
+    };
   }
-  if (section === "settings") {
-    return SETTINGS_SECTIONS.find((item) => item.value === settingsSection)!
-      .label;
+  if (current === "audio") {
+    return {
+      title: audio.workspace?.summary.displayName ?? null,
+      contentMode: "padded",
+      headerDivider: audio.workspace !== null,
+      renderContent: true,
+    };
   }
-  if (section === "messages") return "消息";
-  if (companion.selectedPeer) return companion.selectedPeer.displayName;
-  if (companion.view.kind === "history") return "传输历史";
-  if (companion.view.kind === "pairing" || companion.peers.length === 0) {
-    return "配对手机";
+  if (current === "settings") {
+    return {
+      title: null,
+      contentMode: "edge-to-edge",
+      headerDivider: false,
+      renderContent: true,
+    };
   }
-  return "请选择设备";
+  if (current === "messages") {
+    return {
+      title: selectedActivity?.title ?? null,
+      contentMode: "padded",
+      headerDivider: selectedActivity !== null,
+      renderContent: activityItems.length > 0,
+    };
+  }
+  if (companion.view.kind === "history") {
+    return {
+      title: "传输历史",
+      contentMode: "edge-to-edge",
+      headerDivider: false,
+      renderContent: true,
+    };
+  }
+  if (companion.view.kind === "pairing") {
+    return {
+      title: "配对设备",
+      contentMode: "padded",
+      headerDivider: true,
+      renderContent: true,
+    };
+  }
+  if (companion.selectedPeer) {
+    return {
+      title: companion.selectedPeer.displayName,
+      contentMode: "padded",
+      headerDivider: true,
+      renderContent: true,
+    };
+  }
+  return {
+    title: null,
+    contentMode: "padded",
+    headerDivider: false,
+    renderContent: true,
+  };
 }

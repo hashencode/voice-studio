@@ -6,6 +6,7 @@ import { afterEach, describe, expect, it } from "vitest";
 
 import {
   AUDIO_SCHEMA_VERSION,
+  AudioStorageCompatibilityError,
   openAudioDatabase,
 } from "../../src/main/storage/audio_database";
 import { TransferRepository } from "../../src/main/storage/repositories/transfer_repository";
@@ -48,7 +49,7 @@ describe("U11 companion transfer authority", () => {
       database.close();
       database = undefined;
       expect(() => openAudioDatabase(databasePath)).toThrow(
-        "Existing database is not the fresh Audio v1 store",
+        AudioStorageCompatibilityError,
       );
     } finally {
       database?.close();

@@ -1,10 +1,16 @@
 import * as React from "react";
 import { BrainCircuit, LoaderCircle, RotateCcw } from "lucide-react";
-import { Dialog as DialogPrimitive } from "radix-ui";
 
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
+import {
+  Dialog,
+  DialogClose,
+  DialogContent,
+  DialogDescription,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import type {
   AudioAiConsentPreview,
   AudioAiSnapshot,
@@ -102,6 +108,7 @@ export function AudioAiFeature({
     if (!preview || !consentChecked || pending) return;
     const consent = {
       version: 1 as const,
+      profileId: preview.profileId,
       providerId: preview.providerId,
       endpointOrigin: preview.endpointOrigin,
       endpointIdentitySha256: preview.endpointIdentitySha256,
@@ -120,9 +127,7 @@ export function AudioAiFeature({
               consent,
             })
           : await api.generateAudioAi({
-              audioId,
-              generationId,
-              templateId: "default",
+              preparationId: preview.preparationId,
               idempotencyKey: requestIdentity("audio-ai-generate"),
               consent,
             });
@@ -265,78 +270,72 @@ function ConsentDialog({
   restoreFocus: () => void;
 }) {
   return (
-    <DialogPrimitive.Root
+    <Dialog
       open={preview !== null}
       onOpenChange={(open) => {
         if (!open && !pending) onCancel();
       }}
     >
-      <DialogPrimitive.Portal>
-        <DialogPrimitive.Overlay className="fixed inset-0 z-50 bg-black/50" />
-        <DialogPrimitive.Content
-          className="fixed top-1/2 left-1/2 z-50 max-h-[85vh] w-[min(34rem,calc(100vw-2rem))] -translate-x-1/2 -translate-y-1/2 overflow-auto rounded-xl border bg-background p-6 shadow-lg outline-none"
-          onCloseAutoFocus={(event) => {
-            event.preventDefault();
-            restoreFocus();
-          }}
-        >
-          <DialogPrimitive.Title className="text-lg font-semibold">
-            本次音频云端处理同意
-          </DialogPrimitive.Title>
-          {preview ? (
-            <>
-              <DialogPrimitive.Description className="mt-2 text-sm text-muted-foreground">
-                将音频标题“{preview.audioTitle}”以及本次音频的{" "}
-                {preview.segmentCount}{" "}
-                个转写片段、时间范围和匿名说话人状态发送给{" "}
-                {providerLabel(preview.providerId)}。
-                不会发送音频、密钥、声纹或其他音频。
-              </DialogPrimitive.Description>
-              <dl className="mt-4 grid gap-2 rounded-lg bg-muted p-3 text-sm">
-                <div>
-                  <dt className="font-medium">处理地址</dt>
-                  <dd className="break-all text-muted-foreground">
-                    {preview.endpointOrigin}
-                  </dd>
-                </div>
-                <div>
-                  <dt className="font-medium">转写范围</dt>
-                  <dd className="text-muted-foreground">
-                    {clock(preview.inputStartMs)}–{clock(preview.inputEndMs)} ·{" "}
-                    {preview.segmentCount} 个转写片段
-                  </dd>
-                </div>
-              </dl>
-              <div className="mt-4 flex items-start gap-3 rounded-lg border p-3">
-                <Checkbox
-                  id="audio-ai-consent"
-                  className="mt-0.5"
-                  checked={checked}
-                  onCheckedChange={(value) => onCheckedChange(value === true)}
-                />
-                <Label htmlFor="audio-ai-consent" className="leading-5">
-                  我同意仅针对本次音频发送音频标题与上述转写文本
-                </Label>
+      <DialogContent
+        className="max-h-[85vh] w-[min(34rem,calc(100vw-2rem))] overflow-auto rounded-xl outline-none"
+        onCloseAutoFocus={(event) => {
+          event.preventDefault();
+          restoreFocus();
+        }}
+      >
+        <DialogTitle>本次音频云端处理同意</DialogTitle>
+        {preview ? (
+          <>
+            <DialogDescription className="mt-2 text-sm text-muted-foreground">
+              将音频标题“{preview.audioTitle}”以及本次音频的{" "}
+              {preview.segmentCount} 个转写片段、时间范围和匿名说话人状态发送给{" "}
+              {preview.providerDisplayName} · {preview.modelId}。
+              不会发送音频、密钥、声纹或其他音频。
+            </DialogDescription>
+            <dl className="mt-4 grid gap-2 rounded-lg bg-muted p-3 text-sm">
+              <div>
+                <dt className="font-medium">处理地址</dt>
+                <dd className="break-all text-muted-foreground">
+                  {preview.endpointOrigin}
+                </dd>
               </div>
-              <div className="mt-6 flex justify-end gap-2">
-                <DialogPrimitive.Close asChild>
-                  <Button type="button" variant="outline" disabled={pending}>
-                    取消
-                  </Button>
-                </DialogPrimitive.Close>
-                <Button
-                  type="button"
-                  disabled={pending || !checked}
-                  onClick={onSubmit}
-                >
-                  同意并生成草稿
+              <div>
+                <dt className="font-medium">转写范围</dt>
+                <dd className="text-muted-foreground">
+                  {clock(preview.inputStartMs)}–{clock(preview.inputEndMs)} ·{" "}
+                  {preview.segmentCount} 个转写片段
+                </dd>
+              </div>
+            </dl>
+            <div className="mt-4 flex items-start gap-3 rounded-lg border p-3">
+              <Checkbox
+                id="audio-ai-consent"
+                className="mt-0.5"
+                checked={checked}
+                onCheckedChange={(value) => onCheckedChange(value === true)}
+              />
+              <Label htmlFor="audio-ai-consent" className="leading-5">
+                我同意仅针对本次音频发送音频标题与上述转写文本
+              </Label>
+            </div>
+            <div className="mt-6 flex justify-end gap-2">
+              <DialogClose asChild>
+                <Button type="button" variant="outline" disabled={pending}>
+                  取消
                 </Button>
-              </div>
-            </>
-          ) : null}
-        </DialogPrimitive.Content>
-      </DialogPrimitive.Portal>
-    </DialogPrimitive.Root>
+              </DialogClose>
+              <Button
+                type="button"
+                disabled={pending || !checked}
+                onClick={onSubmit}
+              >
+                同意并生成草稿
+              </Button>
+            </div>
+          </>
+        ) : null}
+      </DialogContent>
+    </Dialog>
   );
 }
 
@@ -345,7 +344,7 @@ function AudioAiNote({ snapshot }: { snapshot: AudioAiSnapshot }) {
   return (
     <div className="mt-4 space-y-3" aria-label="云端音频草稿">
       <p className="text-xs text-muted-foreground">
-        {providerLabel(snapshot.providerId)} · {snapshot.modelId} · 需要人工核对
+        {snapshot.providerDisplayName} · {snapshot.modelId} · 需要人工核对
       </p>
       <ul className="space-y-2">
         {snapshot.note.items.map((item) => (
@@ -374,11 +373,13 @@ function isNewerSnapshot(
   return next.revision > current.revision;
 }
 
-function providerLabel(providerId: string): string {
-  return providerId === "deepseek" ? "DeepSeek" : "OpenAI-compatible";
-}
-
 function aiErrorMessage(cause: unknown, fallback: string): string {
+  if (
+    cause instanceof Error &&
+    cause.message.includes("AI_PREPARATION_STALE")
+  ) {
+    return "模型设置已变化，请重新确认。";
+  }
   const code =
     typeof cause === "object" && cause !== null && "code" in cause
       ? String(cause.code)

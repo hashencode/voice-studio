@@ -5,13 +5,17 @@ import { addAudioWorkspaceSchema } from "./audio_schema_fragments/v5";
 import { addAudioWorkspaceIntegritySchema } from "./audio_schema_fragments/v6";
 import { addCaptureSchema } from "./audio_schema_fragments/v7";
 import { addCaptionSchema } from "./audio_schema_fragments/v8";
-import { addAudioAiSchema } from "./audio_schema_fragments/v9";
+import {
+  addAudioAiSchema,
+  addAudioAiSchemaV1,
+  addAudioAiSchemaV2,
+} from "./audio_schema_fragments/v9";
 import { addCompanionSchema } from "./audio_schema_fragments/v10";
 
-export const AUDIO_SCHEMA_VERSION = 1;
+export const AUDIO_SCHEMA_VERSION = 3;
 export const AUDIO_APPLICATION_ID = 0x56324155;
 
-export const REQUIRED_AUDIO_SCHEMA_TABLES = [
+const REQUIRED_AUDIO_BASE_TABLES = [
   "audio_items",
   "processing_jobs",
   "audio_notes",
@@ -34,7 +38,6 @@ export const REQUIRED_AUDIO_SCHEMA_TABLES = [
   "caption_formal_preparations",
   "caption_formal_attempts",
   "caption_command_receipts",
-  "ai_provider_settings",
   "ai_consents",
   "ai_jobs",
   "ai_notes",
@@ -48,8 +51,46 @@ export const REQUIRED_AUDIO_SCHEMA_TABLES = [
   "companion_command_receipts",
 ] as const;
 
-/** Builds the only supported fresh Audio schema. No historical rows are read. */
+export const REQUIRED_AUDIO_SCHEMA_TABLES_V1 = [
+  ...REQUIRED_AUDIO_BASE_TABLES,
+  "ai_provider_settings",
+] as const;
+
+export const REQUIRED_AUDIO_SCHEMA_TABLES_V2 = [
+  ...REQUIRED_AUDIO_BASE_TABLES,
+  "ai_provider_profiles",
+  "ai_provider_selection",
+] as const;
+
+export const REQUIRED_AUDIO_SCHEMA_TABLES = [
+  ...REQUIRED_AUDIO_SCHEMA_TABLES_V2,
+  "ai_secret_cleanup_queue",
+] as const;
+
+/** Builds the legacy schema used by the v1 migration and its fixtures. */
 export function createAudioSchemaV1(database: DatabaseSync): void {
+  createAudioCoreSchema(database);
+  addAudioWorkspaceSchema(database);
+  addAudioWorkspaceIntegritySchema(database);
+  addCaptureSchema(database);
+  addCaptionSchema(database);
+  addAudioAiSchemaV1(database);
+  addCompanionSchema(database);
+}
+
+/** Builds the current fresh Audio schema. No historical rows are read. */
+export function createAudioSchemaV2(database: DatabaseSync): void {
+  createAudioCoreSchema(database);
+  addAudioWorkspaceSchema(database);
+  addAudioWorkspaceIntegritySchema(database);
+  addCaptureSchema(database);
+  addCaptionSchema(database);
+  addAudioAiSchemaV2(database);
+  addCompanionSchema(database);
+}
+
+/** Builds the current fresh Audio schema. No historical rows are read. */
+export function createAudioSchemaV3(database: DatabaseSync): void {
   createAudioCoreSchema(database);
   addAudioWorkspaceSchema(database);
   addAudioWorkspaceIntegritySchema(database);

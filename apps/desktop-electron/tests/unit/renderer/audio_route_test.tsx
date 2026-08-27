@@ -67,7 +67,8 @@ it("keeps import beside search and new recording in the fixed footer", async () 
     pane.querySelector("[data-context-pane-fixed-footer]"),
   ).not.toBeInTheDocument();
   expect(importButton).toHaveAccessibleName("导入音频");
-  expect(importButton.querySelector("svg.lucide-file-up")).not.toBeNull();
+  expect(importButton).toHaveAttribute("data-variant", "ghost");
+  expect(importButton.querySelector("svg.lucide-file-input")).not.toBeNull();
   expect(importButton).not.toHaveTextContent("导入音频");
   expect(
     within(pane).queryByRole("group", { name: "录音操作" }),
@@ -84,6 +85,14 @@ it("keeps import beside search and new recording in the fixed footer", async () 
   expect(list).not.toHaveClass("border-y");
   const row = within(list).getByRole("button", { name: /打开 音频 A/ });
   expect(row).toHaveAttribute("data-flat-row", "true");
+  expect(row).toHaveAttribute("data-slot", "item");
+  expect(row.querySelector('[data-slot="item-title"]')).toHaveClass(
+    "text-base",
+    "leading-[22px]",
+  );
+  expect(row.querySelector('[data-slot="item-description"]')).toHaveClass(
+    "text-sm",
+  );
   expect(row).not.toHaveClass("rounded-lg", "border", "bg-card");
 
   await user.click(row);
@@ -307,19 +316,20 @@ it("uses the native capture lifecycle for a user-ended microphone test", async (
     testId: "mic-test-123456789012",
     state: "running" as const,
     elapsedMs: 1_000,
-    remainingMs: 29_000,
+    normalizedRMS: 0.1,
     normalizedPeak: 0.5,
     observedFrames: 10,
-    detectedInput: true,
+    observedSound: true,
   };
   const startMicrophoneTest = vi.fn(async () => running);
-  const stopMicrophoneTest = vi.fn(async () => ({
+  const finishMicrophoneTest = vi.fn(async () => ({
     ...running,
-    state: "stopped" as const,
+    state: "finished" as const,
+    reason: "detected" as const,
   }));
   render(
     <AudioRouteFeature
-      api={api({ startMicrophoneTest, stopMicrophoneTest })}
+      api={api({ startMicrophoneTest, finishMicrophoneTest })}
       tasks={[]}
       pendingJobActions={new Map()}
       writable
@@ -336,7 +346,9 @@ it("uses the native capture lifecycle for a user-ended microphone test", async (
   const instructions = await screen.findByRole("dialog", {
     name: "测试麦克风",
   });
-  expect(instructions).toHaveTextContent("最长 30 秒");
+  expect(instructions).toHaveTextContent("开始后，请对着麦克风说话。");
+  expect(instructions).not.toHaveTextContent("测试由你结束");
+  expect(instructions).not.toHaveTextContent("30 秒");
   await userEvent
     .setup()
     .click(within(instructions).getByRole("button", { name: "开始测试" }));
@@ -345,18 +357,242 @@ it("uses the native capture lifecycle for a user-ended microphone test", async (
   });
   expect(within(testingDialog).getByRole("meter")).toHaveAttribute(
     "aria-valuenow",
-    "3",
+    "50",
   );
+  expect(testingDialog).toHaveTextContent("已收到声音");
   await userEvent
     .setup()
     .click(within(testingDialog).getByRole("button", { name: "结束测试" }));
-  expect(
-    await screen.findByRole("dialog", { name: "麦克风测试完成" }),
-  ).toHaveTextContent("已检测到麦克风输入");
+  await waitFor(() =>
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument(),
+  );
+  expect(screen.queryByText("麦克风测试完成")).not.toBeInTheDocument();
   expect(startMicrophoneTest).toHaveBeenCalledWith({
     microphoneDeviceId: "mic-default",
   });
-  expect(stopMicrophoneTest).toHaveBeenCalledWith(running.testId);
+  expect(finishMicrophoneTest).toHaveBeenCalledWith(running.testId);
+});
+
+it("cancels a late microphone start exactly once after the dialog closes", async () => {
+  const pendingStart =
+    deferred<
+      Awaited<ReturnType<Voice2TextDesktopApi["startMicrophoneTest"]>>
+    >();
+  const cancelMicrophoneTest = vi.fn(async (testId: string) => ({
+    testId,
+    state: "cancelled" as const,
+    elapsedMs: 0,
+    normalizedRMS: 0,
+    normalizedPeak: 0,
+    observedFrames: 0,
+    observedSound: false,
+  }));
+  render(
+    <AudioRouteFeature
+      api={api({
+        startMicrophoneTest: vi.fn(() => pendingStart.promise),
+        cancelMicrophoneTest,
+      })}
+      tasks={[]}
+      pendingJobActions={new Map()}
+      writable
+      paneOpen
+      onRecord={vi.fn()}
+      onImport={vi.fn()}
+      onCancel={vi.fn()}
+      onRetry={vi.fn()}
+    />,
+  );
+  const user = userEvent.setup();
+  await user.click(await screen.findByRole("button", { name: "测试麦克风" }));
+  await user.click(screen.getByRole("button", { name: "开始测试" }));
+  const starting = await screen.findByRole("dialog", {
+    name: "正在测试麦克风",
+  });
+  expect(starting).toHaveTextContent("正在连接麦克风…");
+  expect(
+    within(starting).queryByRole("button", { name: "结束测试" }),
+  ).not.toBeInTheDocument();
+  await user.click(within(starting).getByRole("button", { name: "取消" }));
+  expect(screen.getByRole("button", { name: "测试麦克风" })).toBeDisabled();
+  pendingStart.resolve({
+    testId: "mic-test-late-start-123456",
+    state: "running",
+    elapsedMs: 0,
+    normalizedRMS: 0,
+    normalizedPeak: 0,
+    observedFrames: 0,
+    observedSound: false,
+  });
+  await waitFor(() =>
+    expect(cancelMicrophoneTest).toHaveBeenCalledWith(
+      "mic-test-late-start-123456",
+    ),
+  );
+  expect(cancelMicrophoneTest).toHaveBeenCalledOnce();
+  expect(screen.getByRole("button", { name: "测试麦克风" })).toBeEnabled();
+  expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+});
+
+it("cancels once and ignores a late running snapshot after closing during recovery", async () => {
+  const running = {
+    testId: "mic-test-recovery-close-123456",
+    state: "running" as const,
+    elapsedMs: 0,
+    normalizedRMS: 0,
+    normalizedPeak: 0,
+    observedFrames: 0,
+    observedSound: false,
+  };
+  const pendingRecovery = deferred<typeof running>();
+  const cancelMicrophoneTest = vi.fn(async () => ({
+    ...running,
+    state: "cancelled" as const,
+  }));
+  const getMicrophoneTestSnapshot = vi.fn(() => pendingRecovery.promise);
+  render(
+    <AudioRouteFeature
+      api={api({
+        startMicrophoneTest: vi.fn(async () => running),
+        getMicrophoneTestSnapshot,
+        cancelMicrophoneTest,
+      })}
+      tasks={[]}
+      pendingJobActions={new Map()}
+      writable
+      paneOpen
+      onRecord={vi.fn()}
+      onImport={vi.fn()}
+      onCancel={vi.fn()}
+      onRetry={vi.fn()}
+    />,
+  );
+  const user = userEvent.setup();
+  await user.click(await screen.findByRole("button", { name: "测试麦克风" }));
+  await user.click(screen.getByRole("button", { name: "开始测试" }));
+  const testing = await screen.findByRole("dialog", {
+    name: "正在测试麦克风",
+  });
+  await waitFor(() => expect(getMicrophoneTestSnapshot).toHaveBeenCalledOnce());
+  await user.click(within(testing).getByRole("button", { name: "关闭" }));
+  pendingRecovery.resolve({
+    ...running,
+    elapsedMs: 500,
+    normalizedPeak: 0.7,
+    observedFrames: 4_096,
+    observedSound: true,
+  });
+
+  await waitFor(() => expect(cancelMicrophoneTest).toHaveBeenCalledOnce());
+  expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+  expect(screen.queryByText("已收到声音")).not.toBeInTheDocument();
+});
+
+it("shows helper contract failures with one close action and no settings affordance", async () => {
+  const openMicrophoneSettings = vi.fn();
+  render(
+    <AudioRouteFeature
+      api={api({
+        startMicrophoneTest: vi.fn(async () => ({
+          testId: "mic-test-helper-mismatch-123456",
+          state: "failed" as const,
+          reason: "native-helper-failed" as const,
+          elapsedMs: 0,
+          normalizedRMS: 0,
+          normalizedPeak: 0,
+          observedFrames: 0,
+          observedSound: false,
+        })),
+        openMicrophoneSettings,
+      })}
+      tasks={[]}
+      pendingJobActions={new Map()}
+      writable
+      paneOpen
+      onRecord={vi.fn()}
+      onImport={vi.fn()}
+      onCancel={vi.fn()}
+      onRetry={vi.fn()}
+    />,
+  );
+  const user = userEvent.setup();
+  await user.click(await screen.findByRole("button", { name: "测试麦克风" }));
+  await user.click(screen.getByRole("button", { name: "开始测试" }));
+
+  const failure = await screen.findByRole("dialog", {
+    name: "麦克风测试失败",
+  });
+  expect(failure).toHaveTextContent("麦克风测试暂不可用，请重启应用。");
+  expect(
+    within(failure)
+      .getAllByRole("button")
+      .map((button) => button.getAttribute("aria-label") ?? button.textContent),
+  ).toEqual(["知道了"]);
+  expect(within(failure).getByRole("button", { name: "知道了" })).toBeVisible();
+  expect(
+    within(failure).queryByRole("button", { name: "前往麦克风设置" }),
+  ).not.toBeInTheDocument();
+  expect(openMicrophoneSettings).not.toHaveBeenCalled();
+});
+
+it("shows typed silence failure and the fixed settings fallback path", async () => {
+  const running = {
+    testId: "mic-test-silent-12345678",
+    state: "running" as const,
+    elapsedMs: 31_000,
+    normalizedRMS: 0,
+    normalizedPeak: 0,
+    observedFrames: 100,
+    observedSound: false,
+  };
+  const openMicrophoneSettings = vi.fn(async () => ({
+    state: "failed" as const,
+  }));
+  render(
+    <AudioRouteFeature
+      api={api({
+        startMicrophoneTest: vi.fn(async () => running),
+        finishMicrophoneTest: vi.fn(async () => ({
+          ...running,
+          state: "finished" as const,
+          reason: "no-sound-observed" as const,
+        })),
+        openMicrophoneSettings,
+      })}
+      tasks={[]}
+      pendingJobActions={new Map()}
+      writable
+      paneOpen
+      onRecord={vi.fn()}
+      onImport={vi.fn()}
+      onCancel={vi.fn()}
+      onRetry={vi.fn()}
+    />,
+  );
+  const user = userEvent.setup();
+  await user.click(await screen.findByRole("button", { name: "测试麦克风" }));
+  await user.click(screen.getByRole("button", { name: "开始测试" }));
+  await user.click(
+    within(
+      await screen.findByRole("dialog", { name: "正在测试麦克风" }),
+    ).getByRole("button", { name: "结束测试" }),
+  );
+  const failure = await screen.findByRole("dialog", {
+    name: "未检测到麦克风输入",
+  });
+  expect(failure).not.toHaveTextContent("31");
+  await user.click(
+    within(failure).getByRole("button", { name: "前往麦克风设置" }),
+  );
+  expect(
+    await within(failure).findByText(
+      "请手动前往：系统设置 → 隐私与安全 → 麦克风",
+    ),
+  ).toBeVisible();
+  expect(openMicrophoneSettings).toHaveBeenCalledOnce();
+  expect(
+    within(failure).getByRole("button", { name: "前往麦克风设置" }),
+  ).toBeVisible();
 });
 
 it("reports an unavailable microphone in a dialog", async () => {
@@ -404,9 +640,10 @@ it("reports an unavailable microphone in a dialog", async () => {
   const dialog = await screen.findByRole("dialog", {
     name: "麦克风测试失败",
   });
-  expect(dialog).toHaveTextContent(
-    "麦克风暂不可用，请检查系统权限或设备连接。",
-  );
+  expect(dialog).toHaveTextContent("没有麦克风权限");
+  expect(
+    within(dialog).getByRole("button", { name: "前往麦克风设置" }),
+  ).toBeVisible();
 });
 
 it("filters Audio summaries and projects every non-completed processing state", async () => {

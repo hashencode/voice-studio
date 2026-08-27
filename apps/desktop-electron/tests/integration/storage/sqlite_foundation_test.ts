@@ -14,11 +14,13 @@ import {
 import {
   AUDIO_APPLICATION_ID,
   AUDIO_SCHEMA_VERSION,
+  AudioStorageCompatibilityError,
   AudioStorageCorruptionError,
   openAudioDatabase,
   openAudioProfileDatabase,
   withTransaction,
 } from "../../../src/main/storage/audio_database";
+import { createAudioSchemaV1 } from "../../../src/main/storage/audio_schema";
 
 const temporaryRoots: string[] = [];
 
@@ -34,7 +36,7 @@ function temporaryRoot(): string {
   return root;
 }
 
-describe("Electron SQLite v1", () => {
+describe("Electron SQLite v2", () => {
   it("keeps SQLite's in-memory sentinel off disk", () => {
     const database = openAudioDatabase(":memory:");
     try {
@@ -106,7 +108,7 @@ describe("Electron SQLite v1", () => {
     }
   });
 
-  it("rejects an existing unversioned database instead of migrating it", () => {
+  it("rejects an existing unversioned or future database instead of migrating it", () => {
     const root = temporaryRoot();
     const databasePath = join(root, "audio.sqlite3");
     const versionZero = new DatabaseSync(databasePath);
@@ -118,12 +120,70 @@ describe("Electron SQLite v1", () => {
     versionZero.close();
 
     expect(() => openAudioDatabase(databasePath)).toThrow(
-      "Existing database is not the fresh Audio v1 store",
+      AudioStorageCompatibilityError,
     );
     const preserved = new DatabaseSync(databasePath);
     expect(
       preserved.prepare("SELECT value FROM migration_probe").get(),
     ).toEqual({ value: "preserved" });
+    preserved.close();
+
+    const futurePath = join(root, "future.sqlite3");
+    const future = new DatabaseSync(futurePath);
+    future.exec(`
+      PRAGMA application_id = ${AUDIO_APPLICATION_ID};
+      PRAGMA user_version = ${AUDIO_SCHEMA_VERSION + 1};
+      CREATE TABLE future_probe (value TEXT NOT NULL);
+      INSERT INTO future_probe VALUES ('preserved');
+    `);
+    future.close();
+    expect(() => openAudioDatabase(futurePath)).toThrow(
+      AudioStorageCompatibilityError,
+    );
+    const preservedFuture = new DatabaseSync(futurePath);
+    expect(preservedFuture.prepare("PRAGMA user_version").get()).toEqual({
+      user_version: AUDIO_SCHEMA_VERSION + 1,
+    });
+    preservedFuture.close();
+  });
+
+  it("rolls a failed version-1 migration back without changing legacy data or version", () => {
+    const databasePath = join(temporaryRoot(), "migration-rollback.sqlite3");
+    const legacy = new DatabaseSync(databasePath);
+    legacy.exec("PRAGMA foreign_keys = ON");
+    createAudioSchemaV1(legacy);
+    legacy.exec(`
+      CREATE TABLE ai_provider_profiles (collision TEXT NOT NULL);
+      INSERT INTO ai_provider_profiles VALUES ('preserved');
+      UPDATE ai_provider_settings SET model_id = 'legacy-model' WHERE id = 1;
+      PRAGMA application_id = ${AUDIO_APPLICATION_ID};
+      PRAGMA user_version = 1;
+    `);
+    legacy.close();
+
+    expect(() => openAudioDatabase(databasePath)).toThrow(
+      AudioStorageCorruptionError,
+    );
+
+    const preserved = new DatabaseSync(databasePath);
+    expect(preserved.prepare("PRAGMA user_version").get()).toEqual({
+      user_version: 1,
+    });
+    expect(
+      preserved
+        .prepare("SELECT model_id FROM ai_provider_settings WHERE id = 1")
+        .get(),
+    ).toEqual({ model_id: "legacy-model" });
+    expect(
+      preserved.prepare("SELECT collision FROM ai_provider_profiles").get(),
+    ).toEqual({ collision: "preserved" });
+    expect(
+      preserved
+        .prepare(
+          "SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'ai_provider_selection'",
+        )
+        .get(),
+    ).toBeUndefined();
     preserved.close();
   });
 

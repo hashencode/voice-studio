@@ -5,12 +5,14 @@ import { describe, expect, it, vi } from "vitest";
 
 import { DesktopCaptureService } from "../../src/main/domain/capture/desktop_capture_service";
 import type { CaptureNativePort } from "../../src/main/domain/capture/capture_native_port";
+import { MicrophoneTestService } from "../../src/main/domain/capture/microphone_test_service";
 import { openAudioDatabase } from "../../src/main/storage/audio_database";
 import { CaptureRepository } from "../../src/main/storage/repositories/capture_repository";
 import {
   captureSnapshotSchema,
   desktopCaptureParitySchema,
   type CaptureSnapshot,
+  type MicrophoneTestSnapshot,
 } from "../../src/shared/contracts/capture";
 
 const parity = desktopCaptureParitySchema.parse(
@@ -26,6 +28,38 @@ const parity = desktopCaptureParitySchema.parse(
 );
 
 describe("macOS capture parity flow", () => {
+  it("keeps a recoverable microphone snapshot running through the Electron service", async () => {
+    const native = nativeFixture();
+    native.microphoneTestSnapshot.mockImplementationOnce(async (testId) => ({
+      ...microphoneTestSnapshot(testId, "running"),
+      elapsedMs: 750,
+      normalizedRMS: 0.08,
+      normalizedPeak: 0.4,
+      observedFrames: 8_192,
+      observedSound: true,
+    }));
+    const service = new MicrophoneTestService(native);
+
+    const started = await service.start({
+      ownerId: 21,
+      microphoneDeviceId: "bluetooth-microphone",
+    });
+    const recovered = await service.snapshot({
+      ownerId: 21,
+      testId: started.testId,
+    });
+
+    expect(recovered).toEqual(
+      expect.objectContaining({
+        state: "running",
+        observedFrames: 8_192,
+        observedSound: true,
+      }),
+    );
+    await service.stopForOwner(21);
+    expect(native.cancelMicrophoneTest).toHaveBeenCalledOnce();
+  });
+
   it("persists idempotent controls and commits only after native finalization", async () => {
     const database = openAudioDatabase(":memory:");
     const native = nativeFixture();
@@ -403,22 +437,29 @@ function nativeFixture() {
     microphoneTestSnapshot: vi.fn(async (testId: string) =>
       microphoneTestSnapshot(testId, "running"),
     ),
-    stopMicrophoneTest: vi.fn(async (testId: string) =>
-      microphoneTestSnapshot(testId, "stopped"),
+    finishMicrophoneTest: vi.fn(async (testId: string) =>
+      microphoneTestSnapshot(testId, "finished"),
+    ),
+    cancelMicrophoneTest: vi.fn(async (testId: string) =>
+      microphoneTestSnapshot(testId, "cancelled"),
     ),
   } satisfies CaptureNativePort;
 }
 
-function microphoneTestSnapshot(testId: string, state: "running" | "stopped") {
+function microphoneTestSnapshot(
+  testId: string,
+  state: "running" | "finished" | "cancelled",
+): MicrophoneTestSnapshot {
   return {
     testId,
     state,
+    ...(state === "finished" ? { reason: "no-audio-frames" as const } : {}),
     elapsedMs: 0,
-    remainingMs: 30_000,
+    normalizedRMS: 0,
     normalizedPeak: 0,
     observedFrames: 0,
-    detectedInput: false,
-  } as const;
+    observedSound: false,
+  };
 }
 
 function snapshot(overrides: Partial<CaptureSnapshot> = {}): CaptureSnapshot {

@@ -23,6 +23,7 @@ import {
   powerMonitor,
   screen,
   session,
+  shell,
   systemPreferences,
   Tray,
 } from "electron";
@@ -69,6 +70,7 @@ import { DesktopCaptureService } from "./domain/capture/desktop_capture_service"
 import type { CaptureNativePort } from "./domain/capture/capture_native_port";
 import { MacOSCaptureNativePort } from "./domain/capture/macos_capture_native_port";
 import { MicrophoneTestService } from "./domain/capture/microphone_test_service";
+import { openMicrophoneSettings } from "./domain/capture/microphone_settings";
 import {
   activeCaptureQuitDialog,
   captureIsRunning,
@@ -124,6 +126,7 @@ import { FormalTranscriptHandoffService } from "./domain/captions/formal_transcr
 import { prepareFormalCaptureMedia } from "./domain/captions/formal_capture_media";
 import { finalizeCommittedCaptureTranscript } from "./domain/captions/capture_formal_completion";
 import { AudioAiService } from "./domain/audio-intelligence/audio_ai_service";
+import { parseRemoteAiEndpoint } from "./domain/audio-intelligence/provider_security";
 import { AiJobRepository } from "./storage/repositories/ai_job_repository";
 import { MacOSHelperSecretStore } from "./features/secrets/macos_helper_secret_store";
 import { UnavailableDesktopSecretStore } from "./features/secrets/secret_store_port";
@@ -2253,6 +2256,16 @@ function bindDesktopIpc(window: BrowserWindow): void {
       await refreshResourceModelAuthorities();
       return snapshot;
     },
+    openLocalModelRoot: async () => {
+      if (!localModelService || !modelStorageAccess) {
+        throw new Error("本地模型服务暂不可用");
+      }
+      const failure = await modelStorageAccess.withStoreAccess(
+        localModelService.activeStoreId,
+        async () => await shell.openPath(localModelService!.rootPath()),
+      );
+      if (failure) throw new Error(`无法打开本地模型位置：${failure}`);
+    },
     onLocalModelSnapshot: (listener) => {
       localModelListeners.add(listener);
       return () => localModelListeners.delete(listener);
@@ -2299,22 +2312,23 @@ function bindDesktopIpc(window: BrowserWindow): void {
       if (!audioAiService) throw new Error("audio AI settings are unavailable");
       return await audioAiService.getSettings();
     },
-    saveAiSettings: async (options) => {
+    createAiProviderProfile: async (options) => {
       if (!audioAiService) throw new Error("audio AI settings are unavailable");
-      return await audioAiService.saveSettings(options);
+      return await audioAiService.createProfile(options);
     },
-    replaceAiProviderSecret: async (options) => {
+    updateAiProviderProfile: async (options) => {
       if (!audioAiService)
         throw new Error("secure secret storage is unavailable");
-      return await audioAiService.replaceSecret(
-        options.providerId,
-        options.secret,
-      );
+      return await audioAiService.updateProfile(options);
     },
-    deleteAiProviderSecret: async (options) => {
+    selectAiProviderProfile: async (options) => {
+      if (!audioAiService) throw new Error("audio AI settings are unavailable");
+      return await audioAiService.selectProfile(options);
+    },
+    deleteAiProviderProfile: async (options) => {
       if (!audioAiService)
         throw new Error("secure secret storage is unavailable");
-      return await audioAiService.deleteSecret(options.providerId);
+      return await audioAiService.deleteProfile(options);
     },
     prepareAudioAi: async (options) => {
       if (!audioAiService) throw new Error("audio AI is unavailable");
@@ -2338,8 +2352,9 @@ function bindDesktopIpc(window: BrowserWindow): void {
     navigate: (section) => applicationState.navigate(section),
     requestBootstrapAction: async (action) =>
       await requestBootstrapAction(action),
-    acknowledgeActivity: (throughId) =>
-      applicationState.acknowledgeActivity(throughId),
+    markActivityRead: (activityId) =>
+      applicationState.markActivityRead(activityId),
+    markAllActivityRead: () => applicationState.markAllActivityRead(),
     onApplicationSnapshot: (listener) => applicationState.subscribe(listener),
     onOperationEvent: (listener) => {
       operationListeners.add(listener);
@@ -2459,12 +2474,20 @@ function bindDesktopIpc(window: BrowserWindow): void {
       }
       return await microphoneTestService.snapshot(options);
     },
-    stopMicrophoneTest: async (options) => {
+    finishMicrophoneTest: async (options) => {
       if (!microphoneTestService) {
         throw new Error("麦克风测试暂不可用");
       }
-      return await microphoneTestService.stop(options);
+      return await microphoneTestService.finish(options);
     },
+    cancelMicrophoneTest: async (options) => {
+      if (!microphoneTestService) {
+        throw new Error("麦克风测试暂不可用");
+      }
+      return await microphoneTestService.cancel(options);
+    },
+    openMicrophoneSettings: async () =>
+      await openMicrophoneSettings((uri) => shell.openExternal(uri)),
     stopMicrophoneTestForOwner: async (ownerId) => {
       await microphoneTestService?.stopForOwner(ownerId);
     },
@@ -2824,6 +2847,7 @@ async function initializeApplication(): Promise<void> {
     secretStore,
   );
   audioAiService.reconcileInterrupted();
+  void audioAiService.reconcileSecretCleanup().catch(() => undefined);
   audioAiService.subscribe(publishAudioAi);
   setupCaptureLifecycle();
   const workspaceRepository = new AudioWorkspaceRepository(
@@ -3199,11 +3223,7 @@ async function runAiBoundarySmokeIfRequested(): Promise<void> {
   try {
     settings = await audioAiService.getSettings();
     try {
-      await audioAiService.saveSettings({
-        providerId: "openai-compatible",
-        modelId: "invalid-smoke-model",
-        endpoint: "http://untrusted.example.com",
-      });
+      parseRemoteAiEndpoint("http://untrusted.example.com");
     } catch {
       invalidEndpointRejected = true;
     }
@@ -3212,6 +3232,9 @@ async function runAiBoundarySmokeIfRequested(): Promise<void> {
   }
   if (!settings)
     throw new Error("packaged AI settings snapshot is unavailable");
+  const selectedProfile = settings.profiles.find(
+    (profile) => profile.profileId === settings.selectedProfileId,
+  );
   const after = profileDatabase
     .prepare(
       `SELECT
@@ -3224,12 +3247,19 @@ async function runAiBoundarySmokeIfRequested(): Promise<void> {
     schemaVersion: 1,
     phase: "packaged-ai-local-boundary",
     transport: captureNativeSession.transport,
-    providerId: settings.config.providerId,
-    modelId: settings.config.modelId,
+    providerId:
+      selectedProfile?.kind === "custom" ? selectedProfile.protocol : null,
+    modelId:
+      selectedProfile?.kind === "custom" ? selectedProfile.modelId : null,
     endpointIdentitySha256: createHash("sha256")
-      .update(settings.config.endpoint)
+      .update(
+        selectedProfile?.kind === "custom" ? selectedProfile.endpoint : "",
+      )
       .digest("hex"),
-    secretState: settings.secretState,
+    secretState:
+      selectedProfile?.kind === "custom"
+        ? selectedProfile.secretState
+        : "missing",
     deviceSecurity: settings.deviceSecurity,
     invalidEndpointRejected,
     networkRequestCount,
@@ -3886,28 +3916,38 @@ async function runCaptureSmokeIfRequested(): Promise<void> {
       testId,
       state: "running",
       elapsedMs: 0,
-      remainingMs: 30_000,
+      normalizedRMS: 0,
       normalizedPeak: 0,
       observedFrames: 0,
-      detectedInput: false,
+      observedSound: false,
     }),
     microphoneTestSnapshot: async (testId) => ({
       testId,
       state: "running",
       elapsedMs: 0,
-      remainingMs: 30_000,
+      normalizedRMS: 0,
       normalizedPeak: 0,
       observedFrames: 0,
-      detectedInput: false,
+      observedSound: false,
     }),
-    stopMicrophoneTest: async (testId) => ({
+    finishMicrophoneTest: async (testId) => ({
       testId,
-      state: "stopped",
+      state: "finished",
+      reason: "no-audio-frames",
       elapsedMs: 0,
-      remainingMs: 30_000,
+      normalizedRMS: 0,
       normalizedPeak: 0,
       observedFrames: 0,
-      detectedInput: false,
+      observedSound: false,
+    }),
+    cancelMicrophoneTest: async (testId) => ({
+      testId,
+      state: "cancelled",
+      elapsedMs: 0,
+      normalizedRMS: 0,
+      normalizedPeak: 0,
+      observedFrames: 0,
+      observedSound: false,
     }),
   };
   captureService = new DesktopCaptureService(

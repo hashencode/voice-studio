@@ -1,13 +1,26 @@
 import * as React from "react";
-import { AlertCircle, FolderOpen, LoaderCircle, Trash2 } from "lucide-react";
+import { AlertCircle, LoaderCircle, Trash2 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
+import {
+  Item,
+  ItemActions,
+  ItemContent,
+  ItemDescription,
+  ItemSeparator,
+  ItemTitle,
+} from "@/components/ui/item";
 import { Progress } from "@/components/ui/progress";
 import type {
   LocalModelBundleSnapshot,
   LocalModelIntent,
   LocalModelSnapshot,
 } from "@shared/contracts";
+import {
+  SettingsItemGroup,
+  SettingsListBlock,
+  SettingsListSkeleton,
+} from "@/features/settings/settings-page-section";
 
 const STATE_LABELS: Record<LocalModelBundleSnapshot["state"], string> = {
   "not-installed": "未安装",
@@ -80,216 +93,188 @@ export function LocalModelsFeature() {
     [pending, snapshot],
   );
 
-  const changeRoot = React.useCallback(async () => {
-    if (!snapshot || pending) return;
-    setPending(true);
-    setError(null);
-    try {
-      setSnapshot(
-        await window.voice2text.changeLocalModelRoot({
-          expectedRevision: snapshot.revision,
-        }),
-      );
-    } catch (cause) {
-      setError(errorMessage(cause));
-    } finally {
-      setPending(false);
-    }
-  }, [pending, snapshot]);
-
   if (!snapshot) {
-    return (
-      <p role="status" className="text-sm text-muted-foreground">
-        正在读取本地模型…
-      </p>
-    );
+    if (error) {
+      return (
+        <SettingsListBlock
+          role="alert"
+          className="flex items-start gap-2 p-4 text-sm text-destructive"
+        >
+          <AlertCircle className="mt-0.5 size-4 shrink-0" aria-hidden="true" />
+          <span>{error}</span>
+        </SettingsListBlock>
+      );
+    }
+    return <SettingsListSkeleton rows={3} />;
   }
 
   const operation = snapshot.operation;
   return (
-    <section
-      aria-labelledby="local-models-heading"
-      className="mx-auto flex w-full max-w-3xl flex-col gap-6"
-    >
-      <div>
-        <h2 id="local-models-heading" className="text-lg font-semibold">
-          本地模型
-        </h2>
-        <p className="mt-1 text-sm text-muted-foreground">
-          录音和导入不依赖模型。转写与实时字幕仅在你主动使用时检查对应模型。
-        </p>
-      </div>
-
+    <section aria-label="本地模型设置" className="w-full">
       {error ? (
         <div
           role="alert"
-          className="flex items-start gap-2 border border-destructive/40 bg-destructive/5 p-3 text-sm"
+          className="mb-3 flex items-start gap-2 rounded-xl border border-destructive/40 bg-destructive/5 p-4 text-sm"
         >
           <AlertCircle className="mt-0.5 size-4 shrink-0" aria-hidden="true" />
           <span>{error}</span>
         </div>
       ) : null}
 
-      <div className="border-y py-4">
-        <div className="flex flex-wrap items-start justify-between gap-3">
-          <div className="min-w-0">
-            <h3 className="font-medium">模型位置</h3>
-            <p className="mt-1 break-all text-sm text-muted-foreground">
-              {snapshot.storage.displayPath}
-            </p>
-          </div>
-          <Button
-            type="button"
-            variant="outline"
-            disabled={!snapshot.canChangeRoot || pending}
-            onClick={() => void changeRoot()}
-          >
-            <FolderOpen aria-hidden="true" />
-            更换位置
-          </Button>
-        </div>
-        {!snapshot.canChangeRoot ? (
-          <p className="mt-2 text-xs text-muted-foreground">
-            模型操作、迁移、Worker 使用或处理任务存在时不能更换位置。
-          </p>
+      <SettingsItemGroup>
+        {operation ? (
+          <>
+            <Item role="listitem" aria-live="polite" className="rounded-none">
+              <ItemContent className="gap-3">
+                <div className="flex items-center justify-between gap-3 text-sm">
+                  <span>
+                    {operation.phase
+                      ? PHASE_LABELS[operation.phase]
+                      : (operation.message ?? "正在处理模型")}
+                  </span>
+                  {operation.totalBytes > 0 ? (
+                    <span>
+                      {formatBytes(operation.copiedBytes)} /{" "}
+                      {formatBytes(operation.totalBytes)}
+                    </span>
+                  ) : null}
+                </div>
+                {operation.totalBytes > 0 ? (
+                  <Progress
+                    className="mt-3"
+                    value={operation.copiedBytes}
+                    max={operation.totalBytes}
+                  />
+                ) : null}
+                {operation.cancelable ? (
+                  <ItemActions>
+                    {operation.kind === "download" && operation.bundleId ? (
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        disabled={pending}
+                        onClick={() =>
+                          void act({
+                            action:
+                              operation.message === "已暂停"
+                                ? "resume"
+                                : "pause",
+                            bundleId: operation.bundleId!,
+                          })
+                        }
+                      >
+                        {operation.message === "已暂停" ? "继续" : "暂停"}
+                      </Button>
+                    ) : null}
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      disabled={pending}
+                      onClick={() =>
+                        void act({
+                          action:
+                            operation.kind === "migration"
+                              ? "cancel-migration"
+                              : "cancel",
+                          ...(operation.bundleId
+                            ? { bundleId: operation.bundleId }
+                            : {}),
+                        } as Omit<LocalModelIntent, "expectedRevision">)
+                      }
+                    >
+                      取消
+                    </Button>
+                  </ItemActions>
+                ) : operation.kind === "cleanup" ? (
+                  <Button
+                    className="mt-3"
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    disabled={pending}
+                    onClick={() => void act({ action: "retry-cleanup" })}
+                  >
+                    重试清理
+                  </Button>
+                ) : null}
+              </ItemContent>
+            </Item>
+            <ItemSeparator />
+          </>
         ) : null}
-      </div>
 
-      {operation ? (
-        <div role="status" aria-live="polite" className="border p-4">
-          <div className="flex items-center justify-between gap-3 text-sm">
-            <span>
-              {operation.phase
-                ? PHASE_LABELS[operation.phase]
-                : (operation.message ?? "正在处理模型")}
-            </span>
-            {operation.totalBytes > 0 ? (
-              <span>
-                {formatBytes(operation.copiedBytes)} /{" "}
-                {formatBytes(operation.totalBytes)}
-              </span>
-            ) : null}
-          </div>
-          {operation.totalBytes > 0 ? (
-            <Progress
-              className="mt-3"
-              value={operation.copiedBytes}
-              max={operation.totalBytes}
-            />
-          ) : null}
-          {operation.cancelable ? (
-            <div className="mt-3 flex gap-2">
-              {operation.kind === "download" && operation.bundleId ? (
-                <Button
-                  type="button"
-                  variant="outline"
-                  disabled={pending}
-                  onClick={() =>
-                    void act({
-                      action:
-                        operation.message === "已暂停" ? "resume" : "pause",
-                      bundleId: operation.bundleId!,
-                    })
-                  }
-                >
-                  {operation.message === "已暂停" ? "继续" : "暂停"}
-                </Button>
-              ) : null}
-              <Button
-                type="button"
-                variant="outline"
-                disabled={pending}
-                onClick={() =>
-                  void act({
-                    action:
-                      operation.kind === "migration"
-                        ? "cancel-migration"
-                        : "cancel",
-                    ...(operation.bundleId
-                      ? { bundleId: operation.bundleId }
-                      : {}),
-                  } as Omit<LocalModelIntent, "expectedRevision">)
-                }
-              >
-                取消
-              </Button>
-            </div>
-          ) : operation.kind === "cleanup" ? (
-            <Button
-              className="mt-3"
-              type="button"
-              variant="outline"
-              disabled={pending}
-              onClick={() => void act({ action: "retry-cleanup" })}
-            >
-              重试清理
-            </Button>
-          ) : null}
-        </div>
-      ) : null}
-
-      <div className="divide-y border-y">
         <ModelRow
           name="Worker Runtime"
           state={snapshot.runtime.state === "ready" ? "正常" : "已损坏"}
           detail={snapshot.runtime.message}
         />
         {snapshot.bundles.map((bundle) => (
-          <ModelRow
-            key={bundle.id}
-            name={bundle.displayName}
-            state={STATE_LABELS[bundle.state]}
-            detail={
-              bundle.message ??
-              (bundle.version
-                ? `版本 ${bundle.version}`
-                : bundle.distributionEligible
-                  ? "可下载安装"
-                  : "正式下载尚未开放")
-            }
-            action={
-              bundle.state === "corrupt" && bundle.distributionEligible ? (
-                <Button
-                  type="button"
-                  variant="outline"
-                  disabled={pending || operation !== null}
-                  onClick={() =>
-                    void act({ action: "redownload", bundleId: bundle.id })
-                  }
-                >
-                  <Trash2 aria-hidden="true" />
-                  删除并重新下载
-                </Button>
-              ) : bundle.state === "installed" || bundle.state === "corrupt" ? (
-                <Button
-                  type="button"
-                  variant="outline"
-                  disabled={pending || operation !== null}
-                  onClick={() =>
-                    void act({ action: "delete", bundleId: bundle.id })
-                  }
-                >
-                  <Trash2 aria-hidden="true" />
-                  删除
-                </Button>
-              ) : bundle.distributionEligible ? (
-                <Button
-                  type="button"
-                  disabled={pending || operation !== null}
-                  onClick={() =>
-                    void act({ action: "download", bundleId: bundle.id })
-                  }
-                >
-                  {pending ? (
-                    <LoaderCircle className="animate-spin" aria-hidden="true" />
-                  ) : null}
-                  下载
-                </Button>
-              ) : null
-            }
-          />
+          <React.Fragment key={bundle.id}>
+            <ItemSeparator />
+            <ModelRow
+              name={bundle.displayName}
+              state={STATE_LABELS[bundle.state]}
+              detail={
+                bundle.message ??
+                (bundle.version
+                  ? `版本 ${bundle.version}`
+                  : bundle.distributionEligible
+                    ? "可下载安装"
+                    : "正式下载尚未开放")
+              }
+              action={
+                bundle.state === "corrupt" && bundle.distributionEligible ? (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    disabled={pending || operation !== null}
+                    onClick={() =>
+                      void act({ action: "redownload", bundleId: bundle.id })
+                    }
+                  >
+                    <Trash2 aria-hidden="true" />
+                    删除并重新下载
+                  </Button>
+                ) : bundle.state === "installed" ||
+                  bundle.state === "corrupt" ? (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    disabled={pending || operation !== null}
+                    onClick={() =>
+                      void act({ action: "delete", bundleId: bundle.id })
+                    }
+                  >
+                    <Trash2 aria-hidden="true" />
+                    删除
+                  </Button>
+                ) : bundle.distributionEligible ? (
+                  <Button
+                    type="button"
+                    size="sm"
+                    disabled={pending || operation !== null}
+                    onClick={() =>
+                      void act({ action: "download", bundleId: bundle.id })
+                    }
+                  >
+                    {pending ? (
+                      <LoaderCircle
+                        className="animate-spin"
+                        aria-hidden="true"
+                      />
+                    ) : null}
+                    下载
+                  </Button>
+                ) : null
+              }
+            />
+          </React.Fragment>
         ))}
-      </div>
+      </SettingsItemGroup>
     </section>
   );
 }
@@ -306,16 +291,16 @@ function ModelRow({
   action?: React.ReactNode;
 }) {
   return (
-    <div className="flex flex-wrap items-center justify-between gap-4 py-4">
-      <div>
-        <div className="flex flex-wrap items-baseline gap-2">
-          <h3 className="font-medium">{name}</h3>
-          <span className="text-xs text-muted-foreground">{state}</span>
-        </div>
-        <p className="mt-1 text-sm text-muted-foreground">{detail}</p>
-      </div>
-      {action}
-    </div>
+    <Item role="listitem" className="rounded-none">
+      <ItemContent>
+        <ItemTitle>{name}</ItemTitle>
+        <ItemDescription>{detail}</ItemDescription>
+      </ItemContent>
+      <ItemActions>
+        <span className="text-sm text-muted-foreground">{state}</span>
+        {action}
+      </ItemActions>
+    </Item>
   );
 }
 

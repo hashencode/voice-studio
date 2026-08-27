@@ -6,11 +6,16 @@ import {
   LoaderCircle,
   RadioTower,
   RotateCcw,
-  Smartphone,
 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { EmptyState } from "@/components/ui/empty-state";
+import {
+  Item,
+  ItemContent,
+  ItemDescription,
+  ItemTitle,
+} from "@/components/ui/item";
 import { Progress } from "@/components/ui/progress";
 import { SidebarGroup, SidebarGroupContent } from "@/components/ui/sidebar";
 import type {
@@ -218,7 +223,6 @@ export function CompanionContextPane({
       <SidebarGroupContent className="flex h-full flex-col">
         {controller.peers.length === 0 ? (
           <EmptyState
-            icon={Smartphone}
             title="没有已信任设备"
             compact
             className="min-h-0 flex-1"
@@ -231,22 +235,29 @@ export function CompanionContextPane({
           >
             {controller.peers.map((peer) => (
               <li key={peer.deviceId}>
-                <button
-                  type="button"
-                  data-flat-row="true"
-                  className="w-full px-3 py-3 text-left outline-none hover:bg-sidebar-accent focus-visible:ring-2 focus-visible:ring-sidebar-ring aria-pressed:bg-sidebar-accent"
-                  aria-pressed={
-                    controller.selectedPeer?.deviceId === peer.deviceId
-                  }
-                  onClick={() => controller.selectDevice(peer.deviceId)}
+                <Item
+                  asChild
+                  size="sm"
+                  className="w-full rounded-none border-0 px-3 text-left hover:bg-sidebar-accent aria-pressed:bg-muted"
                 >
-                  <span className="block font-medium">{peer.displayName}</span>
-                  <span className="mt-1 block text-xs text-muted-foreground">
-                    {peer.trustState === "credential-missing"
-                      ? "凭据缺失 · 需要重新配对"
-                      : "已信任 · 在线状态未知"}
-                  </span>
-                </button>
+                  <button
+                    type="button"
+                    data-flat-row="true"
+                    aria-pressed={
+                      controller.selectedPeer?.deviceId === peer.deviceId
+                    }
+                    onClick={() => controller.selectDevice(peer.deviceId)}
+                  >
+                    <ItemContent>
+                      <ItemTitle>{peer.displayName}</ItemTitle>
+                      <ItemDescription>
+                        {peer.trustState === "credential-missing"
+                          ? "凭据缺失 · 需要重新配对"
+                          : "已信任 · 在线状态未知"}
+                      </ItemDescription>
+                    </ItemContent>
+                  </button>
+                </Item>
               </li>
             ))}
           </ul>
@@ -256,7 +267,7 @@ export function CompanionContextPane({
   );
 }
 
-export function CompanionContextPaneHeader({
+export function CompanionContextPaneFooter({
   controller,
 }: {
   controller: CompanionRouteController;
@@ -264,13 +275,11 @@ export function CompanionContextPaneHeader({
   return (
     <Button
       type="button"
-      size="sm"
-      variant="outline"
       className="w-full"
-      disabled={controller.loading || !controller.snapshot}
+      disabled={controller.pendingAction !== null}
       onClick={controller.showPairing}
     >
-      添加或配对设备
+      配对设备
     </Button>
   );
 }
@@ -302,8 +311,7 @@ export function CompanionMainWorkspace({
         <div role="alert">无法读取手机接收状态</div>
       ) : controller.view.kind === "history" ? (
         <HistoryWorkspace controller={controller} />
-      ) : controller.view.kind === "pairing" ||
-        controller.peers.length === 0 ? (
+      ) : controller.view.kind === "pairing" ? (
         <PairingWorkspace controller={controller} />
       ) : controller.selectedPeer ? (
         <DeviceWorkspace
@@ -311,22 +319,7 @@ export function CompanionMainWorkspace({
           peer={controller.selectedPeer}
         />
       ) : (
-        <section className="grid min-h-72 place-items-center border-y py-6 text-center">
-          <div>
-            <Smartphone className="mx-auto size-8" aria-hidden="true" />
-            <p className="mt-3 text-sm text-muted-foreground">
-              多个已信任设备是正常状态；选择仅切换管理视图。
-            </p>
-            <Button
-              type="button"
-              variant="outline"
-              className="mt-4"
-              onClick={onOpenPane}
-            >
-              打开设备列表
-            </Button>
-          </div>
-        </section>
+        <ReadinessWorkspace controller={controller} onOpenPane={onOpenPane} />
       )}
     </section>
   );
@@ -412,6 +405,56 @@ function PairingWorkspace({
   );
 }
 
+function ReadinessWorkspace({
+  controller,
+  onOpenPane,
+}: {
+  controller: CompanionRouteController;
+  onOpenPane: () => void;
+}) {
+  const snapshot = controller.snapshot;
+  if (!snapshot) return null;
+  const pending = controller.pendingAction !== null;
+  return (
+    <section className="space-y-4">
+      <ReceiverStatus snapshot={snapshot} />
+      {snapshot.optIn ? (
+        <PairingPanel
+          snapshot={snapshot}
+          pending={pending}
+          onCreateInvite={controller.createInvite}
+        />
+      ) : (
+        <section className="border-y py-5">
+          <h2 className="font-semibold">手机接收当前关闭</h2>
+          <p className="mt-1 text-sm text-muted-foreground">
+            只有启用后才会开始局域网广播、请求系统权限或接受手机连接；已有
+            durable receipt 与历史不会被删除。
+          </p>
+          <Button
+            type="button"
+            className="mt-4"
+            disabled={pending}
+            onClick={controller.setOptIn}
+          >
+            启用手机接收
+          </Button>
+        </section>
+      )}
+      {controller.peers.length > 0 ? (
+        <Button type="button" variant="outline" onClick={onOpenPane}>
+          打开设备列表
+        </Button>
+      ) : null}
+      {snapshot.transfers.length > 0 ? (
+        <Button type="button" variant="ghost" onClick={controller.showHistory}>
+          查看传输历史
+        </Button>
+      ) : null}
+    </section>
+  );
+}
+
 function DeviceWorkspace({
   controller,
   peer,
@@ -465,12 +508,7 @@ function DeviceWorkspace({
           title="此设备的传输"
         />
       ) : (
-        <section className="border-y py-5">
-          <h2 className="font-semibold">此设备的传输</h2>
-          <p className="mt-2 text-sm text-muted-foreground">
-            暂无传输记录。发送端必须保留原件，直到本机返回 durable receipt。
-          </p>
-        </section>
+        <EmptyState title="暂无传输记录" compact className="border-b" />
       )}
     </div>
   );
@@ -502,7 +540,7 @@ function HistoryWorkspace({
         pendingAction={controller.pendingAction}
         onCancel={controller.cancel}
         onRetry={controller.retry}
-        title="全部传输记录"
+        title={null}
       />
     </div>
   );
@@ -516,9 +554,7 @@ function reconcileView(current: CompanionView, peers: Peer[]): CompanionView {
   ) {
     return current;
   }
-  if (peers.length === 1)
-    return { kind: "device", deviceId: peers[0]!.deviceId };
-  return peers.length === 0 ? { kind: "pairing" } : { kind: "choose" };
+  return { kind: "choose" };
 }
 
 function ReceiverStatus({ snapshot }: { snapshot: CompanionSnapshot }) {
@@ -753,23 +789,21 @@ function TransfersPanel({
   pendingAction: string | null;
   onCancel: (transfer: Transfer) => void;
   onRetry: (transfer: Transfer) => void;
-  title?: string;
+  title?: string | null;
 }) {
   return (
-    <section aria-labelledby="transfers-title" className="space-y-3">
-      <div>
+    <section
+      aria-label={title ? undefined : "传输记录"}
+      aria-labelledby={title ? "transfers-title" : undefined}
+      className="space-y-3"
+    >
+      {title ? (
         <h2 id="transfers-title" className="text-lg font-semibold">
           {title}
         </h2>
-        <p className="mt-1 text-sm text-muted-foreground">
-          重启后从 durable checkpoint
-          恢复；只重收缺失且尚未验证的分块，不重复创建音频。
-        </p>
-      </div>
+      ) : null}
       {transfers.length === 0 ? (
-        <div className="border-y py-5 text-sm text-muted-foreground">
-          暂无手机传输。发送端会一直保留原件，直到本机返回 durable receipt。
-        </div>
+        <EmptyState title="暂无手机传输" compact className="border-b" />
       ) : (
         <ul className="space-y-3">
           {transfers.map((transfer) => (

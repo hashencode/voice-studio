@@ -30,10 +30,14 @@ import type {
 } from "./captions";
 import type {
   AiSettingsSnapshot,
+  CreateAiProviderProfileRequest,
+  DeleteAiProviderProfileRequest,
   GenerateAudioAiRequest,
+  SelectAiProviderProfileRequest,
   AudioAiConsentPreview,
   AudioAiSnapshot,
   RetryAudioAiRequest,
+  UpdateAiProviderProfileRequest,
 } from "./audio_ai";
 import type {
   CompanionOptInRequest,
@@ -54,7 +58,9 @@ export const ipcChannels = {
   applicationSnapshot: "desktop.application.snapshot.v1",
   applicationNavigate: "desktop.application.navigate.v1",
   applicationBootstrapAction: "desktop.application.bootstrap-action.v1",
-  applicationActivityAcknowledge: "desktop.application.activity-acknowledge.v1",
+  applicationActivityMarkRead: "desktop.application.activity.mark-read.v1",
+  applicationActivityMarkAllRead:
+    "desktop.application.activity.mark-all-read.v1",
   applicationSnapshotEvent: "desktop.application.snapshot-event.v1",
   captureDetailsRequestedEvent: "desktop.capture.details-requested-event.v1",
   workerHealth: "desktop.worker.health.v1",
@@ -82,7 +88,9 @@ export const ipcChannels = {
   captureRecoveryAction: "desktop.capture.recovery-action.v1",
   microphoneTestStart: "desktop.capture.microphone-test.start.v1",
   microphoneTestSnapshot: "desktop.capture.microphone-test.snapshot.v1",
-  microphoneTestStop: "desktop.capture.microphone-test.stop.v1",
+  microphoneTestFinish: "desktop.capture.microphone-test.finish.v1",
+  microphoneTestCancel: "desktop.capture.microphone-test.cancel.v1",
+  microphoneSettingsOpen: "desktop.capture.microphone-settings.open.v1",
   floatingCaptureSnapshotGet: "desktop.floating-capture.snapshot.get.v1",
   floatingCaptureControl: "desktop.floating-capture.control.v1",
   floatingCaptureWindowAction: "desktop.floating-capture.window-action.v1",
@@ -92,10 +100,11 @@ export const ipcChannels = {
   captionSnapshotGet: "desktop.captions.snapshot.get.v1",
   captionFormalRetry: "desktop.captions.formal.retry.v1",
   captionSnapshotEvent: "desktop.captions.snapshot.v1",
-  aiSettingsGet: "desktop.ai.settings.get.v1",
-  aiSettingsSave: "desktop.ai.settings.save.v1",
-  aiSecretReplace: "desktop.ai.secret.replace.v1",
-  aiSecretDelete: "desktop.ai.secret.delete.v1",
+  aiSettingsGet: "desktop.ai.settings.get.v2",
+  aiProviderProfileCreate: "desktop.ai.provider-profile.create.v1",
+  aiProviderProfileUpdate: "desktop.ai.provider-profile.update.v1",
+  aiProviderProfileSelect: "desktop.ai.provider-profile.select.v1",
+  aiProviderProfileDelete: "desktop.ai.provider-profile.delete.v1",
   audioAiPrepare: "desktop.ai.audio.prepare.v2",
   audioAiSnapshotGet: "desktop.ai.audio.snapshot.get.v2",
   audioAiGenerate: "desktop.ai.audio.generate.v2",
@@ -111,6 +120,7 @@ export const ipcChannels = {
   localModelsSnapshotGet: "desktop.local-models.snapshot.get.v1",
   localModelsIntent: "desktop.local-models.intent.v1",
   localModelsChangeRoot: "desktop.local-models.change-root.v1",
+  localModelsOpenRoot: "desktop.local-models.open-root.v1",
   localModelsSnapshotEvent: "desktop.local-models.snapshot.v1",
 } as const;
 
@@ -264,22 +274,23 @@ export interface Voice2TextDesktopApi {
   changeLocalModelRoot(options: {
     expectedRevision: number;
   }): Promise<LocalModelSnapshot>;
+  openLocalModelRoot(): Promise<void>;
   onLocalModelSnapshot(
     listener: (snapshot: LocalModelSnapshot) => void,
   ): () => void;
   getAiSettings(): Promise<AiSettingsSnapshot>;
-  saveAiSettings(options: {
-    providerId: "deepseek" | "openai-compatible";
-    modelId: string;
-    endpoint: string;
-  }): Promise<AiSettingsSnapshot>;
-  replaceAiProviderSecret(options: {
-    providerId: "deepseek" | "openai-compatible";
-    secret: string;
-  }): Promise<AiSettingsSnapshot>;
-  deleteAiProviderSecret(options: {
-    providerId: "deepseek" | "openai-compatible";
-  }): Promise<AiSettingsSnapshot>;
+  createAiProviderProfile(
+    options: CreateAiProviderProfileRequest,
+  ): Promise<AiSettingsSnapshot>;
+  updateAiProviderProfile(
+    options: UpdateAiProviderProfileRequest,
+  ): Promise<AiSettingsSnapshot>;
+  selectAiProviderProfile(
+    options: SelectAiProviderProfileRequest,
+  ): Promise<AiSettingsSnapshot>;
+  deleteAiProviderProfile(
+    options: DeleteAiProviderProfileRequest,
+  ): Promise<AiSettingsSnapshot>;
   prepareAudioAi(options: {
     audioId: number;
     generationId: number;
@@ -300,9 +311,12 @@ export interface Voice2TextDesktopApi {
   requestBootstrapAction(
     action: import("./application_state").BootstrapAction,
   ): Promise<import("./application_state").ApplicationSnapshot>;
-  acknowledgeActivity?(
-    throughId: string,
+  markActivityRead(
+    activityId: string,
   ): Promise<import("./application_state").ApplicationSnapshot>;
+  markAllActivityRead(): Promise<
+    import("./application_state").ApplicationSnapshot
+  >;
   onApplicationSnapshot(
     listener: (
       snapshot: import("./application_state").ApplicationSnapshot,
@@ -404,7 +418,9 @@ export interface Voice2TextDesktopApi {
     microphoneDeviceId?: string;
   }): Promise<MicrophoneTestSnapshot>;
   getMicrophoneTestSnapshot(testId: string): Promise<MicrophoneTestSnapshot>;
-  stopMicrophoneTest(testId: string): Promise<MicrophoneTestSnapshot>;
+  finishMicrophoneTest(testId: string): Promise<MicrophoneTestSnapshot>;
+  cancelMicrophoneTest(testId: string): Promise<MicrophoneTestSnapshot>;
+  openMicrophoneSettings(): Promise<{ state: "opened" | "failed" }>;
   getFloatingCapturePreference?(): Promise<FloatingCapturePreference>;
   setFloatingCapturePreference?(
     enabled: boolean,

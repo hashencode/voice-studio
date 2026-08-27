@@ -13,7 +13,12 @@ import { join } from "node:path";
 
 import { afterEach, describe, expect, it } from "vitest";
 
-import { MacOSNativeHelperClient } from "../../src/main/features/importing/macos_native_helper_client";
+import {
+  MacOSNativeHelperClient,
+  NativeHelperCommandError,
+  NativeHelperResponseError,
+  NativeHelperTransportError,
+} from "../../src/main/features/importing/macos_native_helper_client";
 import {
   secureImportLimits,
   secureImportRequestSchema,
@@ -52,6 +57,52 @@ describe.skipIf(process.platform !== "darwin")(
       15_000,
     );
 
+    it.each([
+      "missing-microphone-contract",
+      "wrong-microphone-contract",
+    ] as const)(
+      "rejects and terminates a helper with %s before a microphone command",
+      async (mode) => {
+        const fixture = fakeHelper(mode);
+
+        await expect(
+          new MacOSNativeHelperClient(fixture.executable).openSession({
+            exactSourcePaths: [],
+            destinationRoots: [],
+          }),
+        ).rejects.toThrow(/handshake/i);
+
+        expect(
+          processExists(Number(readFileSync(fixture.pidPath, "utf8"))),
+        ).toBe(false);
+        expect(() => readFileSync(fixture.commandPath, "utf8")).toThrow();
+      },
+    );
+
+    it("accepts current start, snapshot, finish, and cancel response shapes", async () => {
+      const fixture = fakeHelper("microphone-contract");
+      const session = await new MacOSNativeHelperClient(
+        fixture.executable,
+      ).openSession({ exactSourcePaths: [], destinationRoots: [] });
+
+      try {
+        await expect(
+          session.startMicrophoneTest("mic-test-contract-123456"),
+        ).resolves.toMatchObject({ state: "running" });
+        await expect(
+          session.microphoneTestSnapshot("mic-test-contract-123456"),
+        ).resolves.toMatchObject({ state: "running" });
+        await expect(
+          session.finishMicrophoneTest("mic-test-contract-123456"),
+        ).resolves.toMatchObject({ state: "finished", reason: "detected" });
+        await expect(
+          session.cancelMicrophoneTest("mic-test-contract-123456"),
+        ).resolves.toMatchObject({ state: "cancelled" });
+      } finally {
+        await session.close();
+      }
+    });
+
     it.each(["forged-result", "forged-error"] as const)(
       "rejects a %s frame that does not echo the session identity",
       async (mode) => {
@@ -61,7 +112,7 @@ describe.skipIf(process.platform !== "darwin")(
         ).openSession({ exactSourcePaths: [], destinationRoots: [] });
         await expect(
           session.invokeRaw({ command: "cleanup-import-temporary" }),
-        ).rejects.toThrow(/session identity/i);
+        ).rejects.toBeInstanceOf(NativeHelperResponseError);
         await session.close();
       },
     );
@@ -74,7 +125,7 @@ describe.skipIf(process.platform !== "darwin")(
 
       await expect(
         session.invokeRaw({ command: "no-response" }),
-      ).rejects.toThrow(/timed out/i);
+      ).rejects.toBeInstanceOf(NativeHelperTransportError);
       expect(processExists(Number(readFileSync(fixture.pidPath, "utf8")))).toBe(
         false,
       );
@@ -148,8 +199,8 @@ describe.skipIf(process.platform !== "darwin")(
         nativeHelperPath(),
       ).openSession({ exactSourcePaths: [], destinationRoots: [] });
       try {
-        await expect(session.captureRecover()).rejects.toThrow(
-          /HELPER_CAPABILITY_DENIED/,
+        await expect(session.captureRecover()).rejects.toBeInstanceOf(
+          NativeHelperCommandError,
         );
       } finally {
         await session.close();
@@ -288,22 +339,56 @@ function fakeHelper(
     | "handshake-timeout"
     | "forged-result"
     | "forged-error"
-    | "invoke-timeout",
-): { executable: string; pidPath: string } {
+    | "invoke-timeout"
+    | "missing-microphone-contract"
+    | "wrong-microphone-contract"
+    | "microphone-contract",
+): { executable: string; pidPath: string; commandPath: string } {
   const root = mkdtempSync(
     join(realpathSync(tmpdir()), "voice2text-helper-client-"),
   );
   roots.push(root);
   const executable = join(root, "fake-helper.sh");
   const pidPath = join(root, "helper.pid");
+  const commandPath = join(root, "microphone-command");
   const helperNonce = "a".repeat(64);
   const sessionSetup = `
 printf '%s\\n' '{"schemaVersion":1,"type":"hello","protocol":"voice2text-macos-helper/v1","transport":"inherited-stdio","helperNonce":"${helperNonce}"}'
 IFS= read -r handshake
 client_nonce=$(printf '%s' "$handshake" | /usr/bin/sed -E 's/.*"clientNonce":"([^"]+)".*/\\1/')
 session_id=$(printf '%s' "$handshake" | /usr/bin/sed -E 's/.*"sessionId":"([^"]+)".*/\\1/')
-printf '{"schemaVersion":1,"type":"ready","protocol":"voice2text-macos-helper/v1","transport":"inherited-stdio","helperNonce":"${helperNonce}","clientNonce":"%s","sessionId":"%s"}\\n' "$client_nonce" "$session_id"
+printf '{"schemaVersion":1,"type":"ready","protocol":"voice2text-macos-helper/v1","microphoneTestContract":"continuous-manual/v1","transport":"inherited-stdio","helperNonce":"${helperNonce}","clientNonce":"%s","sessionId":"%s"}\\n' "$client_nonce" "$session_id"
 IFS= read -r request
+`;
+  const incompatibleSessionSetup = (contractField: string) => `
+printf '%s\\n' '{"schemaVersion":1,"type":"hello","protocol":"voice2text-macos-helper/v1","transport":"inherited-stdio","helperNonce":"${helperNonce}"}'
+IFS= read -r handshake
+client_nonce=$(printf '%s' "$handshake" | /usr/bin/sed -E 's/.*"clientNonce":"([^"]+)".*/\\1/')
+session_id=$(printf '%s' "$handshake" | /usr/bin/sed -E 's/.*"sessionId":"([^"]+)".*/\\1/')
+printf '{"schemaVersion":1,"type":"ready","protocol":"voice2text-macos-helper/v1",${contractField}"transport":"inherited-stdio","helperNonce":"${helperNonce}","clientNonce":"%s","sessionId":"%s"}\\n' "$client_nonce" "$session_id"
+if IFS= read -r request; then printf '%s\\n' "$request" > '${commandPath}'; fi
+`;
+  const microphoneSession = `
+printf '%s\\n' '{"schemaVersion":1,"type":"hello","protocol":"voice2text-macos-helper/v1","transport":"inherited-stdio","helperNonce":"${helperNonce}"}'
+IFS= read -r handshake
+client_nonce=$(printf '%s' "$handshake" | /usr/bin/sed -E 's/.*"clientNonce":"([^"]+)".*/\\1/')
+session_id=$(printf '%s' "$handshake" | /usr/bin/sed -E 's/.*"sessionId":"([^"]+)".*/\\1/')
+printf '{"schemaVersion":1,"type":"ready","protocol":"voice2text-macos-helper/v1","microphoneTestContract":"continuous-manual/v1","transport":"inherited-stdio","helperNonce":"${helperNonce}","clientNonce":"%s","sessionId":"%s"}\\n' "$client_nonce" "$session_id"
+while IFS= read -r request; do
+  command=$(printf '%s' "$request" | /usr/bin/sed -E 's/.*"command":"([^"]+)".*/\\1/')
+  case "$command" in
+    microphone-test-start|microphone-test-snapshot)
+      state='"running"'; reason=''
+      ;;
+    microphone-test-finish)
+      state='"finished"'; reason=',"reason":"detected"'
+      ;;
+    microphone-test-cancel)
+      state='"cancelled"'; reason=''
+      ;;
+  esac
+  printf '{"schemaVersion":1,"type":"result","helperNonce":"${helperNonce}","clientNonce":"%s","sessionId":"%s","microphoneTest":{"testId":"mic-test-contract-123456","state":%s%s,"elapsedMs":1000,"normalizedRMS":0.1,"normalizedPeak":0.2,"observedFrames":100,"observedSound":true}}\\n' "$client_nonce" "$session_id" "$state" "$reason"
+done
 `;
   const behavior =
     mode === "invalid-hello"
@@ -313,11 +398,19 @@ IFS= read -r never`
         ? `printf '%s\\n' '{"schemaVersion":1,"type":"hello","protocol":"voice2text-macos-helper/v1","transport":"inherited-stdio","helperNonce":"${helperNonce}"}'
 IFS= read -r handshake
 IFS= read -r never`
-        : mode === "invoke-timeout"
-          ? `${sessionSetup}IFS= read -r never`
-          : mode === "forged-result"
-            ? `${sessionSetup}printf '%s\\n' '{"schemaVersion":1,"type":"result","helperNonce":"${"b".repeat(64)}","clientNonce":"forged","sessionId":"forged"}'`
-            : `${sessionSetup}printf '%s\\n' '{"schemaVersion":1,"type":"error","helperNonce":"${"b".repeat(64)}","clientNonce":"forged","sessionId":"forged","code":"FORGED","message":"forged"}'`;
+        : mode === "missing-microphone-contract"
+          ? incompatibleSessionSetup("")
+          : mode === "wrong-microphone-contract"
+            ? incompatibleSessionSetup(
+                '"microphoneTestContract":"continuous-manual/v0",',
+              )
+            : mode === "microphone-contract"
+              ? microphoneSession
+              : mode === "invoke-timeout"
+                ? `${sessionSetup}IFS= read -r never`
+                : mode === "forged-result"
+                  ? `${sessionSetup}printf '%s\\n' '{"schemaVersion":1,"type":"result","helperNonce":"${"b".repeat(64)}","clientNonce":"forged","sessionId":"forged"}'`
+                  : `${sessionSetup}printf '%s\\n' '{"schemaVersion":1,"type":"error","helperNonce":"${"b".repeat(64)}","clientNonce":"forged","sessionId":"forged","code":"FORGED","message":"forged"}'`;
   writeFileSync(
     executable,
     `#!/bin/sh
@@ -327,7 +420,7 @@ ${behavior}
 `,
   );
   chmodSync(executable, 0o700);
-  return { executable, pidPath };
+  return { executable, pidPath, commandPath };
 }
 
 function processExists(pid: number): boolean {

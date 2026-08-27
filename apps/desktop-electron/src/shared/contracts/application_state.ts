@@ -140,9 +140,10 @@ export const navigateRequestSchema = z
 export const bootstrapActionRequestSchema = z
   .object({ action: bootstrapActionSchema })
   .strict();
-export const acknowledgeActivityRequestSchema = z
-  .object({ throughId: z.string().min(1).max(260) })
+export const markActivityReadRequestSchema = z
+  .object({ activityId: z.string().min(1).max(260) })
   .strict();
+export const markAllActivityReadRequestSchema = z.object({}).strict();
 
 export type ShellSection = z.infer<typeof shellSectionSchema>;
 export type BootstrapAction = z.infer<typeof bootstrapActionSchema>;

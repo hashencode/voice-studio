@@ -10,6 +10,7 @@ import type {
   ApplicationSnapshot,
   Voice2TextDesktopApi,
 } from "../../src/shared/contracts";
+import { companionRendererStubs } from "../fixtures/companion";
 
 const application: ApplicationSnapshot = {
   protocolVersion: 2,
@@ -43,16 +44,28 @@ const audio = {
 
 const settings = {
   revision: 1,
-  config: {
-    providerId: "deepseek" as const,
-    displayName: "DeepSeek",
-    modelId: "deepseek-chat",
-    endpoint: "https://api.deepseek.com",
-    endpointOrigin: "https://api.deepseek.com",
-    processingLocation: "cloudDirect" as const,
-    requiresConsent: true as const,
-  },
-  secretState: "available" as const,
+  profiles: [
+    {
+      profileId: "profile-deepseek",
+      kind: "custom" as const,
+      configurationName: null,
+      displayName: "DeepSeek",
+      protocol: "deepseek" as const,
+      modelId: "deepseek-chat",
+      modelSummary: "deepseek-chat",
+      endpoint: "https://api.deepseek.com",
+      endpointOrigin: "https://api.deepseek.com",
+      processingLocation: "cloudDirect" as const,
+      requiresConsent: true as const,
+      capabilities: {
+        selectable: true as const,
+        editable: true as const,
+        deletable: true as const,
+      },
+      secretState: "available" as const,
+    },
+  ],
+  selectedProfileId: "profile-deepseek",
   deviceSecurity: {
     kind: "device-security" as const,
     fileVaultState: "enabled" as const,
@@ -72,6 +85,7 @@ function installApi() {
     jobId: 51,
     audioId: 4,
     generationId: 9,
+    providerDisplayName: "DeepSeek",
     providerId: "deepseek" as const,
     modelId: "deepseek-chat",
     endpointOrigin: "https://api.deepseek.com",
@@ -98,6 +112,7 @@ function installApi() {
     },
   };
   const api = {
+    ...companionRendererStubs(),
     getApplicationSnapshot: vi.fn(async () => current),
     navigate: vi.fn(
       async (section: ApplicationSnapshot["navigation"]["section"]) => {
@@ -128,13 +143,16 @@ function installApi() {
     getCaptionSnapshot: vi.fn(async () => null),
     onCaptionSnapshot: vi.fn(() => () => undefined),
     getAiSettings: vi.fn(async () => settings),
-    saveAiSettings: vi.fn(async () => settings),
-    replaceAiProviderSecret: vi.fn(async () => settings),
-    deleteAiProviderSecret: vi.fn(async () => settings),
+    createAiProviderProfile: vi.fn(async () => settings),
+    updateAiProviderProfile: vi.fn(async () => settings),
+    selectAiProviderProfile: vi.fn(async () => settings),
+    deleteAiProviderProfile: vi.fn(async () => settings),
     getAudioAiSnapshot: vi.fn(async () => null),
     prepareAudioAi: vi.fn(async () => ({
       audioId: 4,
       generationId: 9,
+      profileId: "profile-deepseek",
+      providerDisplayName: "DeepSeek",
       providerId: "deepseek" as const,
       modelId: "deepseek-chat",
       audioTitle: "项目周会.wav",
@@ -180,6 +198,7 @@ describe("audio AI Renderer e2e", () => {
     expect(api.generateAudioAi).toHaveBeenCalledWith(
       expect.objectContaining({
         consent: expect.objectContaining({
+          profileId: "profile-deepseek",
           endpointIdentitySha256: "c".repeat(64),
           transcriptScopeSha256: "b".repeat(64),
         }),
@@ -191,10 +210,10 @@ describe("audio AI Renderer e2e", () => {
     await user.click(
       within(
         screen.getByRole("complementary", { name: "设置上下文面板" }),
-      ).getByRole("button", { name: "音频智能" }),
+      ).getByRole("link", { name: "云端模型" }),
     );
     expect(
-      await screen.findByRole("heading", { name: "音频智能", level: 1 }),
+      await screen.findByRole("heading", { name: "云端模型", level: 2 }),
     ).toBeVisible();
     await waitFor(() => expect(api.getAiSettings).toHaveBeenCalledTimes(1));
     expect(api.generateAudioAi).toHaveBeenCalledTimes(1);

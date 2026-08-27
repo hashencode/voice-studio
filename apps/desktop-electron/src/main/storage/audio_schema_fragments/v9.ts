@@ -1,21 +1,45 @@
 import type { DatabaseSync } from "node:sqlite";
 
+export function addAudioAiSchemaV1(database: DatabaseSync): void {
+  addAudioAiSchemaVersion(database, legacyProviderSettingsSchema, "", "");
+}
+
 export function addAudioAiSchema(database: DatabaseSync): void {
+  addAudioAiSchemaVersion(
+    database,
+    providerProfilesSchemaV3,
+    "profile_id TEXT NOT NULL,",
+    `profile_id TEXT NOT NULL,
+     secret_ref TEXT NOT NULL,
+     provider_display_name TEXT NOT NULL CHECK (length(trim(provider_display_name)) BETWEEN 1 AND 128),`,
+  );
+}
+
+export function addAudioAiSchemaV2(database: DatabaseSync): void {
+  addAudioAiSchemaVersion(
+    database,
+    providerProfilesSchemaV2,
+    "profile_id TEXT NOT NULL,",
+    `profile_id TEXT NOT NULL,
+     secret_ref TEXT NOT NULL,
+     provider_display_name TEXT NOT NULL CHECK (length(trim(provider_display_name)) BETWEEN 1 AND 128),`,
+  );
+}
+
+function addAudioAiSchemaVersion(
+  database: DatabaseSync,
+  providerSchema: string,
+  consentProfileColumn: string,
+  jobProfileColumns: string,
+): void {
   database.exec(`
-    CREATE TABLE ai_provider_settings (
-      id INTEGER PRIMARY KEY CHECK (id = 1),
-      provider_id TEXT NOT NULL CHECK (provider_id IN ('deepseek', 'openai-compatible')),
-      model_id TEXT NOT NULL CHECK (length(trim(model_id)) BETWEEN 1 AND 256),
-      endpoint TEXT NOT NULL CHECK (length(endpoint) BETWEEN 1 AND 2048),
-      updated_at_ms INTEGER NOT NULL
-    );
-    INSERT INTO ai_provider_settings VALUES
-      (1, 'deepseek', 'deepseek-chat', 'https://api.deepseek.com', 0);
+    ${providerSchema}
 
     CREATE TABLE ai_consents (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       audio_id INTEGER NOT NULL,
       generation_id INTEGER NOT NULL,
+      ${consentProfileColumn}
       provider_id TEXT NOT NULL,
       endpoint TEXT NOT NULL,
       endpoint_origin TEXT NOT NULL,
@@ -27,7 +51,7 @@ export function addAudioAiSchema(database: DatabaseSync): void {
       granted_at_ms INTEGER NOT NULL,
       FOREIGN KEY(audio_id) REFERENCES audio_items(id) ON DELETE CASCADE,
       FOREIGN KEY(generation_id) REFERENCES audio_generations(id) ON DELETE CASCADE,
-      UNIQUE(audio_id, generation_id, provider_id, endpoint_identity_sha256, transcript_scope_sha256, consent_version)
+      UNIQUE(audio_id, generation_id, ${consentProfileColumn ? "profile_id," : ""} provider_id, endpoint_identity_sha256, transcript_scope_sha256, consent_version)
     );
 
     CREATE TABLE ai_jobs (
@@ -36,6 +60,7 @@ export function addAudioAiSchema(database: DatabaseSync): void {
       generation_id INTEGER NOT NULL,
       consent_id INTEGER NOT NULL,
       idempotency_key TEXT NOT NULL UNIQUE,
+      ${jobProfileColumns}
       provider_id TEXT NOT NULL,
       model_id TEXT NOT NULL,
       endpoint TEXT NOT NULL,
@@ -104,3 +129,86 @@ export function addAudioAiSchema(database: DatabaseSync): void {
     );
   `);
 }
+
+const legacyProviderSettingsSchema = `
+  CREATE TABLE ai_provider_settings (
+    id INTEGER PRIMARY KEY CHECK (id = 1),
+    provider_id TEXT NOT NULL CHECK (provider_id IN ('deepseek', 'openai-compatible')),
+    model_id TEXT NOT NULL CHECK (length(trim(model_id)) BETWEEN 1 AND 256),
+    endpoint TEXT NOT NULL CHECK (length(endpoint) BETWEEN 1 AND 2048),
+    updated_at_ms INTEGER NOT NULL
+  );
+  INSERT INTO ai_provider_settings VALUES
+    (1, 'deepseek', 'deepseek-chat', 'https://api.deepseek.com', 0);
+`;
+
+const providerProfilesSchemaV2 = `
+  CREATE TABLE ai_provider_profiles (
+    profile_id TEXT PRIMARY KEY CHECK (length(trim(profile_id)) BETWEEN 1 AND 128),
+    kind TEXT NOT NULL CHECK (kind = 'custom'),
+    display_name TEXT NOT NULL CHECK (length(trim(display_name)) BETWEEN 1 AND 128),
+    normalized_display_name TEXT NOT NULL UNIQUE CHECK (
+      length(trim(normalized_display_name)) BETWEEN 1 AND 128
+    ),
+    protocol TEXT NOT NULL CHECK (protocol IN ('deepseek', 'openai-compatible')),
+    model_id TEXT NOT NULL CHECK (length(trim(model_id)) BETWEEN 1 AND 256),
+    endpoint TEXT NOT NULL CHECK (length(endpoint) BETWEEN 1 AND 2048),
+    secret_ref TEXT NOT NULL UNIQUE CHECK (length(trim(secret_ref)) BETWEEN 1 AND 256),
+    created_at_ms INTEGER NOT NULL,
+    updated_at_ms INTEGER NOT NULL,
+    revision INTEGER NOT NULL DEFAULT 0 CHECK (revision >= 0)
+  );
+  CREATE UNIQUE INDEX ai_provider_profiles_normalized_name
+    ON ai_provider_profiles(normalized_display_name COLLATE NOCASE);
+
+  CREATE TABLE ai_provider_selection (
+    id INTEGER PRIMARY KEY CHECK (id = 1),
+    selected_profile_id TEXT,
+    revision INTEGER NOT NULL DEFAULT 0 CHECK (revision >= 0),
+    FOREIGN KEY(selected_profile_id) REFERENCES ai_provider_profiles(profile_id) ON DELETE SET NULL
+  );
+  INSERT INTO ai_provider_selection (id, selected_profile_id, revision)
+    VALUES (1, NULL, 0);
+`;
+
+const providerProfilesSchemaV3 = `
+  CREATE TABLE ai_provider_profiles (
+    profile_id TEXT PRIMARY KEY CHECK (length(trim(profile_id)) BETWEEN 1 AND 128),
+    kind TEXT NOT NULL CHECK (kind = 'custom'),
+    configuration_name TEXT CHECK (
+      configuration_name IS NULL OR
+      (configuration_name = trim(configuration_name) AND length(configuration_name) BETWEEN 1 AND 128)
+    ),
+    protocol TEXT NOT NULL CHECK (protocol IN ('deepseek', 'openai-compatible')),
+    model_id TEXT NOT NULL CHECK (
+      model_id = trim(model_id) AND length(model_id) BETWEEN 1 AND 256
+    ),
+    endpoint TEXT NOT NULL CHECK (length(endpoint) BETWEEN 1 AND 2048),
+    secret_ref TEXT NOT NULL UNIQUE CHECK (length(trim(secret_ref)) BETWEEN 1 AND 256),
+    created_at_ms INTEGER NOT NULL,
+    updated_at_ms INTEGER NOT NULL,
+    revision INTEGER NOT NULL DEFAULT 0 CHECK (revision >= 0)
+  );
+  CREATE UNIQUE INDEX ai_provider_profiles_model_id_unique
+    ON ai_provider_profiles(model_id);
+
+  CREATE TABLE ai_provider_selection (
+    id INTEGER PRIMARY KEY CHECK (id = 1),
+    selected_profile_id TEXT,
+    revision INTEGER NOT NULL DEFAULT 0 CHECK (revision >= 0),
+    FOREIGN KEY(selected_profile_id) REFERENCES ai_provider_profiles(profile_id) ON DELETE SET NULL
+  );
+  INSERT INTO ai_provider_selection (id, selected_profile_id, revision)
+    VALUES (1, NULL, 0);
+
+  CREATE TABLE ai_secret_cleanup_queue (
+    secret_ref TEXT PRIMARY KEY CHECK (length(trim(secret_ref)) BETWEEN 1 AND 256),
+    operation TEXT NOT NULL CHECK (operation IN ('delete-keychain-item')),
+    state TEXT NOT NULL CHECK (state IN ('pending', 'failed')),
+    created_at_ms INTEGER NOT NULL,
+    updated_at_ms INTEGER NOT NULL,
+    error_code TEXT CHECK (
+      error_code IS NULL OR length(trim(error_code)) BETWEEN 1 AND 64
+    )
+  );
+`;

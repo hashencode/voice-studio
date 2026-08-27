@@ -33,6 +33,33 @@ interface HelperFrame {
   [key: string]: unknown;
 }
 
+// Advance this identity for any semantic microphone command, response, or snapshot change.
+const microphoneTestContractIdentity = "continuous-manual/v1";
+
+export class NativeHelperTransportError extends Error {
+  constructor(message: string, options?: ErrorOptions) {
+    super(message, options);
+    this.name = "NativeHelperTransportError";
+  }
+}
+
+export class NativeHelperResponseError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "NativeHelperResponseError";
+  }
+}
+
+export class NativeHelperCommandError extends Error {
+  constructor(
+    readonly code: string,
+    message: string,
+  ) {
+    super(`${code}: ${message}`);
+    this.name = "NativeHelperCommandError";
+  }
+}
+
 export class MacOSNativeHelperClient {
   constructor(
     private readonly executable: string,
@@ -101,6 +128,8 @@ export class MacOSNativeHelperClient {
       if (
         ready.schemaVersion !== 1 ||
         ready.type !== "ready" ||
+        ready.protocol !== "voice2text-macos-helper/v1" ||
+        ready.microphoneTestContract !== microphoneTestContractIdentity ||
         ready.helperNonce !== helperNonce ||
         ready.clientNonce !== clientNonce ||
         ready.sessionId !== sessionId ||
@@ -258,9 +287,17 @@ export class MacOSNativeHelperSession {
     return microphoneTestSnapshotSchema.parse(response.microphoneTest);
   }
 
-  async stopMicrophoneTest(testId: string): Promise<MicrophoneTestSnapshot> {
+  async finishMicrophoneTest(testId: string): Promise<MicrophoneTestSnapshot> {
     const response = await this.invoke({
-      command: "microphone-test-stop",
+      command: "microphone-test-finish",
+      request: { testId },
+    });
+    return microphoneTestSnapshotSchema.parse(response.microphoneTest);
+  }
+
+  async cancelMicrophoneTest(testId: string): Promise<MicrophoneTestSnapshot> {
+    const response = await this.invoke({
+      command: "microphone-test-cancel",
       request: { testId },
     });
     return microphoneTestSnapshotSchema.parse(response.microphoneTest);
@@ -296,7 +333,14 @@ export class MacOSNativeHelperSession {
           );
         } catch (error) {
           await this.protocol.terminate();
-          throw error;
+          throw error instanceof NativeHelperTransportError
+            ? error
+            : new NativeHelperTransportError(
+                error instanceof Error
+                  ? error.message
+                  : "native helper transport failed",
+                { cause: error },
+              );
         }
         if (
           response.schemaVersion !== 1 ||
@@ -305,16 +349,23 @@ export class MacOSNativeHelperSession {
           response.sessionId !== this.sessionId
         ) {
           await this.protocol.terminate();
-          throw new Error("helper response session identity is invalid");
+          throw new NativeHelperResponseError(
+            "helper response session identity is invalid",
+          );
         }
         if (response.type === "error") {
-          throw new Error(
-            `${typeof response.code === "string" ? response.code : "HELPER_FAILED"}: ${typeof response.message === "string" ? response.message : "helper request failed"}`,
+          throw new NativeHelperCommandError(
+            typeof response.code === "string" ? response.code : "HELPER_FAILED",
+            typeof response.message === "string"
+              ? response.message
+              : "helper request failed",
           );
         }
         if (response.type !== "result") {
           await this.protocol.terminate();
-          throw new Error("helper response type is invalid");
+          throw new NativeHelperResponseError(
+            "helper response type is invalid",
+          );
         }
         return response;
       });
@@ -349,8 +400,12 @@ class HelperLineProtocol {
     this.closed = new Promise((resolve) => {
       child.once("close", (code) => {
         if (code !== 0)
-          this.fail(new Error(`native helper exited with ${String(code)}`));
-        else this.fail(new Error("native helper closed"));
+          this.fail(
+            new NativeHelperTransportError(
+              `native helper exited with ${String(code)}`,
+            ),
+          );
+        else this.fail(new NativeHelperTransportError("native helper closed"));
         resolve();
       });
     });

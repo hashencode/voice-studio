@@ -9,6 +9,13 @@ import {
 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
+import {
+  Field,
+  FieldContent,
+  FieldDescription,
+  FieldError,
+  FieldLabel,
+} from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
@@ -435,20 +442,19 @@ export function FloatingCapturePreferenceSetting({
   }, []);
   if (!window.voice2text.setFloatingCapturePreference) return null;
   return (
-    <div className={`flex items-start justify-between gap-4 ${className}`}>
-      <div>
-        <Label htmlFor="floating-capture-enabled">录制时显示桌面悬浮控制</Label>
-        <p className="mt-1 text-sm text-muted-foreground">
-          切换到其他应用或最小化后，在桌面右上角显示精简状态与控制。
-        </p>
-        {error ? (
-          <p className="mt-1 text-sm text-destructive" role="alert">
-            设置未保存，请重试。
-          </p>
-        ) : null}
-      </div>
+    <Field orientation="horizontal" className={`items-center! ${className}`}>
+      <FieldContent>
+        <FieldLabel asChild>
+          <div id="floating-capture-label">悬浮控制条</div>
+        </FieldLabel>
+        <FieldDescription>
+          录制音频时在桌面右上角显示状态和控件
+        </FieldDescription>
+        {error ? <FieldError>设置未保存，请重试。</FieldError> : null}
+      </FieldContent>
       <Switch
         id="floating-capture-enabled"
+        aria-labelledby="floating-capture-label"
         checked={enabled}
         disabled={pending}
         onCheckedChange={(value) => {
@@ -466,7 +472,7 @@ export function FloatingCapturePreferenceSetting({
             .finally(() => setPending(false));
         }}
       />
-    </div>
+    </Field>
   );
 }
 

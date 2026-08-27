@@ -20,7 +20,7 @@ Before changing UI, screens, navigation, visual states, or Flutter component usa
 - Default to shadowless UI. Do not add shadows unless the user explicitly requests them or an existing platform contract requires them.
 - Establish hierarchy with spacing, borders, surface color differences, and typography before considering elevation.
 - Keep keyboard focus visible but lightweight. Inputs, buttons, and other form controls should use a thin focus indicator rather than a thick ring or glow.
-- Keep interface copy concise. Do not narrate behavior that is already clear from the control, state, or surrounding context.
+- Keep interface copy concise, natural, and considerate. Include only information that affects the user's next action or decision; do not repeat visible controls, states, or capabilities. For instructions, prefer brief and polite wording when it adds warmth without adding explanation.
 
 ## Visual validation permission
 

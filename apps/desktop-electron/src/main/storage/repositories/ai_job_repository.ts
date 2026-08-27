@@ -1,20 +1,38 @@
 import type { DatabaseSync, StatementResultingChanges } from "node:sqlite";
 
 import type { AudioAiOutput } from "../../domain/audio-intelligence/provider_output";
+import { AiProviderFailure } from "../../domain/audio-intelligence/provider_security";
 import {
-  AiProviderFailure,
-  parseRemoteAiEndpoint,
-} from "../../domain/audio-intelligence/provider_security";
+  projectAiModelDisplayName,
+  validateAiProviderProfileInput,
+} from "../../domain/audio-intelligence/provider_profile_validation";
 import { withTransaction } from "../audio_database";
+import { SecretCleanupRepository } from "./secret_cleanup_repository";
 
 export interface AiProviderSettingsRecord {
   providerId: "deepseek" | "openai-compatible";
   modelId: string;
   endpoint: string;
+  secretRef: string;
+}
+
+export interface AiProviderProfileRecord {
+  profileId: string;
+  kind: "custom";
+  configurationName: string | null;
+  displayName: string;
+  protocol: "deepseek" | "openai-compatible";
+  modelId: string;
+  endpoint: string;
+  secretRef: string;
+  createdAtMs: number;
+  updatedAtMs: number;
+  revision: number;
 }
 
 export interface AiConsentIdentity {
   version: 1;
+  profileId: string;
   providerId: string;
   endpointOrigin: string;
   endpointIdentitySha256: string;
@@ -25,6 +43,9 @@ export interface AiJobRecord {
   id: number;
   audioId: number;
   generationId: number;
+  profileId: string;
+  secretRef: string;
+  providerDisplayName: string;
   providerId: string;
   modelId: string;
   endpoint: string;
@@ -69,56 +90,203 @@ export interface AiTranscriptScopeSource {
   }>;
 }
 
-export class AiJobRepository {
-  constructor(private readonly database: DatabaseSync) {}
+interface ProfileWriteCommand {
+  profileId: string;
+  configurationName: string | null;
+  protocol: "deepseek" | "openai-compatible";
+  modelId: string;
+  endpoint: string;
+  expectedRevision: number;
+  nowMs: number;
+}
 
-  loadSettings(): AiProviderSettingsRecord {
-    const row = this.database
-      .prepare(
-        "SELECT provider_id, model_id, endpoint FROM ai_provider_settings WHERE id = 1",
-      )
-      .get();
-    if (!row) throw new Error("AI provider settings are unavailable");
-    return {
-      providerId: String(
-        row.provider_id,
-      ) as AiProviderSettingsRecord["providerId"],
-      modelId: String(row.model_id),
-      endpoint: String(row.endpoint),
-    };
+export class AiJobRepository {
+  readonly secretCleanup: SecretCleanupRepository;
+
+  constructor(private readonly database: DatabaseSync) {
+    this.secretCleanup = new SecretCleanupRepository(database);
   }
 
-  saveSettings(settings: AiProviderSettingsRecord, nowMs = Date.now()): void {
-    const modelId = settings.modelId.trim();
-    if (modelId.length === 0 || [...modelId].length > 256) {
-      throw new AiProviderFailure(
-        "AI_INVALID_CONFIGURATION",
-        "AI model id is invalid",
-      );
-    }
-    const endpoint = parseRemoteAiEndpoint(settings.endpoint);
-    if (
-      settings.providerId === "deepseek" &&
-      (endpoint.origin !== "https://api.deepseek.com" ||
-        endpoint.baseUrl !== "https://api.deepseek.com")
-    ) {
-      throw new AiProviderFailure(
-        "AI_INVALID_CONFIGURATION",
-        "DeepSeek endpoint cannot be changed",
-      );
-    }
-    this.database
+  profiles(): AiProviderProfileRecord[] {
+    return this.database
       .prepare(
-        `UPDATE ai_provider_settings SET provider_id = ?, model_id = ?, endpoint = ?,
-         updated_at_ms = ? WHERE id = 1`,
+        `SELECT * FROM ai_provider_profiles
+         ORDER BY created_at_ms, profile_id`,
       )
-      .run(settings.providerId, modelId, endpoint.baseUrl, nowMs);
+      .all()
+      .map(mapProfile);
+  }
+
+  profile(profileId: string): AiProviderProfileRecord | null {
+    const row = this.database
+      .prepare("SELECT * FROM ai_provider_profiles WHERE profile_id = ?")
+      .get(profileId);
+    return row ? mapProfile(row) : null;
+  }
+
+  selectedProfile(): AiProviderProfileRecord | null {
+    const row = this.database
+      .prepare(
+        `SELECT profiles.* FROM ai_provider_selection AS selection
+         JOIN ai_provider_profiles AS profiles
+           ON profiles.profile_id = selection.selected_profile_id
+         WHERE selection.id = 1`,
+      )
+      .get();
+    return row ? mapProfile(row) : null;
+  }
+
+  createProfile(command: ProfileWriteCommand & { secretRef: string }): void {
+    withTransaction(this.database, () => {
+      this.assertSettingsRevision(command.expectedRevision);
+      const profile = validateAiProviderProfileInput(command);
+      this.assertModelIdAvailable(profile.modelId);
+      this.database
+        .prepare(
+          `INSERT INTO ai_provider_profiles (
+             profile_id, kind, configuration_name, protocol,
+             model_id, endpoint, secret_ref, created_at_ms, updated_at_ms, revision
+           ) VALUES (?, 'custom', ?, ?, ?, ?, ?, ?, ?, 0)`,
+        )
+        .run(
+          command.profileId,
+          profile.configurationName,
+          profile.protocol,
+          profile.modelId,
+          profile.endpoint,
+          command.secretRef,
+          command.nowMs,
+          command.nowMs,
+        );
+      this.bumpSelectionRevision(command.expectedRevision, command.profileId);
+    });
+  }
+
+  updateProfile(command: ProfileWriteCommand & { secretRef?: string }): void {
+    withTransaction(this.database, () => {
+      this.assertSettingsRevision(command.expectedRevision);
+      if (!this.profile(command.profileId)) this.missingProfile();
+      const profile = validateAiProviderProfileInput(command);
+      this.assertModelIdAvailable(profile.modelId, command.profileId);
+      this.assertOneChange(
+        this.database
+          .prepare(
+            `UPDATE ai_provider_profiles
+             SET configuration_name = ?, protocol = ?,
+                 model_id = ?, endpoint = ?, secret_ref = COALESCE(?, secret_ref),
+                 updated_at_ms = ?, revision = revision + 1
+             WHERE profile_id = ?`,
+          )
+          .run(
+            profile.configurationName,
+            profile.protocol,
+            profile.modelId,
+            profile.endpoint,
+            command.secretRef ?? null,
+            command.nowMs,
+            command.profileId,
+          ),
+      );
+      this.bumpSelectionRevision(command.expectedRevision);
+    });
+  }
+
+  secretRefInUse(secretRef: string): boolean {
+    if (
+      this.database
+        .prepare(
+          "SELECT 1 FROM ai_provider_profiles WHERE secret_ref = ? LIMIT 1",
+        )
+        .get(secretRef)
+    ) {
+      return true;
+    }
+    if (this.jobUsesSecretRef(secretRef)) return true;
+    return Boolean(
+      this.database
+        .prepare(
+          "SELECT 1 FROM ai_secret_cleanup_queue WHERE secret_ref = ? LIMIT 1",
+        )
+        .get(secretRef),
+    );
+  }
+
+  jobUsesSecretRef(secretRef: string): boolean {
+    return Boolean(
+      this.hasColumn("ai_jobs", "secret_ref") &&
+      this.database
+        .prepare("SELECT 1 FROM ai_jobs WHERE secret_ref = ? LIMIT 1")
+        .get(secretRef),
+    );
+  }
+
+  blockingJobUsesSecretRef(secretRef: string): boolean {
+    return Boolean(
+      this.hasColumn("ai_jobs", "secret_ref") &&
+      this.database
+        .prepare(
+          `SELECT 1 FROM ai_jobs
+            WHERE secret_ref = ?
+              AND state IN ('queued', 'running', 'failed', 'interrupted')
+            LIMIT 1`,
+        )
+        .get(secretRef),
+    );
+  }
+
+  selectProfile(command: {
+    profileId: string;
+    expectedRevision: number;
+  }): void {
+    withTransaction(this.database, () => {
+      this.assertSettingsRevision(command.expectedRevision);
+      if (!this.profile(command.profileId)) this.missingProfile();
+      this.bumpSelectionRevision(command.expectedRevision, command.profileId);
+    });
+  }
+
+  deleteProfile(command: {
+    profileId: string;
+    expectedRevision: number;
+    nowMs: number;
+  }): void {
+    withTransaction(this.database, () => {
+      this.assertSettingsRevision(command.expectedRevision);
+      const profile = this.profile(command.profileId);
+      if (!profile) this.missingProfile();
+      const selected = this.selectedProfile()?.profileId ?? null;
+      this.assertOneChange(
+        this.database
+          .prepare("DELETE FROM ai_provider_profiles WHERE profile_id = ?")
+          .run(command.profileId),
+      );
+      const replacement =
+        selected === command.profileId
+          ? this.database
+              .prepare(
+                `SELECT profile_id FROM ai_provider_profiles
+                 ORDER BY created_at_ms, profile_id LIMIT 1`,
+              )
+              .get()
+          : null;
+      this.bumpSelectionRevision(
+        command.expectedRevision,
+        selected === command.profileId
+          ? replacement
+            ? String(replacement.profile_id)
+            : null
+          : undefined,
+      );
+    });
   }
 
   enqueue(
     command: {
       audioId: number;
       generationId: number;
+      profileId: string;
+      secretRef: string;
+      providerDisplayName: string;
       providerId: string;
       modelId: string;
       endpoint: string;
@@ -139,6 +307,7 @@ export class AiJobRepository {
     if (
       !consent ||
       consent.version !== 1 ||
+      consent.profileId !== command.profileId ||
       consent.providerId !== command.providerId ||
       consent.endpointOrigin !== command.endpointOrigin ||
       consent.endpointIdentitySha256 !== command.endpointIdentitySha256 ||
@@ -150,6 +319,7 @@ export class AiJobRepository {
       );
     }
     return withTransaction(this.database, () => {
+      const hasProfileSnapshots = this.hasColumn("ai_jobs", "profile_id");
       if (
         !this.database
           .prepare(
@@ -165,57 +335,71 @@ export class AiJobRepository {
       this.database
         .prepare(
           `INSERT INTO ai_consents (
-            audio_id, generation_id, provider_id, endpoint, endpoint_origin, endpoint_identity_sha256,
+            audio_id, generation_id, ${hasProfileSnapshots ? "profile_id," : ""} provider_id, endpoint, endpoint_origin, endpoint_identity_sha256,
             transcript_scope_sha256, consent_version, granted_at_ms
-          ) VALUES (?, ?, ?, ?, ?, ?, ?, 1, ?)
-          ON CONFLICT(audio_id, generation_id, provider_id, endpoint_identity_sha256,
-            transcript_scope_sha256, consent_version) DO NOTHING`,
+          ) VALUES (?, ?, ${hasProfileSnapshots ? "?," : ""} ?, ?, ?, ?, ?, 1, ?)
+          ON CONFLICT DO NOTHING`,
         )
         .run(
-          command.audioId,
-          command.generationId,
-          command.providerId,
-          command.endpoint,
-          command.endpointOrigin,
-          command.endpointIdentitySha256,
-          command.transcriptScopeSha256,
-          command.nowMs,
+          ...[
+            command.audioId,
+            command.generationId,
+            ...(hasProfileSnapshots ? [command.profileId] : []),
+            command.providerId,
+            command.endpoint,
+            command.endpointOrigin,
+            command.endpointIdentitySha256,
+            command.transcriptScopeSha256,
+            command.nowMs,
+          ],
         );
       const consentRow = this.database
         .prepare(
           `SELECT id FROM ai_consents WHERE audio_id = ? AND generation_id = ?
-           AND provider_id = ? AND endpoint_identity_sha256 = ? AND transcript_scope_sha256 = ?
+           ${hasProfileSnapshots ? "AND profile_id = ?" : ""} AND provider_id = ? AND endpoint_identity_sha256 = ? AND transcript_scope_sha256 = ?
            AND consent_version = 1`,
         )
         .get(
-          command.audioId,
-          command.generationId,
-          command.providerId,
-          command.endpointIdentitySha256,
-          command.transcriptScopeSha256,
+          ...[
+            command.audioId,
+            command.generationId,
+            ...(hasProfileSnapshots ? [command.profileId] : []),
+            command.providerId,
+            command.endpointIdentitySha256,
+            command.transcriptScopeSha256,
+          ],
         );
       const inserted = this.database
         .prepare(
           `INSERT INTO ai_jobs (
-            audio_id, generation_id, consent_id, idempotency_key, provider_id,
+            audio_id, generation_id, consent_id, idempotency_key, ${hasProfileSnapshots ? "profile_id, secret_ref, provider_display_name," : ""} provider_id,
             model_id, endpoint, endpoint_origin, endpoint_identity_sha256, transcript_scope_sha256, template_id,
             state, attempt, revision, created_at_ms, updated_at_ms
-          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'queued', 0, 0, ?, ?)`,
+          ) VALUES (?, ?, ?, ?, ${hasProfileSnapshots ? "?, ?, ?," : ""} ?, ?, ?, ?, ?, ?, ?, 'queued', 0, 0, ?, ?)`,
         )
         .run(
-          command.audioId,
-          command.generationId,
-          Number(consentRow!.id),
-          command.idempotencyKey,
-          command.providerId,
-          command.modelId,
-          command.endpoint,
-          command.endpointOrigin,
-          command.endpointIdentitySha256,
-          command.transcriptScopeSha256,
-          command.templateId,
-          command.nowMs,
-          command.nowMs,
+          ...[
+            command.audioId,
+            command.generationId,
+            Number(consentRow!.id),
+            command.idempotencyKey,
+            ...(hasProfileSnapshots
+              ? [
+                  command.profileId,
+                  command.secretRef,
+                  command.providerDisplayName,
+                ]
+              : []),
+            command.providerId,
+            command.modelId,
+            command.endpoint,
+            command.endpointOrigin,
+            command.endpointIdentitySha256,
+            command.transcriptScopeSha256,
+            command.templateId,
+            command.nowMs,
+            command.nowMs,
+          ],
         );
       const jobId = Number(inserted.lastInsertRowid);
       this.database
@@ -460,9 +644,9 @@ export class AiJobRepository {
 
   settingsRevision(): number {
     const row = this.database
-      .prepare("SELECT updated_at_ms FROM ai_provider_settings WHERE id = 1")
+      .prepare("SELECT revision FROM ai_provider_selection WHERE id = 1")
       .get();
-    return Number(row?.updated_at_ms ?? 0);
+    return Number(row?.revision ?? 0);
   }
 
   noteSnapshot(jobId: number): AiNoteSnapshotRecord | null {
@@ -594,6 +778,9 @@ export class AiJobRepository {
     if (
       existing.audioId !== command.audioId ||
       existing.generationId !== command.generationId ||
+      existing.profileId !== command.profileId ||
+      existing.secretRef !== command.secretRef ||
+      existing.providerDisplayName !== command.providerDisplayName ||
       existing.providerId !== command.providerId ||
       existing.modelId !== command.modelId ||
       existing.endpoint !== command.endpoint ||
@@ -613,6 +800,88 @@ export class AiJobRepository {
     if (result.changes !== 1)
       throw new AiProviderFailure("AI_ATTEMPT_CONFLICT", "AI attempt is stale");
   }
+
+  private hasColumn(table: string, column: string): boolean {
+    return this.database
+      .prepare(`PRAGMA table_info(${table})`)
+      .all()
+      .some((row) => String(row.name) === column);
+  }
+
+  private assertSettingsRevision(expectedRevision: number): void {
+    if (this.settingsRevision() !== expectedRevision) {
+      throw new AiProviderFailure(
+        "AI_ATTEMPT_CONFLICT",
+        "AI settings revision is stale",
+      );
+    }
+  }
+
+  private assertModelIdAvailable(
+    modelId: string,
+    excludingProfileId?: string,
+  ): void {
+    const row = this.database
+      .prepare(
+        `SELECT profile_id FROM ai_provider_profiles
+         WHERE model_id = ?
+           AND (? IS NULL OR profile_id <> ?)`,
+      )
+      .get(modelId, excludingProfileId ?? null, excludingProfileId ?? null);
+    if (row) {
+      throw new AiProviderFailure(
+        "AI_INVALID_CONFIGURATION",
+        "AI model ID is already in use",
+      );
+    }
+  }
+
+  private bumpSelectionRevision(
+    expectedRevision: number,
+    selectedProfileId?: string | null,
+  ): void {
+    const statement =
+      selectedProfileId === undefined
+        ? this.database.prepare(
+            `UPDATE ai_provider_selection SET revision = revision + 1
+             WHERE id = 1 AND revision = ?`,
+          )
+        : this.database.prepare(
+            `UPDATE ai_provider_selection
+             SET selected_profile_id = ?, revision = revision + 1
+             WHERE id = 1 AND revision = ?`,
+          );
+    this.assertOneChange(
+      selectedProfileId === undefined
+        ? statement.run(expectedRevision)
+        : statement.run(selectedProfileId, expectedRevision),
+    );
+  }
+
+  private missingProfile(): never {
+    throw new AiProviderFailure(
+      "AI_PROVIDER_MISSING",
+      "AI provider profile is unavailable",
+    );
+  }
+}
+
+function mapProfile(row: Record<string, unknown>): AiProviderProfileRecord {
+  const modelId = String(row.model_id);
+  return {
+    profileId: String(row.profile_id),
+    kind: "custom",
+    configurationName:
+      row.configuration_name == null ? null : String(row.configuration_name),
+    displayName: projectAiModelDisplayName(modelId),
+    protocol: String(row.protocol) as AiProviderProfileRecord["protocol"],
+    modelId,
+    endpoint: String(row.endpoint),
+    secretRef: String(row.secret_ref),
+    createdAtMs: Number(row.created_at_ms),
+    updatedAtMs: Number(row.updated_at_ms),
+    revision: Number(row.revision),
+  };
 }
 
 function mapJob(row: Record<string, unknown>): AiJobRecord {
@@ -620,6 +889,14 @@ function mapJob(row: Record<string, unknown>): AiJobRecord {
     id: Number(row.id),
     audioId: Number(row.audio_id),
     generationId: Number(row.generation_id),
+    profileId:
+      row.profile_id == null ? "legacy-default" : String(row.profile_id),
+    secretRef:
+      row.secret_ref == null ? String(row.provider_id) : String(row.secret_ref),
+    providerDisplayName:
+      row.provider_display_name == null
+        ? legacyProviderDisplayName(String(row.provider_id))
+        : String(row.provider_display_name),
     providerId: String(row.provider_id),
     modelId: String(row.model_id),
     endpoint: String(row.endpoint),
@@ -632,4 +909,8 @@ function mapJob(row: Record<string, unknown>): AiJobRecord {
     revision: Number(row.revision),
     errorCode: row.error_code == null ? null : String(row.error_code),
   };
+}
+
+function legacyProviderDisplayName(providerId: string): string {
+  return providerId === "deepseek" ? "DeepSeek" : "OpenAI Compatible";
 }

@@ -187,8 +187,9 @@ describe("companion Renderer flow", () => {
     expect(await within(pane).findByText("Offline Phone")).toBeVisible();
     expect(within(pane).queryByText("Revoked Phone")).not.toBeInTheDocument();
     await user.click(
-      within(pane).getByRole("button", { name: "添加或配对设备" }),
+      within(pane).getByRole("button", { name: /Offline Phone/ }),
     );
+    await user.click(within(pane).getByRole("button", { name: "配对设备" }));
     expect(
       await screen.findByRole("alert", { name: "局域网权限被拒绝" }),
     ).toHaveTextContent("仍可使用手动配对");

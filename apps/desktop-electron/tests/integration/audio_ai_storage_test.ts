@@ -1,36 +1,438 @@
-import type { DatabaseSync } from "node:sqlite";
+import { mkdtempSync, rmSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { DatabaseSync } from "node:sqlite";
 import { afterEach, describe, expect, it } from "vitest";
 
 import {
   AUDIO_SCHEMA_VERSION,
   openAudioDatabase,
 } from "../../src/main/storage/audio_database";
+import {
+  AUDIO_APPLICATION_ID,
+  createAudioSchemaV1,
+  createAudioSchemaV2,
+  createAudioSchemaV3,
+} from "../../src/main/storage/audio_schema";
 import { AiJobRepository } from "../../src/main/storage/repositories/ai_job_repository";
 
 describe("U10 AI storage authority", () => {
   let database: DatabaseSync | undefined;
-  afterEach(() => database?.close());
+  let temporaryRoot: string | undefined;
+  afterEach(() => {
+    database?.close();
+    database = undefined;
+    if (temporaryRoot) rmSync(temporaryRoot, { force: true, recursive: true });
+  });
 
-  it("creates fresh Audio AI tables without persisting secret material", () => {
+  it("creates fresh Audio AI profile storage without persisting secret material", () => {
     database = openAudioDatabase(":memory:");
     expect(database.prepare("PRAGMA user_version").get()).toEqual({
       user_version: AUDIO_SCHEMA_VERSION,
     });
-    const repository = new AiJobRepository(database);
-    repository.saveSettings({
-      providerId: "openai-compatible",
-      modelId: "audio-model",
-      endpoint: "https://ai.example.com",
-    });
-    expect(repository.loadSettings()).toMatchObject({
-      providerId: "openai-compatible",
-      modelId: "audio-model",
-    });
+    expect(
+      database
+        .prepare(
+          "SELECT name FROM sqlite_master WHERE type = 'table' AND (name LIKE 'ai_provider_%' OR name = 'ai_secret_cleanup_queue') ORDER BY name",
+        )
+        .all(),
+    ).toEqual([
+      { name: "ai_provider_profiles" },
+      { name: "ai_provider_selection" },
+      { name: "ai_secret_cleanup_queue" },
+    ]);
+    expect(
+      database.prepare("SELECT * FROM ai_provider_selection").get(),
+    ).toEqual({ id: 1, selected_profile_id: null, revision: 0 });
+    expect(
+      database
+        .prepare("PRAGMA table_info(ai_jobs)")
+        .all()
+        .find((column) => column.name === "provider_display_name"),
+    ).toEqual(expect.objectContaining({ notnull: 1 }));
     expect(
       JSON.stringify(
-        database.prepare("SELECT * FROM ai_provider_settings").all(),
+        database
+          .prepare("SELECT name, sql FROM sqlite_master WHERE type = 'table'")
+          .all(),
       ),
-    ).not.toContain("sk-do-not-persist");
+    ).not.toMatch(/api_key|secret_value|sk-do-not-persist/);
+    expect(
+      database.prepare("PRAGMA table_info(ai_provider_profiles)").all(),
+    ).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ name: "configuration_name", notnull: 0 }),
+      ]),
+    );
+    expect(
+      database
+        .prepare(
+          "SELECT name FROM sqlite_master WHERE type = 'index' AND tbl_name = 'ai_provider_profiles' ORDER BY name",
+        )
+        .all(),
+    ).toEqual(
+      expect.arrayContaining([
+        { name: "ai_provider_profiles_model_id_unique" },
+      ]),
+    );
+  });
+
+  it("rejects a database falsely marked v3 with a malformed cleanup queue", () => {
+    temporaryRoot = mkdtempSync(join(tmpdir(), "voice2text-ai-malformed-v3-"));
+    const databasePath = join(temporaryRoot, "malformed-v3.sqlite3");
+    const malformed = new DatabaseSync(databasePath);
+    createAudioSchemaV3(malformed);
+    malformed.exec(`
+      DROP TABLE ai_secret_cleanup_queue;
+      CREATE TABLE ai_secret_cleanup_queue (secret_ref TEXT PRIMARY KEY);
+      PRAGMA application_id = ${AUDIO_APPLICATION_ID};
+      PRAGMA user_version = ${AUDIO_SCHEMA_VERSION};
+    `);
+    malformed.close();
+
+    expect(() => openAudioDatabase(databasePath)).toThrow(
+      /secret cleanup schema does not match v3/,
+    );
+  });
+
+  it("migrates v2 profile names to optional notes and preserves selection revisions", () => {
+    const databasePath = createV2Database();
+    const legacy = new DatabaseSync(databasePath);
+    legacy.exec(`
+      INSERT INTO ai_provider_profiles (
+        profile_id, kind, display_name, normalized_display_name, protocol,
+        model_id, endpoint, secret_ref, created_at_ms, updated_at_ms, revision
+      ) VALUES
+        ('deepseek-profile', 'custom', '工作模型', '工作模型', 'deepseek',
+         'deepseek-chat', 'https://api.deepseek.com', 'secret-deepseek', 10, 20, 4),
+        ('compatible-profile', 'custom', '备用模型', '备用模型', 'openai-compatible',
+         'vendor-chat', 'https://ai.example.com/v1', 'secret-compatible', 11, 21, 5);
+      UPDATE ai_provider_selection
+        SET selected_profile_id = 'compatible-profile', revision = 7
+        WHERE id = 1;
+    `);
+    legacy.close();
+
+    database = openAudioDatabase(databasePath);
+
+    expect(database.prepare("PRAGMA user_version").get()).toEqual({
+      user_version: AUDIO_SCHEMA_VERSION,
+    });
+    expect(
+      database
+        .prepare(
+          `SELECT profile_id, configuration_name, protocol, model_id, endpoint,
+                  secret_ref, created_at_ms, updated_at_ms, revision
+             FROM ai_provider_profiles ORDER BY profile_id`,
+        )
+        .all(),
+    ).toEqual([
+      {
+        profile_id: "compatible-profile",
+        configuration_name: "备用模型",
+        protocol: "openai-compatible",
+        model_id: "vendor-chat",
+        endpoint: "https://ai.example.com/v1",
+        secret_ref: "secret-compatible",
+        created_at_ms: 11,
+        updated_at_ms: 21,
+        revision: 5,
+      },
+      {
+        profile_id: "deepseek-profile",
+        configuration_name: "工作模型",
+        protocol: "deepseek",
+        model_id: "deepseek-chat",
+        endpoint: "https://api.deepseek.com",
+        secret_ref: "secret-deepseek",
+        created_at_ms: 10,
+        updated_at_ms: 20,
+        revision: 4,
+      },
+    ]);
+    expect(
+      database.prepare("SELECT * FROM ai_provider_selection").get(),
+    ).toEqual({
+      id: 1,
+      selected_profile_id: "compatible-profile",
+      revision: 7,
+    });
+  });
+
+  it("rejects a v2 duplicate-model collision without mutating the legacy store", () => {
+    const databasePath = createV2Database();
+    const legacy = new DatabaseSync(databasePath);
+    legacy.exec(`
+      INSERT INTO ai_provider_profiles (
+        profile_id, kind, display_name, normalized_display_name, protocol,
+        model_id, endpoint, secret_ref, created_at_ms, updated_at_ms, revision
+      ) VALUES
+        ('first', 'custom', 'First', 'first', 'openai-compatible',
+         'shared-model', 'https://one.example.com/v1', 'secret-one', 1, 1, 0),
+        ('second', 'custom', 'Second', 'second', 'openai-compatible',
+         'shared-model', 'https://two.example.com/v1', 'secret-two', 2, 2, 0);
+    `);
+    legacy.close();
+
+    expect(() => openAudioDatabase(databasePath)).toThrow(/shared-model/);
+
+    const preserved = new DatabaseSync(databasePath);
+    expect(preserved.prepare("PRAGMA user_version").get()).toEqual({
+      user_version: 2,
+    });
+    expect(
+      preserved
+        .prepare(
+          "SELECT profile_id, display_name, model_id FROM ai_provider_profiles ORDER BY profile_id",
+        )
+        .all(),
+    ).toEqual([
+      { profile_id: "first", display_name: "First", model_id: "shared-model" },
+      {
+        profile_id: "second",
+        display_name: "Second",
+        model_id: "shared-model",
+      },
+    ]);
+    preserved.close();
+  });
+
+  it.each([
+    {
+      providerId: "deepseek",
+      modelId: "deepseek-reasoner",
+      endpoint: "https://api.deepseek.com",
+      displayName: "DeepSeek",
+    },
+    {
+      providerId: "openai-compatible",
+      modelId: "audio-model",
+      endpoint: "https://ai.example.com/v1",
+      displayName: "OpenAI Compatible",
+    },
+  ] as const)(
+    "migrates a legacy $providerId setting into the selected custom profile",
+    ({ providerId, modelId, endpoint, displayName }) => {
+      const databasePath = createLegacyDatabase();
+      const legacy = new DatabaseSync(databasePath);
+      legacy
+        .prepare(
+          "UPDATE ai_provider_settings SET provider_id = ?, model_id = ?, endpoint = ?, updated_at_ms = ? WHERE id = 1",
+        )
+        .run(providerId, modelId, endpoint, 1234);
+      seedAudio(legacy);
+      const identity = {
+        profileId: "legacy-default",
+        providerId,
+        endpointOrigin: new URL(endpoint).origin,
+        endpointIdentitySha256: "c".repeat(64),
+        transcriptScopeSha256: "d".repeat(64),
+      };
+      new AiJobRepository(legacy).enqueue(
+        {
+          audioId: 1,
+          generationId: 1,
+          ...identity,
+          secretRef: providerId,
+          providerDisplayName: displayName,
+          modelId,
+          endpoint,
+          templateId: "default",
+          idempotencyKey: `migrate-${providerId}-job`,
+          nowMs: 1235,
+        },
+        { version: 1, ...identity },
+      );
+      legacy.close();
+
+      database = openAudioDatabase(databasePath);
+
+      expect(
+        database.prepare("SELECT * FROM ai_provider_profiles").get(),
+      ).toEqual({
+        profile_id: "legacy-default",
+        kind: "custom",
+        configuration_name: displayName,
+        protocol: providerId,
+        model_id: modelId,
+        endpoint,
+        secret_ref: providerId,
+        created_at_ms: 1234,
+        updated_at_ms: 1234,
+        revision: 0,
+      });
+      expect(
+        database.prepare("SELECT * FROM ai_provider_selection").get(),
+      ).toEqual({
+        id: 1,
+        selected_profile_id: "legacy-default",
+        revision: 0,
+      });
+      expect(
+        database.prepare("SELECT provider_display_name FROM ai_jobs").get(),
+      ).toEqual({ provider_display_name: displayName });
+      expect(
+        database
+          .prepare("PRAGMA table_info(ai_jobs)")
+          .all()
+          .filter((column) =>
+            ["profile_id", "secret_ref", "provider_display_name"].includes(
+              String(column.name),
+            ),
+          )
+          .map((column) => ({
+            name: column.name,
+            notnull: column.notnull,
+            defaultValue: column.dflt_value,
+          })),
+      ).toEqual([
+        { name: "profile_id", notnull: 1, defaultValue: null },
+        { name: "secret_ref", notnull: 1, defaultValue: null },
+        { name: "provider_display_name", notnull: 1, defaultValue: null },
+      ]);
+    },
+  );
+
+  it("preserves immutable AI job, consent, note, and evidence history during migration", () => {
+    const databasePath = createLegacyDatabase();
+    const legacy = new DatabaseSync(databasePath);
+    seedAudio(legacy);
+    const repository = new AiJobRepository(legacy);
+    const identity = {
+      profileId: "legacy-default",
+      providerId: "deepseek",
+      endpointOrigin: "https://api.deepseek.com",
+      endpointIdentitySha256: "f".repeat(64),
+      transcriptScopeSha256: "e".repeat(64),
+    } as const;
+    const job = repository.enqueue(
+      {
+        audioId: 1,
+        generationId: 1,
+        ...identity,
+        secretRef: "deepseek",
+        providerDisplayName: "DeepSeek",
+        modelId: "deepseek-chat",
+        endpoint: "https://api.deepseek.com",
+        templateId: "default",
+        idempotencyKey: "legacy-history-job",
+        nowMs: 100,
+      },
+      { version: 1, ...identity },
+    );
+    repository.claim(job.id, 200);
+    repository.publish(
+      job.id,
+      1,
+      {
+        schemaVersion: "audio_intelligence_output/v1",
+        suggestedTitle: "Legacy note",
+        audioType: null,
+        items: [
+          {
+            kind: "decision",
+            body: "preserve history",
+            evidence: [{ segmentId: 7, startMs: 0, endMs: 1000 }],
+            actionOwner: null,
+            actionDueAtMs: null,
+          },
+        ],
+      },
+      300,
+    );
+    legacy.close();
+
+    database = openAudioDatabase(databasePath);
+
+    expect(
+      database
+        .prepare(
+          `SELECT provider_id, provider_display_name, model_id, endpoint, profile_id, secret_ref FROM ai_jobs WHERE id = ?`,
+        )
+        .get(job.id),
+    ).toEqual({
+      provider_id: "deepseek",
+      provider_display_name: "DeepSeek",
+      model_id: "deepseek-chat",
+      endpoint: "https://api.deepseek.com",
+      profile_id: "legacy-default",
+      secret_ref: "deepseek",
+    });
+    expect(
+      database
+        .prepare(
+          "SELECT provider_id, endpoint, profile_id FROM ai_consents WHERE id = 1",
+        )
+        .get(),
+    ).toEqual({
+      provider_id: "deepseek",
+      endpoint: "https://api.deepseek.com",
+      profile_id: "legacy-default",
+    });
+    for (const table of [
+      "ai_jobs",
+      "ai_consents",
+      "ai_notes",
+      "ai_insights",
+      "ai_evidence_links",
+    ]) {
+      expect(
+        database.prepare(`SELECT COUNT(*) AS count FROM ${table}`).get(),
+      ).toEqual({ count: 1 });
+    }
+  });
+
+  it("allows migrated stores to bind identical endpoint consent to distinct profiles", () => {
+    const databasePath = createLegacyDatabase();
+    database = openAudioDatabase(databasePath);
+    seedAudio(database);
+    const repository = new AiJobRepository(database);
+    repository.createProfile({
+      profileId: "second-profile",
+      secretRef: "second-secret",
+      configurationName: "Second",
+      protocol: "deepseek",
+      modelId: "deepseek-reasoner",
+      endpoint: "https://api.deepseek.com",
+      expectedRevision: 0,
+      nowMs: 2,
+    });
+    const identity = {
+      providerId: "deepseek" as const,
+      endpointOrigin: "https://api.deepseek.com",
+      endpointIdentitySha256: "c".repeat(64),
+      transcriptScopeSha256: "a".repeat(64),
+    };
+    for (const [profileId, secretRef, idempotencyKey] of [
+      ["legacy-default", "deepseek", "migrated-consent-first"],
+      ["second-profile", "second-secret", "migrated-consent-second"],
+    ] as const) {
+      repository.enqueue(
+        {
+          audioId: 1,
+          generationId: 1,
+          profileId,
+          secretRef,
+          providerDisplayName:
+            identity.providerId === "deepseek"
+              ? "DeepSeek"
+              : "OpenAI Compatible",
+          ...identity,
+          modelId:
+            profileId === "legacy-default"
+              ? "deepseek-chat"
+              : "deepseek-reasoner",
+          endpoint: "https://api.deepseek.com",
+          templateId: "default",
+          idempotencyKey,
+          nowMs: 3,
+        },
+        { version: 1, profileId, ...identity },
+      );
+    }
+    expect(
+      database.prepare("SELECT COUNT(*) AS count FROM ai_consents").get(),
+    ).toEqual({ count: 2 });
   });
 
   it("binds consent and exactly-one note to audio provider endpoint and scope", () => {
@@ -40,6 +442,9 @@ describe("U10 AI storage authority", () => {
     const command = {
       audioId: 1,
       generationId: 1,
+      profileId: "legacy-default",
+      secretRef: "deepseek",
+      providerDisplayName: "DeepSeek",
       providerId: "deepseek",
       modelId: "deepseek-chat",
       endpoint: "https://api.deepseek.com",
@@ -55,6 +460,7 @@ describe("U10 AI storage authority", () => {
     );
     const consent = {
       version: 1 as const,
+      profileId: "legacy-default",
       providerId: command.providerId,
       endpointOrigin: command.endpointOrigin,
       endpointIdentitySha256: command.endpointIdentitySha256,
@@ -109,6 +515,7 @@ describe("U10 AI storage authority", () => {
     const repository = new AiJobRepository(database);
     const consent = {
       version: 1 as const,
+      profileId: "legacy-default",
       providerId: "deepseek",
       endpointOrigin: "https://api.deepseek.com",
       endpointIdentitySha256: "d".repeat(64),
@@ -118,6 +525,9 @@ describe("U10 AI storage authority", () => {
       {
         audioId: 1,
         generationId: 1,
+        profileId: consent.profileId,
+        secretRef: "deepseek",
+        providerDisplayName: "DeepSeek",
         providerId: consent.providerId,
         modelId: "deepseek-chat",
         endpoint: "https://api.deepseek.com",
@@ -135,6 +545,9 @@ describe("U10 AI storage authority", () => {
       {
         audioId: 1,
         generationId: 1,
+        profileId: consent.profileId,
+        secretRef: "deepseek",
+        providerDisplayName: "DeepSeek",
         providerId: consent.providerId,
         modelId: "deepseek-chat",
         endpoint: "https://api.deepseek.com",
@@ -185,6 +598,30 @@ describe("U10 AI storage authority", () => {
       database.prepare("SELECT COUNT(*) AS count FROM ai_notes").get(),
     ).toEqual({ count: 0 });
   });
+
+  function createLegacyDatabase(): string {
+    temporaryRoot = mkdtempSync(join(tmpdir(), "voice2text-ai-migration-"));
+    const databasePath = join(temporaryRoot, "audio.sqlite3");
+    const legacy = new DatabaseSync(databasePath);
+    legacy.exec("PRAGMA foreign_keys = ON");
+    createAudioSchemaV1(legacy);
+    legacy.exec(`PRAGMA application_id = ${AUDIO_APPLICATION_ID}`);
+    legacy.exec("PRAGMA user_version = 1");
+    legacy.close();
+    return databasePath;
+  }
+
+  function createV2Database(): string {
+    temporaryRoot = mkdtempSync(join(tmpdir(), "voice2text-ai-v2-migration-"));
+    const databasePath = join(temporaryRoot, "audio.sqlite3");
+    const legacy = new DatabaseSync(databasePath);
+    legacy.exec("PRAGMA foreign_keys = ON");
+    createAudioSchemaV2(legacy);
+    legacy.exec(`PRAGMA application_id = ${AUDIO_APPLICATION_ID}`);
+    legacy.exec("PRAGMA user_version = 2");
+    legacy.close();
+    return databasePath;
+  }
 });
 
 function seedAudio(database: DatabaseSync): void {

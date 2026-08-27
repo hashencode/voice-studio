@@ -9,6 +9,7 @@ final class CaptureControllerTests: XCTestCase {
     defer { try? FileManager.default.removeItem(at: root) }
     let engine = TestMicrophoneEngine()
     engine.frames = 1_024
+    engine.rms = 0.01
     engine.peak = 0.2
     let controller = try CaptureController(
       captureRootPath: root.path,
@@ -24,20 +25,24 @@ final class CaptureControllerTests: XCTestCase {
       testId: started.testId
     )
     XCTAssertEqual(running.observedFrames, 1_024)
-    XCTAssertTrue(running.detectedInput)
-    let stopped = try controller.stopMicrophoneTest(testId: started.testId)
-    XCTAssertEqual(stopped.state, "stopped")
+    XCTAssertTrue(running.observedSound)
+    XCTAssertEqual(running.normalizedRMS, 0.01)
+    let stopped = try controller.finishMicrophoneTest(testId: started.testId)
+    XCTAssertEqual(stopped.state, "finished")
+    XCTAssertEqual(stopped.reason, "detected")
     XCTAssertEqual(engine.stopCount, 1)
     XCTAssertEqual(try FileManager.default.contentsOfDirectory(atPath: root.path), [])
   }
 
-  func testMicrophoneTestRejectsConcurrentStartAndKeepsSilenceNonfatal() throws {
+  func testMicrophoneTestRejectsConcurrentStartAndKeepsSilenceRunningPastThirtySeconds() throws {
     let root = try temporaryRoot()
     defer { try? FileManager.default.removeItem(at: root) }
     let engine = TestMicrophoneEngine()
+    var now: UInt64 = 1_000_000_000
     let controller = try CaptureController(
       captureRootPath: root.path,
-      microphoneTestFactory: { _ in engine }
+      microphoneTestFactory: { _ in engine },
+      nowNanoseconds: { now }
     )
     let first = try controller.startMicrophoneTest(
       testId: "mic-test-silent-test-123456",
@@ -49,10 +54,211 @@ final class CaptureControllerTests: XCTestCase {
         microphoneDeviceId: nil
       )
     )
-    XCTAssertFalse(
-      try controller.microphoneTestSnapshot(testId: first.testId).detectedInput
+    now += 31_000_000_000
+    let running = try controller.microphoneTestSnapshot(testId: first.testId)
+    XCTAssertEqual(running.state, "running")
+    XCTAssertEqual(running.elapsedMs, 31_000)
+    XCTAssertFalse(running.observedSound)
+    XCTAssertNoThrow(try controller.cancelMicrophoneTest(testId: first.testId))
+  }
+
+  func testMicrophoneSoundUsesRMSFloorAndLatchesWithoutPeakClassification() throws {
+    let root = try temporaryRoot()
+    defer { try? FileManager.default.removeItem(at: root) }
+    let engine = TestMicrophoneEngine()
+    engine.frames = 1_024
+    engine.peak = 0.9
+    engine.rms = pow(10, -55.0 / 20.0) * 0.99
+    let controller = try CaptureController(
+      captureRootPath: root.path,
+      microphoneTestFactory: { _ in engine }
     )
-    XCTAssertNoThrow(try controller.stopMicrophoneTest(testId: first.testId))
+    let started = try controller.startMicrophoneTest(
+      testId: "mic-test-rms-floor-123456",
+      microphoneDeviceId: nil
+    )
+    XCTAssertFalse(started.observedSound)
+    XCTAssertFalse(
+      try controller.microphoneTestSnapshot(testId: started.testId).observedSound
+    )
+
+    engine.rms = pow(10, -55.0 / 20.0)
+    XCTAssertTrue(
+      try controller.microphoneTestSnapshot(testId: started.testId).observedSound
+    )
+    engine.rms = 0
+    engine.peak = 0
+    XCTAssertTrue(
+      try controller.microphoneTestSnapshot(testId: started.testId).observedSound
+    )
+  }
+
+  func testMicrophoneFinishDistinguishesNoFramesAndNoSound() throws {
+    let root = try temporaryRoot()
+    defer { try? FileManager.default.removeItem(at: root) }
+    let engines = [TestMicrophoneEngine(), TestMicrophoneEngine()]
+    engines[1].frames = 1_024
+    var index = 0
+    let controller = try CaptureController(
+      captureRootPath: root.path,
+      microphoneTestFactory: { _ in
+        defer { index += 1 }
+        return engines[index]
+      }
+    )
+
+    let empty = try controller.startMicrophoneTest(
+      testId: "mic-test-no-frames-123456",
+      microphoneDeviceId: nil
+    )
+    let emptyFinish = try controller.finishMicrophoneTest(testId: empty.testId)
+    XCTAssertEqual(emptyFinish.reason, "no-audio-frames")
+
+    let silent = try controller.startMicrophoneTest(
+      testId: "mic-test-no-sound-123456",
+      microphoneDeviceId: nil
+    )
+    let silentFinish = try controller.finishMicrophoneTest(testId: silent.testId)
+    XCTAssertEqual(silentFinish.reason, "no-sound-observed")
+  }
+
+  func testMicrophoneTestKeepsSameIDWhileReceivingLaterMeterSamples() throws {
+    let root = try temporaryRoot()
+    defer { try? FileManager.default.removeItem(at: root) }
+    let engine = TestMicrophoneEngine()
+    let controller = try CaptureController(
+      captureRootPath: root.path,
+      microphoneTestFactory: { _ in engine }
+    )
+    let started = try controller.startMicrophoneTest(
+      testId: "mic-test-runtime-health-123456",
+      microphoneDeviceId: nil
+    )
+    engine.frames = 2_048
+    engine.rms = 0.02
+    engine.peak = 0.4
+
+    let recovered = try controller.microphoneTestSnapshot(testId: started.testId)
+
+    XCTAssertEqual(recovered.testId, started.testId)
+    XCTAssertEqual(recovered.state, "running")
+    XCTAssertNil(recovered.diagnostic)
+    XCTAssertEqual(recovered.observedFrames, 2_048)
+    XCTAssertEqual(engine.stopCount, 0)
+  }
+
+  func testMicrophoneTerminalDiagnosticsMapToStableReasons() throws {
+    let cases: [(diagnostic: String, reason: String)] = [
+      ("permission_denied", "permission-denied"),
+      ("selected_uid_unavailable", "device-unavailable"),
+      ("selected_device_inactive", "device-unavailable"),
+      ("audio_unit_selection_failed", "device-open-failed"),
+      ("initial_engine_start_failed", "device-open-failed"),
+      ("recovery_restart_failed", "device-open-failed"),
+      ("unsupported_format", "unsupported-format"),
+    ]
+
+    for (index, testCase) in cases.enumerated() {
+      let root = try temporaryRoot()
+      defer { try? FileManager.default.removeItem(at: root) }
+      let engine = TestMicrophoneEngine()
+      let controller = try CaptureController(
+        captureRootPath: root.path,
+        microphoneTestFactory: { _ in engine }
+      )
+      let started = try controller.startMicrophoneTest(
+        testId: "mic-test-diagnostic-\(index)-123456",
+        microphoneDeviceId: nil
+      )
+
+      engine.reportHealthFailure(testCase.diagnostic)
+      let failed = try controller.microphoneTestSnapshot(testId: started.testId)
+
+      XCTAssertEqual(failed.state, "failed", testCase.diagnostic)
+      XCTAssertEqual(failed.reason, testCase.reason, testCase.diagnostic)
+      XCTAssertEqual(failed.diagnostic, testCase.diagnostic, testCase.diagnostic)
+      XCTAssertEqual(engine.stopCount, 1, testCase.diagnostic)
+    }
+  }
+
+  func testMicrophoneStartFailuresPreserveStableReasonAndDiagnostic() throws {
+    let cases: [(error: DesktopMicrophoneCaptureError, reason: String, diagnostic: String)] = [
+      (.permissionDenied, "permission-denied", "permission_denied"),
+      (.selectedInputUnavailable, "device-unavailable", "selected_uid_unavailable"),
+      (.selectedInputInactive, "device-unavailable", "selected_device_inactive"),
+      (.selectedInputFailed(kAudio_ParamError), "device-open-failed", "audio_unit_selection_failed"),
+      (.invalidFormat, "unsupported-format", "unsupported_format"),
+      (.engineStart(TestMicrophoneStartError()), "device-open-failed", "initial_engine_start_failed"),
+    ]
+
+    for (index, testCase) in cases.enumerated() {
+      let root = try temporaryRoot()
+      defer { try? FileManager.default.removeItem(at: root) }
+      let engine = TestMicrophoneEngine()
+      engine.startError = testCase.error
+      let controller = try CaptureController(
+        captureRootPath: root.path,
+        microphoneTestFactory: { _ in engine }
+      )
+
+      let failed = try controller.startMicrophoneTest(
+        testId: "mic-test-start-failure-\(index)-123456",
+        microphoneDeviceId: nil
+      )
+
+      XCTAssertEqual(failed.state, "failed")
+      XCTAssertEqual(failed.reason, testCase.reason)
+      XCTAssertEqual(failed.diagnostic, testCase.diagnostic)
+      XCTAssertEqual(engine.stopCount, 1)
+    }
+  }
+
+  func testMicrophoneTerminalTransitionsIgnoreLateAndRepeatedCallbacks() throws {
+    let outcomes: [(name: String, terminal: (CaptureController, String) throws -> MicrophoneTestSnapshot, state: String)] = [
+      ("finish", { try $0.finishMicrophoneTest(testId: $1) }, "finished"),
+      ("cancel", { try $0.cancelMicrophoneTest(testId: $1) }, "cancelled"),
+    ]
+
+    for outcome in outcomes {
+      let root = try temporaryRoot()
+      defer { try? FileManager.default.removeItem(at: root) }
+      let engine = TestMicrophoneEngine()
+      let controller = try CaptureController(
+        captureRootPath: root.path,
+        microphoneTestFactory: { _ in engine }
+      )
+      let started = try controller.startMicrophoneTest(
+        testId: "mic-test-late-\(outcome.name)-123456",
+        microphoneDeviceId: nil
+      )
+
+      let terminal = try outcome.terminal(controller, started.testId)
+      engine.reportLateHealthFailure("recovery_restart_failed")
+
+      XCTAssertEqual(try controller.microphoneTestSnapshot(testId: started.testId).state, outcome.state)
+      XCTAssertEqual(try outcome.terminal(controller, started.testId).state, outcome.state)
+      XCTAssertEqual(terminal.state, outcome.state)
+      XCTAssertEqual(engine.stopCount, 1)
+    }
+
+    let root = try temporaryRoot()
+    defer { try? FileManager.default.removeItem(at: root) }
+    let engine = TestMicrophoneEngine()
+    let controller = try CaptureController(
+      captureRootPath: root.path,
+      microphoneTestFactory: { _ in engine }
+    )
+    let started = try controller.startMicrophoneTest(
+      testId: "mic-test-repeat-failure-123456",
+      microphoneDeviceId: nil
+    )
+    engine.reportHealthFailure("selected_uid_unavailable")
+    engine.reportLateHealthFailure("recovery_restart_failed")
+
+    let failed = try controller.microphoneTestSnapshot(testId: started.testId)
+    XCTAssertEqual(failed.reason, "device-unavailable")
+    XCTAssertEqual(failed.diagnostic, "selected_uid_unavailable")
+    XCTAssertEqual(engine.stopCount, 1)
   }
 
   func testPreflightReportsEveryFrozenBranchWithoutBlockingOnOptionalCaptions() {
@@ -549,12 +755,38 @@ final class CaptureControllerTests: XCTestCase {
 
 private final class TestMicrophoneEngine: MicrophoneTestEngine {
   var frames: UInt64 = 0
+  var rms: Double = 0
   var peak: Double = 0
+  var status = MicrophoneMeterStatus.samples
+  var startError: Error?
   var stopCount = 0
+  private var healthHandler: ((MicrophoneCaptureDiagnostic) -> Void)?
+  private var lastHealthHandler: ((MicrophoneCaptureDiagnostic) -> Void)?
 
-  func start() throws {}
+  func start() throws {
+    if let startError { throw startError }
+  }
   func stop() { stopCount += 1 }
-  func snapshot() -> (observedFrames: UInt64, normalizedPeak: Double) {
-    (frames, peak)
+  func setHealthHandler(_ handler: ((MicrophoneCaptureDiagnostic) -> Void)?) {
+    healthHandler = handler
+    if let handler { lastHealthHandler = handler }
+  }
+  func snapshot() -> MicrophoneCapture.MeterSnapshot {
+    MicrophoneCapture.MeterSnapshot(
+      observedFrames: frames,
+      normalizedRMS: rms,
+      normalizedPeak: peak,
+      status: status
+    )
+  }
+  func reportHealthFailure(_ reason: String) {
+    guard let diagnostic = MicrophoneCaptureDiagnostic(rawValue: reason) else { return }
+    healthHandler?(diagnostic)
+  }
+  func reportLateHealthFailure(_ reason: String) {
+    guard let diagnostic = MicrophoneCaptureDiagnostic(rawValue: reason) else { return }
+    lastHealthHandler?(diagnostic)
   }
 }
+
+private struct TestMicrophoneStartError: Error {}

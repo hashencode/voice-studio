@@ -81,10 +81,13 @@ function installOperationsApi(overrides: Partial<Voice2TextDesktopApi> = {}) {
   const unsubscribeOperation = vi.fn();
   const api: Voice2TextDesktopApi = {
     ...companionRendererStubs(),
+    markActivityRead: vi.fn(async () => tasksSnapshot),
+    markAllActivityRead: vi.fn(async () => tasksSnapshot),
     getAiSettings: vi.fn(async () => testAiSettings()),
-    saveAiSettings: vi.fn(async () => testAiSettings()),
-    replaceAiProviderSecret: vi.fn(async () => testAiSettings()),
-    deleteAiProviderSecret: vi.fn(async () => testAiSettings()),
+    createAiProviderProfile: vi.fn(async () => testAiSettings()),
+    updateAiProviderProfile: vi.fn(async () => testAiSettings()),
+    selectAiProviderProfile: vi.fn(async () => testAiSettings()),
+    deleteAiProviderProfile: vi.fn(async () => testAiSettings()),
     prepareAudioAi: vi.fn(),
     getAudioAiSnapshot: vi.fn(async () => null),
     generateAudioAi: vi.fn(),
@@ -144,21 +147,35 @@ function installOperationsApi(overrides: Partial<Voice2TextDesktopApi> = {}) {
 function testAiSettings() {
   return {
     revision: 1,
-    config: {
-      providerId: "deepseek" as const,
-      displayName: "DeepSeek",
-      modelId: "deepseek-chat",
-      endpoint: "https://api.deepseek.com",
-      endpointOrigin: "https://api.deepseek.com",
-      processingLocation: "cloudDirect" as const,
-      requiresConsent: true as const,
-    },
-    secretState: "missing" as const,
+    profiles: [testAiProfile()],
+    selectedProfileId: "profile-deepseek",
     deviceSecurity: {
       kind: "device-security" as const,
       fileVaultState: "unknown" as const,
       applicationLayerEncryption: "not-claimed" as const,
     },
+  };
+}
+
+function testAiProfile() {
+  return {
+    profileId: "profile-deepseek",
+    kind: "custom" as const,
+    configurationName: null,
+    displayName: "DeepSeek",
+    protocol: "deepseek" as const,
+    modelId: "deepseek-chat",
+    modelSummary: "deepseek-chat",
+    endpoint: "https://api.deepseek.com",
+    endpointOrigin: "https://api.deepseek.com",
+    processingLocation: "cloudDirect" as const,
+    requiresConsent: true as const,
+    capabilities: {
+      selectable: true as const,
+      editable: true as const,
+      deletable: true as const,
+    },
+    secretState: "missing" as const,
   };
 }
 
