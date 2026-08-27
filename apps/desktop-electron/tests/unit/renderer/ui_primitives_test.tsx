@@ -72,6 +72,7 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
+import { ApplicationBlocker } from "@/components/application-blocker";
 import {
   Field,
   FieldContent,
@@ -317,6 +318,86 @@ describe("current shadcn primitives", () => {
       screen.getByRole("button", { name: "关闭第二层", hidden: true }),
     );
     expect(navigated).toHaveBeenCalledOnce();
+  });
+
+  it("keeps application blockers open and discards pending modal navigation", async () => {
+    const navigated = vi.fn();
+    const user = userEvent.setup();
+
+    function Harness() {
+      const [ordinaryOpen, setOrdinaryOpen] = useState(true);
+      const [blocked, setBlocked] = useState(false);
+      const { applicationBlocked, requestNavigationAfterModals } =
+        useModalCoordinator();
+      return (
+        <>
+          <output aria-label="应用阻塞状态">
+            {applicationBlocked ? "阻塞" : "可用"}
+          </output>
+          <button onClick={() => requestNavigationAfterModals(navigated)}>
+            授权导航
+          </button>
+          <button onClick={() => setBlocked(true)}>启用阻塞器</button>
+          <button onClick={() => setBlocked(false)}>解除阻塞器</button>
+          <button onClick={() => setOrdinaryOpen(false)}>关闭普通对话框</button>
+          <Dialog open={ordinaryOpen} onOpenChange={setOrdinaryOpen}>
+            <DialogContent>
+              <DialogTitle>普通对话框</DialogTitle>
+            </DialogContent>
+          </Dialog>
+          <ApplicationBlocker
+            open={blocked}
+            title="需要先处理本机资料库"
+            description="请重新检查资料库状态。"
+          >
+            <button type="button">重新检查</button>
+          </ApplicationBlocker>
+        </>
+      );
+    }
+
+    render(
+      <ModalCoordinatorProvider>
+        <Harness />
+      </ModalCoordinatorProvider>,
+    );
+
+    fireEvent.click(
+      screen.getByRole("button", { name: "授权导航", hidden: true }),
+    );
+    fireEvent.click(
+      screen.getByRole("button", { name: "启用阻塞器", hidden: true }),
+    );
+    expect(await screen.findByLabelText("应用阻塞状态")).toHaveTextContent(
+      "阻塞",
+    );
+
+    const blocker = screen.getByRole("dialog", {
+      name: "需要先处理本机资料库",
+    });
+    expect(blocker).toHaveTextContent("请重新检查资料库状态。");
+    expect(
+      within(blocker).queryByRole("button", { name: "关闭", hidden: true }),
+    ).not.toBeInTheDocument();
+
+    await user.keyboard("{Escape}");
+    expect(blocker).toBeInTheDocument();
+    const overlays = document.querySelectorAll('[data-slot="dialog-overlay"]');
+    fireEvent.pointerDown(overlays.item(overlays.length - 1));
+    expect(blocker).toBeInTheDocument();
+
+    fireEvent.click(
+      screen.getByRole("button", { name: "关闭普通对话框", hidden: true }),
+    );
+    fireEvent.click(
+      screen.getByRole("button", { name: "解除阻塞器", hidden: true }),
+    );
+    await waitFor(() => {
+      expect(
+        screen.queryByRole("dialog", { name: "需要先处理本机资料库" }),
+      ).not.toBeInTheDocument();
+    });
+    expect(navigated).not.toHaveBeenCalled();
   });
 
   it("keeps Sheet dismissal semantics on the Dialog mask and ghost close", async () => {
