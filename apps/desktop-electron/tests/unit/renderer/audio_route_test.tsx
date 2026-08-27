@@ -87,8 +87,8 @@ it("keeps import beside search and new recording in the fixed footer", async () 
   expect(row).toHaveAttribute("data-flat-row", "true");
   expect(row).toHaveAttribute("data-slot", "item");
   expect(row.querySelector('[data-slot="item-title"]')).toHaveClass(
-    "text-base",
-    "leading-[22px]",
+    "text-sm",
+    "leading-snug",
   );
   expect(row.querySelector('[data-slot="item-description"]')).toHaveClass(
     "text-sm",
@@ -261,13 +261,9 @@ it("keeps search with the list and aligns loading with the empty state", async (
     Node.DOCUMENT_POSITION_FOLLOWING,
   );
   expect(search.parentElement).not.toHaveClass("border-b");
-  expect(empty.parentElement).toHaveClass(
-    "grid",
-    "flex-1",
-    "grid-rows-[1fr_auto_3fr]",
-  );
-  expect(empty).toHaveClass("row-start-2");
-  expect(loadingLayoutClassName).toBe(empty.parentElement?.className);
+  expect(empty.parentElement).toHaveClass("flex", "h-full", "flex-col");
+  expect(empty).toHaveClass("min-h-0", "flex-1");
+  expect(loadingLayoutClassName).not.toBe(empty.parentElement?.className);
 });
 
 it("disables recording when no microphone is available", async () => {

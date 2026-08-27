@@ -364,9 +364,11 @@ describe("sidebar navigation e2e", () => {
     expect(
       screen.getByRole("complementary", { name: "消息上下文面板" }),
     ).toBeVisible();
-    expect(screen.getByRole("region", { name: "消息详情" })).toHaveTextContent(
-      "录制已保存",
-    );
+    const messageDetails = screen.getByRole("region", { name: "消息详情" });
+    expect(messageDetails).toHaveTextContent("已完成");
+    expect(
+      within(messageDetails).getByRole("button", { name: "打开录制详情" }),
+    ).toBeVisible();
 
     await user.click(screen.getByRole("button", { name: /录制失败/ }));
     expect(

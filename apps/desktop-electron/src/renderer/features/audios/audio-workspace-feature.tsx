@@ -12,6 +12,7 @@ import {
 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
+import { Card } from "@/components/ui/card";
 import { EmptyState } from "@/components/ui/empty-state";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -854,157 +855,158 @@ function AudioCommandDeck({
     playback?.durationMs ?? workspace.summary.durationMs,
   );
   return (
-    <section
-      aria-label="音频控制台"
-      className="rounded-xl border bg-card p-4 shadow-sm"
-    >
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <p className="text-sm text-muted-foreground">
-          {workspace.summary.segmentCount} 个片段 ·{" "}
-          {generationLabel(workspace.summary.generationKind)}
-        </p>
-        <div
-          className="flex flex-wrap items-center gap-1"
-          role="group"
-          aria-label="音频工作区操作"
-        >
-          <Button
-            type="button"
-            variant="ghost"
-            size="icon-sm"
-            disabled={pending || !workspace.canUndo}
-            aria-label="撤销"
-            onClick={onUndo}
-          >
-            <Undo2 aria-hidden="true" />
-          </Button>
-          <Button
-            type="button"
-            variant="ghost"
-            size="icon-sm"
-            disabled={pending || !workspace.canRedo}
-            aria-label="重做"
-            onClick={onRedo}
-          >
-            <Redo2 aria-hidden="true" />
-          </Button>
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                disabled={pending}
-              >
-                <Download aria-hidden="true" />
-                导出
-                <ChevronDown aria-hidden="true" />
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end">
-              <DropdownMenuLabel>选择导出格式</DropdownMenuLabel>
-              {(["txt", "md", "vtt", "srt", "json"] as const).map((format) => (
-                <DropdownMenuItem
-                  key={format}
-                  onSelect={() => onExport(format)}
-                >
-                  {format.toUpperCase()}
-                </DropdownMenuItem>
-              ))}
-            </DropdownMenuContent>
-          </DropdownMenu>
-        </div>
-      </div>
-      <div className="mt-4 grid items-center gap-4 md:grid-cols-[auto_minmax(12rem,1fr)_auto]">
-        <div
-          className="flex items-center gap-1"
-          role="group"
-          aria-label="播放控制"
-        >
-          <Button
-            type="button"
-            variant="ghost"
-            size="icon"
-            disabled={pending}
-            aria-label="后退 10 秒"
-            onClick={() =>
-              onAction({
-                action: "seek",
-                positionMs: Math.max(0, positionMs - 10_000),
-              })
-            }
-          >
-            <RotateCcw aria-hidden="true" />
-          </Button>
-          <Button
-            type="button"
-            size="icon"
-            disabled={pending}
-            aria-label={playing ? "暂停音频" : "播放音频"}
-            onClick={() => onAction({ action: playing ? "pause" : "play" })}
-          >
-            {playing ? (
-              <Pause aria-hidden="true" />
-            ) : (
-              <Play aria-hidden="true" />
-            )}
-          </Button>
-          <Button
-            type="button"
-            variant="ghost"
-            size="icon"
-            disabled={pending}
-            aria-label="前进 10 秒"
-            onClick={() =>
-              onAction({
-                action: "seek",
-                positionMs: Math.min(resolvedDurationMs, positionMs + 10_000),
-              })
-            }
-          >
-            <RotateCw aria-hidden="true" />
-          </Button>
-        </div>
-        <div className="space-y-2">
+    <section aria-label="音频控制台">
+      <Card className="gap-0 p-4">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <p className="text-sm text-muted-foreground">
+            {workspace.summary.segmentCount} 个片段 ·{" "}
+            {generationLabel(workspace.summary.generationKind)}
+          </p>
           <div
-            className="flex justify-between text-xs text-muted-foreground"
-            aria-hidden="true"
+            className="flex flex-wrap items-center gap-1"
+            role="group"
+            aria-label="音频工作区操作"
           >
-            <span>{clock(positionMs)}</span>
-            <span>{clock(resolvedDurationMs)}</span>
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon-sm"
+              disabled={pending || !workspace.canUndo}
+              aria-label="撤销"
+              onClick={onUndo}
+            >
+              <Undo2 aria-hidden="true" />
+            </Button>
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon-sm"
+              disabled={pending || !workspace.canRedo}
+              aria-label="重做"
+              onClick={onRedo}
+            >
+              <Redo2 aria-hidden="true" />
+            </Button>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  disabled={pending}
+                >
+                  <Download aria-hidden="true" />
+                  导出
+                  <ChevronDown aria-hidden="true" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuLabel>选择导出格式</DropdownMenuLabel>
+                {(["txt", "md", "vtt", "srt", "json"] as const).map(
+                  (format) => (
+                    <DropdownMenuItem
+                      key={format}
+                      onSelect={() => onExport(format)}
+                    >
+                      {format.toUpperCase()}
+                    </DropdownMenuItem>
+                  ),
+                )}
+              </DropdownMenuContent>
+            </DropdownMenu>
           </div>
-          <Slider
-            aria-label="音频播放位置"
-            aria-valuetext={clock(positionMs)}
-            min={0}
-            max={resolvedDurationMs}
-            step={1}
-            value={[positionMs]}
+        </div>
+        <div className="mt-4 grid items-center gap-4 md:grid-cols-[auto_minmax(12rem,1fr)_auto]">
+          <div
+            className="flex items-center gap-1"
+            role="group"
+            aria-label="播放控制"
+          >
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon"
+              disabled={pending}
+              aria-label="后退 10 秒"
+              onClick={() =>
+                onAction({
+                  action: "seek",
+                  positionMs: Math.max(0, positionMs - 10_000),
+                })
+              }
+            >
+              <RotateCcw aria-hidden="true" />
+            </Button>
+            <Button
+              type="button"
+              size="icon"
+              disabled={pending}
+              aria-label={playing ? "暂停音频" : "播放音频"}
+              onClick={() => onAction({ action: playing ? "pause" : "play" })}
+            >
+              {playing ? (
+                <Pause aria-hidden="true" />
+              ) : (
+                <Play aria-hidden="true" />
+              )}
+            </Button>
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon"
+              disabled={pending}
+              aria-label="前进 10 秒"
+              onClick={() =>
+                onAction({
+                  action: "seek",
+                  positionMs: Math.min(resolvedDurationMs, positionMs + 10_000),
+                })
+              }
+            >
+              <RotateCw aria-hidden="true" />
+            </Button>
+          </div>
+          <div className="space-y-2">
+            <div
+              className="flex justify-between text-xs text-muted-foreground"
+              aria-hidden="true"
+            >
+              <span>{clock(positionMs)}</span>
+              <span>{clock(resolvedDurationMs)}</span>
+            </div>
+            <Slider
+              aria-label="音频播放位置"
+              aria-valuetext={clock(positionMs)}
+              min={0}
+              max={resolvedDurationMs}
+              step={1}
+              value={[positionMs]}
+              disabled={pending}
+              onValueChange={(value) =>
+                onAction({ action: "seek", positionMs: value[0] ?? 0 })
+              }
+            />
+          </div>
+          <Select
+            value={String(playback?.speed ?? 1)}
             disabled={pending}
             onValueChange={(value) =>
-              onAction({ action: "seek", positionMs: value[0] ?? 0 })
+              onAction({ action: "speed", speed: Number(value) })
             }
-          />
+          >
+            <SelectTrigger aria-label="播放速度" size="sm">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {[0.5, 0.75, 1, 1.25, 1.5, 2].map((speed) => (
+                <SelectItem key={speed} value={String(speed)}>
+                  {speed}×
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
         </div>
-        <Select
-          value={String(playback?.speed ?? 1)}
-          disabled={pending}
-          onValueChange={(value) =>
-            onAction({ action: "speed", speed: Number(value) })
-          }
-        >
-          <SelectTrigger aria-label="播放速度" size="sm">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            {[0.5, 0.75, 1, 1.25, 1.5, 2].map((speed) => (
-              <SelectItem key={speed} value={String(speed)}>
-                {speed}×
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-      </div>
+      </Card>
     </section>
   );
 }

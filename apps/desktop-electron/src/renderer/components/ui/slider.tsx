@@ -53,7 +53,7 @@ function Slider({
           aria-label={ariaLabel}
           aria-labelledby={ariaLabelledBy}
           aria-valuetext={ariaValueText}
-          className="block size-4 shrink-0 rounded-full border border-primary bg-white ring-ring/40 transition-[color,box-shadow] hover:ring-1 focus-visible:ring-1 focus-visible:outline-hidden disabled:pointer-events-none disabled:opacity-50"
+          className="relative block size-4 shrink-0 rounded-full border border-primary bg-white ring-ring/40 transition-[color,box-shadow] after:absolute after:-inset-2 hover:ring-1 active:ring-1 focus-visible:ring-1 focus-visible:outline-hidden data-[disabled]:pointer-events-none data-[disabled]:opacity-50"
         />
       ))}
     </SliderPrimitive.Root>

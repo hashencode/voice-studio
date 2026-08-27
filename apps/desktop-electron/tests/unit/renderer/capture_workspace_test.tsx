@@ -4,7 +4,10 @@ import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { CaptureWorkspace } from "../../../src/renderer/features/capture/capture-workspace";
+import {
+  CaptureWorkspace,
+  FloatingCapturePreferenceSetting,
+} from "../../../src/renderer/features/capture/capture-workspace";
 import type {
   ApplicationSnapshot,
   CapturePreflight,
@@ -64,6 +67,35 @@ function installCaptureApi(overrides: Partial<Voice2TextDesktopApi> = {}) {
 }
 
 describe("capture workspace", () => {
+  it("keeps the floating preference controlled while pending and rolls back on failure", async () => {
+    let rejectPreference!: (reason?: unknown) => void;
+    const preferenceUpdate = new Promise<{ enabled: boolean }>((_, reject) => {
+      rejectPreference = reject;
+    });
+    const setFloatingCapturePreference = vi.fn(() => preferenceUpdate);
+    installCaptureApi({
+      getFloatingCapturePreference: vi.fn(async () => ({ enabled: false })),
+      setFloatingCapturePreference,
+    });
+    const user = userEvent.setup();
+
+    render(<FloatingCapturePreferenceSetting />);
+    const toggle = await screen.findByRole("switch", {
+      name: "悬浮控制条",
+    });
+    expect(toggle).not.toBeChecked();
+
+    await user.click(toggle);
+    expect(setFloatingCapturePreference).toHaveBeenCalledWith(true);
+    expect(toggle).toBeChecked();
+    expect(toggle).toBeDisabled();
+
+    rejectPreference(new Error("设置保存失败"));
+    await waitFor(() => expect(toggle).not.toBeDisabled());
+    expect(toggle).not.toBeChecked();
+    expect(screen.getByText("设置未保存，请重试。")).toBeVisible();
+  });
+
   it.each([
     "microphone_permission_denied",
     "system_audio_runtime_unsupported",

@@ -76,7 +76,7 @@ it("shows Runtime and both bundles without exposing file-location or unavailable
   );
   expect(list.querySelector('[data-slot="item-description"]')).toHaveClass(
     "text-sm",
-    "leading-5",
+    "leading-normal",
     "text-muted-foreground",
   );
   expect(screen.getAllByText("正式下载尚未开放")).toHaveLength(2);

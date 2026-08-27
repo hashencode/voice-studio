@@ -49,7 +49,7 @@ export function SettingsItemGroup({
   return (
     <ItemGroup
       className={cn(
-        "overflow-hidden rounded-xl border bg-card shadow-none [&_[data-slot=item-description]]:line-clamp-1 [&_[data-slot=item-description]]:text-xs [&_[data-slot=item-description]]:leading-4 [&_[data-slot=item-title]]:text-sm [&_[data-slot=item-title]]:leading-5",
+        "gap-0 overflow-hidden rounded-xl border bg-card shadow-none [&_[data-slot=item-description]]:line-clamp-1 [&_[data-slot=item-description]]:text-xs [&_[data-slot=item-description]]:leading-4 [&_[data-slot=item-separator]]:my-0 [&_[data-slot=item-title]]:text-sm [&_[data-slot=item-title]]:leading-5",
         className,
       )}
       {...props}

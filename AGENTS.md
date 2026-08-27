@@ -1,8 +1,9 @@
 # Project Agent Instructions
 
-## Goo component guidance
+## Flutter Goo component guidance
 
-Treat the sibling `flutter-ui-mobile` project as the design and implementation authority for this app:
+For Flutter work only, treat the sibling `flutter-ui-mobile` project as the
+design and implementation authority:
 
 - Design guidance: `/Users/studio/Documents/GitHub/flutter-ui-mobile/DESIGN.md`
 - Flutter development guidance: `/Users/studio/Documents/GitHub/flutter-ui-mobile/DOC.md`
@@ -14,6 +15,24 @@ Before changing UI, screens, navigation, visual states, or Flutter component usa
 - If the docs and the installed package API disagree, the API that imports and passes analyzer in this project wins.
 - Use Goo design tokens and component variants before hand-writing Material surfaces, typography, colors, dividers, loading states, dialogs, panels, toasts, snackbars, or form controls.
 - Preserve existing business behavior and platform contracts when migrating UI to Goo components.
+
+Goo components, tokens, typography, and surface guidance do not govern the
+Electron renderer.
+
+## Electron renderer component guidance
+
+- Treat the official shadcn `radix-nova` recipe as the component and typography
+  authority for Electron renderer primitives. Keep the existing Radix APIs,
+  controlled state, keyboard behavior, focus restoration, and callbacks.
+- Merge only the scoped official Radix component diff and the required Nova
+  recipe classes into local primitives. Never overwrite a customized component
+  wholesale or import the full Nova preset stylesheet.
+- Electron owns exactly these visual exceptions: shadowless surfaces, a thin
+  keyboard focus indicator, and the current Dialog modal mask
+  (`bg-black/10` with `supports-backdrop-filter:backdrop-blur-xs`).
+- Shared primitives own decorative defaults. Renderer consumers may override
+  layout such as width, direction, alignment, and contextual density, but must
+  not duplicate surface, radius, shadow, or interaction-state styling.
 
 ## Visual styling guidance
 
