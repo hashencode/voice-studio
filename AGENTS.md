@@ -44,10 +44,13 @@ Electron renderer.
   icon-only controls, labels for form controls, Dialog titles, and concise
   descriptions. Prefer native HTML semantics and existing primitive parts
   before adding ARIA attributes or custom keyboard handlers.
-- Add custom accessibility behavior only for an explicit product requirement or
-  a reproducible gap in the composed component. A review suggestion or a
-  hypothetical assistive-technology benefit is not sufficient evidence by
-  itself.
+- Historical plans, tests, accepted review comments, and release evidence are
+  context only. None independently establishes a current Electron product
+  requirement or justifies retaining custom accessibility behavior.
+- Every new custom accessibility protocol must cite either a current explicit
+  product requirement or a reproducible gap in the composed native HTML or
+  local shadcn/Radix component. A review suggestion or a hypothetical
+  assistive-technology benefit is not sufficient evidence by itself.
 - Do not add hidden live regions, duplicate `role="status"` / `role="alert"`
   announcements, global announcers, or multi-state screen-reader protocols when
   the same decision-relevant state is already conveyed by the current title,
