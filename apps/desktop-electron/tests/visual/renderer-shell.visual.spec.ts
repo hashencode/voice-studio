@@ -84,23 +84,20 @@ test.describe("sidebar-09 production Renderer", () => {
   test("1240x820 Empty audio library and recording ready", async () => {
     await withVisualSession("audio-empty", 1240, 820, async (session) => {
       const { page } = session;
-      await expect(
-        page.getByRole("heading", { name: "还没有音频" }),
-      ).toBeVisible();
+      const emptyHeading = page.getByRole("heading", { name: "还没有音频" });
+      await expect(emptyHeading).toBeVisible();
       await expect(
         page.getByRole("region", { name: "录制准备" }),
       ).toBeVisible();
 
-      const layout = await page.evaluate(() => {
+      const layout = await emptyHeading.evaluate((heading) => {
         const paneHeader = document.querySelector<HTMLElement>(
           "[data-context-pane-fixed-header]",
         )!;
         const paneContent = document.querySelector<HTMLElement>(
           "[data-context-pane-scrolling-content]",
         )!;
-        const empty = Array.from(document.querySelectorAll("h3")).find(
-          (heading) => heading.textContent === "还没有音频",
-        )!.parentElement!;
+        const empty = heading.parentElement!;
         const paneContentRect = paneContent.getBoundingClientRect();
         const emptyRect = empty.getBoundingClientRect();
         return {

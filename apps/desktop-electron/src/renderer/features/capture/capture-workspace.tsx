@@ -11,7 +11,6 @@ import {
 import { Button } from "@/components/ui/button";
 import {
   AlertDialog,
-  AlertDialogAction,
   AlertDialogCancel,
   AlertDialogContent,
   AlertDialogDescription,
@@ -661,20 +660,15 @@ function ActiveCapture({
                     取消
                   </Button>
                 </AlertDialogCancel>
-                <AlertDialogAction asChild>
-                  <Button
-                    type="button"
-                    variant="destructive"
-                    disabled={busy}
-                    onClick={(event) => {
-                      event.preventDefault();
-                      onConfirmStop();
-                    }}
-                  >
-                    <Square aria-hidden="true" />
-                    {busy ? "正在保存…" : "确认停止并保存"}
-                  </Button>
-                </AlertDialogAction>
+                <Button
+                  type="button"
+                  variant="destructive"
+                  disabled={busy}
+                  onClick={onConfirmStop}
+                >
+                  <Square aria-hidden="true" />
+                  {busy ? "正在保存…" : "确认停止并保存"}
+                </Button>
               </AlertDialogFooter>
             </AlertDialogContent>
           </AlertDialog>

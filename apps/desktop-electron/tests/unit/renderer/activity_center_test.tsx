@@ -26,8 +26,9 @@ describe("activity pages", () => {
     render(
       <ActivityContextPane items={[]} selectedId={null} onSelect={vi.fn()} />,
     );
-    const empty = screen.getByRole("heading", { name: "暂无消息" })
-      .parentElement!;
+    const empty = screen.getByRole("heading", {
+      name: "暂无消息",
+    }).parentElement!;
     expect(empty).toBeVisible();
     expect(empty).toHaveTextContent("暂无消息");
     expect(empty.querySelector("svg.lucide-sprout")).not.toBeNull();
@@ -35,8 +36,9 @@ describe("activity pages", () => {
 
   it("uses an empty state when no message is selected", () => {
     render(<ActivityMainWorkspace item={null} onOpenDetails={vi.fn()} />);
-    const empty = screen.getByRole("heading", { name: "请选择消息" })
-      .parentElement!;
+    const empty = screen.getByRole("heading", {
+      name: "请选择消息",
+    }).parentElement!;
     expect(empty).toHaveTextContent("请选择消息");
     expect(empty.querySelector("p")).toBeNull();
   });

@@ -233,7 +233,9 @@ function ProviderProfileList({
   onReload: () => Promise<AiSettingsSnapshot | null>;
   addActionRef: React.RefObject<HTMLButtonElement | null>;
 }) {
-  const profileRadioRefs = React.useRef(new Map<string, HTMLButtonElement>());
+  const [profileRadioRefs] = React.useState(
+    () => new Map<string, HTMLButtonElement>(),
+  );
   const selectProfile = (profile: AiProviderProfile) => {
     if (mutationPending || !profile.capabilities.selectable) return;
     onPendingChange(true);
@@ -296,18 +298,10 @@ function ProviderProfileList({
                   className="rounded-none data-[selected=true]:bg-muted/50"
                   data-selected={selected}
                 >
-                  <RadioGroupItem
-                    ref={(node) => {
-                      if (node) {
-                        profileRadioRefs.current.set(profile.profileId, node);
-                      } else {
-                        profileRadioRefs.current.delete(profile.profileId);
-                      }
-                    }}
+                  <ProfileRadioGroupItem
+                    profile={profile}
+                    registry={profileRadioRefs}
                     id={radioId}
-                    value={profile.profileId}
-                    disabled={!profile.capabilities.selectable}
-                    aria-label={profile.modelSummary}
                   />
                   <label
                     htmlFor={radioId}
@@ -362,6 +356,33 @@ function ProviderProfileList({
         </RadioGroup>
       )}
     </>
+  );
+}
+
+function ProfileRadioGroupItem({
+  profile,
+  registry,
+  id,
+}: {
+  profile: AiProviderProfile;
+  registry: Map<string, HTMLButtonElement>;
+  id: string;
+}) {
+  const register = React.useCallback(
+    (node: HTMLButtonElement | null) => {
+      if (node) registry.set(profile.profileId, node);
+      else registry.delete(profile.profileId);
+    },
+    [profile.profileId, registry],
+  );
+  return (
+    <RadioGroupItem
+      ref={register}
+      id={id}
+      value={profile.profileId}
+      disabled={!profile.capabilities.selectable}
+      aria-label={profile.modelSummary}
+    />
   );
 }
 
@@ -757,7 +778,7 @@ function focusAfterProfileDeletion(
   previousProfiles: AiProviderProfile[],
   deletedProfileId: string,
   nextProfiles: AiProviderProfile[],
-  profileRadioRefs: React.RefObject<Map<string, HTMLButtonElement>>,
+  profileRadioRefs: Map<string, HTMLButtonElement>,
   addActionRef: React.RefObject<HTMLButtonElement | null>,
 ): void {
   const deletedIndex = previousProfiles.findIndex(
@@ -767,7 +788,7 @@ function focusAfterProfileDeletion(
     nextProfiles[deletedIndex] ?? nextProfiles[Math.max(0, deletedIndex - 1)];
   requestAnimationFrame(() => {
     const focusTarget = target
-      ? profileRadioRefs.current.get(target.profileId)
+      ? profileRadioRefs.get(target.profileId)
       : addActionRef.current;
     focusTarget?.focus();
   });

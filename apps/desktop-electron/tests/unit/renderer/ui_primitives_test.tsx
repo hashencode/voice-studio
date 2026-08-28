@@ -549,10 +549,7 @@ describe("current shadcn primitives", () => {
     }
 
     render(<Harness />);
-    const trigger = document.querySelector<HTMLElement>(
-      '[data-slot="select-trigger"]',
-    );
-    expect(trigger).not.toBeNull();
+    const trigger = screen.getByLabelText("AI 提供商");
     const content = await screen.findByRole("listbox");
     expect(content).toHaveAttribute("data-align-trigger", "true");
     expect(content).toHaveClass(
@@ -569,7 +566,7 @@ describe("current shadcn primitives", () => {
 
     fireEvent.click(screen.getByRole("option", { name: "OpenAI" }));
     expect(onValueChange).toHaveBeenCalledWith("openai");
-    expect(trigger!).toHaveTextContent("OpenAI");
+    expect(trigger).toHaveTextContent("OpenAI");
   });
 
   it("keeps nav menu width, side, and alignment as layout-only overrides", async () => {
