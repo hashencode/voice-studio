@@ -10,6 +10,17 @@ import {
 
 import { Button } from "@/components/ui/button";
 import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
+import {
   Field,
   FieldContent,
   FieldDescription,
@@ -81,8 +92,6 @@ export function CaptureWorkspace({
   const [stopConfirmationSessionId, setStopConfirmationSessionId] =
     React.useState<string | null>(null);
   const pendingRef = React.useRef(new Set<string>());
-  const errorRef = React.useRef<HTMLDivElement>(null);
-  const titleRef = React.useRef<HTMLInputElement>(null);
   const lastRecordRequestRef = React.useRef(recordRequest ?? 0);
   const recoverySessionId =
     capture.phase === "recovery" ? capture.sessionId : null;
@@ -126,14 +135,6 @@ export function CaptureWorkspace({
       active = false;
     };
   }, [autoOpenRecoveries, onDetailOpenChange, prioritizedRecoverySessionId]);
-
-  React.useEffect(() => {
-    if (error) errorRef.current?.focus();
-  }, [error]);
-
-  React.useEffect(() => {
-    if (preflight?.canStart && setupOpen) titleRef.current?.focus();
-  }, [preflight, setupOpen]);
 
   const captureCandidate = capture.phase === "idle" ? null : capture;
   const activeCapture =
@@ -354,10 +355,8 @@ export function CaptureWorkspace({
       ) : null}
       {error ? (
         <div
-          ref={errorRef}
           role="alert"
-          tabIndex={-1}
-          className="mb-3 border-y border-destructive/40 bg-destructive/5 py-3 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring"
+          className="mb-3 border-y border-destructive/40 bg-destructive/5 py-3 text-sm"
         >
           {error}
         </div>
@@ -397,7 +396,6 @@ export function CaptureWorkspace({
           preflight={preflight}
           title={title}
           busy={busy}
-          titleRef={titleRef}
           onCheck={checkPreflight}
           onStart={start}
           onTitleChange={setTitle}
@@ -475,7 +473,6 @@ function CaptureSetup({
   preflight,
   title,
   busy,
-  titleRef,
   onCheck,
   onStart,
   onTitleChange,
@@ -487,7 +484,6 @@ function CaptureSetup({
   preflight: CapturePreflight | null;
   title: string;
   busy: boolean;
-  titleRef: React.RefObject<HTMLInputElement | null>;
   onCheck: () => void;
   onStart: () => void;
   onTitleChange: (value: string) => void;
@@ -523,7 +519,6 @@ function CaptureSetup({
       <div className="space-y-1.5">
         <Label htmlFor="capture-title">录制名称</Label>
         <Input
-          ref={titleRef}
           id="capture-title"
           value={title}
           maxLength={256}
@@ -639,23 +634,50 @@ function ActiveCapture({
               {wakeRequiresResume ? "确认并继续录制" : "继续录制"}
             </Button>
           )}
-          {stopConfirmationOpen ? (
-            <StopConfirmation
-              busy={busy}
-              onCancel={onCancelStop}
-              onConfirm={onConfirmStop}
-            />
-          ) : (
-            <Button
-              type="button"
-              variant="destructive"
-              disabled={busy}
-              onClick={() => onControl("stop")}
-            >
-              <Square aria-hidden="true" />
-              停止并保存
-            </Button>
-          )}
+          <AlertDialog
+            open={stopConfirmationOpen}
+            onOpenChange={(open) => {
+              if (busy) return;
+              if (open) onControl("stop");
+              else onCancelStop();
+            }}
+          >
+            <AlertDialogTrigger asChild>
+              <Button type="button" variant="destructive" disabled={busy}>
+                <Square aria-hidden="true" />
+                停止并保存
+              </Button>
+            </AlertDialogTrigger>
+            <AlertDialogContent>
+              <AlertDialogHeader>
+                <AlertDialogTitle>确认停止并保存</AlertDialogTitle>
+                <AlertDialogDescription className="sr-only">
+                  确认停止录制
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+              <AlertDialogFooter>
+                <AlertDialogCancel asChild>
+                  <Button type="button" variant="outline" disabled={busy}>
+                    取消
+                  </Button>
+                </AlertDialogCancel>
+                <AlertDialogAction asChild>
+                  <Button
+                    type="button"
+                    variant="destructive"
+                    disabled={busy}
+                    onClick={(event) => {
+                      event.preventDefault();
+                      onConfirmStop();
+                    }}
+                  >
+                    <Square aria-hidden="true" />
+                    {busy ? "正在保存…" : "确认停止并保存"}
+                  </Button>
+                </AlertDialogAction>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
         </div>
       ) : capture.phase === "completed" ||
         capture.phase === "failed" ||
@@ -680,59 +702,6 @@ function canBeginAnotherCapture(capture: CaptureView): boolean {
     (capture.phase === "partial_capture" &&
       !capture.systemAudioHealthy &&
       !capture.microphoneHealthy)
-  );
-}
-
-function StopConfirmation({
-  busy,
-  compact = false,
-  onCancel,
-  onConfirm,
-}: {
-  busy: boolean;
-  compact?: boolean;
-  onCancel: () => void;
-  onConfirm: () => void;
-}) {
-  const confirmRef = React.useRef<HTMLButtonElement>(null);
-
-  React.useEffect(() => {
-    confirmRef.current?.focus();
-  }, []);
-
-  return (
-    <span
-      role="group"
-      aria-label="确认停止录制"
-      className="flex items-center gap-1"
-      onKeyDown={(event) => {
-        if (event.key === "Escape" && !busy) {
-          event.preventDefault();
-          onCancel();
-        }
-      }}
-    >
-      <Button
-        type="button"
-        size={compact ? "sm" : "default"}
-        variant="ghost"
-        disabled={busy}
-        onClick={onCancel}
-      >
-        取消
-      </Button>
-      <Button
-        ref={confirmRef}
-        type="button"
-        size={compact ? "sm" : "default"}
-        variant="destructive"
-        disabled={busy}
-        onClick={onConfirm}
-      >
-        <Square aria-hidden="true" />
-        {busy ? "正在保存…" : "确认停止并保存"}
-      </Button>
-    </span>
   );
 }
 

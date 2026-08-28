@@ -329,7 +329,7 @@ describe("capture workspace", () => {
     ).not.toBeInTheDocument();
   });
 
-  it("guards repeated stop and renders the completed terminal state", async () => {
+  it("cancels stop without a command, then guards confirmation until terminal state", async () => {
     let resolveStop!: (value: CaptureSnapshot) => void;
     const completed: CaptureSnapshot = {
       ...recording,
@@ -357,17 +357,20 @@ describe("capture workspace", () => {
 
     const stop = await screen.findByRole("button", { name: "停止并保存" });
     fireEvent.click(stop);
+    const dialog = screen.getByRole("alertdialog", { name: "确认停止并保存" });
+    fireEvent.click(within(dialog).getByRole("button", { name: "取消" }));
+    expect(controlCapture).not.toHaveBeenCalled();
+    expect(screen.queryByRole("alertdialog")).not.toBeInTheDocument();
+
+    fireEvent.click(stop);
     const confirm = screen.getByRole("button", { name: "确认停止并保存" });
-    expect(confirm).toHaveFocus();
     fireEvent.click(confirm);
     fireEvent.click(confirm);
     expect(controlCapture).toHaveBeenCalledTimes(1);
     expect(confirm).toBeDisabled();
-    expect(
-      within(screen.getByRole("region", { name: "录制详情" })).getByText(
-        "正在安全结束录制",
-      ),
-    ).toBeVisible();
+    expect(screen.getByRole("alertdialog")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "取消" })).toBeDisabled();
+    expect(screen.getByText("正在安全结束录制")).toBeVisible();
 
     resolveStop(completed);
     await waitFor(() => expect(confirm).toBeEnabled());
@@ -381,6 +384,7 @@ describe("capture workspace", () => {
         }}
       />,
     );
+    expect(screen.queryByRole("alertdialog")).not.toBeInTheDocument();
     expect(
       await screen.findByRole("region", { name: "当前录制" }),
     ).toHaveTextContent("录制已完成");
@@ -579,14 +583,27 @@ describe("capture workspace", () => {
       />,
     );
 
-    await user.click(screen.getByRole("button", { name: "继续录制" }));
+    const resume = screen.getByRole("button", { name: "继续录制" });
+    resume.focus();
+    await user.click(resume);
     expect(await screen.findByRole("alert")).toHaveTextContent(
       "录制操作未完成",
     );
+    expect(resume).toHaveFocus();
     await waitFor(() =>
       expect(screen.getByRole("button", { name: "继续录制" })).toBeEnabled(),
     );
     await user.click(screen.getByRole("button", { name: "继续录制" }));
+  });
+
+  it("opens embedded setup without moving focus to the title", async () => {
+    installCaptureApi();
+    const user = userEvent.setup();
+    render(<CaptureWorkspace capture={idle} applicationRevision={1} />);
+
+    await user.click(screen.getByRole("button", { name: "检查并设置录制" }));
+    const title = await screen.findByRole("textbox", { name: "录制名称" });
+    expect(title).not.toHaveFocus();
   });
 
   it("treats a kept partial recovery as finalized when no track is live", async () => {

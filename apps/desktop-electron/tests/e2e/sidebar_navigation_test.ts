@@ -141,7 +141,7 @@ const restored: ApplicationSnapshot = {
 };
 
 describe("sidebar navigation e2e", () => {
-  it("supports rail tooltips, roving keys, selection and restored snapshots", async () => {
+  it("keeps native rail order, tooltips, selection and restored snapshots", async () => {
     const { api } = applicationApi(restored);
     const user = userEvent.setup();
     const first = render(createElement(App));
@@ -152,23 +152,16 @@ describe("sidebar navigation e2e", () => {
     const companion = within(navigation).getByRole("button", {
       name: "互联",
     });
+    const navigationButtons = within(navigation).getAllByRole("button");
+    expect(navigationButtons.map((button) => button.getAttribute("aria-label")))
+      .toEqual(["音频", "互联", "消息", "设置"]);
     expect(companion).toHaveAttribute("aria-current", "page");
-    expect(companion).toHaveAttribute("tabindex", "0");
-    expect(
-      within(navigation).getByRole("button", { name: "音频" }),
-    ).toHaveAttribute("tabindex", "-1");
+    expect(navigationButtons.every((button) => !button.hasAttribute("tabindex")))
+      .toBe(true);
     companion.focus();
     expect(await screen.findByRole("tooltip")).toHaveTextContent("互联");
-    await user.keyboard("{ArrowDown}{Enter}");
-    expect(
-      within(navigation).getByRole("button", { name: "消息" }),
-    ).toHaveFocus();
-    expect(api.navigate).not.toHaveBeenCalled();
-    await user.keyboard("{ArrowDown}{Enter}");
+    await user.click(within(navigation).getByRole("button", { name: "设置" }));
     await waitFor(() => expect(api.navigate).toHaveBeenCalledWith("settings"));
-    expect(
-      within(navigation).getByRole("button", { name: "设置" }),
-    ).toHaveFocus();
 
     expect(
       screen.queryByRole("complementary", { name: "录制控制" }),

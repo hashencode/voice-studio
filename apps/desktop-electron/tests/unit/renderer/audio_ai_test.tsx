@@ -93,7 +93,7 @@ describe("per-generation audio AI consent", () => {
     expect(screen.queryByText(rawDiagnostic)).not.toBeInTheDocument();
   });
 
-  it("cancels with Escape, restores focus, and sends no transcript", async () => {
+  it("cancels consent without changing business state or sending a transcript", async () => {
     const desktop = api();
     const user = userEvent.setup();
     render(<AudioAiFeature api={desktop} audioId={4} generationId={9} />);
@@ -101,8 +101,7 @@ describe("per-generation audio AI consent", () => {
       name: "生成云端音频草稿",
     });
 
-    generate.focus();
-    await user.keyboard("{Enter}");
+    await user.click(generate);
     expect(desktop.prepareAudioAi).toHaveBeenCalledWith({
       audioId: 4,
       generationId: 9,
@@ -119,9 +118,8 @@ describe("per-generation audio AI consent", () => {
       within(dialog).getByRole("button", { name: "同意并生成草稿" }),
     ).toBeDisabled();
 
-    await user.keyboard("{Escape}");
+    await user.click(within(dialog).getByRole("button", { name: "取消" }));
     expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
-    expect(generate).toHaveFocus();
     expect(desktop.generateAudioAi).not.toHaveBeenCalled();
   });
 

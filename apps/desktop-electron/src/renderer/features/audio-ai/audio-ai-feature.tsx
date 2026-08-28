@@ -41,8 +41,6 @@ export function AudioAiFeature({
   const [requestTarget, setRequestTarget] = React.useState<RequestTarget>({
     kind: "generate",
   });
-  const triggerRef = React.useRef<HTMLButtonElement>(null);
-
   const accept = React.useCallback(
     (next: AudioAiSnapshot) => {
       if (next.audioId !== audioId || next.generationId !== generationId)
@@ -197,10 +195,7 @@ export function AudioAiFeature({
             <Button
               type="button"
               disabled={pending}
-              onClick={(event) => {
-                triggerRef.current = event.currentTarget;
-                void prepare("retry");
-              }}
+              onClick={() => void prepare("retry")}
             >
               <RotateCcw aria-hidden="true" />
               重试云端音频草稿
@@ -209,10 +204,7 @@ export function AudioAiFeature({
               type="button"
               variant="outline"
               disabled={pending}
-              onClick={(event) => {
-                triggerRef.current = event.currentTarget;
-                void prepare("generate");
-              }}
+              onClick={() => void prepare("generate")}
             >
               按当前内容重新生成云端音频草稿
             </Button>
@@ -221,10 +213,7 @@ export function AudioAiFeature({
           <Button
             type="button"
             disabled={pending}
-            onClick={(event) => {
-              triggerRef.current = event.currentTarget;
-              void prepare("generate");
-            }}
+            onClick={() => void prepare("generate")}
           >
             {buttonLabel}
           </Button>
@@ -241,7 +230,6 @@ export function AudioAiFeature({
           setConsentChecked(false);
         }}
         onSubmit={() => void submit()}
-        restoreFocus={() => triggerRef.current?.focus()}
       />
     </section>
   );
@@ -254,7 +242,6 @@ function ConsentDialog({
   onCheckedChange,
   onCancel,
   onSubmit,
-  restoreFocus,
 }: {
   preview: AudioAiConsentPreview | null;
   checked: boolean;
@@ -262,7 +249,6 @@ function ConsentDialog({
   onCheckedChange: (checked: boolean) => void;
   onCancel: () => void;
   onSubmit: () => void;
-  restoreFocus: () => void;
 }) {
   return (
     <Dialog
@@ -271,13 +257,7 @@ function ConsentDialog({
         if (!open && !pending) onCancel();
       }}
     >
-      <DialogContent
-        className="max-h-[85vh] w-[min(34rem,calc(100vw-2rem))] overflow-auto rounded-xl outline-none"
-        onCloseAutoFocus={(event) => {
-          event.preventDefault();
-          restoreFocus();
-        }}
-      >
+      <DialogContent className="max-h-[85vh] w-[min(34rem,calc(100vw-2rem))] overflow-auto rounded-xl outline-none">
         <DialogTitle>本次音频云端处理同意</DialogTitle>
         {preview ? (
           <>

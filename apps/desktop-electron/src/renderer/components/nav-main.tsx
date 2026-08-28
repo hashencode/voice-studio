@@ -1,4 +1,3 @@
-import * as React from "react";
 import type { LucideIcon } from "lucide-react";
 
 import {
@@ -31,54 +30,20 @@ export function NavMain({
   current: RendererShellSection;
   onNavigate: (section: RendererShellSection) => void;
 }) {
-  const buttons = React.useRef<Array<HTMLButtonElement | null>>([]);
-  const [rovingSection, setRovingSection] =
-    React.useState<RendererShellSection | null>(null);
-  const rovingIndex = Math.max(
-    0,
-    items.findIndex((item) => item.section === (rovingSection ?? current)),
-  );
   const primaryItems = items.filter((item) => item.placement !== "footer");
   const footerItems = items.filter((item) => item.placement === "footer");
 
-  const handleKeyDown = (
-    event: React.KeyboardEvent<HTMLButtonElement>,
-    index: number,
-  ) => {
-    let target = index;
-    if (event.key === "ArrowDown") target = (index + 1) % items.length;
-    else if (event.key === "ArrowUp")
-      target = (index - 1 + items.length) % items.length;
-    else if (event.key === "Home") target = 0;
-    else if (event.key === "End") target = items.length - 1;
-    else return;
-    event.preventDefault();
-    const targetItem = items[target];
-    if (!targetItem) return;
-    setRovingSection(targetItem.section);
-    buttons.current[target]?.focus();
-  };
-
   const renderItem = (item: ShellNavigationItem) => {
-    const index = items.indexOf(item);
     return (
       <SidebarMenuItem key={item.section}>
         <SidebarMenuButton
-          ref={(node) => {
-            buttons.current[index] = node;
-          }}
           type="button"
           tooltip={{ children: item.title, hidden: false }}
           isActive={current === item.section}
-          tabIndex={rovingIndex === index ? 0 : -1}
           aria-current={current === item.section ? "page" : undefined}
           aria-label={item.ariaLabel ?? item.title}
           className="px-2.5 md:px-2"
-          onClick={() => {
-            setRovingSection(item.section);
-            onNavigate(item.section);
-          }}
-          onKeyDown={(event) => handleKeyDown(event, index)}
+          onClick={() => onNavigate(item.section)}
         >
           <item.icon aria-hidden="true" />
           {item.badgeCount && item.badgeCount > 0 ? (
