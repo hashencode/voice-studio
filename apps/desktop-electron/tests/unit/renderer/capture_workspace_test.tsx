@@ -373,7 +373,12 @@ describe("capture workspace", () => {
     expect(screen.getByText("正在安全结束录制")).toBeVisible();
 
     resolveStop(completed);
-    await waitFor(() => expect(confirm).toBeEnabled());
+    await waitFor(() =>
+      expect(screen.queryByRole("alertdialog")).not.toBeInTheDocument(),
+    );
+    expect(screen.getByRole("button", { name: "停止并保存" })).toBeDisabled();
+    fireEvent.click(screen.getByRole("button", { name: "停止并保存" }));
+    expect(controlCapture).toHaveBeenCalledTimes(1);
     view.rerender(
       <CaptureWorkspace
         capture={{
@@ -388,6 +393,11 @@ describe("capture workspace", () => {
     expect(
       await screen.findByRole("region", { name: "当前录制" }),
     ).toHaveTextContent("录制已完成");
+    await waitFor(() =>
+      expect(
+        screen.getByRole("button", { name: "录制另一个音频" }),
+      ).toHaveFocus(),
+    );
 
     await userEvent
       .setup()
@@ -399,6 +409,33 @@ describe("capture workspace", () => {
       requestPermissions: true,
       captionEnabled: true,
     });
+  });
+
+  it("allows a failed stop confirmation to be retried", async () => {
+    const controlCapture = vi
+      .fn()
+      .mockRejectedValueOnce(new Error("capture service unavailable"))
+      .mockResolvedValueOnce(recording);
+    installCaptureApi({ controlCapture });
+    render(
+      <CaptureWorkspace
+        capture={{
+          phase: "recording",
+          sessionId: recording.sessionId,
+          title: "访谈录制",
+          elapsedMs: 5_000,
+        }}
+      />,
+    );
+
+    fireEvent.click(await screen.findByRole("button", { name: "停止并保存" }));
+    const confirm = screen.getByRole("button", { name: "确认停止并保存" });
+    fireEvent.click(confirm);
+
+    await waitFor(() => expect(confirm).toBeEnabled());
+    expect(screen.getByRole("alertdialog")).toBeInTheDocument();
+    fireEvent.click(confirm);
+    expect(controlCapture).toHaveBeenCalledTimes(2);
   });
 
   it("pauses once and renders the returned state", async () => {

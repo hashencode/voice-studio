@@ -90,7 +90,11 @@ export function CaptureWorkspace({
   const [error, setError] = React.useState<string | null>(null);
   const [stopConfirmationSessionId, setStopConfirmationSessionId] =
     React.useState<string | null>(null);
+  const [successfulTerminalStopSessionId, setSuccessfulTerminalStopSessionId] =
+    React.useState<string | null>(null);
   const pendingRef = React.useRef(new Set<string>());
+  const terminalActionRef = React.useRef<HTMLButtonElement>(null);
+  const focusedTerminalStopSessionRef = React.useRef<string | null>(null);
   const lastRecordRequestRef = React.useRef(recordRequest ?? 0);
   const recoverySessionId =
     capture.phase === "recovery" ? capture.sessionId : null;
@@ -143,8 +147,26 @@ export function CaptureWorkspace({
   const stopConfirmationOpen = Boolean(
     activeCapture &&
     activeCapture.sessionId === stopConfirmationSessionId &&
+    activeCapture.sessionId !== successfulTerminalStopSessionId &&
     !["completed", "failed", "recovery"].includes(activeCapture.phase),
   );
+
+  React.useEffect(() => {
+    if (!successfulTerminalStopSessionId) return;
+    if (
+      !activeCapture ||
+      activeCapture.sessionId !== successfulTerminalStopSessionId
+    )
+      return;
+    if (!canBeginAnotherCapture(activeCapture) || pendingAction !== null)
+      return;
+    if (
+      focusedTerminalStopSessionRef.current === successfulTerminalStopSessionId
+    )
+      return;
+    terminalActionRef.current?.focus();
+    focusedTerminalStopSessionRef.current = successfulTerminalStopSessionId;
+  }, [activeCapture, pendingAction, successfulTerminalStopSessionId]);
 
   const runExclusive = React.useCallback(
     async (identity: string, label: string, operation: () => Promise<void>) => {
@@ -239,7 +261,12 @@ export function CaptureWorkspace({
 
   const control = React.useCallback(
     (action: CaptureControlAction) => {
-      if (!activeCapture) return;
+      if (
+        !activeCapture ||
+        (action === "stop" &&
+          activeCapture.sessionId === successfulTerminalStopSessionId)
+      )
+        return;
       const operationLabel = {
         pause: "正在暂停录制",
         resume: "正在继续录制",
@@ -260,23 +287,31 @@ export function CaptureWorkspace({
               result.interruptionReason,
             ),
           );
+          if (action === "stop" && isTerminalStopResult(result)) {
+            focusedTerminalStopSessionRef.current = null;
+            setSuccessfulTerminalStopSessionId(result.sessionId);
+            setStopConfirmationSessionId(null);
+          }
         },
       );
     },
-    [activeCapture, runExclusive],
+    [activeCapture, runExclusive, successfulTerminalStopSessionId],
   );
 
   const requestControl = React.useCallback(
     (action: CaptureControlAction) => {
       if (action === "stop") {
-        if (activeCapture) {
+        if (
+          activeCapture &&
+          activeCapture.sessionId !== successfulTerminalStopSessionId
+        ) {
           setStopConfirmationSessionId(activeCapture.sessionId);
         }
         return;
       }
       control(action);
     },
-    [activeCapture, control],
+    [activeCapture, control, successfulTerminalStopSessionId],
   );
 
   const confirmStop = React.useCallback(() => {
@@ -384,6 +419,10 @@ export function CaptureWorkspace({
           busy={busy}
           pendingAction={pendingAction}
           stopConfirmationOpen={stopConfirmationOpen}
+          stopSubmitted={
+            focusedActiveCapture.sessionId === successfulTerminalStopSessionId
+          }
+          terminalActionRef={terminalActionRef}
           onCancelStop={() => setStopConfirmationSessionId(null)}
           onConfirmStop={confirmStop}
           onControl={requestControl}
@@ -558,6 +597,8 @@ function ActiveCapture({
   busy,
   pendingAction,
   stopConfirmationOpen,
+  stopSubmitted,
+  terminalActionRef,
   onCancelStop,
   onConfirmStop,
   onControl,
@@ -567,6 +608,8 @@ function ActiveCapture({
   busy: boolean;
   pendingAction: string | null;
   stopConfirmationOpen: boolean;
+  stopSubmitted: boolean;
+  terminalActionRef: React.RefObject<HTMLButtonElement | null>;
   onCancelStop: () => void;
   onConfirmStop: () => void;
   onControl: (action: CaptureControlAction) => void;
@@ -636,13 +679,17 @@ function ActiveCapture({
           <AlertDialog
             open={stopConfirmationOpen}
             onOpenChange={(open) => {
-              if (busy) return;
+              if (busy || stopSubmitted) return;
               if (open) onControl("stop");
               else onCancelStop();
             }}
           >
             <AlertDialogTrigger asChild>
-              <Button type="button" variant="destructive" disabled={busy}>
+              <Button
+                type="button"
+                variant="destructive"
+                disabled={busy || stopSubmitted}
+              >
                 <Square aria-hidden="true" />
                 停止并保存
               </Button>
@@ -677,7 +724,12 @@ function ActiveCapture({
         capture.phase === "failed" ||
         finalizedPartial ? (
         <div className="flex justify-end">
-          <Button type="button" disabled={busy} onClick={onBeginAnother}>
+          <Button
+            ref={terminalActionRef}
+            type="button"
+            disabled={busy}
+            onClick={onBeginAnother}
+          >
             <Mic aria-hidden="true" />
             {capture.phase === "completed" || finalizedPartial
               ? "录制另一个音频"
@@ -694,6 +746,16 @@ function canBeginAnotherCapture(capture: CaptureView): boolean {
     capture.phase === "completed" ||
     capture.phase === "failed" ||
     (capture.phase === "partial_capture" &&
+      !capture.systemAudioHealthy &&
+      !capture.microphoneHealthy)
+  );
+}
+
+function isTerminalStopResult(capture: CaptureSnapshot): boolean {
+  return (
+    capture.state === "completed" ||
+    capture.state === "failed" ||
+    (capture.state === "partial_capture" &&
       !capture.systemAudioHealthy &&
       !capture.microphoneHealthy)
   );
