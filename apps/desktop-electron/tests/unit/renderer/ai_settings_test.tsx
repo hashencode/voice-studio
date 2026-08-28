@@ -112,12 +112,16 @@ describe("cloud model settings", () => {
     ).toBeVisible();
     expect(screen.queryByText("团队模型")).toBeNull();
     const radios = screen.getAllByRole("radio");
+    const deepseekRow = screen
+      .getByText("deepseek-chat")
+      .closest<HTMLElement>('[data-slot="item"]');
+    const teamRow = screen
+      .getByText("team-chat")
+      .closest<HTMLElement>('[data-slot="item"]');
     expect(radios[0]).toHaveAttribute("aria-checked", "true");
-    expect(radios[0]?.querySelector("img")).toHaveClass("size-5");
-    expect(radios[0]?.querySelector("img")).not.toHaveClass("grayscale");
-    expect(radios[1]?.querySelector("svg")).toHaveClass(
-      "text-muted-foreground",
-    );
+    expect(deepseekRow?.querySelector("img")).toHaveClass("size-5");
+    expect(deepseekRow?.querySelector("img")).not.toHaveClass("grayscale");
+    expect(teamRow?.querySelector("svg")).toHaveClass("text-muted-foreground");
     expect(screen.queryByLabelText("当前模型")).toBeNull();
     expect(screen.queryByLabelText("未选择")).toBeNull();
     const selectedEdit = screen.getByRole("button", {
@@ -172,31 +176,43 @@ describe("cloud model settings", () => {
     expect(within(dialog).getByRole("button", { name: "取消" })).toBeVisible();
   });
 
-  it("keeps click, Space, and arrow-key radio selection", async () => {
-    const desktop = api();
+  it("forwards controlled selection with the current revision and fences pending mutations", async () => {
+    let resolveSelection!: (settings: AiSettingsSnapshot) => void;
+    const desktop = api({
+      selectAiProviderProfile: vi.fn(
+        () =>
+          new Promise<AiSettingsSnapshot>((resolve) => {
+            resolveSelection = resolve;
+          }),
+      ),
+    });
     const user = userEvent.setup();
     render(<AiSettingsFeature api={desktop} settingsPage />);
     const radios = await screen.findAllByRole("radio");
-    await user.click(radios[1]!);
-    expect(desktop.selectAiProviderProfile).toHaveBeenLastCalledWith({
+    const deepseekRow = screen
+      .getByText("deepseek-chat")
+      .closest<HTMLElement>('[data-slot="item"]');
+    const teamRow = screen
+      .getByText("team-chat")
+      .closest<HTMLElement>('[data-slot="item"]');
+    await user.click(screen.getByText("team-chat"));
+    expect(desktop.selectAiProviderProfile).toHaveBeenCalledOnce();
+    expect(desktop.selectAiProviderProfile).toHaveBeenCalledWith({
       profileId: teamProfile.profileId,
       expectedRevision: 4,
     });
+    await waitFor(() => expect(radios[0]).toBeDisabled());
+    await user.click(radios[0]!);
+    expect(desktop.selectAiProviderProfile).toHaveBeenCalledOnce();
+
+    resolveSelection(changed({ selectedProfileId: teamProfile.profileId }));
     await waitFor(() => {
-      expect(radios[0]?.querySelector("img")).toHaveClass(
+      expect(deepseekRow?.querySelector("img")).toHaveClass(
         "grayscale",
         "opacity-50",
       );
-      expect(radios[1]?.querySelector("svg")).toHaveClass("text-primary");
+      expect(teamRow?.querySelector("svg")).toHaveClass("text-primary");
     });
-    desktop.selectAiProviderProfile.mockClear();
-    radios[0]!.focus();
-    await user.keyboard("{ArrowDown}");
-    expect(radios[1]).toHaveFocus();
-    expect(desktop.selectAiProviderProfile).toHaveBeenCalledTimes(1);
-    desktop.selectAiProviderProfile.mockClear();
-    await user.keyboard(" ");
-    expect(desktop.selectAiProviderProfile).toHaveBeenCalledTimes(1);
   });
 
   it("shows deletion only in edit mode and restores focus after cancel", async () => {
@@ -206,6 +222,7 @@ describe("cloud model settings", () => {
     await user.click(
       await screen.findByRole("button", { name: "编辑 team-chat" }),
     );
+    expect(desktop.selectAiProviderProfile).not.toHaveBeenCalled();
     const edit = screen.getByRole("dialog", { name: "编辑 team-chat" });
     const remove = within(edit).getByRole("button", { name: "删除模型" });
     expect(remove).not.toHaveTextContent("删除模型");
@@ -226,6 +243,64 @@ describe("cloud model settings", () => {
       }),
     );
     await waitFor(() => expect(screen.getByRole("radio")).toHaveFocus());
+    expect(desktop.selectAiProviderProfile).not.toHaveBeenCalled();
+  });
+
+  it("focuses the next profile after deleting a middle row", async () => {
+    const thirdProfile: CustomAiProviderProfile = {
+      ...teamProfile,
+      profileId: "profile-third",
+      displayName: "third-chat",
+      modelId: "third-chat",
+      modelSummary: "third-chat",
+    };
+    const desktop = api({
+      getAiSettings: vi.fn(async () => ({
+        ...configured,
+        profiles: [deepseekProfile, teamProfile, thirdProfile],
+      })),
+      deleteAiProviderProfile: vi.fn(async () =>
+        changed({ profiles: [deepseekProfile, thirdProfile] }),
+      ),
+    });
+    const user = userEvent.setup();
+    render(<AiSettingsFeature api={desktop} settingsPage />);
+
+    await user.click(
+      await screen.findByRole("button", { name: "编辑 team-chat" }),
+    );
+    await user.click(screen.getByRole("button", { name: "删除模型" }));
+    await user.click(screen.getByRole("button", { name: "删除" }));
+
+    await waitFor(() =>
+      expect(screen.getByRole("radio", { name: "third-chat" })).toHaveFocus(),
+    );
+  });
+
+  it("focuses the add action after deleting the final profile", async () => {
+    const desktop = api({
+      getAiSettings: vi.fn(async () => ({
+        ...configured,
+        profiles: [deepseekProfile],
+      })),
+      deleteAiProviderProfile: vi.fn(async () =>
+        changed({ profiles: [], selectedProfileId: null }),
+      ),
+    });
+    const user = userEvent.setup();
+    render(<AiSettingsFeature api={desktop} settingsPage />);
+
+    await user.click(
+      await screen.findByRole("button", { name: "编辑 deepseek-chat" }),
+    );
+    await user.click(screen.getByRole("button", { name: "删除模型" }));
+    await user.click(screen.getByRole("button", { name: "删除" }));
+
+    await waitFor(() =>
+      expect(
+        screen.getByRole("button", { name: "新增云端模型" }),
+      ).toHaveFocus(),
+    );
   });
 
   it("creates with only operational fields and an ephemeral key", async () => {

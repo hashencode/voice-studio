@@ -32,6 +32,7 @@ import {
   ItemTitle,
 } from "@/components/ui/item";
 import { Label } from "@/components/ui/label";
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import {
   Select,
   SelectContent,
@@ -84,6 +85,7 @@ export function AiSettingsFeature({
   const [error, setError] = React.useState<string | null>(null);
   const [pending, setPending] = React.useState(true);
   const [mutationPending, setMutationPending] = React.useState(false);
+  const addActionRef = React.useRef<HTMLButtonElement>(null);
 
   const load = React.useCallback(async () => {
     setPending(true);
@@ -162,6 +164,7 @@ export function AiSettingsFeature({
       settings={settings}
       api={api}
       disabled={mutationPending}
+      triggerRef={addActionRef}
       onPendingChange={setMutationPending}
       onSaved={setSettings}
       onReload={load}
@@ -177,6 +180,7 @@ export function AiSettingsFeature({
       onSaved={setSettings}
       onError={setError}
       onReload={load}
+      addActionRef={addActionRef}
     />
   );
 
@@ -217,6 +221,7 @@ function ProviderProfileList({
   onSaved,
   onError,
   onReload,
+  addActionRef,
 }: {
   settings: AiSettingsSnapshot;
   api: Voice2TextDesktopApi;
@@ -226,7 +231,9 @@ function ProviderProfileList({
   onSaved: (settings: AiSettingsSnapshot) => void;
   onError: (error: string | null) => void;
   onReload: () => Promise<AiSettingsSnapshot | null>;
+  addActionRef: React.RefObject<HTMLButtonElement | null>;
 }) {
+  const profileRadioRefs = React.useRef(new Map<string, HTMLButtonElement>());
   const selectProfile = (profile: AiProviderProfile) => {
     if (mutationPending || !profile.capabilities.selectable) return;
     onPendingChange(true);
@@ -265,98 +272,94 @@ function ProviderProfileList({
           </Item>
         </SettingsItemGroup>
       ) : (
-        <SettingsItemGroup role="radiogroup" aria-label="云端模型">
-          {settings.profiles.map((profile, index) => {
-            const selected = settings.selectedProfileId === profile.profileId;
-            const custom = profile.kind === "custom" ? profile : null;
-            const isRovingTabStop =
-              selected || (settings.selectedProfileId === null && index === 0);
-            return (
-              <Item
-                key={profile.profileId}
-                className="rounded-none data-[selected=true]:bg-muted/50"
-                data-selected={selected}
-              >
-                <div
-                  role="radio"
-                  aria-checked={selected}
-                  aria-disabled={mutationPending || undefined}
-                  data-profile-radio={profile.profileId}
-                  tabIndex={mutationPending || !isRovingTabStop ? -1 : 0}
-                  className="flex min-w-0 flex-1 cursor-pointer items-center gap-4 rounded-md outline-none focus-visible:ring-1 focus-visible:ring-ring/40"
-                  onClick={() => selectProfile(profile)}
-                  onKeyDown={(event) => {
-                    if (event.key === " ") {
-                      event.preventDefault();
-                      selectProfile(profile);
-                      return;
-                    }
-                    if (
-                      ![
-                        "ArrowDown",
-                        "ArrowLeft",
-                        "ArrowRight",
-                        "ArrowUp",
-                      ].includes(event.key)
-                    )
-                      return;
-                    event.preventDefault();
-                    const direction =
-                      event.key === "ArrowDown" || event.key === "ArrowRight"
-                        ? 1
-                        : -1;
-                    const nextIndex =
-                      (index + direction + settings.profiles.length) %
-                      settings.profiles.length;
-                    const radios = event.currentTarget
-                      .closest('[role="radiogroup"]')
-                      ?.querySelectorAll<HTMLElement>('[role="radio"]');
-                    radios?.[nextIndex]?.focus();
-                    selectProfile(settings.profiles[nextIndex]!);
-                  }}
-                >
-                  <ItemMedia aria-hidden="true">
-                    {custom ? (
-                      <ModelProviderIcon
-                        protocol={custom.protocol}
-                        active={selected}
-                      />
-                    ) : null}
-                  </ItemMedia>
-                  <ItemContent>
-                    <ItemTitle>{profile.modelSummary}</ItemTitle>
-                    <ItemDescription
-                      title={custom ? interfaceSummary(custom) : undefined}
-                    >
-                      {custom ? interfaceSummary(custom) : profile.displayName}
-                    </ItemDescription>
-                  </ItemContent>
-                </div>
-                {custom ? (
-                  <ItemActions>
-                    <ProviderProfileDialog
-                      mode={{ kind: "edit", profile: custom }}
-                      settings={settings}
-                      api={api}
-                      disabled={mutationPending}
-                      onPendingChange={onPendingChange}
-                      onSaved={onSaved}
-                      onReload={onReload}
-                      onDeleted={(deletedProfileId, next) => {
-                        onSaved(next);
-                        focusAfterProfileDeletion(
-                          settings.profiles,
-                          deletedProfileId,
-                          next.profiles,
-                        );
-                      }}
-                    />
-                  </ItemActions>
-                ) : null}
-              </Item>
+        <RadioGroup
+          aria-label="云端模型"
+          className="gap-0"
+          value={settings.selectedProfileId ?? ""}
+          disabled={mutationPending}
+          onValueChange={(profileId) => {
+            const profile = settings.profiles.find(
+              (candidate) => candidate.profileId === profileId,
             );
-          })}
-        </SettingsItemGroup>
+            if (profile) selectProfile(profile);
+          }}
+          asChild
+        >
+          <SettingsItemGroup>
+            {settings.profiles.map((profile) => {
+              const selected = settings.selectedProfileId === profile.profileId;
+              const custom = profile.kind === "custom" ? profile : null;
+              const radioId = `profile-radio-${profile.profileId}`;
+              return (
+                <Item
+                  key={profile.profileId}
+                  className="rounded-none data-[selected=true]:bg-muted/50"
+                  data-selected={selected}
+                >
+                  <RadioGroupItem
+                    ref={(node) => {
+                      if (node) {
+                        profileRadioRefs.current.set(profile.profileId, node);
+                      } else {
+                        profileRadioRefs.current.delete(profile.profileId);
+                      }
+                    }}
+                    id={radioId}
+                    value={profile.profileId}
+                    disabled={!profile.capabilities.selectable}
+                    aria-label={profile.modelSummary}
+                  />
+                  <label
+                    htmlFor={radioId}
+                    className="flex min-w-0 flex-1 cursor-pointer items-center gap-4"
+                  >
+                    <ItemMedia aria-hidden="true">
+                      {custom ? (
+                        <ModelProviderIcon
+                          protocol={custom.protocol}
+                          active={selected}
+                        />
+                      ) : null}
+                    </ItemMedia>
+                    <ItemContent>
+                      <ItemTitle>{profile.modelSummary}</ItemTitle>
+                      <ItemDescription
+                        title={custom ? interfaceSummary(custom) : undefined}
+                      >
+                        {custom
+                          ? interfaceSummary(custom)
+                          : profile.displayName}
+                      </ItemDescription>
+                    </ItemContent>
+                  </label>
+                  {custom ? (
+                    <ItemActions>
+                      <ProviderProfileDialog
+                        mode={{ kind: "edit", profile: custom }}
+                        settings={settings}
+                        api={api}
+                        disabled={mutationPending}
+                        onPendingChange={onPendingChange}
+                        onSaved={onSaved}
+                        onReload={onReload}
+                        onDeleted={(deletedProfileId, next) => {
+                          onSaved(next);
+                          focusAfterProfileDeletion(
+                            settings.profiles,
+                            deletedProfileId,
+                            next.profiles,
+                            profileRadioRefs,
+                            addActionRef,
+                          );
+                        }}
+                      />
+                    </ItemActions>
+                  ) : null}
+                </Item>
+              );
+            })}
+          </SettingsItemGroup>
+        </RadioGroup>
       )}
     </>
   );
@@ -371,6 +374,7 @@ function ProviderProfileDialog({
   onSaved,
   onReload,
   onDeleted,
+  triggerRef,
 }: {
   mode: DialogMode;
   settings: AiSettingsSnapshot;
@@ -380,6 +384,7 @@ function ProviderProfileDialog({
   onSaved: (settings: AiSettingsSnapshot) => void;
   onReload: () => Promise<AiSettingsSnapshot | null>;
   onDeleted?: (profileId: string, settings: AiSettingsSnapshot) => void;
+  triggerRef?: React.Ref<HTMLButtonElement>;
 }) {
   const profile = mode.kind === "edit" ? mode.profile : null;
   const [open, setOpen] = React.useState(false);
@@ -423,12 +428,12 @@ function ProviderProfileDialog({
     >
       <DialogTrigger asChild>
         <Button
+          ref={triggerRef}
           type="button"
           variant="ghost"
           size="icon-sm"
           disabled={disabled || (mode.kind === "edit" && !profile)}
           aria-label={profile ? `编辑 ${profile.modelId}` : "新增云端模型"}
-          data-add-model={profile ? undefined : "true"}
           data-profile-edit={profile?.profileId}
         >
           {profile ? <Pencil /> : <Plus />}
@@ -752,6 +757,8 @@ function focusAfterProfileDeletion(
   previousProfiles: AiProviderProfile[],
   deletedProfileId: string,
   nextProfiles: AiProviderProfile[],
+  profileRadioRefs: React.RefObject<Map<string, HTMLButtonElement>>,
+  addActionRef: React.RefObject<HTMLButtonElement | null>,
 ): void {
   const deletedIndex = previousProfiles.findIndex(
     (profile) => profile.profileId === deletedProfileId,
@@ -760,12 +767,8 @@ function focusAfterProfileDeletion(
     nextProfiles[deletedIndex] ?? nextProfiles[Math.max(0, deletedIndex - 1)];
   requestAnimationFrame(() => {
     const focusTarget = target
-      ? [
-          ...document.querySelectorAll<HTMLElement>("[data-profile-radio]"),
-        ].find(
-          (candidate) => candidate.dataset.profileRadio === target.profileId,
-        )
-      : document.querySelector<HTMLButtonElement>("[data-add-model='true']");
+      ? profileRadioRefs.current.get(target.profileId)
+      : addActionRef.current;
     focusTarget?.focus();
   });
 }

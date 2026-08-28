@@ -39,6 +39,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Label } from "@/components/ui/label";
 import { Progress } from "@/components/ui/progress";
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import {
   Popover,
   PopoverContent,
@@ -884,6 +885,43 @@ describe("current shadcn primitives", () => {
         "focus-visible:ring-1",
       );
     }
+  });
+
+  it("forwards controlled RadioGroup values with the Electron thin-focus exception", async () => {
+    const onValueChange = vi.fn();
+    const user = userEvent.setup();
+
+    function ControlledRadioGroup() {
+      const [value, setValue] = useState("deepseek");
+      return (
+        <RadioGroup
+          aria-label="云端模型"
+          value={value}
+          onValueChange={(nextValue) => {
+            setValue(nextValue);
+            onValueChange(nextValue);
+          }}
+        >
+          <RadioGroupItem value="deepseek" aria-label="DeepSeek" />
+          <RadioGroupItem value="team" aria-label="Team" />
+        </RadioGroup>
+      );
+    }
+
+    render(<ControlledRadioGroup />);
+
+    const deepseek = screen.getByRole("radio", { name: "DeepSeek" });
+    const team = screen.getByRole("radio", { name: "Team" });
+    expect(deepseek).toBeChecked();
+    expect(team).toHaveClass("focus-visible:ring-1");
+    expect(team).not.toHaveClass("focus-visible:ring-3", "shadow-xs");
+
+    await user.click(team);
+
+    expect(onValueChange).toHaveBeenCalledOnce();
+    expect(onValueChange).toHaveBeenCalledWith("team");
+    expect(team).toBeChecked();
+    expect(deepseek).not.toBeChecked();
   });
 
   it("preserves controlled Slider keyboard changes and per-thumb aria forwarding", async () => {
