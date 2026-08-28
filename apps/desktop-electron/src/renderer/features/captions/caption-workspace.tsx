@@ -212,7 +212,7 @@ function DraftTranscript({
       <div
         aria-label="实时草稿内容"
         tabIndex={0}
-        className="max-h-40 space-y-1 overflow-auto rounded-md bg-background p-2 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring"
+        className="max-h-40 space-y-1 overflow-auto rounded-md bg-background p-2 text-sm outline-none focus-visible:ring-1 focus-visible:ring-ring"
       >
         {draft.hasEarlierUtterances ? (
           <p className="text-xs text-muted-foreground">更早字幕已安全保存</p>

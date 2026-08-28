@@ -54,6 +54,9 @@ import {
 } from "@/components/ui/select";
 import {
   Sidebar,
+  SidebarMenu,
+  SidebarMenuButton,
+  SidebarMenuItem,
   SidebarProvider,
   SidebarTrigger,
 } from "@/components/ui/sidebar";
@@ -739,6 +742,24 @@ describe("current shadcn primitives", () => {
     expect(
       screen.getByRole("button", { name: /工作区 B 团队版/ }),
     ).toBeVisible();
+  });
+
+  it("uses the Electron thin-focus rule for Sidebar menu actions", () => {
+    render(
+      <SidebarProvider defaultOpen persistState={false}>
+        <Sidebar>
+          <SidebarMenu>
+            <SidebarMenuItem>
+              <SidebarMenuButton>音频</SidebarMenuButton>
+            </SidebarMenuItem>
+          </SidebarMenu>
+        </Sidebar>
+      </SidebarProvider>,
+    );
+
+    const action = screen.getByRole("button", { name: "音频" });
+    expect(action).toHaveClass("focus-visible:ring-1");
+    expect(action).not.toHaveClass("focus-visible:ring-2");
   });
 
   it("lets controlled Sidebar consumers bypass cookie persistence and the shortcut", async () => {

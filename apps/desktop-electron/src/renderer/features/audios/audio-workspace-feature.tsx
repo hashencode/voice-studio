@@ -179,7 +179,7 @@ export function AudioWorkspaceFeature({
                 <button
                   type="button"
                   aria-label={`打开 ${audio.displayName}`}
-                  className="w-full rounded-xl border bg-card p-4 text-left outline-none transition-colors hover:bg-accent focus-visible:ring-2 focus-visible:ring-ring"
+                  className="w-full rounded-xl border bg-card p-4 text-left outline-none transition-colors hover:bg-accent focus-visible:ring-1 focus-visible:ring-ring"
                   data-audio-id={audio.audioId}
                   disabled={pending}
                   onClick={() => void openAudio(audio.audioId)}
