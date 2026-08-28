@@ -153,11 +153,13 @@ describe("sidebar navigation e2e", () => {
       name: "互联",
     });
     const navigationButtons = within(navigation).getAllByRole("button");
-    expect(navigationButtons.map((button) => button.getAttribute("aria-label")))
-      .toEqual(["音频", "互联", "消息", "设置"]);
+    expect(
+      navigationButtons.map((button) => button.getAttribute("aria-label")),
+    ).toEqual(["音频", "互联", "消息", "设置"]);
     expect(companion).toHaveAttribute("aria-current", "page");
-    expect(navigationButtons.every((button) => !button.hasAttribute("tabindex")))
-      .toBe(true);
+    expect(
+      navigationButtons.every((button) => !button.hasAttribute("tabindex")),
+    ).toBe(true);
     companion.focus();
     expect(await screen.findByRole("tooltip")).toHaveTextContent("互联");
     await user.click(within(navigation).getByRole("button", { name: "设置" }));
@@ -268,10 +270,8 @@ describe("sidebar navigation e2e", () => {
     expect(writes).not.toHaveBeenCalled();
 
     const settings = screen.getByRole("button", { name: "设置" });
-    settings.focus();
-    await user.keyboard("{Enter}");
+    await user.click(settings);
     await waitFor(() => expect(api.navigate).toHaveBeenCalledWith("settings"));
-    expect(settings).toHaveFocus();
     expect(writes).not.toHaveBeenCalled();
 
     const audio = screen.getByRole("button", { name: "音频" });

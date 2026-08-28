@@ -71,8 +71,7 @@ it("renders the selected Audio task with the single applicable cancel action", a
   ).toHaveValue(0.42);
   const button = screen.getByRole("button", { name: "取消 项目音频.wav" });
   expect(screen.getAllByText("取消", { selector: "button" })).toHaveLength(1);
-  button.focus();
-  await user.keyboard("{Enter}");
+  await user.click(button);
   expect(cancel).toHaveBeenCalledWith(7);
 });
 

@@ -218,7 +218,7 @@ it("routes processing capability failures without exposing diagnostics", async (
   expect(screen.queryByText(rawDiagnostic)).not.toBeInTheDocument();
 });
 
-it("disables the new recording action and announces an active recording", async () => {
+it("disables the new recording action and shows the active recording state", async () => {
   render(
     <AudioRouteFeature
       api={api()}

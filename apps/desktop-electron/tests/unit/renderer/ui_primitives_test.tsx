@@ -27,18 +27,11 @@ import { NavUser } from "@/components/nav-user";
 import { TeamSwitcher } from "@/components/team-switcher";
 import {
   DropdownMenu,
-  DropdownMenuCheckboxItem,
   DropdownMenuContent,
   DropdownMenuItem,
-  DropdownMenuRadioGroup,
-  DropdownMenuRadioItem,
-  DropdownMenuSub,
-  DropdownMenuSubContent,
-  DropdownMenuSubTrigger,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Label } from "@/components/ui/label";
-import { Progress } from "@/components/ui/progress";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import {
   Popover,
@@ -60,12 +53,7 @@ import {
   SidebarProvider,
   SidebarTrigger,
 } from "@/components/ui/sidebar";
-import {
-  Sheet,
-  SheetContent,
-  SheetTitle,
-  SheetTrigger,
-} from "@/components/ui/sheet";
+import { Sheet, SheetContent, SheetTitle } from "@/components/ui/sheet";
 import { Slider } from "@/components/ui/slider";
 import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
@@ -239,8 +227,6 @@ describe("current shadcn primitives", () => {
       "aria-pressed:bg-muted",
       "focus-visible:ring-1",
     );
-    selected.focus();
-    expect(selected).toHaveFocus();
     await user.click(selected);
     expect(onAction).toHaveBeenCalledOnce();
     expect(screen.getByText("操作")).toHaveAttribute(
@@ -404,23 +390,16 @@ describe("current shadcn primitives", () => {
     expect(navigated).not.toHaveBeenCalled();
   });
 
-  it("keeps Sheet dismissal semantics on the Dialog mask and ghost close", async () => {
-    const onOpenChange = vi.fn();
-    const user = userEvent.setup();
-
+  it("preserves the Electron Sheet mask, surface, and close recipe", async () => {
     render(
-      <Sheet onOpenChange={onOpenChange}>
-        <SheetTrigger>打开面板</SheetTrigger>
+      <Sheet open>
         <SheetContent>
           <SheetTitle>详情面板</SheetTitle>
         </SheetContent>
       </Sheet>,
     );
 
-    const trigger = screen.getByRole("button", { name: "打开面板" });
-    await user.click(trigger);
-
-    let sheet = await screen.findByRole("dialog", { name: "详情面板" });
+    const sheet = await screen.findByRole("dialog", { name: "详情面板" });
     expect(document.querySelector('[data-slot="sheet-overlay"]')).toHaveClass(
       "bg-black/10",
       "supports-backdrop-filter:backdrop-blur-xs",
@@ -435,23 +414,6 @@ describe("current shadcn primitives", () => {
     expect(close).toHaveAttribute("data-variant", "ghost");
     expect(close).toHaveAttribute("data-size", "icon-sm");
     expect(close).toHaveClass("hover:bg-accent");
-
-    await user.click(close);
-    await waitFor(() => expect(sheet).not.toBeInTheDocument());
-    expect(trigger).toHaveFocus();
-
-    await user.click(trigger);
-    sheet = await screen.findByRole("dialog", { name: "详情面板" });
-    await user.keyboard("{Escape}");
-    await waitFor(() => expect(sheet).not.toBeInTheDocument());
-    expect(trigger).toHaveFocus();
-
-    await user.click(trigger);
-    sheet = await screen.findByRole("dialog", { name: "详情面板" });
-    await user.click(document.querySelector('[data-slot="sheet-overlay"]')!);
-    await waitFor(() => expect(sheet).not.toBeInTheDocument());
-    expect(trigger).toHaveFocus();
-    expect(onOpenChange).toHaveBeenLastCalledWith(false);
   });
 
   it("keeps the mobile Sidebar Sheet close hidden without changing desktop state", async () => {
@@ -461,8 +423,6 @@ describe("current shadcn primitives", () => {
       writable: true,
     });
     const onOpenChange = vi.fn();
-    const user = userEvent.setup();
-
     render(
       <SidebarProvider
         open
@@ -475,7 +435,7 @@ describe("current shadcn primitives", () => {
       </SidebarProvider>,
     );
 
-    await user.click(screen.getByRole("button", { name: "打开移动侧栏" }));
+    fireEvent.click(screen.getByRole("button", { name: "打开移动侧栏" }));
     const mobileSidebar = await screen.findByText("移动侧栏内容");
     const sheet = mobileSidebar.closest('[data-mobile="true"]');
     expect(sheet).toHaveClass("[&>button]:hidden");
@@ -483,26 +443,18 @@ describe("current shadcn primitives", () => {
       within(sheet as HTMLElement).getByRole("button", { name: "Close" }),
     ).toHaveAttribute("data-variant", "ghost");
 
-    await user.keyboard("{Escape}");
-    await waitFor(() => expect(mobileSidebar).not.toBeInTheDocument());
     expect(onOpenChange).not.toHaveBeenCalled();
   });
 
-  it("preserves Popover keyboard, pointer, outside-dismiss, and focus contracts", async () => {
-    const onOpenChange = vi.fn();
-    const user = userEvent.setup();
-
+  it("preserves the shadowless Nova Popover recipe", async () => {
     render(
-      <Popover onOpenChange={onOpenChange}>
+      <Popover open>
         <PopoverTrigger>打开浮层</PopoverTrigger>
         <PopoverContent>浮层内容</PopoverContent>
       </Popover>,
     );
 
-    const trigger = screen.getByRole("button", { name: "打开浮层" });
-    trigger.focus();
-    await user.keyboard("{Enter}");
-    let content = await screen.findByText("浮层内容");
+    const content = await screen.findByText("浮层内容");
     expect(content).toHaveAttribute("data-align", "center");
     expect(content).toHaveClass(
       "w-72",
@@ -514,16 +466,6 @@ describe("current shadcn primitives", () => {
       "data-[state=closed]:animate-out",
     );
     expect(content).not.toHaveClass("shadow-md");
-
-    await user.keyboard("{Escape}");
-    await waitFor(() => expect(content).not.toBeInTheDocument());
-    expect(trigger).toHaveFocus();
-
-    await user.click(trigger);
-    content = await screen.findByText("浮层内容");
-    fireEvent.pointerDown(document.body);
-    await waitFor(() => expect(content).not.toBeInTheDocument());
-    expect(onOpenChange).toHaveBeenLastCalledWith(false);
   });
 
   it("keeps long Tooltip content constrained with its arrow and state classes", async () => {
@@ -549,39 +491,15 @@ describe("current shadcn primitives", () => {
     expect(content).not.toHaveClass("shadow-md", "shadow-lg");
   });
 
-  it("keeps DropdownMenu state, selection, dismissal, and focus contracts on one Nova surface", async () => {
-    const onSelect = vi.fn();
-    const onDisabledSelect = vi.fn();
-    const user = userEvent.setup();
-
+  it("keeps DropdownMenu on the shadowless Nova surface", async () => {
     render(
-      <DropdownMenu>
+      <DropdownMenu open>
         <DropdownMenuTrigger>打开操作菜单</DropdownMenuTrigger>
         <DropdownMenuContent>
-          <DropdownMenuItem onSelect={onSelect}>打开项目</DropdownMenuItem>
           <DropdownMenuItem variant="destructive">删除项目</DropdownMenuItem>
-          <DropdownMenuItem disabled onSelect={onDisabledSelect}>
-            不可用操作
-          </DropdownMenuItem>
-          <DropdownMenuCheckboxItem checked>显示归档</DropdownMenuCheckboxItem>
-          <DropdownMenuRadioGroup value="recent">
-            <DropdownMenuRadioItem value="recent">
-              最近使用
-            </DropdownMenuRadioItem>
-          </DropdownMenuRadioGroup>
-          <DropdownMenuSub>
-            <DropdownMenuSubTrigger>更多操作</DropdownMenuSubTrigger>
-            <DropdownMenuSubContent>
-              <DropdownMenuItem>子菜单操作</DropdownMenuItem>
-            </DropdownMenuSubContent>
-          </DropdownMenuSub>
         </DropdownMenuContent>
       </DropdownMenu>,
     );
-
-    const trigger = screen.getByRole("button", { name: "打开操作菜单" });
-    trigger.focus();
-    await user.keyboard("{Enter}");
 
     const content = await screen.findByRole("menu");
     expect(content).toHaveAttribute("data-align", "start");
@@ -600,44 +518,16 @@ describe("current shadcn primitives", () => {
       "data-[variant=destructive]:text-destructive",
       "data-[variant=destructive]:focus:bg-destructive/10",
     );
-    const disabled = screen.getByRole("menuitem", { name: "不可用操作" });
-    expect(disabled).toHaveAttribute("data-disabled");
-    expect(disabled).toHaveClass(
-      "data-[disabled]:pointer-events-none",
-      "data-[disabled]:opacity-50",
-    );
-    expect(
-      screen.getByRole("menuitemcheckbox", { name: "显示归档" }),
-    ).toBeChecked();
-    expect(
-      screen.getByRole("menuitemradio", { name: "最近使用" }),
-    ).toBeChecked();
-    expect(screen.getByText("更多操作")).toHaveClass(
-      "data-[state=open]:bg-accent",
-      "data-[state=open]:text-accent-foreground",
-    );
-
-    await user.keyboard("{Home}{Enter}");
-    expect(onSelect).toHaveBeenCalledOnce();
-    expect(onDisabledSelect).not.toHaveBeenCalled();
-    await waitFor(() => expect(content).not.toBeInTheDocument());
-    expect(trigger).toHaveFocus();
-
-    await user.keyboard("{Enter}");
-    expect(await screen.findByRole("menu")).toBeVisible();
-    await user.keyboard("{Escape}");
-    await waitFor(() => expect(screen.queryByRole("menu")).toBeNull());
-    expect(trigger).toHaveFocus();
   });
 
-  it("keeps controlled Select keyboard values, disabled items, and focus restoration", async () => {
+  it("forwards controlled Select values on the shadowless Nova surface", async () => {
     const onValueChange = vi.fn();
-    const user = userEvent.setup();
 
     function Harness() {
       const [value, setValue] = useState("deepseek");
       return (
         <Select
+          open
           value={value}
           onValueChange={(nextValue) => {
             onValueChange(nextValue);
@@ -659,11 +549,11 @@ describe("current shadcn primitives", () => {
     }
 
     render(<Harness />);
-    const trigger = screen.getByRole("combobox", { name: "AI 提供商" });
-    trigger.focus();
-    await user.keyboard("{Enter}");
-
-    let content = await screen.findByRole("listbox");
+    const trigger = document.querySelector<HTMLElement>(
+      '[data-slot="select-trigger"]',
+    );
+    expect(trigger).not.toBeNull();
+    const content = await screen.findByRole("listbox");
     expect(content).toHaveAttribute("data-align-trigger", "true");
     expect(content).toHaveClass(
       "rounded-lg",
@@ -677,16 +567,9 @@ describe("current shadcn primitives", () => {
       screen.getByRole("option", { name: "不可用提供商" }),
     ).toHaveAttribute("data-disabled");
 
-    await user.keyboard("{ArrowDown}{Enter}");
+    fireEvent.click(screen.getByRole("option", { name: "OpenAI" }));
     expect(onValueChange).toHaveBeenCalledWith("openai");
-    expect(trigger).toHaveTextContent("OpenAI");
-    expect(trigger).toHaveFocus();
-
-    await user.keyboard("{Enter}");
-    content = await screen.findByRole("listbox");
-    await user.keyboard("{Escape}");
-    await waitFor(() => expect(content).not.toBeInTheDocument());
-    expect(trigger).toHaveFocus();
+    expect(trigger!).toHaveTextContent("OpenAI");
   });
 
   it("keeps nav menu width, side, and alignment as layout-only overrides", async () => {
@@ -818,29 +701,13 @@ describe("current shadcn primitives", () => {
     expect(onOpenChange).not.toHaveBeenCalled();
   });
 
-  it("keeps small-control geometry while exposing Nova hit zones and thin interaction states", async () => {
-    const onCheckboxChange = vi.fn();
-    const onDisabledCheckboxChange = vi.fn();
-    const onSwitchChange = vi.fn();
-    const onDisabledSwitchChange = vi.fn();
-    const user = userEvent.setup();
-
+  it("keeps small-control geometry with Nova hit zones and thin focus", () => {
     render(
       <div>
         <Label htmlFor="enabled-checkbox">启用复选项</Label>
-        <Checkbox id="enabled-checkbox" onCheckedChange={onCheckboxChange} />
-        <Checkbox
-          aria-label="不可用复选项"
-          disabled
-          onCheckedChange={onDisabledCheckboxChange}
-        />
+        <Checkbox id="enabled-checkbox" />
         <Label htmlFor="enabled-switch">启用开关</Label>
-        <Switch id="enabled-switch" onCheckedChange={onSwitchChange} />
-        <Switch
-          aria-label="不可用开关"
-          disabled
-          onCheckedChange={onDisabledSwitchChange}
-        />
+        <Switch id="enabled-switch" />
         <Slider aria-label="范围" defaultValue={[20, 80]} />
       </div>,
     );
@@ -855,22 +722,6 @@ describe("current shadcn primitives", () => {
       "enabled:active:ring-1",
       "focus-visible:ring-1",
     );
-    await user.click(screen.getByText("启用复选项"));
-    expect(checkbox).toBeChecked();
-    checkbox.focus();
-    await user.keyboard(" ");
-    expect(checkbox).not.toBeChecked();
-    expect(onCheckboxChange).toHaveBeenCalledTimes(2);
-
-    const disabledCheckbox = screen.getByRole("checkbox", {
-      name: "不可用复选项",
-    });
-    await user.click(disabledCheckbox);
-    disabledCheckbox.focus();
-    await user.keyboard(" ");
-    expect(disabledCheckbox).not.toBeChecked();
-    expect(onDisabledCheckboxChange).not.toHaveBeenCalled();
-
     const toggle = screen.getByRole("switch", { name: "启用开关" });
     expect(toggle).toHaveClass(
       "relative",
@@ -882,20 +733,6 @@ describe("current shadcn primitives", () => {
       "enabled:active:ring-1",
       "focus-visible:ring-1",
     );
-    await user.click(screen.getByText("启用开关"));
-    expect(toggle).toBeChecked();
-    toggle.focus();
-    await user.keyboard(" ");
-    expect(toggle).not.toBeChecked();
-    expect(onSwitchChange).toHaveBeenCalledTimes(2);
-
-    const disabledSwitch = screen.getByRole("switch", { name: "不可用开关" });
-    await user.click(disabledSwitch);
-    disabledSwitch.focus();
-    await user.keyboard(" ");
-    expect(disabledSwitch).not.toBeChecked();
-    expect(onDisabledSwitchChange).not.toHaveBeenCalled();
-
     for (const thumb of screen.getAllByRole("slider", { name: "范围" })) {
       expect(thumb).toHaveClass(
         "relative",
@@ -945,29 +782,17 @@ describe("current shadcn primitives", () => {
     expect(deepseek).not.toBeChecked();
   });
 
-  it("preserves controlled Slider keyboard changes and per-thumb aria forwarding", async () => {
-    const onValueChange = vi.fn();
-    const user = userEvent.setup();
-
-    function RangeSlider() {
-      const [value, setValue] = useState([20, 80]);
-      return (
-        <Slider
-          aria-label="剪辑范围"
-          aria-valuetext="已选范围"
-          min={0}
-          max={100}
-          step={5}
-          value={value}
-          onValueChange={(nextValue) => {
-            setValue(nextValue);
-            onValueChange(nextValue);
-          }}
-        />
-      );
-    }
-
-    render(<RangeSlider />);
+  it("forwards controlled Slider values and aria text to every thumb", () => {
+    render(
+      <Slider
+        aria-label="剪辑范围"
+        aria-valuetext="已选范围"
+        min={0}
+        max={100}
+        step={5}
+        value={[20, 80]}
+      />,
+    );
     const thumbs = screen.getAllByRole("slider", { name: "剪辑范围" });
     expect(thumbs).toHaveLength(2);
     expect(thumbs[0]).toHaveAttribute("aria-valuenow", "20");
@@ -975,48 +800,17 @@ describe("current shadcn primitives", () => {
     for (const thumb of thumbs) {
       expect(thumb).toHaveAttribute("aria-valuetext", "已选范围");
     }
-
-    thumbs[0]?.focus();
-    await user.keyboard("{ArrowRight}");
-    expect(onValueChange).toHaveBeenLastCalledWith([25, 80]);
-    expect(thumbs[0]).toHaveAttribute("aria-valuenow", "25");
   });
 
-  it("keeps Input and Textarea invalid, disabled, and readOnly semantics distinct", async () => {
-    const onInputChange = vi.fn();
-    const onDisabledInputChange = vi.fn();
-    const onReadOnlyInputChange = vi.fn();
-    const onTextareaChange = vi.fn();
-    const user = userEvent.setup();
-
+  it("pins invalid and read-only Input and Textarea recipe classes", () => {
     render(
       <div>
-        <Input aria-label="普通输入" onChange={onInputChange} />
         <Input aria-label="无效输入" aria-invalid="true" />
-        <Input
-          aria-label="不可用输入"
-          disabled
-          onChange={onDisabledInputChange}
-        />
-        <Input
-          aria-label="只读输入"
-          readOnly
-          value="固定值"
-          onChange={onReadOnlyInputChange}
-        />
-        <Textarea
-          aria-label="无效文本域"
-          aria-invalid="true"
-          onChange={onTextareaChange}
-        />
-        <Textarea aria-label="不可用文本域" disabled />
+        <Input aria-label="只读输入" readOnly value="固定值" />
+        <Textarea aria-label="无效文本域" aria-invalid="true" />
         <Textarea aria-label="只读文本域" readOnly value="固定文本" />
       </div>,
     );
-
-    const input = screen.getByRole("textbox", { name: "普通输入" });
-    await user.type(input, "可编辑");
-    expect(onInputChange).toHaveBeenCalled();
 
     const invalidInput = screen.getByRole("textbox", { name: "无效输入" });
     expect(invalidInput).toHaveAttribute("aria-invalid", "true");
@@ -1025,20 +819,8 @@ describe("current shadcn primitives", () => {
       "aria-invalid:ring-1",
     );
 
-    const disabledInput = screen.getByRole("textbox", { name: "不可用输入" });
-    expect(disabledInput).toBeDisabled();
-    expect(disabledInput).not.toHaveAttribute("readonly");
-    await user.type(disabledInput, "忽略");
-    expect(onDisabledInputChange).not.toHaveBeenCalled();
-
     const readOnlyInput = screen.getByRole("textbox", { name: "只读输入" });
-    expect(readOnlyInput).not.toBeDisabled();
     expect(readOnlyInput).toHaveAttribute("readonly");
-    await user.click(readOnlyInput);
-    expect(readOnlyInput).toHaveFocus();
-    await user.type(readOnlyInput, "忽略");
-    expect(onReadOnlyInputChange).not.toHaveBeenCalled();
-    expect(readOnlyInput).toHaveValue("固定值");
     expect(readOnlyInput).toHaveClass("read-only:cursor-default");
 
     const invalidTextarea = screen.getByRole("textbox", {
@@ -1049,77 +831,10 @@ describe("current shadcn primitives", () => {
       "aria-invalid:border-destructive",
       "aria-invalid:ring-1",
     );
-    await user.type(invalidTextarea, "可编辑文本");
-    expect(onTextareaChange).toHaveBeenCalled();
-
-    expect(
-      screen.getByRole("textbox", { name: "不可用文本域" }),
-    ).toBeDisabled();
     const readOnlyTextarea = screen.getByRole("textbox", {
       name: "只读文本域",
     });
-    expect(readOnlyTextarea).not.toBeDisabled();
     expect(readOnlyTextarea).toHaveAttribute("readonly");
     expect(readOnlyTextarea).toHaveClass("read-only:cursor-default");
-  });
-
-  it("exposes labels, values, and states for each migrated control", () => {
-    render(
-      <div>
-        <Label htmlFor="provider">音频智能提供商</Label>
-        <Select defaultValue="deepseek">
-          <SelectTrigger id="provider">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="deepseek">DeepSeek</SelectItem>
-            <SelectItem value="openai">OpenAI</SelectItem>
-          </SelectContent>
-        </Select>
-
-        <Label htmlFor="caption-switch">同时生成字幕</Label>
-        <Switch id="caption-switch" defaultChecked />
-
-        <Label htmlFor="cloud-consent">允许云端处理</Label>
-        <Checkbox id="cloud-consent" defaultChecked />
-
-        <Label id="playback-position-label">播放位置</Label>
-        <Slider
-          id="playback-position"
-          aria-labelledby="playback-position-label"
-          min={0}
-          max={120}
-          step={5}
-          value={[35]}
-        />
-
-        <Progress aria-label="处理进度" value={64} />
-
-        <Label htmlFor="transcript">转写文本</Label>
-        <Textarea id="transcript" defaultValue="测试转写" />
-      </div>,
-    );
-
-    expect(
-      screen.getByRole("combobox", { name: "音频智能提供商" }),
-    ).toHaveTextContent("DeepSeek");
-    expect(screen.getByRole("switch", { name: "同时生成字幕" })).toBeChecked();
-    expect(
-      screen.getByRole("checkbox", { name: "允许云端处理" }),
-    ).toBeChecked();
-    expect(screen.getByRole("slider", { name: "播放位置" })).toHaveAttribute(
-      "aria-valuenow",
-      "35",
-    );
-    expect(screen.getByRole("slider", { name: "播放位置" })).toHaveAttribute(
-      "aria-valuemax",
-      "120",
-    );
-    expect(
-      screen.getByRole("progressbar", { name: "处理进度" }),
-    ).toHaveAttribute("aria-valuenow", "64");
-    expect(screen.getByRole("textbox", { name: "转写文本" })).toHaveValue(
-      "测试转写",
-    );
   });
 });

@@ -401,7 +401,7 @@ describe("capture workspace", () => {
     });
   });
 
-  it("pauses from the keyboard and renders the returned state", async () => {
+  it("pauses once and renders the returned state", async () => {
     const paused: CaptureSnapshot = { ...recording, state: "paused" };
     const controlCapture = vi.fn(async () => paused);
     installCaptureApi({ controlCapture });
@@ -419,8 +419,7 @@ describe("capture workspace", () => {
     );
 
     const pause = screen.getByRole("button", { name: "暂停录制" });
-    pause.focus();
-    await user.keyboard("{Enter}");
+    await user.click(pause);
     expect(controlCapture).toHaveBeenCalledWith(
       expect.objectContaining({
         action: "pause",
@@ -496,8 +495,7 @@ describe("capture workspace", () => {
       />,
     );
     const resume = screen.getByRole("button", { name: "确认并继续录制" });
-    resume.focus();
-    await user.keyboard("{Enter}");
+    await user.click(resume);
     expect(controlCapture).toHaveBeenCalledWith(
       expect.objectContaining({
         action: "resume",

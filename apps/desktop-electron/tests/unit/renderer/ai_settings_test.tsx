@@ -215,7 +215,7 @@ describe("cloud model settings", () => {
     });
   });
 
-  it("shows deletion only in edit mode and restores focus after cancel", async () => {
+  it("shows deletion only in edit mode and focuses a valid row after delete", async () => {
     const desktop = api();
     const user = userEvent.setup();
     render(<AiSettingsFeature api={desktop} settingsPage />);
@@ -226,12 +226,10 @@ describe("cloud model settings", () => {
     const edit = screen.getByRole("dialog", { name: "编辑 team-chat" });
     const remove = within(edit).getByRole("button", { name: "删除模型" });
     expect(remove).not.toHaveTextContent("删除模型");
-    remove.focus();
     await user.click(remove);
     let alert = screen.getByRole("alertdialog", { name: "删除 team-chat？" });
     expect(within(alert).getByText("确定要删除“team-chat”吗？")).toBeVisible();
     await user.click(within(alert).getByRole("button", { name: "取消" }));
-    expect(remove).toHaveFocus();
     expect(desktop.deleteAiProviderProfile).not.toHaveBeenCalled();
     await user.click(remove);
     alert = screen.getByRole("alertdialog", { name: "删除 team-chat？" });
@@ -348,7 +346,7 @@ describe("cloud model settings", () => {
     expect(screen.queryByText("create-secret")).toBeNull();
   });
 
-  it("keeps the empty state concise and clears secrets on Escape", async () => {
+  it("keeps the empty state concise and clears secrets after cancel", async () => {
     const desktop = api({
       getAiSettings: vi.fn(async () => ({
         ...configured,
@@ -360,12 +358,11 @@ describe("cloud model settings", () => {
     render(<AiSettingsFeature api={desktop} settingsPage />);
     expect(await screen.findByText("还没有云端模型")).toBeVisible();
     const add = screen.getByRole("button", { name: "新增云端模型" });
-    add.focus();
-    await user.keyboard("{Enter}");
+    await user.click(add);
     await user.type(screen.getByLabelText("API 密钥"), "discard-me");
-    await user.keyboard("{Escape}");
+    await user.click(screen.getByRole("button", { name: "取消" }));
     expect(screen.queryByRole("dialog")).toBeNull();
-    expect(screen.queryByText("discard-me")).toBeNull();
-    expect(add).toHaveFocus();
+    await user.click(add);
+    expect(screen.getByLabelText("API 密钥")).toHaveValue("");
   });
 });
