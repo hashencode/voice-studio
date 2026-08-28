@@ -1,6 +1,12 @@
 // @vitest-environment jsdom
 
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import {
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+  within,
+} from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
@@ -200,7 +206,7 @@ describe("capture workspace", () => {
     ).not.toBeInTheDocument();
   });
 
-  it("starts once on repeated activation and exposes a semantic recording status", async () => {
+  it("starts once on repeated activation and keeps pending state visible", async () => {
     let resolveStart!: (value: CaptureSnapshot) => void;
     const startCapture = vi.fn(
       () =>
@@ -223,15 +229,11 @@ describe("capture workspace", () => {
     fireEvent.click(start);
     expect(startCapture).toHaveBeenCalledTimes(1);
     expect(start).toBeDisabled();
-    expect(
-      screen.getByRole("status", { name: "录制操作状态" }),
-    ).toHaveTextContent("正在开始录制");
+    expect(screen.getByText("正在开始录制")).toBeVisible();
 
     resolveStart(recording);
     await waitFor(() =>
-      expect(
-        screen.getByRole("status", { name: "录制操作状态" }),
-      ).toHaveTextContent("录制已经开始"),
+      expect(screen.queryByText("录制已经开始")).not.toBeInTheDocument(),
     );
     view.rerender(
       <CaptureWorkspace
@@ -244,7 +246,7 @@ describe("capture workspace", () => {
       />,
     );
     expect(
-      await screen.findByRole("status", { name: "录制状态" }),
+      await screen.findByRole("region", { name: "当前录制" }),
     ).toHaveTextContent("正在录制");
   });
 
@@ -327,7 +329,7 @@ describe("capture workspace", () => {
     ).not.toBeInTheDocument();
   });
 
-  it("guards repeated stop and announces the completed terminal state", async () => {
+  it("guards repeated stop and renders the completed terminal state", async () => {
     let resolveStop!: (value: CaptureSnapshot) => void;
     const completed: CaptureSnapshot = {
       ...recording,
@@ -362,8 +364,10 @@ describe("capture workspace", () => {
     expect(controlCapture).toHaveBeenCalledTimes(1);
     expect(confirm).toBeDisabled();
     expect(
-      screen.getByRole("status", { name: "录制操作状态" }),
-    ).toHaveTextContent("正在安全结束录制");
+      within(screen.getByRole("region", { name: "录制详情" })).getByText(
+        "正在安全结束录制",
+      ),
+    ).toBeVisible();
 
     resolveStop(completed);
     await waitFor(() => expect(confirm).toBeEnabled());
@@ -378,7 +382,7 @@ describe("capture workspace", () => {
       />,
     );
     expect(
-      await screen.findByRole("status", { name: "录制状态" }),
+      await screen.findByRole("region", { name: "当前录制" }),
     ).toHaveTextContent("录制已完成");
 
     await userEvent
@@ -430,7 +434,7 @@ describe("capture workspace", () => {
       />,
     );
     expect(
-      await screen.findByRole("status", { name: "录制状态" }),
+      await screen.findByRole("region", { name: "当前录制" }),
     ).toHaveTextContent("录制已暂停");
   });
 
@@ -470,7 +474,7 @@ describe("capture workspace", () => {
         }}
       />,
     );
-    expect(screen.getByRole("status", { name: "录制状态" })).toHaveTextContent(
+    expect(screen.getByRole("region", { name: "当前录制" })).toHaveTextContent(
       "电脑睡眠，录制已暂停",
     );
 

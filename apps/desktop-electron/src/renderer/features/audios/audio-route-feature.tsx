@@ -708,7 +708,6 @@ export function AudioMainWorkspace({
     : null;
   return (
     <div className="flex min-h-full flex-col gap-4">
-      <ProcessingLiveStatus tasks={controller.tasks} />
       {operationError ? <AudioOperationError message={operationError} /> : null}
       {controller.transitionError ? (
         <AudioOperationError message={controller.transitionError} />
@@ -1097,9 +1096,6 @@ function RecordingReadyState({
             </div>
           ) : testPhase === "failure" ? (
             <div className="space-y-3 pt-2">
-              <div aria-live="assertive" className="sr-only">
-                {microphoneFailureDescription(failureReason)}
-              </div>
               {settingsManualPathVisible ? (
                 <p role="alert" className="text-sm text-muted-foreground">
                   请手动前往：系统设置 → 隐私与安全 → 麦克风
@@ -1231,69 +1227,6 @@ function AudioProcessingDetail({
       <p className="mt-2 text-sm">{Math.round(task.progressFraction * 100)}%</p>
     </section>
   );
-}
-
-function ProcessingLiveStatus({ tasks }: { tasks: readonly ProcessingTask[] }) {
-  const announcement = useThrottledAnnouncement(tasks);
-  return (
-    <p
-      role="status"
-      aria-label="音频处理进度公告"
-      aria-live="polite"
-      aria-atomic="true"
-      className="sr-only"
-    >
-      {announcement}
-    </p>
-  );
-}
-
-function useThrottledAnnouncement(tasks: readonly ProcessingTask[]): string {
-  const previousTasks = React.useRef(tasks);
-  const [current, setCurrent] = React.useState(() => announce(tasks, tasks));
-  const currentRef = React.useRef(current);
-  const lastUpdate = React.useRef(0);
-  React.useEffect(() => {
-    const next = announce(tasks, previousTasks.current);
-    previousTasks.current = tasks;
-    if (next === currentRef.current) return;
-    const delay = Math.max(0, 750 - (Date.now() - lastUpdate.current));
-    const timer = window.setTimeout(() => {
-      lastUpdate.current = Date.now();
-      currentRef.current = next;
-      setCurrent(next);
-    }, delay);
-    return () => window.clearTimeout(timer);
-  }, [tasks]);
-  return current;
-}
-
-function announce(
-  tasks: readonly ProcessingTask[],
-  previousTasks: readonly ProcessingTask[],
-): string {
-  const task = tasks.find(
-    (candidate) =>
-      candidate.state === "running" || candidate.state === "canceling",
-  );
-  if (task) {
-    return `${task.displayName} ${task.state === "canceling" ? "正在取消" : phaseLabel(task.phase)} ${Math.round(task.progressFraction * 100)}%`;
-  }
-  const terminal = tasks.find((candidate) => {
-    if (
-      !["completed", "failed", "canceled", "interrupted"].includes(
-        candidate.state,
-      )
-    )
-      return false;
-    const previous = previousTasks.find(
-      (item) => item.id === candidate.id && item.attempt === candidate.attempt,
-    );
-    return previous?.state !== candidate.state;
-  });
-  return terminal
-    ? `${terminal.displayName} ${taskStateLabel(terminal.state)}`
-    : "当前没有正在运行的音频处理";
 }
 
 function groupTasksByAudioId(tasks: readonly ProcessingTask[]) {

@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 
-import { act, render, screen } from "@testing-library/react";
+import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { expect, it, vi } from "vitest";
 
@@ -103,23 +103,31 @@ it("shows retry for failed/interrupted and hides completed chrome once transcrip
 });
 
 it.each([
-  ["completed", "已完成"],
   ["failed", "处理失败"],
   ["canceled", "已取消"],
   ["interrupted", "已中断"],
 ] as const)(
-  "announces a named %s terminal transition",
+  "renders a visible named %s terminal transition",
   async (state, label) => {
     const view = renderRoute([running]);
     view.rerender(route([{ ...running, state }]));
-    await act(async () => {
-      await new Promise((resolve) => window.setTimeout(resolve, 800));
-    });
-    expect(
-      screen.getByRole("status", { name: "音频处理进度公告" }),
-    ).toHaveTextContent(`项目音频.wav ${label}`);
+    expect(await screen.findByText(label, { selector: "span" })).toBeVisible();
   },
 );
+
+it("keeps completed audio discoverable without processing chrome", async () => {
+  renderRoute([{ ...running, state: "completed", progressFraction: 1 }]);
+  await userEvent
+    .setup()
+    .click(await screen.findByRole("button", { name: "打开 项目音频.wav" }));
+
+  expect(
+    screen.queryByRole("region", { name: "当前音频处理" }),
+  ).not.toBeInTheDocument();
+  expect(
+    screen.getByRole("region", { name: "项目音频.wav 工作区" }),
+  ).toBeVisible();
+});
 
 function renderRoute(
   tasks: ProcessingTask[],

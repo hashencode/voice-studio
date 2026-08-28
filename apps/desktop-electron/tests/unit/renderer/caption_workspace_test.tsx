@@ -115,9 +115,6 @@ describe("caption workspace", () => {
     expect(
       screen.queryByRole("button", { name: "复制字幕" }),
     ).not.toBeInTheDocument();
-    expect(
-      screen.getByTestId("caption-live-announcement"),
-    ).toBeEmptyDOMElement();
   });
 
   it("restores the durable draft after reload without starting a duplicate session", async () => {
@@ -264,8 +261,7 @@ describe("caption workspace", () => {
     expect(screen.getByText("新音频字幕。")).toBeVisible();
   });
 
-  it("throttles live announcements while keeping reading focus stable", async () => {
-    vi.useFakeTimers();
+  it("updates the visible draft while keeping reading focus stable", async () => {
     const bridge = createCaptionBridge();
     render(
       <CaptionWorkspace
@@ -321,14 +317,7 @@ describe("caption workspace", () => {
       },
     });
     expect(readingControl).toHaveFocus();
-    expect(
-      screen.getByTestId("caption-live-announcement"),
-    ).not.toHaveTextContent("第四句。");
-
-    await act(async () => vi.advanceTimersByTimeAsync(750));
-    expect(screen.getByTestId("caption-live-announcement")).toHaveTextContent(
-      "最新实时草稿：第四句。",
-    );
+    expect(screen.getByText("第四句。")).toBeVisible();
     expect(readingControl).toHaveFocus();
   });
 

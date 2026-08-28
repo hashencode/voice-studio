@@ -140,9 +140,10 @@ describe("Companion route composition", () => {
     const pane = await screen.findByRole("complementary", {
       name: "互联上下文面板",
     });
-    const empty = await within(pane).findByRole("status", {
+    const emptyHeading = await within(pane).findByRole("heading", {
       name: "没有已信任设备",
     });
+    const empty = emptyHeading.parentElement!;
     expect(empty).toHaveClass("flex-1", "min-h-0");
     expect(
       within(empty).getByRole("heading", { name: "没有已信任设备" }),

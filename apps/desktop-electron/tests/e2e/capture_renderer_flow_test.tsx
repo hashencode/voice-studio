@@ -152,7 +152,7 @@ describe("capture Renderer flow", () => {
     });
     await user.click(within(navigation).getByRole("button", { name: "音频" }));
     expect(
-      await screen.findByRole("status", { name: "录制状态" }),
+      await screen.findByRole("region", { name: "当前录制" }),
     ).toHaveTextContent("等待你确认继续录制");
     expect(
       screen.getByRole("button", { name: "确认并继续录制" }),

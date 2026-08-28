@@ -130,7 +130,7 @@ export function LocalModelsFeature() {
       <SettingsItemGroup>
         {operation ? (
           <>
-            <Item role="listitem" aria-live="polite" className="rounded-none">
+            <Item role="listitem" className="rounded-none">
               <ItemContent className="gap-3">
                 <div className="flex items-center justify-between gap-3 text-sm">
                   <span>

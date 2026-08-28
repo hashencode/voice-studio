@@ -347,18 +347,11 @@ export function CaptureWorkspace({
       aria-busy={busy}
       className="mx-auto w-full max-w-3xl space-y-5"
     >
-      <p
-        role="status"
-        aria-label="录制操作状态"
-        aria-live="polite"
-        className={
-          busy
-            ? "mb-3 border-b bg-muted/40 pb-3 text-sm font-medium"
-            : "sr-only"
-        }
-      >
-        {operationMessage}
-      </p>
+      {busy ? (
+        <p className="mb-3 border-b bg-muted/40 pb-3 text-sm font-medium">
+          {operationMessage}
+        </p>
+      ) : null}
       {error ? (
         <div
           ref={errorRef}
@@ -596,12 +589,7 @@ function ActiveCapture({
     : capturePhaseLabel(capture.phase, capture.interruptionReason);
   return (
     <section aria-label="当前录制" className="space-y-3">
-      <div
-        role="status"
-        aria-label="录制状态"
-        aria-live="polite"
-        className="flex items-start gap-3"
-      >
+      <div className="flex items-start gap-3">
         <span className="mt-0.5 flex size-9 shrink-0 items-center justify-center rounded-full bg-destructive/10 text-destructive">
           {paused ? (
             <CirclePause className="size-5" aria-hidden="true" />

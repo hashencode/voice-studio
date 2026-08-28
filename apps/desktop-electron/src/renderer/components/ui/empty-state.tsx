@@ -13,8 +13,6 @@ export function EmptyState({
 }) {
   return (
     <div
-      role="status"
-      aria-label={title}
       className={cn(
         "flex flex-col items-center justify-center text-center",
         compact ? "px-4 py-8" : "min-h-72 px-6 py-12",

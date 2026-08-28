@@ -297,9 +297,10 @@ it("keeps search with the list and aligns loading with the empty state", async (
 
   await act(async () => listAudios.resolve([]));
 
-  const empty = await within(pane).findByRole("status", {
+  const emptyHeading = await within(pane).findByRole("heading", {
     name: "还没有音频",
   });
+  const empty = emptyHeading.parentElement!;
   expect(search.closest('[data-slot="sidebar-group-content"]')).toBe(
     empty.closest('[data-slot="sidebar-group-content"]'),
   );
@@ -682,7 +683,12 @@ it("reports an unavailable microphone in a dialog", async () => {
   const dialog = await screen.findByRole("dialog", {
     name: "麦克风测试失败",
   });
-  expect(dialog).toHaveTextContent("没有麦克风权限");
+  expect(
+    within(dialog).getByRole("heading", { name: "麦克风测试失败" }),
+  ).toBeVisible();
+  expect(
+    within(dialog).getAllByText("没有麦克风权限，请在系统设置中允许访问。"),
+  ).toHaveLength(1);
   expect(
     within(dialog).getByRole("button", { name: "前往麦克风设置" }),
   ).toBeVisible();
@@ -735,10 +741,6 @@ it("filters Audio summaries and projects every non-completed processing state", 
   ]) {
     expect(screen.getByText(label, { selector: "span" })).toBeVisible();
   }
-  expect(
-    screen.getAllByRole("status", { name: "音频处理进度公告" }),
-  ).toHaveLength(1);
-
   const search = screen.getByRole("searchbox", { name: "搜索音频" });
   await userEvent.setup().type(search, "音频 4");
   expect(screen.getByRole("button", { name: /打开 音频 4/ })).toBeVisible();

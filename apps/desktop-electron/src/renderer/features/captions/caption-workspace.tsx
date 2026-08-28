@@ -27,7 +27,6 @@ interface CaptionWorkspaceProps {
   retryFormal: (request: CaptionFormalRetryRequest) => Promise<CaptionSnapshot>;
 }
 
-const LIVE_ANNOUNCEMENT_DELAY_MS = 750;
 const CAPTION_BACKLOG_LIMIT_BYTES = 960_000;
 
 export function CaptionWorkspace({
@@ -47,10 +46,6 @@ export function CaptionWorkspace({
   const [retryFailure, setRetryFailure] = React.useState<{
     sessionId: string;
     message: string;
-  } | null>(null);
-  const [announcement, setAnnouncement] = React.useState<{
-    sessionId: string;
-    value: string;
   } | null>(null);
   const activeSessionRef = React.useRef(sessionId);
   const pendingRetriesRef = React.useRef(new Set<string>());
@@ -94,22 +89,6 @@ export function CaptionWorkspace({
     loadFailure?.sessionId === sessionId ? loadFailure.message : null;
   const retryError =
     retryFailure?.sessionId === sessionId ? retryFailure.message : null;
-  const latestUtterance = visibleSnapshot?.draft?.utterances.at(-1) ?? null;
-  const announcementIdentity = latestUtterance
-    ? `${visibleSnapshot?.draft?.generationId}:${visibleSnapshot?.draft?.attempt}:${latestUtterance.sequence}`
-    : null;
-  const latestUtteranceText = latestUtterance?.text ?? "";
-  React.useEffect(() => {
-    if (!latestUtteranceText || !announcementIdentity) return;
-    const timer = window.setTimeout(() => {
-      setAnnouncement({
-        sessionId,
-        value: `最新实时草稿：${latestUtteranceText}`,
-      });
-    }, LIVE_ANNOUNCEMENT_DELAY_MS);
-    return () => window.clearTimeout(timer);
-  }, [announcementIdentity, latestUtteranceText, sessionId]);
-
   const retry = React.useCallback(() => {
     if (!visibleSnapshot) return;
     const expectedAttempt = visibleSnapshot.formal.attempt;
@@ -155,14 +134,6 @@ export function CaptionWorkspace({
       aria-busy={retryPending}
       className="space-y-3 border-y py-3"
     >
-      <span
-        data-testid="caption-live-announcement"
-        aria-live="polite"
-        aria-atomic="true"
-        className="sr-only"
-      >
-        {announcement?.sessionId === sessionId ? announcement.value : ""}
-      </span>
       {loadError ? (
         <div role="alert" className="flex gap-2 text-sm">
           <AlertTriangle
