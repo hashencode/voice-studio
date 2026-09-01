@@ -39,7 +39,7 @@ test.describe("sidebar-09 production Renderer", () => {
           .querySelector<HTMLElement>('[data-slot="sidebar-inset"] > header')!
           .getBoundingClientRect().height,
       }));
-      expect(headerHeights.pane).toBeGreaterThan(58);
+      expectWithin(headerHeights.pane, 48);
       expectWithin(headerHeights.content, 58);
 
       await assertRuntimeContract(page, 1240, 820);
@@ -59,11 +59,11 @@ test.describe("sidebar-09 production Renderer", () => {
     await withVisualSession("audio-closed", 1240, 820, async (session) => {
       const { page } = session;
       await expect(
-        page.getByRole("region", { name: "录制准备" }),
+        page.getByRole("heading", { name: "请选择音频", level: 1 }),
       ).toBeVisible();
       await expect(
-        page.getByRole("heading", { name: "请选择音频", level: 1 }),
-      ).toHaveCount(0);
+        page.getByRole("button", { name: "导入音频" }),
+      ).toBeVisible();
       await page.getByRole("button", { name: "收起音频上下文面板" }).click();
       await expect(
         page.getByRole("complementary", { name: "音频上下文面板" }),
@@ -73,7 +73,7 @@ test.describe("sidebar-09 production Renderer", () => {
       ).toBeVisible();
       await expect(
         page.getByRole("heading", { name: "请选择音频", level: 1 }),
-      ).toHaveCount(0);
+      ).toBeVisible();
 
       await assertRuntimeContract(page, 1240, 820);
       await assertRailOnlyGeometry(page, 1240, 820);
@@ -84,35 +84,37 @@ test.describe("sidebar-09 production Renderer", () => {
   test("1240x820 Empty audio library and recording ready", async () => {
     await withVisualSession("audio-empty", 1240, 820, async (session) => {
       const { page } = session;
-      const emptyHeading = page.getByRole("heading", { name: "还没有音频" });
+      const emptyHeading = page.getByRole("heading", {
+        name: "开始你的第一段音频",
+      });
       await expect(emptyHeading).toBeVisible();
       await expect(
-        page.getByRole("region", { name: "录制准备" }),
+        page.getByRole("region", { name: "首次使用音频" }),
       ).toBeVisible();
+      await expect(
+        page.getByRole("complementary", { name: "音频上下文面板" }),
+      ).toHaveCount(0);
+      await expect(
+        page.getByRole("button", { name: /音频上下文面板/ }),
+      ).toHaveCount(0);
 
       const layout = await emptyHeading.evaluate((heading) => {
-        const paneHeader = document.querySelector<HTMLElement>(
-          "[data-context-pane-fixed-header]",
-        )!;
-        const paneContent = document.querySelector<HTMLElement>(
-          "[data-context-pane-scrolling-content]",
-        )!;
-        const empty = heading.parentElement!;
-        const paneContentRect = paneContent.getBoundingClientRect();
+        const mainContent =
+          document.querySelector<HTMLElement>("#main-content")!;
+        const empty = heading.closest("section")!;
+        const mainContentRect = mainContent.getBoundingClientRect();
         const emptyRect = empty.getBoundingClientRect();
         return {
-          paneHeaderHeight: paneHeader.getBoundingClientRect().height,
           emptyCenterRatio:
-            (emptyRect.y + emptyRect.height / 2 - paneContentRect.y) /
-            paneContentRect.height,
+            (emptyRect.y + emptyRect.height / 2 - mainContentRect.y) /
+            mainContentRect.height,
         };
       });
-      expect(layout.paneHeaderHeight).toBeGreaterThan(58);
       expect(layout.emptyCenterRatio).toBeGreaterThan(0.46);
       expect(layout.emptyCenterRatio).toBeLessThan(0.54);
 
       await assertRuntimeContract(page, 1240, 820);
-      await assertDockedGeometry(page, 1240, 820);
+      await assertRailOnlyGeometry(page, 1240, 820);
       await screenshot(session, "audio-empty-recording-ready.png", 1240, 820);
     });
   });

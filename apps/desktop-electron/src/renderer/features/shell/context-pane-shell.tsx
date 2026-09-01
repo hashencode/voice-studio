@@ -10,13 +10,16 @@ import type {
   ContextPaneSection,
 } from "@/features/shell/context-pane-contract";
 import { SHELL_SECTION_LABELS } from "@/features/shell/context-pane-contract";
+import { cn } from "@/lib/utils";
 
 export function ContextPaneShell({
   open,
   section,
   presentation,
   onRequestClose,
+  variant = "default",
   collapseControl,
+  primaryHeader,
   header,
   footer,
   children,
@@ -25,7 +28,9 @@ export function ContextPaneShell({
   section: ContextPaneSection;
   presentation: ContextPanePresentation;
   onRequestClose: () => void;
+  variant?: "default" | "audio";
   collapseControl?: React.ReactNode;
+  primaryHeader?: React.ReactNode;
   header?: React.ReactNode;
   footer?: React.ReactNode;
 }>) {
@@ -50,14 +55,36 @@ export function ContextPaneShell({
       aria-hidden={!open}
       inert={!open}
       data-presentation={presentation}
-      className="w-[calc(var(--sidebar-width)-var(--sidebar-width-icon)-1px)]! shrink-0"
+      className={cn(
+        "w-[calc(var(--sidebar-width)-var(--sidebar-width-icon)-1px)]! shrink-0",
+        variant === "audio" && "bg-background text-foreground",
+      )}
     >
       <SidebarHeader
         data-context-pane-fixed-header="true"
-        className={`${header ? "min-h-[58px]" : "h-[58px]"} shrink-0 gap-2 border-b p-2`}
+        className={cn(
+          "shrink-0 gap-2 border-b p-2",
+          variant === "audio"
+            ? header
+              ? "min-h-12"
+              : "h-12"
+            : header
+              ? "min-h-[58px]"
+              : "h-[58px]",
+        )}
       >
-        <div className="flex h-[42px] min-w-0 shrink-0 items-center justify-between gap-2 px-2">
-          <h2 className="font-semibold">{label}</h2>
+        <div
+          className={cn(
+            "flex min-w-0 shrink-0 items-center justify-between gap-2 px-2",
+            variant === "audio" ? "h-8" : "h-[42px]",
+          )}
+        >
+          <h2 className={cn("font-semibold", primaryHeader && "sr-only")}>
+            {label}
+          </h2>
+          {primaryHeader ? (
+            <div className="min-w-0 flex-1">{primaryHeader}</div>
+          ) : null}
           {collapseControl}
         </div>
         {header}

@@ -22,6 +22,8 @@ import { cn } from "@/lib/utils";
 import {
   AudioContextPane,
   AudioContextPaneHeader,
+  AudioContextPaneSearch,
+  AudioMainHeaderActions,
   AudioMainWorkspace,
   type AudioRouteController,
   useAudioRouteController,
@@ -482,11 +484,17 @@ function App() {
     selectedActivity,
     activityItems,
   });
-  const standalonePaneTriggerVisible = !pane.open && !presentation.title;
+  const paneStructurallyAvailable =
+    current !== "audio" || audio.libraryPresentation === "populated";
+  const effectivePaneOpen = pane.open && paneStructurallyAvailable;
+  const audioWorkspacePresentation =
+    current === "audio" && !captureDetailVisible;
+  const standalonePaneTriggerVisible =
+    paneStructurallyAvailable && !effectivePaneOpen && !presentation.title;
 
   return (
     <SidebarProvider
-      open={pane.open}
+      open={effectivePaneOpen}
       persistState={false}
       enableKeyboardShortcut={false}
       className="h-svh overflow-hidden"
@@ -495,63 +503,71 @@ function App() {
       <AppSidebar
         current={current}
         onNavigate={navigatePrimary}
-        presentation={pane.open ? pane.presentation : "closed"}
+        presentation={effectivePaneOpen ? pane.presentation : "closed"}
         unreadActivityCount={unreadActivityItems.length}
       >
-        <ContextPaneShell
-          open={pane.open}
-          section={pane.paneSection}
-          presentation={pane.presentation}
-          onRequestClose={requestPaneClose}
-          collapseControl={
-            <ContextPaneTrigger
-              ref={paneTriggerRef}
-              section={pane.paneSection}
-              open={pane.open}
-              onToggle={requestPaneToggle}
-              className="max-[349px]:mr-[calc(var(--sidebar-width)-100vw)]"
-            />
-          }
-          footer={
-            pane.paneSection === "audio" && audio.workspace !== null ? (
-              <AudioContextPaneHeader controller={audio} />
-            ) : pane.paneSection === "companion" &&
-              companion.view.kind === "device" ? (
-              <CompanionContextPaneFooter controller={companion} />
-            ) : null
-          }
-        >
-          {pane.paneSection === "audio" ? (
-            <AudioContextPane controller={audio} />
-          ) : pane.paneSection === "companion" ? (
-            <CompanionContextPane controller={companion} />
-          ) : pane.paneSection === "messages" ? (
-            <ActivityContextPane
-              items={activityItems}
-              selectedId={selectedActivity?.id ?? null}
-              onSelect={(item) => {
-                setSelectedActivityId(item.id);
-                void markActivityRead(item);
-                if (item.kind === "capture_failed") {
-                  setActivityError(item);
-                }
-              }}
-              unreadCount={unreadActivityItems.length}
-              markAllPending={markAllActivityPending}
-              operationError={activityOperationError}
-              onMarkAllRead={() => void markAllActivityRead()}
-            />
-          ) : (
-            <SettingsContextPane
-              value={settingsSection}
-              onValueChange={navigateSettingsSection}
-            />
-          )}
-        </ContextPaneShell>
+        {paneStructurallyAvailable ? (
+          <ContextPaneShell
+            open={effectivePaneOpen}
+            section={pane.paneSection}
+            presentation={pane.presentation}
+            variant={pane.paneSection === "audio" ? "audio" : "default"}
+            onRequestClose={requestPaneClose}
+            collapseControl={
+              <ContextPaneTrigger
+                ref={paneTriggerRef}
+                section={pane.paneSection}
+                open={effectivePaneOpen}
+                onToggle={requestPaneToggle}
+                className="max-[349px]:mr-[calc(var(--sidebar-width)-100vw)]"
+              />
+            }
+            primaryHeader={
+              pane.paneSection === "audio" ? (
+                <AudioContextPaneSearch controller={audio} />
+              ) : undefined
+            }
+            footer={
+              pane.paneSection === "audio" && audio.workspace !== null ? (
+                <AudioContextPaneHeader controller={audio} />
+              ) : pane.paneSection === "companion" &&
+                companion.view.kind === "device" ? (
+                <CompanionContextPaneFooter controller={companion} />
+              ) : null
+            }
+          >
+            {pane.paneSection === "audio" ? (
+              <AudioContextPane controller={audio} />
+            ) : pane.paneSection === "companion" ? (
+              <CompanionContextPane controller={companion} />
+            ) : pane.paneSection === "messages" ? (
+              <ActivityContextPane
+                items={activityItems}
+                selectedId={selectedActivity?.id ?? null}
+                onSelect={(item) => {
+                  setSelectedActivityId(item.id);
+                  void markActivityRead(item);
+                  if (item.kind === "capture_failed") {
+                    setActivityError(item);
+                  }
+                }}
+                unreadCount={unreadActivityItems.length}
+                markAllPending={markAllActivityPending}
+                operationError={activityOperationError}
+                onMarkAllRead={() => void markAllActivityRead()}
+              />
+            ) : (
+              <SettingsContextPane
+                value={settingsSection}
+                onValueChange={navigateSettingsSection}
+              />
+            )}
+          </ContextPaneShell>
+        ) : null}
       </AppSidebar>
       <SidebarInset
         className={`z-30 min-h-0 min-w-0 overflow-hidden transition-[margin] duration-200 ease-linear ${
-          pane.open
+          effectivePaneOpen
             ? "ml-[calc(var(--sidebar-width)-var(--sidebar-width-icon))]"
             : ""
         }`}
@@ -559,11 +575,12 @@ function App() {
         {presentation.title ? (
           <header
             className={cn(
-              "sticky top-0 z-10 flex h-[58px] shrink-0 items-center gap-3 bg-background px-4 py-2",
+              "sticky top-0 z-10 flex shrink-0 items-center gap-3 bg-background px-4 py-2",
+              audioWorkspacePresentation ? "h-12" : "h-[58px]",
               presentation.headerDivider && "border-b",
             )}
           >
-            {!pane.open ? (
+            {!effectivePaneOpen && paneStructurallyAvailable ? (
               <ContextPaneTrigger
                 ref={paneTriggerRef}
                 section={pane.paneSection}
@@ -579,6 +596,11 @@ function App() {
             >
               {presentation.title}
             </h1>
+            {audioWorkspacePresentation ? (
+              <div className="ml-auto">
+                <AudioMainHeaderActions controller={audio} />
+              </div>
+            ) : null}
           </header>
         ) : null}
         {standalonePaneTriggerVisible ? (
@@ -597,7 +619,8 @@ function App() {
           data-context-pane-background="true"
           className={cn(
             "flex min-h-0 flex-1 flex-col overflow-auto",
-            presentation.contentMode === "padded" && "p-4 sm:p-6",
+            presentation.contentMode === "padded" &&
+              (audioWorkspacePresentation ? "p-4" : "p-4 sm:p-6"),
             current === "settings" && "bg-muted/20",
             current === "settings" && standalonePaneTriggerVisible && "pt-12",
           )}
@@ -904,10 +927,13 @@ function deriveContentPresentation({
     };
   }
   if (current === "audio") {
+    const populated = audio.libraryPresentation === "populated";
     return {
-      title: audio.workspace?.summary.displayName ?? null,
+      title: populated
+        ? (audio.workspace?.summary.displayName ?? "请选择音频")
+        : null,
       contentMode: "padded",
-      headerDivider: audio.workspace !== null,
+      headerDivider: populated,
       renderContent: true,
     };
   }

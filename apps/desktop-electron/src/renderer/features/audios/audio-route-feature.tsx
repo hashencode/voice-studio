@@ -256,12 +256,7 @@ export function useAudioRouteController({
       recordingCompletionToken !== null &&
       recordingCompletionToken !== previous.recording;
     if (libraryChanged || recordingCompleted) void loadAudios();
-  }, [
-    enabled,
-    libraryRefreshToken,
-    loadAudios,
-    recordingCompletionToken,
-  ]);
+  }, [enabled, libraryRefreshToken, loadAudios, recordingCompletionToken]);
 
   React.useEffect(() => {
     const currentTasks = currentTasksByAudioId(tasksByAudioId);
@@ -561,6 +556,14 @@ export function AudioRouteFeature({
           aria-label="音频列表"
           className="flex h-full min-h-0 flex-col"
         >
+          {controller.libraryPresentation === "populated" ? (
+            <div
+              data-context-pane-fixed-header="true"
+              className="flex h-12 shrink-0 items-center border-b p-2"
+            >
+              <AudioContextPaneSearch controller={controller} />
+            </div>
+          ) : null}
           <div className="min-h-0 flex-1">
             <AudioContextPane controller={controller} />
           </div>
@@ -575,6 +578,11 @@ export function AudioRouteFeature({
         </section>
       ) : null}
       <section role="region" aria-label="音频工作区">
+        {controller.libraryPresentation === "populated" ? (
+          <div className="flex h-12 items-center justify-end border-b px-4 py-2">
+            <AudioMainHeaderActions controller={controller} />
+          </div>
+        ) : null}
         <AudioMainWorkspace controller={controller} />
       </section>
     </div>
@@ -617,23 +625,6 @@ export function AudioContextPane({
     <SidebarGroup className="h-full p-0">
       <SidebarGroupContent className="flex h-full flex-col">
         <h3 className="sr-only">音频列表</h3>
-        <div className="flex shrink-0 items-center gap-2 p-2">
-          <div className="relative min-w-0 flex-1">
-            <Search
-              aria-hidden="true"
-              className="pointer-events-none absolute top-2 left-2.5 size-4 text-muted-foreground"
-            />
-            <SidebarInput
-              type="search"
-              aria-label="搜索音频"
-              value={controller.query}
-              onChange={(event) =>
-                controller.setQuery(event.currentTarget.value)
-              }
-              className="pl-8"
-            />
-          </div>
-        </div>
         {controller.listPending ? (
           <p
             role="status"
@@ -720,6 +711,28 @@ export function AudioContextPane({
   );
 }
 
+export function AudioContextPaneSearch({
+  controller,
+}: {
+  controller: AudioRouteController;
+}) {
+  return (
+    <div className="relative min-w-0">
+      <Search
+        aria-hidden="true"
+        className="pointer-events-none absolute top-2 left-2.5 size-4 text-muted-foreground"
+      />
+      <SidebarInput
+        type="search"
+        aria-label="搜索音频"
+        value={controller.query}
+        onChange={(event) => controller.setQuery(event.currentTarget.value)}
+        className="pl-8"
+      />
+    </div>
+  );
+}
+
 export function AudioMainWorkspace({
   controller,
   operationError,
@@ -755,13 +768,9 @@ export function AudioMainWorkspace({
         showRecordingReady ? (
         <RecordingReadyState controller={controller} />
       ) : controller.libraryPresentation === "populated" && !workspace ? (
-        <AudioSelectionPrompt controller={controller} />
+        <AudioSelectionPrompt />
       ) : workspace ? (
         <div key={workspace.summary.audioId} className="space-y-4">
-          <div className="flex justify-end">
-            <AudioImportButton controller={controller} />
-          </div>
-          <AudioImportError controller={controller} />
           {!task && workspace.segments.length === 0 ? (
             <div className="flex flex-wrap items-center justify-between gap-3 border-y py-3">
               <div>
@@ -837,6 +846,20 @@ function AudioLibraryError({
   );
 }
 
+export function AudioMainHeaderActions({
+  controller,
+}: {
+  controller: AudioRouteController;
+}) {
+  if (controller.libraryPresentation !== "populated") return null;
+  return (
+    <div className="flex min-w-0 items-center gap-3">
+      <AudioImportError controller={controller} />
+      <AudioImportButton controller={controller} />
+    </div>
+  );
+}
+
 function AudioImportButton({
   controller,
   variant = "outline",
@@ -870,22 +893,12 @@ function AudioImportError({
   ) : null;
 }
 
-function AudioSelectionPrompt({
-  controller,
-}: {
-  controller: AudioRouteController;
-}) {
+function AudioSelectionPrompt() {
   return (
     <EmptyState
       title="选择一段音频"
-      description="从列表中选择音频，或导入新的音频文件。"
+      description="从列表中选择一段音频。"
       icon={false}
-      actions={
-        <div className="space-y-3">
-          <AudioImportButton controller={controller} />
-          <AudioImportError controller={controller} />
-        </div>
-      }
       className="flex-1"
     />
   );
@@ -973,9 +986,9 @@ function RecordingReadyState({
                   size="sm"
                   variant="outline"
                   onClick={() =>
-                    void controller.refreshCapturePreflight(true).catch(
-                      () => undefined,
-                    )
+                    void controller
+                      .refreshCapturePreflight(true)
+                      .catch(() => undefined)
                   }
                 >
                   <RotateCcw aria-hidden="true" />

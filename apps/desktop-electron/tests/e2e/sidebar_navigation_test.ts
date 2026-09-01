@@ -19,6 +19,17 @@ import type {
 } from "../../src/shared/contracts";
 import { companionRendererStubs } from "../fixtures/companion";
 
+const navigationAudio = {
+  audioId: 1,
+  displayName: "导航测试.wav",
+  durationMs: 1_000,
+  createdAtMs: 1,
+  processingState: "completed" as const,
+  generationId: null,
+  generationKind: null,
+  segmentCount: 0,
+};
+
 afterEach(() => {
   vi.restoreAllMocks();
   window.history.replaceState(null, "", "/");
@@ -54,7 +65,7 @@ function applicationApi(
     retryProcessing: vi.fn(),
     listProcessingTasks: vi.fn(async () => []),
     importAudio: vi.fn(),
-    listAudios: vi.fn(async () => []),
+    listAudios: vi.fn(async () => [navigationAudio]),
     openAudio: vi.fn(async () => null),
     searchTranscript: vi.fn(async () => []),
     editAudioSegment: vi.fn(),
