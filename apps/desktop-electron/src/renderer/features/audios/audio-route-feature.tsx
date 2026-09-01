@@ -14,7 +14,6 @@ import {
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
-  DialogClose,
   DialogContent,
   DialogDescription,
   DialogHeader,
@@ -763,7 +762,7 @@ function RecordingReadyState({
   const [selectedMicrophoneDeviceId, setSelectedMicrophoneDeviceId] =
     React.useState("");
   const [testPhase, setTestPhase] = React.useState<
-    "closed" | "instructions" | "starting" | "testing" | "failure"
+    "closed" | "starting" | "testing" | "failure"
   >("closed");
   const [testSnapshot, setTestSnapshot] = React.useState<
     import("@shared/contracts").MicrophoneTestSnapshot | null
@@ -776,6 +775,7 @@ function RecordingReadyState({
   const [settingsManualPathVisible, setSettingsManualPathVisible] =
     React.useState(false);
   const activeTestIdRef = React.useRef<string | null>(null);
+  const startPendingRef = React.useRef(false);
   const generationRef = React.useRef(0);
   const microphoneDeviceId =
     selectPreferredMicrophone(
@@ -847,6 +847,8 @@ function RecordingReadyState({
 
   const startTest = React.useCallback(
     async (selectedDeviceId: string) => {
+      if (startPendingRef.current || activeTestIdRef.current) return;
+      startPendingRef.current = true;
       const generation = generationRef.current + 1;
       generationRef.current = generation;
       setTestPhase("starting");
@@ -888,6 +890,7 @@ function RecordingReadyState({
           showFailure("native-helper-failed");
         }
       } finally {
+        startPendingRef.current = false;
         if (generation !== generationRef.current) {
           setTeardownPending(false);
         }
@@ -990,7 +993,7 @@ function RecordingReadyState({
             controller.capturePreflightPending ||
             controller.recordingActive
           }
-          onClick={() => setTestPhase("instructions")}
+          onClick={() => void startTest(microphoneDeviceId)}
         >
           测试麦克风
         </Button>
@@ -1022,39 +1025,21 @@ function RecordingReadyState({
         >
           <DialogHeader>
             <DialogTitle>
-              {testPhase === "instructions"
+              {testPhase === "starting" || testPhase === "testing"
                 ? "测试麦克风"
-                : testPhase === "starting" || testPhase === "testing"
-                  ? "正在测试麦克风"
-                  : microphoneFailureTitle(failureReason)}
+                : microphoneFailureTitle(failureReason)}
             </DialogTitle>
             <DialogDescription>
-              {testPhase === "instructions"
-                ? "开始后，请对着麦克风说话。"
-                : testPhase === "starting"
-                  ? "正在连接麦克风…"
-                  : testPhase === "testing"
-                    ? testSnapshot?.observedSound
-                      ? "已收到声音"
-                      : "暂未收到声音"
-                    : microphoneFailureDescription(failureReason)}
+              {testPhase === "starting"
+                ? "正在连接麦克风…"
+                : testPhase === "testing"
+                  ? testSnapshot?.observedSound
+                    ? "已收到声音"
+                    : "请对着麦克风说话。"
+                  : microphoneFailureDescription(failureReason)}
             </DialogDescription>
           </DialogHeader>
-          {testPhase === "instructions" ? (
-            <div className="flex justify-end gap-2 pt-2">
-              <DialogClose asChild>
-                <Button type="button" variant="outline">
-                  取消
-                </Button>
-              </DialogClose>
-              <Button
-                type="button"
-                onClick={() => void startTest(microphoneDeviceId)}
-              >
-                开始测试
-              </Button>
-            </div>
-          ) : testPhase === "starting" ? (
+          {testPhase === "starting" ? (
             <div className="flex justify-end pt-2">
               <Button type="button" variant="outline" onClick={closeTest}>
                 取消
@@ -1080,9 +1065,6 @@ function RecordingReadyState({
                   }}
                 />
               </div>
-              <p role="status" aria-live="polite" className="text-sm">
-                {testSnapshot?.observedSound ? "已收到声音" : "暂未收到声音"}
-              </p>
               <div className="flex justify-end">
                 <Button
                   type="button"

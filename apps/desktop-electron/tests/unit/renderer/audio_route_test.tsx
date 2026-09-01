@@ -386,23 +386,18 @@ it("uses the native capture lifecycle for a user-ended microphone test", async (
   await userEvent
     .setup()
     .click(await screen.findByRole("button", { name: "测试麦克风" }));
-  const instructions = await screen.findByRole("dialog", {
+  const testingDialog = await screen.findByRole("dialog", {
     name: "测试麦克风",
   });
-  expect(instructions).toHaveTextContent("开始后，请对着麦克风说话。");
-  expect(instructions).not.toHaveTextContent("测试由你结束");
-  expect(instructions).not.toHaveTextContent("30 秒");
-  await userEvent
-    .setup()
-    .click(within(instructions).getByRole("button", { name: "开始测试" }));
-  const testingDialog = await screen.findByRole("dialog", {
-    name: "正在测试麦克风",
-  });
+  expect(
+    within(testingDialog).queryByRole("button", { name: "开始测试" }),
+  ).not.toBeInTheDocument();
   expect(within(testingDialog).getByRole("meter")).toHaveAttribute(
     "aria-valuenow",
     "50",
   );
-  expect(testingDialog).toHaveTextContent("已收到声音");
+  expect(within(testingDialog).getAllByText("已收到声音")).toHaveLength(1);
+  expect(within(testingDialog).queryByRole("status")).not.toBeInTheDocument();
   await userEvent
     .setup()
     .click(within(testingDialog).getByRole("button", { name: "结束测试" }));
@@ -414,6 +409,56 @@ it("uses the native capture lifecycle for a user-ended microphone test", async (
     microphoneDeviceId: "mic-default",
   });
   expect(finishMicrophoneTest).toHaveBeenCalledWith(running.testId);
+});
+
+it("shows one instruction before sound and starts only once on rapid activation", async () => {
+  const running = {
+    testId: "mic-test-rapid-start-123456",
+    state: "running" as const,
+    elapsedMs: 0,
+    normalizedRMS: 0,
+    normalizedPeak: 0,
+    observedFrames: 0,
+    observedSound: false,
+  };
+  const startMicrophoneTest = vi.fn(async () => running);
+  const pendingSnapshot = deferred<typeof running>();
+  const desktop = api({
+    startMicrophoneTest,
+    getMicrophoneTestSnapshot: vi.fn(() => pendingSnapshot.promise),
+  });
+  const preflightCapture = vi.mocked(desktop.preflightCapture);
+  render(
+    <AudioRouteFeature
+      api={desktop}
+      tasks={[]}
+      pendingJobActions={new Map()}
+      writable
+      paneOpen
+      onRecord={vi.fn()}
+      onImport={vi.fn()}
+      onCancel={vi.fn()}
+      onRetry={vi.fn()}
+    />,
+  );
+
+  const trigger = await screen.findByRole("button", { name: "测试麦克风" });
+  await waitFor(() => expect(trigger).toBeEnabled());
+  preflightCapture.mockClear();
+  act(() => {
+    trigger.click();
+    trigger.click();
+  });
+
+  const dialog = await screen.findByRole("dialog", { name: "测试麦克风" });
+  await waitFor(() => expect(startMicrophoneTest).toHaveBeenCalledOnce());
+  expect(preflightCapture).toHaveBeenCalledOnce();
+  expect(dialog).toHaveTextContent("请对着麦克风说话。");
+  expect(dialog).not.toHaveTextContent("暂未收到声音");
+  expect(within(dialog).queryByRole("status")).not.toBeInTheDocument();
+  expect(
+    within(dialog).queryByRole("button", { name: "开始测试" }),
+  ).not.toBeInTheDocument();
 });
 
 it("cancels a late microphone start exactly once after the dialog closes", async () => {
@@ -448,9 +493,8 @@ it("cancels a late microphone start exactly once after the dialog closes", async
   );
   const user = userEvent.setup();
   await user.click(await screen.findByRole("button", { name: "测试麦克风" }));
-  await user.click(screen.getByRole("button", { name: "开始测试" }));
   const starting = await screen.findByRole("dialog", {
-    name: "正在测试麦克风",
+    name: "测试麦克风",
   });
   expect(starting).toHaveTextContent("正在连接麦克风…");
   expect(
@@ -512,9 +556,8 @@ it("cancels once and ignores a late running snapshot after closing during recove
   );
   const user = userEvent.setup();
   await user.click(await screen.findByRole("button", { name: "测试麦克风" }));
-  await user.click(screen.getByRole("button", { name: "开始测试" }));
   const testing = await screen.findByRole("dialog", {
-    name: "正在测试麦克风",
+    name: "测试麦克风",
   });
   await waitFor(() => expect(getMicrophoneTestSnapshot).toHaveBeenCalledOnce());
   await user.click(within(testing).getByRole("button", { name: "关闭" }));
@@ -560,7 +603,6 @@ it("shows helper contract failures with one close action and no settings afforda
   );
   const user = userEvent.setup();
   await user.click(await screen.findByRole("button", { name: "测试麦克风" }));
-  await user.click(screen.getByRole("button", { name: "开始测试" }));
 
   const failure = await screen.findByRole("dialog", {
     name: "麦克风测试失败",
@@ -614,10 +656,9 @@ it("shows typed silence failure and the fixed settings fallback path", async () 
   );
   const user = userEvent.setup();
   await user.click(await screen.findByRole("button", { name: "测试麦克风" }));
-  await user.click(screen.getByRole("button", { name: "开始测试" }));
   await user.click(
     within(
-      await screen.findByRole("dialog", { name: "正在测试麦克风" }),
+      await screen.findByRole("dialog", { name: "测试麦克风" }),
     ).getByRole("button", { name: "结束测试" }),
   );
   const failure = await screen.findByRole("dialog", {
@@ -672,13 +713,6 @@ it("reports an unavailable microphone in a dialog", async () => {
   });
   await waitFor(() => expect(testMicrophone).toBeEnabled());
   await userEvent.setup().click(testMicrophone);
-
-  const instructions = await screen.findByRole("dialog", {
-    name: "测试麦克风",
-  });
-  await userEvent
-    .setup()
-    .click(within(instructions).getByRole("button", { name: "开始测试" }));
 
   const dialog = await screen.findByRole("dialog", {
     name: "麦克风测试失败",
