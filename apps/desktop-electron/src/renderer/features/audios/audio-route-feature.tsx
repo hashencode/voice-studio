@@ -753,6 +753,65 @@ export function AudioMainWorkspace({
   );
 }
 
+const MICROPHONE_METER_DB_FLOOR = -60;
+const MICROPHONE_METER_POLL_INTERVAL_MS = 100;
+const MICROPHONE_METER_RELEASE_MS = 300;
+const MICROPHONE_MAXIMUM_REFRESH_MS = 500;
+
+type MicrophoneMeterEnvelope = {
+  value: number;
+  releaseStart: number;
+  releaseElapsedMs: number;
+};
+
+function boundedNormalizedRms(normalizedRms: number): number {
+  if (!Number.isFinite(normalizedRms)) return 0;
+  return Math.max(0, Math.min(1, normalizedRms));
+}
+
+function normalizedRmsToMeterPercentage(normalizedRms: number): number {
+  const rms = boundedNormalizedRms(normalizedRms);
+  if (rms === 0) return 0;
+  const dbfs = Math.max(MICROPHONE_METER_DB_FLOOR, 20 * Math.log10(rms));
+  return Math.min(
+    100,
+    ((dbfs - MICROPHONE_METER_DB_FLOOR) / -MICROPHONE_METER_DB_FLOOR) * 100,
+  );
+}
+
+function normalizedRmsToRoundedDbfs(normalizedRms: number): number {
+  const rms = boundedNormalizedRms(normalizedRms);
+  if (rms === 0) return MICROPHONE_METER_DB_FLOOR;
+  return Math.max(
+    MICROPHONE_METER_DB_FLOOR,
+    Math.min(0, Math.round(20 * Math.log10(rms))),
+  );
+}
+
+function applyMicrophoneMeterEnvelope(
+  current: MicrophoneMeterEnvelope,
+  target: number,
+): MicrophoneMeterEnvelope {
+  if (target >= current.value) {
+    return { value: target, releaseStart: target, releaseElapsedMs: 0 };
+  }
+  const releaseStart =
+    current.releaseElapsedMs === 0 ? current.value : current.releaseStart;
+  const releaseElapsedMs = Math.min(
+    MICROPHONE_METER_RELEASE_MS,
+    current.releaseElapsedMs + MICROPHONE_METER_POLL_INTERVAL_MS,
+  );
+  const value = Math.max(
+    target,
+    releaseStart * (1 - releaseElapsedMs / MICROPHONE_METER_RELEASE_MS),
+  );
+  return { value, releaseStart, releaseElapsedMs };
+}
+
+function formatDbfs(dbfs: number): string {
+  return dbfs < 0 ? `−${Math.abs(dbfs)}` : "0";
+}
+
 function RecordingReadyState({
   controller,
 }: {
@@ -774,9 +833,21 @@ function RecordingReadyState({
   const [teardownPending, setTeardownPending] = React.useState(false);
   const [settingsManualPathVisible, setSettingsManualPathVisible] =
     React.useState(false);
+  const [meterPercentage, setMeterPercentage] = React.useState(0);
+  const [displayedMaximumDbfs, setDisplayedMaximumDbfs] = React.useState<
+    number | null
+  >(null);
   const activeTestIdRef = React.useRef<string | null>(null);
   const startPendingRef = React.useRef(false);
   const generationRef = React.useRef(0);
+  const meterEnvelopeRef = React.useRef<MicrophoneMeterEnvelope>({
+    value: 0,
+    releaseStart: 0,
+    releaseElapsedMs: 0,
+  });
+  const maximumRmsRef = React.useRef(0);
+  const displayedMaximumDbfsRef = React.useRef<number | null>(null);
+  const maximumPublishedAtMsRef = React.useRef(0);
   const microphoneDeviceId =
     selectPreferredMicrophone(
       preflight?.microphones ?? [],
@@ -810,6 +881,50 @@ function RecordingReadyState({
     }
   }, [controller.api]);
 
+  const resetMeterPresentation = React.useCallback(() => {
+    meterEnvelopeRef.current = {
+      value: 0,
+      releaseStart: 0,
+      releaseElapsedMs: 0,
+    };
+    maximumRmsRef.current = 0;
+    displayedMaximumDbfsRef.current = null;
+    maximumPublishedAtMsRef.current = 0;
+    setMeterPercentage(0);
+    setDisplayedMaximumDbfs(null);
+  }, []);
+
+  const applyRunningSnapshot = React.useCallback(
+    (snapshot: import("@shared/contracts").MicrophoneTestSnapshot) => {
+      const target = normalizedRmsToMeterPercentage(snapshot.normalizedRMS);
+      const envelope = applyMicrophoneMeterEnvelope(
+        meterEnvelopeRef.current,
+        target,
+      );
+      meterEnvelopeRef.current = envelope;
+      setMeterPercentage(envelope.value);
+
+      maximumRmsRef.current = Math.max(
+        maximumRmsRef.current,
+        boundedNormalizedRms(snapshot.normalizedRMS),
+      );
+      if (!snapshot.observedSound) return;
+      const nextMaximumDbfs = normalizedRmsToRoundedDbfs(maximumRmsRef.current);
+      const displayed = displayedMaximumDbfsRef.current;
+      if (
+        displayed === null ||
+        (nextMaximumDbfs > displayed &&
+          snapshot.elapsedMs - maximumPublishedAtMsRef.current >=
+            MICROPHONE_MAXIMUM_REFRESH_MS)
+      ) {
+        displayedMaximumDbfsRef.current = nextMaximumDbfs;
+        maximumPublishedAtMsRef.current = snapshot.elapsedMs;
+        setDisplayedMaximumDbfs(nextMaximumDbfs);
+      }
+    },
+    [],
+  );
+
   const closeTest = React.useCallback(() => {
     generationRef.current += 1;
     if (testPhase === "starting") setTeardownPending(true);
@@ -817,8 +932,9 @@ function RecordingReadyState({
     setTestSnapshot(null);
     setFailureReason(null);
     setSettingsManualPathVisible(false);
+    resetMeterPresentation();
     void cancelActiveTest();
-  }, [cancelActiveTest, testPhase]);
+  }, [cancelActiveTest, resetMeterPresentation, testPhase]);
 
   const finishTest = React.useCallback(async () => {
     const testId = activeTestIdRef.current;
@@ -855,6 +971,7 @@ function RecordingReadyState({
       setTestSnapshot(null);
       setFailureReason(null);
       setSettingsManualPathVisible(false);
+      resetMeterPresentation();
       try {
         const next = await refreshCapturePreflight(true);
         if (generation !== generationRef.current) return;
@@ -881,6 +998,7 @@ function RecordingReadyState({
         activeTestIdRef.current = started.testId;
         setTestSnapshot(started);
         if (started.state === "running") {
+          applyRunningSnapshot(started);
           setTestPhase("testing");
         } else if (started.state === "failed") {
           showFailure(started.reason ?? "native-helper-failed");
@@ -896,7 +1014,13 @@ function RecordingReadyState({
         }
       }
     },
-    [controller.api, refreshCapturePreflight, showFailure],
+    [
+      applyRunningSnapshot,
+      controller.api,
+      refreshCapturePreflight,
+      resetMeterPresentation,
+      showFailure,
+    ],
   );
 
   React.useEffect(() => {
@@ -912,7 +1036,11 @@ function RecordingReadyState({
         if (!active || generation !== generationRef.current) return;
         setTestSnapshot(next);
         if (next.state === "running") {
-          timer = window.setTimeout(() => void poll(), 50);
+          applyRunningSnapshot(next);
+          timer = window.setTimeout(
+            () => void poll(),
+            MICROPHONE_METER_POLL_INTERVAL_MS,
+          );
         } else if (next.state === "failed") {
           activeTestIdRef.current = null;
           showFailure(next.reason ?? "snapshot-failed");
@@ -923,12 +1051,21 @@ function RecordingReadyState({
         showFailure("snapshot-failed");
       }
     };
-    timer = window.setTimeout(() => void poll(), 50);
+    timer = window.setTimeout(
+      () => void poll(),
+      MICROPHONE_METER_POLL_INTERVAL_MS,
+    );
     return () => {
       active = false;
       if (timer !== null) window.clearTimeout(timer);
     };
-  }, [controller.api, showFailure, testPhase, testSnapshot?.testId]);
+  }, [
+    applyRunningSnapshot,
+    controller.api,
+    showFailure,
+    testPhase,
+    testSnapshot?.testId,
+  ]);
 
   React.useEffect(() => {
     return () => {
@@ -1034,7 +1171,7 @@ function RecordingReadyState({
                 ? "正在连接麦克风…"
                 : testPhase === "testing"
                   ? testSnapshot?.observedSound
-                    ? "已收到声音"
+                    ? `已收到声音 · 最高输入电平 ${formatDbfs(displayedMaximumDbfs ?? MICROPHONE_METER_DB_FLOOR)} dBFS`
                     : "请对着麦克风说话。"
                   : microphoneFailureDescription(failureReason)}
             </DialogDescription>
@@ -1052,16 +1189,14 @@ function RecordingReadyState({
                 aria-label="麦克风输入音量"
                 aria-valuemin={0}
                 aria-valuemax={100}
-                aria-valuenow={Math.round(
-                  (testSnapshot?.normalizedPeak ?? 0) * 100,
-                )}
-                aria-valuetext={`${Math.round((testSnapshot?.normalizedPeak ?? 0) * 100)}%`}
+                aria-valuenow={Math.round(meterPercentage)}
+                aria-valuetext={`${Math.round(meterPercentage)}%`}
                 className="h-2 overflow-hidden rounded-full bg-muted"
               >
                 <div
-                  className="h-full bg-primary transition-[width] duration-200 ease-out motion-reduce:transition-none"
+                  className="h-full bg-primary transition-[width] duration-75 ease-out motion-reduce:transition-none"
                   style={{
-                    width: `${(testSnapshot?.normalizedPeak ?? 0) * 100}%`,
+                    width: `${meterPercentage}%`,
                   }}
                 />
               </div>

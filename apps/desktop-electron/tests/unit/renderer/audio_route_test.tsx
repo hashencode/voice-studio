@@ -394,9 +394,9 @@ it("uses the native capture lifecycle for a user-ended microphone test", async (
   ).not.toBeInTheDocument();
   expect(within(testingDialog).getByRole("meter")).toHaveAttribute(
     "aria-valuenow",
-    "50",
+    "67",
   );
-  expect(within(testingDialog).getAllByText("已收到声音")).toHaveLength(1);
+  expect(testingDialog).toHaveTextContent("已收到声音 · 最高输入电平 −20 dBFS");
   expect(within(testingDialog).queryByRole("status")).not.toBeInTheDocument();
   await userEvent
     .setup()
@@ -409,6 +409,117 @@ it("uses the native capture lifecycle for a user-ended microphone test", async (
     microphoneDeviceId: "mic-default",
   });
   expect(finishMicrophoneTest).toHaveBeenCalledWith(running.testId);
+});
+
+it("smooths the RMS meter, throttles its maximum, and keeps polls serial", async () => {
+  const running = {
+    testId: "mic-test-rms-envelope-123456",
+    state: "running" as const,
+    elapsedMs: 0,
+    normalizedRMS: 0.1,
+    normalizedPeak: 0.9,
+    observedFrames: 1_024,
+    observedSound: true,
+  };
+  const firstSnapshot = deferred<typeof running>();
+  const snapshots = [
+    { ...running, elapsedMs: 200, normalizedRMS: 0, normalizedPeak: 1 },
+    { ...running, elapsedMs: 300, normalizedRMS: 0, normalizedPeak: 1 },
+    { ...running, elapsedMs: 400, normalizedRMS: 0, normalizedPeak: 1 },
+    {
+      ...running,
+      elapsedMs: 500,
+      normalizedRMS: 0.2,
+      normalizedPeak: 0,
+    },
+  ];
+  const getMicrophoneTestSnapshot = vi
+    .fn<Voice2TextDesktopApi["getMicrophoneTestSnapshot"]>()
+    .mockImplementationOnce(() => firstSnapshot.promise)
+    .mockImplementation(async () => snapshots.shift() ?? running);
+  const startMicrophoneTest = vi.fn(async () => running);
+  const cancelMicrophoneTest = vi.fn(async () => ({
+    ...running,
+    state: "cancelled" as const,
+  }));
+
+  render(
+    <AudioRouteFeature
+      api={api({
+        startMicrophoneTest,
+        getMicrophoneTestSnapshot,
+        cancelMicrophoneTest,
+      })}
+      tasks={[]}
+      pendingJobActions={new Map()}
+      writable
+      paneOpen
+      onRecord={vi.fn()}
+      onImport={vi.fn()}
+      onCancel={vi.fn()}
+      onRetry={vi.fn()}
+    />,
+  );
+
+  const trigger = await screen.findByRole("button", { name: "测试麦克风" });
+  vi.useFakeTimers();
+  try {
+    await act(async () => {
+      trigger.click();
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+    const dialog = screen.getByRole("dialog", { name: "测试麦克风" });
+    const meter = within(dialog).getByRole("meter");
+    expect(meter).toHaveAttribute("aria-valuenow", "67");
+    expect(dialog).toHaveTextContent("已收到声音 · 最高输入电平 −20 dBFS");
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(100);
+    });
+    expect(getMicrophoneTestSnapshot).toHaveBeenCalledOnce();
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(500);
+    });
+    expect(getMicrophoneTestSnapshot).toHaveBeenCalledOnce();
+
+    await act(async () => {
+      firstSnapshot.resolve(snapshots.shift()!);
+      await Promise.resolve();
+    });
+    expect(meter).toHaveAttribute("aria-valuenow", "44");
+    expect(dialog).toHaveTextContent("已收到声音 · 最高输入电平 −20 dBFS");
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(100);
+    });
+    expect(meter).toHaveAttribute("aria-valuenow", "22");
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(100);
+    });
+    expect(meter).toHaveAttribute("aria-valuenow", "0");
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(100);
+    });
+    expect(meter).toHaveAttribute("aria-valuenow", "77");
+    expect(dialog).toHaveTextContent("已收到声音 · 最高输入电平 −14 dBFS");
+
+    await act(async () => {
+      within(dialog).getByRole("button", { name: "关闭" }).click();
+      await Promise.resolve();
+    });
+    await act(async () => {
+      screen.getByRole("button", { name: "测试麦克风" }).click();
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+    expect(startMicrophoneTest).toHaveBeenCalledTimes(2);
+    expect(
+      screen.getByRole("dialog", { name: "测试麦克风" }),
+    ).toHaveTextContent("已收到声音 · 最高输入电平 −20 dBFS");
+  } finally {
+    vi.useRealTimers();
+  }
 });
 
 it("shows one instruction before sound and starts only once on rapid activation", async () => {
@@ -657,9 +768,10 @@ it("shows typed silence failure and the fixed settings fallback path", async () 
   const user = userEvent.setup();
   await user.click(await screen.findByRole("button", { name: "测试麦克风" }));
   await user.click(
-    within(
-      await screen.findByRole("dialog", { name: "测试麦克风" }),
-    ).getByRole("button", { name: "结束测试" }),
+    within(await screen.findByRole("dialog", { name: "测试麦克风" })).getByRole(
+      "button",
+      { name: "结束测试" },
+    ),
   );
   const failure = await screen.findByRole("dialog", {
     name: "未检测到麦克风输入",
