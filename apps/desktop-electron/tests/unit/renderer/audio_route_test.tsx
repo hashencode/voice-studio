@@ -411,7 +411,7 @@ it("uses the native capture lifecycle for a user-ended microphone test", async (
   expect(finishMicrophoneTest).toHaveBeenCalledWith(running.testId);
 });
 
-it("smooths the RMS meter, throttles its maximum, and keeps polls serial", async () => {
+it("smooths the RMS meter and throttles its maximum", async () => {
   const running = {
     testId: "mic-test-rms-envelope-123456",
     state: "running" as const,
@@ -421,21 +421,14 @@ it("smooths the RMS meter, throttles its maximum, and keeps polls serial", async
     observedFrames: 1_024,
     observedSound: true,
   };
-  const firstSnapshot = deferred<typeof running>();
   const snapshots = [
-    { ...running, elapsedMs: 200, normalizedRMS: 0, normalizedPeak: 1 },
+    { ...running, elapsedMs: 200, normalizedRMS: 0.2, normalizedPeak: 0 },
     { ...running, elapsedMs: 300, normalizedRMS: 0, normalizedPeak: 1 },
     { ...running, elapsedMs: 400, normalizedRMS: 0, normalizedPeak: 1 },
-    {
-      ...running,
-      elapsedMs: 500,
-      normalizedRMS: 0.2,
-      normalizedPeak: 0,
-    },
+    { ...running, elapsedMs: 500, normalizedRMS: 0, normalizedPeak: 1 },
   ];
   const getMicrophoneTestSnapshot = vi
     .fn<Voice2TextDesktopApi["getMicrophoneTestSnapshot"]>()
-    .mockImplementationOnce(() => firstSnapshot.promise)
     .mockImplementation(async () => snapshots.shift() ?? running);
   const startMicrophoneTest = vi.fn(async () => running);
   const cancelMicrophoneTest = vi.fn(async () => ({
@@ -468,30 +461,21 @@ it("smooths the RMS meter, throttles its maximum, and keeps polls serial", async
       await vi.advanceTimersByTimeAsync(100);
     });
     expect(getMicrophoneTestSnapshot).toHaveBeenCalledOnce();
-    await act(async () => {
-      await vi.advanceTimersByTimeAsync(500);
-    });
-    expect(getMicrophoneTestSnapshot).toHaveBeenCalledOnce();
-
-    await act(async () => {
-      firstSnapshot.resolve(snapshots.shift()!);
-      await Promise.resolve();
-    });
-    expect(meter).toHaveAttribute("aria-valuenow", "44");
+    expect(meter).toHaveAttribute("aria-valuenow", "77");
     expect(dialog).toHaveTextContent("已收到声音 · 最高输入电平 −20 dBFS");
 
     await act(async () => {
       await vi.advanceTimersByTimeAsync(100);
     });
-    expect(meter).toHaveAttribute("aria-valuenow", "22");
+    expect(meter).toHaveAttribute("aria-valuenow", "51");
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(100);
+    });
+    expect(meter).toHaveAttribute("aria-valuenow", "26");
     await act(async () => {
       await vi.advanceTimersByTimeAsync(100);
     });
     expect(meter).toHaveAttribute("aria-valuenow", "0");
-    await act(async () => {
-      await vi.advanceTimersByTimeAsync(100);
-    });
-    expect(meter).toHaveAttribute("aria-valuenow", "77");
     expect(dialog).toHaveTextContent("已收到声音 · 最高输入电平 −14 dBFS");
 
     await act(async () => {
@@ -507,6 +491,73 @@ it("smooths the RMS meter, throttles its maximum, and keeps polls serial", async
     expect(
       screen.getByRole("dialog", { name: "测试麦克风" }),
     ).toHaveTextContent("已收到声音 · 最高输入电平 −20 dBFS");
+  } finally {
+    vi.useRealTimers();
+  }
+});
+
+it("keeps slow snapshots serial and releases by elapsed time", async () => {
+  const running = {
+    testId: "mic-test-slow-snapshot-123456",
+    state: "running" as const,
+    elapsedMs: 0,
+    normalizedRMS: 0.1,
+    normalizedPeak: 0.9,
+    observedFrames: 1_024,
+    observedSound: true,
+  };
+  const slowSnapshot = deferred<typeof running>();
+  const getMicrophoneTestSnapshot = vi
+    .fn<Voice2TextDesktopApi["getMicrophoneTestSnapshot"]>()
+    .mockImplementationOnce(() => slowSnapshot.promise)
+    .mockImplementation(async () => ({
+      ...running,
+      elapsedMs: 700,
+      normalizedRMS: 0,
+    }));
+
+  renderRoute(
+    api({
+      startMicrophoneTest: vi.fn(async () => running),
+      getMicrophoneTestSnapshot,
+    }),
+  );
+
+  const trigger = await screen.findByRole("button", { name: "测试麦克风" });
+  vi.useFakeTimers();
+  try {
+    await act(async () => {
+      trigger.click();
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+    const meter = within(screen.getByRole("dialog")).getByRole("meter");
+    expect(meter).toHaveAttribute("aria-valuenow", "67");
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(100);
+      await vi.advanceTimersByTimeAsync(500);
+    });
+    expect(getMicrophoneTestSnapshot).toHaveBeenCalledOnce();
+
+    await act(async () => {
+      slowSnapshot.resolve({
+        ...running,
+        elapsedMs: 600,
+        normalizedRMS: 0,
+      });
+      await Promise.resolve();
+    });
+    expect(meter).toHaveAttribute("aria-valuenow", "0");
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(99);
+    });
+    expect(getMicrophoneTestSnapshot).toHaveBeenCalledOnce();
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(1);
+    });
+    expect(getMicrophoneTestSnapshot).toHaveBeenCalledTimes(2);
   } finally {
     vi.useRealTimers();
   }

@@ -791,6 +791,7 @@ function normalizedRmsToRoundedDbfs(normalizedRms: number): number {
 function applyMicrophoneMeterEnvelope(
   current: MicrophoneMeterEnvelope,
   target: number,
+  elapsedMs: number,
 ): MicrophoneMeterEnvelope {
   if (target >= current.value) {
     return { value: target, releaseStart: target, releaseElapsedMs: 0 };
@@ -799,7 +800,7 @@ function applyMicrophoneMeterEnvelope(
     current.releaseElapsedMs === 0 ? current.value : current.releaseStart;
   const releaseElapsedMs = Math.min(
     MICROPHONE_METER_RELEASE_MS,
-    current.releaseElapsedMs + MICROPHONE_METER_POLL_INTERVAL_MS,
+    current.releaseElapsedMs + Math.max(0, elapsedMs),
   );
   const value = Math.max(
     target,
@@ -842,6 +843,7 @@ function RecordingReadyState({
     releaseStart: 0,
     releaseElapsedMs: 0,
   });
+  const meterPresentationUpdatedAtMsRef = React.useRef<number | null>(null);
   const maximumRmsRef = React.useRef(0);
   const displayedMaximumDbfsRef = React.useRef<number | null>(null);
   const maximumPublishedAtMsRef = React.useRef(0);
@@ -884,6 +886,7 @@ function RecordingReadyState({
       releaseStart: 0,
       releaseElapsedMs: 0,
     };
+    meterPresentationUpdatedAtMsRef.current = null;
     maximumRmsRef.current = 0;
     displayedMaximumDbfsRef.current = null;
     maximumPublishedAtMsRef.current = 0;
@@ -893,10 +896,14 @@ function RecordingReadyState({
 
   const applyRunningSnapshot = React.useCallback(
     (snapshot: import("@shared/contracts").MicrophoneTestSnapshot) => {
+      const now = performance.now();
+      const lastUpdatedAt = meterPresentationUpdatedAtMsRef.current;
+      meterPresentationUpdatedAtMsRef.current = now;
       const target = normalizedRmsToMeterPercentage(snapshot.normalizedRMS);
       const envelope = applyMicrophoneMeterEnvelope(
         meterEnvelopeRef.current,
         target,
+        lastUpdatedAt === null ? 0 : now - lastUpdatedAt,
       );
       meterEnvelopeRef.current = envelope;
       setMeterPercentage(envelope.value);
