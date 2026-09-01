@@ -14,6 +14,12 @@ import {
   CaptureWorkspace,
   FloatingCapturePreferenceSetting,
 } from "../../../src/renderer/features/capture/capture-workspace";
+import {
+  RECORDING_PREFERENCE_STORAGE_KEY,
+  SYSTEM_DEFAULT_MICROPHONE,
+  resolveRecordingMicrophone,
+  useRecordingPreference,
+} from "../../../src/renderer/features/capture/use-recording-preference";
 import type {
   ApplicationSnapshot,
   CapturePreflight,
@@ -51,7 +57,26 @@ const recording: CaptureSnapshot = {
   recordingSha256: null,
 };
 
-afterEach(() => vi.restoreAllMocks());
+afterEach(() => {
+  window.localStorage.clear();
+  vi.restoreAllMocks();
+});
+
+function RecordingPreferenceProbe() {
+  const preference = useRecordingPreference();
+  return (
+    <div>
+      <output>{preference.microphoneDeviceId}</output>
+      <output>{preference.error ?? "ok"}</output>
+      <button
+        type="button"
+        onClick={() => preference.setMicrophone("mic-usb", "USB 麦克风")}
+      >
+        保存麦克风
+      </button>
+    </div>
+  );
+}
 
 function installCaptureApi(overrides: Partial<Voice2TextDesktopApi> = {}) {
   const api = {
@@ -73,6 +98,157 @@ function installCaptureApi(overrides: Partial<Voice2TextDesktopApi> = {}) {
 }
 
 describe("capture workspace", () => {
+  it("resolves the saved microphone with deterministic default and first-device fallbacks", () => {
+    const microphones = [
+      { id: "mic-first", name: "外接麦克风", isDefault: false },
+      { id: "mic-default", name: "系统麦克风", isDefault: true },
+    ];
+
+    expect(
+      resolveRecordingMicrophone(microphones, SYSTEM_DEFAULT_MICROPHONE)?.id,
+    ).toBe("mic-default");
+    expect(
+      resolveRecordingMicrophone(
+        microphones.map((device) => ({ ...device, isDefault: false })),
+        SYSTEM_DEFAULT_MICROPHONE,
+      )?.id,
+    ).toBe("mic-first");
+    expect(resolveRecordingMicrophone(microphones, "mic-first")?.id).toBe(
+      "mic-first",
+    );
+    expect(resolveRecordingMicrophone(microphones, "mic-missing")?.id).toBe(
+      "mic-default",
+    );
+    expect(
+      resolveRecordingMicrophone(
+        [
+          ...microphones,
+          {
+            id: "mic-missing",
+            name: "已恢复的会议麦克风",
+            isDefault: false,
+          },
+        ],
+        "mic-missing",
+      )?.id,
+    ).toBe("mic-missing");
+  });
+
+  it.each([
+    ["invalid JSON", "{"],
+    [
+      "an unknown version",
+      JSON.stringify({
+        version: 2,
+        microphoneDeviceId: "mic-usb",
+        microphoneName: "USB 麦克风",
+      }),
+    ],
+  ])("falls back safely for %s", (_, stored) => {
+    window.localStorage.setItem(RECORDING_PREFERENCE_STORAGE_KEY, stored);
+
+    render(<RecordingPreferenceProbe />);
+
+    expect(screen.getByText(SYSTEM_DEFAULT_MICROPHONE)).toBeVisible();
+    expect(screen.getByText("read-failed")).toBeVisible();
+  });
+
+  it("persists a selected microphone across consumer remounts", async () => {
+    const first = render(<RecordingPreferenceProbe />);
+    await userEvent
+      .setup()
+      .click(screen.getByRole("button", { name: "保存麦克风" }));
+    expect(screen.getByText("mic-usb")).toBeVisible();
+    expect(screen.getByText("ok")).toBeVisible();
+    first.unmount();
+
+    render(<RecordingPreferenceProbe />);
+
+    expect(screen.getByText("mic-usb")).toBeVisible();
+    expect(screen.getByText("ok")).toBeVisible();
+  });
+
+  it("keeps preference reads and writes usable with stable storage errors", async () => {
+    const getItem = vi
+      .spyOn(Storage.prototype, "getItem")
+      .mockImplementation(() => {
+        throw new Error("storage denied");
+      });
+    const view = render(<RecordingPreferenceProbe />);
+
+    expect(screen.getByText(SYSTEM_DEFAULT_MICROPHONE)).toBeVisible();
+    expect(screen.getByText("read-failed")).toBeVisible();
+
+    getItem.mockRestore();
+    vi.spyOn(Storage.prototype, "setItem").mockImplementation(() => {
+      throw new Error("storage full");
+    });
+    await userEvent
+      .setup()
+      .click(screen.getByRole("button", { name: "保存麦克风" }));
+
+    expect(screen.getByText("mic-usb")).toBeVisible();
+    expect(screen.getByText("write-failed")).toBeVisible();
+    view.unmount();
+  });
+
+  it("uses a persisted microphone for formal recording", async () => {
+    window.localStorage.setItem(
+      RECORDING_PREFERENCE_STORAGE_KEY,
+      JSON.stringify({
+        version: 1,
+        microphoneDeviceId: "mic-usb",
+        microphoneName: "USB 麦克风",
+      }),
+    );
+    const startCapture = vi.fn(async () => recording);
+    installCaptureApi({
+      preflightCapture: vi.fn(async () => ({
+        ...readyPreflight,
+        microphones: [
+          ...readyPreflight.microphones,
+          { id: "mic-usb", name: "USB 麦克风", isDefault: false },
+        ],
+      })),
+      startCapture,
+    });
+    const user = userEvent.setup();
+    render(<CaptureWorkspace capture={idle} applicationRevision={1} />);
+
+    await user.click(screen.getByRole("button", { name: "检查并设置录制" }));
+    await user.click(screen.getByRole("button", { name: "开始录制" }));
+
+    expect(startCapture).toHaveBeenCalledWith(
+      expect.objectContaining({ microphoneDeviceId: "mic-usb" }),
+    );
+  });
+
+  it("falls back without clearing a temporarily missing persisted microphone", async () => {
+    const storedPreference = JSON.stringify({
+      version: 1,
+      microphoneDeviceId: "mic-disconnected",
+      microphoneName: "会议麦克风",
+    });
+    window.localStorage.setItem(
+      RECORDING_PREFERENCE_STORAGE_KEY,
+      storedPreference,
+    );
+    const startCapture = vi.fn(async () => recording);
+    installCaptureApi({ startCapture });
+    const user = userEvent.setup();
+    render(<CaptureWorkspace capture={idle} applicationRevision={1} />);
+
+    await user.click(screen.getByRole("button", { name: "检查并设置录制" }));
+    await user.click(screen.getByRole("button", { name: "开始录制" }));
+
+    expect(startCapture).toHaveBeenCalledWith(
+      expect.objectContaining({ microphoneDeviceId: "mic-default" }),
+    );
+    expect(
+      window.localStorage.getItem(RECORDING_PREFERENCE_STORAGE_KEY),
+    ).toBe(storedPreference);
+  });
+
   it("keeps the floating preference controlled while pending and rolls back on failure", async () => {
     let rejectPreference!: (reason?: unknown) => void;
     const preferenceUpdate = new Promise<{ enabled: boolean }>((_, reject) => {

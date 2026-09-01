@@ -2,9 +2,12 @@
 
 import { act, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { expect, it, vi } from "vitest";
+import { afterEach, expect, it, vi } from "vitest";
 
 import { AudioRouteFeature } from "../../../src/renderer/features/audios/audio-route-feature";
+import {
+  RECORDING_PREFERENCE_STORAGE_KEY,
+} from "../../../src/renderer/features/capture/use-recording-preference";
 import type {
   AudioSummary,
   AudioWorkspaceSnapshot,
@@ -25,6 +28,11 @@ function deferred<T>() {
 const audioA = summary(1, "音频 A.wav");
 const audioB = summary(2, "音频 B.wav");
 const audioC = summary(3, "音频 C.wav");
+
+afterEach(() => {
+  window.localStorage.clear();
+  vi.restoreAllMocks();
+});
 
 it("keeps import beside search and new recording in the fixed footer", async () => {
   const onImport = vi.fn(async () => undefined);
@@ -411,6 +419,73 @@ it("uses the native capture lifecycle for a user-ended microphone test", async (
   expect(finishMicrophoneTest).toHaveBeenCalledWith(running.testId);
 });
 
+it("uses the persisted microphone for tests and recording", async () => {
+  window.localStorage.setItem(
+    RECORDING_PREFERENCE_STORAGE_KEY,
+    JSON.stringify({
+      version: 1,
+      microphoneDeviceId: "mic-usb",
+      microphoneName: "USB 麦克风",
+    }),
+  );
+  const microphones = [
+    { id: "mic-default", name: "MacBook 麦克风", isDefault: true },
+    { id: "mic-usb", name: "USB 麦克风", isDefault: false },
+  ];
+  const startMicrophoneTest = vi.fn(async () => ({
+    testId: "mic-test-persisted-device",
+    state: "running" as const,
+    elapsedMs: 0,
+    normalizedRMS: 0,
+    normalizedPeak: 0,
+    observedFrames: 0,
+    observedSound: false,
+  }));
+  const onRecord = vi.fn();
+  render(
+    <AudioRouteFeature
+      api={api({
+        preflightCapture: vi.fn(async () => ({
+          minimumMacosVersion: "13.0",
+          systemAudioMinimumMacosVersion: "13.0",
+          captureMode: "dual_track" as const,
+          systemAudioPermission: "granted" as const,
+          microphonePermission: "granted" as const,
+          microphones,
+          availableBytes: 8 * 1024 ** 3,
+          requiredBytes: 2 * 1024 ** 3,
+          captionModelAvailable: true,
+          canStart: true,
+          blockingReasons: [],
+        })),
+        startMicrophoneTest,
+      })}
+      tasks={[]}
+      pendingJobActions={new Map()}
+      writable
+      paneOpen
+      onRecord={onRecord}
+      onImport={vi.fn()}
+      onCancel={vi.fn()}
+      onRetry={vi.fn()}
+    />,
+  );
+
+  await userEvent
+    .setup()
+    .click(await screen.findByRole("button", { name: "测试麦克风" }));
+  expect(startMicrophoneTest).toHaveBeenCalledWith({
+    microphoneDeviceId: "mic-usb",
+  });
+  await userEvent
+    .setup()
+    .click(screen.getByRole("button", { name: "关闭" }));
+  await userEvent
+    .setup()
+    .click(screen.getByRole("button", { name: "开始录制" }));
+  expect(onRecord).toHaveBeenCalledWith("mic-usb");
+});
+
 it("smooths the RMS meter and throttles its maximum", async () => {
   const running = {
     testId: "mic-test-rms-envelope-123456",
@@ -712,6 +787,36 @@ it("cancels once and ignores a late running snapshot after closing during recove
   await waitFor(() => expect(cancelMicrophoneTest).toHaveBeenCalledOnce());
   expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
   expect(screen.queryByText("已收到声音")).not.toBeInTheDocument();
+});
+
+it("cancels an active microphone test exactly once when its owner unmounts", async () => {
+  const running = {
+    testId: "mic-test-unmount-123456789",
+    state: "running" as const,
+    elapsedMs: 0,
+    normalizedRMS: 0,
+    normalizedPeak: 0,
+    observedFrames: 0,
+    observedSound: false,
+  };
+  const cancelMicrophoneTest = vi.fn(async () => ({
+    ...running,
+    state: "cancelled" as const,
+  }));
+  const view = renderRoute(
+    api({
+      startMicrophoneTest: vi.fn(async () => running),
+      cancelMicrophoneTest,
+    }),
+  );
+
+  await userEvent
+    .setup()
+    .click(await screen.findByRole("button", { name: "测试麦克风" }));
+  await screen.findByRole("dialog", { name: "测试麦克风" });
+  view.unmount();
+
+  await waitFor(() => expect(cancelMicrophoneTest).toHaveBeenCalledOnce());
 });
 
 it("shows helper contract failures with one close action and no settings affordance", async () => {

@@ -42,6 +42,10 @@ import {
   type CaptureCompactAction,
   type CaptureView,
 } from "./capture-presentation";
+import {
+  resolveRecordingMicrophone,
+  useRecordingPreference,
+} from "./use-recording-preference";
 
 type CaptureControlAction = CaptureCompactAction;
 
@@ -52,7 +56,6 @@ export function CaptureWorkspace({
   recordRequest,
   detailOpen = true,
   focusSessionId = null,
-  preferredMicrophoneDeviceId = null,
   autoOpenRecoveries = false,
   onPreflightResolved,
   onDetailOpenChange,
@@ -99,6 +102,7 @@ export function CaptureWorkspace({
   const recoverySessionId =
     capture.phase === "recovery" ? capture.sessionId : null;
   const prioritizedRecoverySessionId = focusSessionId ?? recoverySessionId;
+  const recordingPreference = useRecordingPreference();
 
   React.useEffect(() => {
     let active = true;
@@ -196,12 +200,10 @@ export function CaptureWorkspace({
       setPreflight(result);
       onPreflightResolved?.(result);
       if (!result.captionModelAvailable) setCaptionEnabled(false);
-      const defaultMicrophone =
-        result.microphones.find(
-          (device) => device.id === preferredMicrophoneDeviceId,
-        ) ??
-        result.microphones.find((device) => device.isDefault) ??
-        result.microphones[0];
+      const defaultMicrophone = resolveRecordingMicrophone(
+        result.microphones,
+        recordingPreference.microphoneDeviceId,
+      );
       setMicrophoneDeviceId(defaultMicrophone?.id ?? "");
       if (!result.canStart || !defaultMicrophone) {
         setSetupOpen(false);
@@ -216,7 +218,7 @@ export function CaptureWorkspace({
     captionEnabled,
     onDetailOpenChange,
     onPreflightResolved,
-    preferredMicrophoneDeviceId,
+    recordingPreference.microphoneDeviceId,
     runExclusive,
   ]);
 
