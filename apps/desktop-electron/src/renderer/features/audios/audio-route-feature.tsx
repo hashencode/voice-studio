@@ -823,9 +823,6 @@ function RecordingReadyState({
   const [testPhase, setTestPhase] = React.useState<
     "closed" | "starting" | "testing" | "failure"
   >("closed");
-  const [testSnapshot, setTestSnapshot] = React.useState<
-    import("@shared/contracts").MicrophoneTestSnapshot | null
-  >(null);
   const [failureReason, setFailureReason] = React.useState<
     import("@shared/contracts").MicrophoneTestSnapshot["reason"] | null
   >(null);
@@ -929,7 +926,6 @@ function RecordingReadyState({
     generationRef.current += 1;
     if (testPhase === "starting") setTeardownPending(true);
     setTestPhase("closed");
-    setTestSnapshot(null);
     setFailureReason(null);
     setSettingsManualPathVisible(false);
     resetMeterPresentation();
@@ -945,7 +941,6 @@ function RecordingReadyState({
       const finished = await controller.api.finishMicrophoneTest(testId);
       if (generation !== generationRef.current) return;
       activeTestIdRef.current = null;
-      setTestSnapshot(finished);
       if (finished.reason === "detected" || finished.observedSound) {
         setTestPhase("closed");
         setFailureReason(null);
@@ -968,7 +963,6 @@ function RecordingReadyState({
       const generation = generationRef.current + 1;
       generationRef.current = generation;
       setTestPhase("starting");
-      setTestSnapshot(null);
       setFailureReason(null);
       setSettingsManualPathVisible(false);
       resetMeterPresentation();
@@ -996,7 +990,6 @@ function RecordingReadyState({
           return;
         }
         activeTestIdRef.current = started.testId;
-        setTestSnapshot(started);
         if (started.state === "running") {
           applyRunningSnapshot(started);
           setTestPhase("testing");
@@ -1024,17 +1017,15 @@ function RecordingReadyState({
   );
 
   React.useEffect(() => {
-    if (testPhase !== "testing" || !testSnapshot?.testId) return;
+    const testId = activeTestIdRef.current;
+    if (testPhase !== "testing" || !testId) return;
     let active = true;
     const generation = generationRef.current;
     let timer: number | null = null;
     const poll = async () => {
       try {
-        const next = await controller.api.getMicrophoneTestSnapshot(
-          testSnapshot.testId,
-        );
+        const next = await controller.api.getMicrophoneTestSnapshot(testId);
         if (!active || generation !== generationRef.current) return;
-        setTestSnapshot(next);
         if (next.state === "running") {
           applyRunningSnapshot(next);
           timer = window.setTimeout(
@@ -1059,13 +1050,7 @@ function RecordingReadyState({
       active = false;
       if (timer !== null) window.clearTimeout(timer);
     };
-  }, [
-    applyRunningSnapshot,
-    controller.api,
-    showFailure,
-    testPhase,
-    testSnapshot?.testId,
-  ]);
+  }, [applyRunningSnapshot, controller.api, showFailure, testPhase]);
 
   React.useEffect(() => {
     return () => {
@@ -1084,6 +1069,15 @@ function RecordingReadyState({
   }, [controller.api]);
 
   const testBusy = testPhase === "starting" || testPhase === "testing";
+  let testDescription = microphoneFailureDescription(failureReason);
+  if (testPhase === "starting") {
+    testDescription = "正在连接麦克风…";
+  } else if (testPhase === "testing") {
+    testDescription =
+      displayedMaximumDbfs === null
+        ? "请对着麦克风说话。"
+        : `已收到声音 · 最高输入电平 ${formatDbfs(displayedMaximumDbfs)} dBFS`;
+  }
 
   return (
     <section
@@ -1166,15 +1160,7 @@ function RecordingReadyState({
                 ? "测试麦克风"
                 : microphoneFailureTitle(failureReason)}
             </DialogTitle>
-            <DialogDescription>
-              {testPhase === "starting"
-                ? "正在连接麦克风…"
-                : testPhase === "testing"
-                  ? testSnapshot?.observedSound
-                    ? `已收到声音 · 最高输入电平 ${formatDbfs(displayedMaximumDbfs ?? MICROPHONE_METER_DB_FLOOR)} dBFS`
-                    : "请对着麦克风说话。"
-                  : microphoneFailureDescription(failureReason)}
-            </DialogDescription>
+            <DialogDescription>{testDescription}</DialogDescription>
           </DialogHeader>
           {testPhase === "starting" ? (
             <div className="flex justify-end pt-2">

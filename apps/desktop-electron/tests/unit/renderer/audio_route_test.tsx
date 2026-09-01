@@ -443,22 +443,12 @@ it("smooths the RMS meter, throttles its maximum, and keeps polls serial", async
     state: "cancelled" as const,
   }));
 
-  render(
-    <AudioRouteFeature
-      api={api({
-        startMicrophoneTest,
-        getMicrophoneTestSnapshot,
-        cancelMicrophoneTest,
-      })}
-      tasks={[]}
-      pendingJobActions={new Map()}
-      writable
-      paneOpen
-      onRecord={vi.fn()}
-      onImport={vi.fn()}
-      onCancel={vi.fn()}
-      onRetry={vi.fn()}
-    />,
+  renderRoute(
+    api({
+      startMicrophoneTest,
+      getMicrophoneTestSnapshot,
+      cancelMicrophoneTest,
+    }),
   );
 
   const trigger = await screen.findByRole("button", { name: "测试麦克风" });
@@ -539,19 +529,7 @@ it("shows one instruction before sound and starts only once on rapid activation"
     getMicrophoneTestSnapshot: vi.fn(() => pendingSnapshot.promise),
   });
   const preflightCapture = vi.mocked(desktop.preflightCapture);
-  render(
-    <AudioRouteFeature
-      api={desktop}
-      tasks={[]}
-      pendingJobActions={new Map()}
-      writable
-      paneOpen
-      onRecord={vi.fn()}
-      onImport={vi.fn()}
-      onCancel={vi.fn()}
-      onRetry={vi.fn()}
-    />,
-  );
+  renderRoute(desktop);
 
   const trigger = await screen.findByRole("button", { name: "测试麦克风" });
   await waitFor(() => expect(trigger).toBeEnabled());
