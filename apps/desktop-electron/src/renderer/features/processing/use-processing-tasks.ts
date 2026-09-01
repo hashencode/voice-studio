@@ -190,8 +190,7 @@ export function useProcessingTasks(
       if (result.state === "imported") {
         acceptSnapshot(await window.voice2text.getApplicationSnapshot());
       }
-    } catch {
-      if (mountedRef.current) setOperationError("无法导入音频，请重试。");
+      return result;
     } finally {
       importPendingRef.current = false;
       if (mountedRef.current) setImportPending(false);

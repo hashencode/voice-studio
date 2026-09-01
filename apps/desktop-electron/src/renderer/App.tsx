@@ -319,6 +319,16 @@ function App() {
     processingAvailable: snapshot?.capability.processing === "available",
     recordingActive: isCaptureInProgress(snapshot?.capture),
     newRecordingBlocked: isNewRecordingBlocked(snapshot?.capture),
+    libraryRefreshToken: snapshot
+      ? [
+          snapshot.library.phase,
+          snapshot.library.phase === "ready" ? snapshot.library.audioCount : "",
+        ].join(":")
+      : undefined,
+    recordingCompletionToken:
+      snapshot?.capture.phase === "completed"
+        ? snapshot.capture.sessionId
+        : null,
     active: current === "audio",
     enabled: snapshot?.profile.phase === "ready",
     onAudioSelected: closeUnblockedCaptureDetailForAudioSelection,

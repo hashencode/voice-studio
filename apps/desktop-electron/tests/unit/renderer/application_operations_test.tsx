@@ -150,6 +150,21 @@ function ProcessingTasksErrorHarness() {
   return <div>{operationError}</div>;
 }
 
+function ProcessingImportResultHarness({
+  onResult,
+  onSnapshot,
+}: {
+  onResult: (result: unknown) => void;
+  onSnapshot: (snapshot: ApplicationSnapshot) => void;
+}) {
+  const { importAudio } = useProcessingTasks(onSnapshot, true);
+  return (
+    <button type="button" onClick={() => void importAudio().then(onResult)}>
+      导入
+    </button>
+  );
+}
+
 function testAiSettings() {
   return {
     revision: 1,
@@ -185,6 +200,69 @@ function testAiProfile() {
 }
 
 describe("renderer processing operation races", () => {
+  it("returns the existing imported and canceled operation results", async () => {
+    const imported = {
+      protocolVersion: 2 as const,
+      state: "imported" as const,
+      audioId: 37,
+      mediaSha256: "b".repeat(64),
+      inserted: true,
+    };
+    const importAudio = vi
+      .fn()
+      .mockResolvedValueOnce(imported)
+      .mockResolvedValueOnce({ protocolVersion: 2, state: "canceled" });
+    installOperationsApi({ importAudio });
+    const onResult = vi.fn();
+    const onSnapshot = vi.fn();
+    render(
+      <ProcessingImportResultHarness
+        onResult={onResult}
+        onSnapshot={onSnapshot}
+      />,
+    );
+
+    const user = userEvent.setup();
+    await user.click(screen.getByRole("button", { name: "导入" }));
+    await waitFor(() => expect(onResult).toHaveBeenCalledWith(imported));
+    expect(onSnapshot).toHaveBeenCalledWith(tasksSnapshot);
+    await user.click(screen.getByRole("button", { name: "导入" }));
+    await waitFor(() =>
+      expect(onResult).toHaveBeenCalledWith({
+        protocolVersion: 2,
+        state: "canceled",
+      }),
+    );
+    expect(onSnapshot).toHaveBeenCalledTimes(1);
+  });
+
+  it("integrates an imported result through App to the exact audio selection", async () => {
+    const listAudios = vi.fn(async () => [runningAudio]);
+    const openAudio = vi.fn(async () => runningWorkspace);
+    const importAudio = vi.fn(async () => ({
+      protocolVersion: 2 as const,
+      state: "imported" as const,
+      audioId: runningAudio.audioId,
+      mediaSha256: "c".repeat(64),
+      inserted: false,
+    }));
+    installOperationsApi({ listAudios, openAudio, importAudio });
+    render(<App />);
+
+    await waitFor(() => expect(listAudios).toHaveBeenCalledTimes(2));
+    const listReadsBeforeImport = listAudios.mock.calls.length;
+
+    await userEvent
+      .setup()
+      .click(await screen.findByRole("button", { name: "导入音频" }));
+
+    expect(
+      await screen.findByRole("region", { name: "项目周会.wav 工作区" }),
+    ).toBeVisible();
+    expect(openAudio).toHaveBeenCalledWith(runningAudio.audioId);
+    expect(listAudios).toHaveBeenCalledTimes(listReadsBeforeImport + 1);
+  });
+
   it("sanitizes an initial task refresh failure", async () => {
     const rawDiagnostic = "SQLITE_IOERR /private/profile/audio.sqlite3";
     installOperationsApi({
