@@ -1,5 +1,5 @@
 import * as React from "react";
-import { Cloud, HardDrive, Settings2 } from "lucide-react";
+import { Cloud, HardDrive, Mic, Settings2 } from "lucide-react";
 
 import { AppSidebar } from "@/components/app-sidebar";
 import {
@@ -28,10 +28,7 @@ import {
   type AudioRouteController,
   useAudioRouteController,
 } from "@/features/audios/audio-route-feature";
-import {
-  CaptureWorkspace,
-  FloatingCapturePreferenceSetting,
-} from "@/features/capture/capture-workspace";
+import { CaptureWorkspace } from "@/features/capture/capture-workspace";
 import {
   CompanionContextPane,
   CompanionContextPaneFooter,
@@ -59,10 +56,8 @@ import {
 } from "@/features/shell/use-application-shell";
 import { AiSettingsFeature } from "@/features/settings/ai-settings-feature";
 import { LocalModelsFeature } from "@/features/settings/local-models-feature";
-import {
-  SettingsListBlock,
-  SettingsPageSection,
-} from "@/features/settings/settings-page-section";
+import { RecordingSettingsFeature } from "@/features/settings/recording-settings-feature";
+import { SettingsPageSection } from "@/features/settings/settings-page-section";
 import {
   isSettingsSection,
   settingsSectionHeadingId,
@@ -76,6 +71,7 @@ import {
 
 const SETTINGS_SECTIONS = [
   { value: "general", label: "通用", icon: Settings2 },
+  { value: "recording", label: "录制", icon: Mic },
   { value: "local-models", label: "本地模型", icon: HardDrive },
   { value: "cloud-models", label: "云端模型", icon: Cloud },
 ] as const;
@@ -858,10 +854,9 @@ const SettingsContent = React.memo(function SettingsContent() {
   return (
     <div data-settings-page="true" className="min-h-full bg-muted/20">
       <div className="mx-auto w-full max-w-4xl space-y-8 px-4 py-6 sm:px-6 lg:px-10">
-        <SettingsPageSection section="general" title="通用">
-          <SettingsListBlock>
-            <FloatingCapturePreferenceSetting className="p-4" />
-          </SettingsListBlock>
+        <SettingsPageSection section="general" title="通用" />
+        <SettingsPageSection section="recording" title="录制">
+          <RecordingSettingsFeature />
         </SettingsPageSection>
         <SettingsPageSection section="local-models" title="本地模型">
           <LocalModelsFeature />

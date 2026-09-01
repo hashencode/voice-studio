@@ -244,9 +244,9 @@ describe("capture workspace", () => {
     expect(startCapture).toHaveBeenCalledWith(
       expect.objectContaining({ microphoneDeviceId: "mic-default" }),
     );
-    expect(
-      window.localStorage.getItem(RECORDING_PREFERENCE_STORAGE_KEY),
-    ).toBe(storedPreference);
+    expect(window.localStorage.getItem(RECORDING_PREFERENCE_STORAGE_KEY)).toBe(
+      storedPreference,
+    );
   });
 
   it("keeps the floating preference controlled while pending and rolls back on failure", async () => {

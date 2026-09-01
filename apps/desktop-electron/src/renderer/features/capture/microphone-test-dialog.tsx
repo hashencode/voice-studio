@@ -38,6 +38,8 @@ export type MicrophoneTestController = ReturnType<
   typeof useMicrophoneTestController
 >;
 
+// The controller is intentionally shared by the Audio and Recording settings owners.
+// eslint-disable-next-line react-refresh/only-export-components
 export function useMicrophoneTestController({
   api,
   preferredMicrophoneDeviceId,

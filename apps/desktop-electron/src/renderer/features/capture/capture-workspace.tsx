@@ -35,6 +35,7 @@ import type {
   ApplicationSnapshot,
   CapturePreflight,
   CaptureSnapshot,
+  Voice2TextDesktopApi,
 } from "@shared/contracts";
 import {
   deriveCaptureCompactPresentation,
@@ -452,15 +453,17 @@ export function CaptureWorkspace({
 
 export function FloatingCapturePreferenceSetting({
   className = "",
+  api = window.voice2text,
 }: {
   className?: string;
+  api?: Voice2TextDesktopApi;
 }) {
   const [enabled, setEnabled] = React.useState(false);
   const [pending, setPending] = React.useState(false);
   const [error, setError] = React.useState(false);
   React.useEffect(() => {
     let active = true;
-    void window.voice2text
+    void api
       .getFloatingCapturePreference?.()
       .then((preference) => {
         if (active) setEnabled(preference.enabled);
@@ -471,8 +474,8 @@ export function FloatingCapturePreferenceSetting({
     return () => {
       active = false;
     };
-  }, []);
-  if (!window.voice2text.setFloatingCapturePreference) return null;
+  }, [api]);
+  if (!api.setFloatingCapturePreference) return null;
   return (
     <Field orientation="horizontal" className={`items-center! ${className}`}>
       <FieldContent>
@@ -494,7 +497,7 @@ export function FloatingCapturePreferenceSetting({
           setEnabled(value);
           setPending(true);
           setError(false);
-          void window.voice2text
+          void api
             .setFloatingCapturePreference?.(value)
             .then((preference) => setEnabled(preference.enabled))
             .catch(() => {

@@ -57,6 +57,20 @@ const shellAudio = {
   segmentCount: 0,
 };
 
+const shellCapturePreflight = {
+  minimumMacosVersion: "13.0",
+  systemAudioMinimumMacosVersion: "13.0",
+  captureMode: "dual_track" as const,
+  systemAudioPermission: "granted" as const,
+  microphonePermission: "granted" as const,
+  microphones: [{ id: "mic-default", name: "MacBook 麦克风", isDefault: true }],
+  availableBytes: 8 * 1024 ** 3,
+  requiredBytes: 2 * 1024 ** 3,
+  captionModelAvailable: true,
+  canStart: true,
+  blockingReasons: [],
+};
+
 afterEach(() => {
   vi.restoreAllMocks();
   window.history.replaceState(null, "", "/");
@@ -97,7 +111,7 @@ function installApi(
     assignAudioSpeaker: vi.fn(),
     controlAudioPlayback: vi.fn(),
     exportAudio: vi.fn(),
-    preflightCapture: vi.fn(),
+    preflightCapture: vi.fn(async () => shellCapturePreflight),
     getFloatingCapturePreference: vi.fn(async () => ({ enabled: false })),
     setFloatingCapturePreference: vi.fn(async (enabled) => ({ enabled })),
     startCapture: vi.fn(),
@@ -400,7 +414,7 @@ describe("application shell", () => {
     expect(document.querySelector("[data-settings-page]")).toHaveClass(
       "bg-muted/20",
     );
-    for (const heading of ["通用", "本地模型", "云端模型"]) {
+    for (const heading of ["通用", "录制", "本地模型", "云端模型"]) {
       expect(
         screen.getByRole("heading", { name: heading, level: 2 }),
       ).toBeVisible();
@@ -414,6 +428,14 @@ describe("application shell", () => {
     const floatingCaptureRow = screen.getByRole("switch", {
       name: "悬浮控制条",
     }).parentElement;
+    const generalSection = document.querySelector(
+      '[data-settings-section="general"]',
+    );
+    const recordingSection = document.querySelector(
+      '[data-settings-section="recording"]',
+    );
+    expect(generalSection).not.toContainElement(floatingCaptureRow);
+    expect(recordingSection).toContainElement(floatingCaptureRow);
     expect(floatingCaptureRow).toHaveAttribute("data-slot", "field");
     expect(floatingCaptureRow).toHaveClass("items-center!", "p-4");
     expect(
@@ -436,9 +458,17 @@ describe("application shell", () => {
     const generalSetting = within(settingsPane).getByRole("link", {
       name: "通用",
     });
+    const recordingSetting = within(settingsPane).getByRole("link", {
+      name: "录制",
+    });
     const localModelsSetting = within(settingsPane).getByRole("link", {
       name: "本地模型",
     });
+    expect(
+      within(settingsPane)
+        .getAllByRole("link")
+        .map((link) => link.textContent),
+    ).toEqual(["通用", "录制", "本地模型", "云端模型"]);
     expect(generalSetting).toHaveAttribute("data-active", "true");
     expect(generalSetting).toHaveAttribute("aria-current", "location");
     expect(generalSetting).toHaveClass(
@@ -447,6 +477,23 @@ describe("application shell", () => {
     );
     expect(generalSetting).toHaveAttribute("data-slot", "sidebar-menu-button");
     expect(localModelsSetting).toHaveAttribute("data-active", "false");
+    const recordingHeading = screen.getByRole("heading", {
+      name: "录制",
+      level: 2,
+    });
+    const recordingScrollIntoView = vi.spyOn(
+      recordingHeading,
+      "scrollIntoView",
+    );
+    await user.click(recordingSetting);
+    await waitFor(() =>
+      expect(recordingScrollIntoView).toHaveBeenCalledWith({
+        behavior: "smooth",
+        block: "start",
+      }),
+    );
+    expect(recordingSetting).toHaveAttribute("aria-current", "location");
+    expect(generalSetting).not.toHaveAttribute("aria-current");
     const localModelsHeading = screen.getByRole("heading", {
       name: "本地模型",
       level: 2,
@@ -480,6 +527,7 @@ describe("application shell", () => {
     expect(cloudSetting.querySelector(".lucide-bot")).toBeNull();
     const sectionPositions = {
       general: -300,
+      recording: -220,
       "local-models": -120,
       "cloud-models": 20,
     } as const;

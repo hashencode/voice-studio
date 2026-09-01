@@ -5,9 +5,7 @@ import userEvent from "@testing-library/user-event";
 import { afterEach, expect, it, vi } from "vitest";
 
 import { AudioRouteFeature } from "../../../src/renderer/features/audios/audio-route-feature";
-import {
-  RECORDING_PREFERENCE_STORAGE_KEY,
-} from "../../../src/renderer/features/capture/use-recording-preference";
+import { RECORDING_PREFERENCE_STORAGE_KEY } from "../../../src/renderer/features/capture/use-recording-preference";
 import type {
   AudioSummary,
   AudioWorkspaceSnapshot,
@@ -325,9 +323,7 @@ it("preserves a populated workspace during background refresh and query-empty", 
 
   const search = await screen.findByRole("searchbox", { name: "搜索音频" });
   expect(screen.getByText("选择一段音频")).toBeVisible();
-  view.rerender(
-    <AudioRouteFeature {...props} libraryRefreshToken="ready:2" />,
-  );
+  view.rerender(<AudioRouteFeature {...props} libraryRefreshToken="ready:2" />);
   expect(await screen.findByText("正在刷新音频…")).toBeVisible();
   expect(search).toBeVisible();
   expect(screen.getByText("选择一段音频")).toBeVisible();
@@ -367,9 +363,9 @@ it.each([true, false])(
       />,
     );
 
-    await userEvent.setup().click(
-      await screen.findByRole("button", { name: "导入音频" }),
-    );
+    await userEvent
+      .setup()
+      .click(await screen.findByRole("button", { name: "导入音频" }));
 
     expect(
       await screen.findByRole("region", { name: "音频 B.wav 工作区" }),
@@ -480,9 +476,7 @@ it("recovers first-use recording after a failed microphone preflight", async () 
     .setup()
     .click(within(alert).getByRole("button", { name: "重试" }));
 
-  expect(
-    await screen.findByRole("button", { name: "开始录制" }),
-  ).toBeEnabled();
+  expect(await screen.findByRole("button", { name: "开始录制" })).toBeEnabled();
   expect(preflightCapture).toHaveBeenNthCalledWith(2, {
     requestPermissions: true,
     captionEnabled: false,
@@ -490,9 +484,8 @@ it("recovers first-use recording after a failed microphone preflight", async () 
 });
 
 it("shows first-use preflight progress and keeps recording blocks effective", async () => {
-  const preflight = deferred<
-    Awaited<ReturnType<Voice2TextDesktopApi["preflightCapture"]>>
-  >();
+  const preflight =
+    deferred<Awaited<ReturnType<Voice2TextDesktopApi["preflightCapture"]>>>();
   const onRecord = vi.fn();
   render(
     <AudioRouteFeature
@@ -690,9 +683,7 @@ it("uses the persisted microphone for tests and recording", async () => {
   expect(startMicrophoneTest).toHaveBeenCalledWith({
     microphoneDeviceId: "mic-usb",
   });
-  await userEvent
-    .setup()
-    .click(screen.getByRole("button", { name: "关闭" }));
+  await userEvent.setup().click(screen.getByRole("button", { name: "关闭" }));
   await userEvent
     .setup()
     .click(screen.getByRole("button", { name: "开始录制" }));
