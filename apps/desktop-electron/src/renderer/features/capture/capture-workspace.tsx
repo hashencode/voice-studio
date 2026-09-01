@@ -68,7 +68,6 @@ export function CaptureWorkspace({
   recordRequest?: number;
   detailOpen?: boolean;
   focusSessionId?: string | null;
-  preferredMicrophoneDeviceId?: string | null;
   autoOpenRecoveries?: boolean;
   onPreflightResolved?: (preflight: CapturePreflight) => void;
   onDetailOpenChange?: (open: boolean) => void;

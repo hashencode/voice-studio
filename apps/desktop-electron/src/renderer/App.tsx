@@ -138,8 +138,6 @@ function App() {
   const [recordRequest, setRecordRequest] = React.useState(0);
   const [processingUnavailableReason, setProcessingUnavailableReason] =
     React.useState<string | null>(null);
-  const [preferredMicrophoneDeviceId, setPreferredMicrophoneDeviceId] =
-    React.useState<string | null>(null);
   const [captureDetailOpen, setCaptureDetailOpen] = React.useState(false);
   const [captureDetailSessionId, setCaptureDetailSessionId] = React.useState<
     string | null
@@ -330,12 +328,11 @@ function App() {
     active: current === "audio",
     enabled: snapshot?.profile.phase === "ready",
     onAudioSelected: closeUnblockedCaptureDetailForAudioSelection,
-    onRecord: (microphoneDeviceId) => {
+    onRecord: () => {
       captureInvokerRef.current =
         document.activeElement instanceof HTMLElement
           ? document.activeElement
           : null;
-      setPreferredMicrophoneDeviceId(microphoneDeviceId ?? null);
       setRecordRequest((value) => value + 1);
     },
     onImport: importAudio,
@@ -638,7 +635,6 @@ function App() {
             recordRequest={recordRequest}
             detailOpen={captureDetailVisible}
             focusSessionId={captureDetailSessionId}
-            preferredMicrophoneDeviceId={preferredMicrophoneDeviceId}
             autoOpenRecoveries={current === "audio"}
             onPreflightResolved={audio.acceptCapturePreflight}
             onDetailOpenChange={changeCaptureDetail}

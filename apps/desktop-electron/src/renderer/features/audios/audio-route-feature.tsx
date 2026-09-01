@@ -58,7 +58,7 @@ type AudioRouteOptions = {
   active?: boolean;
   enabled?: boolean;
   onAudioSelected?: () => void;
-  onRecord: (microphoneDeviceId?: string) => void;
+  onRecord: () => void;
   onImport: () => Promise<ImportAudioResponse | undefined>;
   onProcessingUnavailable?: (reason?: string) => void;
   onCancel: (jobId: number) => void | Promise<void>;
@@ -949,7 +949,7 @@ function RecordingReadyState({
                 microphoneTest.busy ||
                 microphoneTest.teardownPending
               }
-              onClick={() => controller.record(microphone?.id)}
+              onClick={() => controller.record()}
             >
               {controller.capturePreflightPending ? (
                 <LoaderCircle
