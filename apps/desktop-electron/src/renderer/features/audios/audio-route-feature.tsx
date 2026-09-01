@@ -226,6 +226,12 @@ export function useAudioRouteController({
     });
   }, [api, clearRemovedSelection]);
 
+  const refreshAudios = React.useCallback(async () => {
+    const activeRequest = listRequestRef.current;
+    if (activeRequest) await activeRequest;
+    await loadAudios();
+  }, [loadAudios]);
+
   React.useEffect(() => {
     if (!enabled) return;
     void Promise.resolve().then(loadAudios);
@@ -238,8 +244,8 @@ export function useAudioRouteController({
     }
     if (previousTaskStructureRef.current === taskStructureToken) return;
     previousTaskStructureRef.current = taskStructureToken;
-    void loadAudios();
-  }, [enabled, loadAudios, taskStructureToken]);
+    void refreshAudios();
+  }, [enabled, refreshAudios, taskStructureToken]);
 
   React.useEffect(() => {
     const previous = previousRefreshSignalsRef.current;
@@ -255,8 +261,8 @@ export function useAudioRouteController({
     const recordingCompleted =
       recordingCompletionToken !== null &&
       recordingCompletionToken !== previous.recording;
-    if (libraryChanged || recordingCompleted) void loadAudios();
-  }, [enabled, libraryRefreshToken, loadAudios, recordingCompletionToken]);
+    if (libraryChanged || recordingCompleted) void refreshAudios();
+  }, [enabled, libraryRefreshToken, recordingCompletionToken, refreshAudios]);
 
   React.useEffect(() => {
     const currentTasks = currentTasksByAudioId(tasksByAudioId);
@@ -385,7 +391,7 @@ export function useAudioRouteController({
     try {
       const result = await onImport();
       if (!result || result.state === "canceled") return;
-      await loadAudios();
+      await refreshAudios();
       await selectAudio(result.audioId);
     } catch (cause) {
       setImportError(userFacingError(cause, "无法导入音频，请重试。"));
@@ -393,7 +399,7 @@ export function useAudioRouteController({
       importPendingRef.current = false;
       setImportPending(false);
     }
-  }, [loadAudios, onImport, selectAudio, writable]);
+  }, [onImport, refreshAudios, selectAudio, writable]);
 
   const retryProcessing = React.useCallback(
     (jobId: number, attempt: number) => {

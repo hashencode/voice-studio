@@ -375,6 +375,52 @@ it.each([true, false])(
   },
 );
 
+it("waits for a trailing authoritative refresh when import overlaps a list request", async () => {
+  const staleRefresh = deferred<AudioSummary[]>();
+  const listAudios = vi
+    .fn()
+    .mockResolvedValueOnce([audioA])
+    .mockImplementationOnce(() => staleRefresh.promise)
+    .mockResolvedValueOnce([audioA, audioB]);
+  const openAudio = vi.fn(async () => workspace(audioB));
+  const onImport = vi.fn(async () => ({
+    protocolVersion: 2 as const,
+    state: "imported" as const,
+    audioId: audioB.audioId,
+    mediaSha256: "a".repeat(64),
+    inserted: true,
+  }));
+  const props = {
+    api: api({ listAudios, openAudio }),
+    tasks: [],
+    pendingJobActions: new Map<number, never>(),
+    writable: true,
+    paneOpen: true,
+    onRecord: vi.fn(),
+    onImport,
+    onCancel: vi.fn(),
+    onRetry: vi.fn(),
+  };
+  const view = render(
+    <AudioRouteFeature {...props} libraryRefreshToken="ready:1" />,
+  );
+  await screen.findByRole("button", { name: /打开 音频 A/ });
+
+  view.rerender(<AudioRouteFeature {...props} libraryRefreshToken="ready:2" />);
+  await screen.findByText("正在刷新音频…");
+  await userEvent
+    .setup()
+    .click(screen.getByRole("button", { name: "导入音频" }));
+  await act(async () => staleRefresh.resolve([audioA]));
+
+  expect(
+    await screen.findByRole("region", { name: "音频 B.wav 工作区" }),
+  ).toBeVisible();
+  expect(screen.getByRole("button", { name: /打开 音频 B/ })).toBeVisible();
+  expect(listAudios).toHaveBeenCalledTimes(3);
+  expect(openAudio).toHaveBeenCalledWith(audioB.audioId);
+});
+
 it("keeps canceled imports in first-use and reports retryable failures there", async () => {
   const onImport = vi
     .fn()
@@ -445,6 +491,40 @@ it("refreshes once when recording completes and never guesses an audio selection
     />,
   );
   await waitFor(() => expect(listAudios).toHaveBeenCalledTimes(2));
+});
+
+it("queues an authoritative refresh when recording completes during a list request", async () => {
+  const staleList = deferred<AudioSummary[]>();
+  const listAudios = vi
+    .fn()
+    .mockImplementationOnce(() => staleList.promise)
+    .mockResolvedValueOnce([audioA]);
+  const props = {
+    api: api({ listAudios }),
+    tasks: [],
+    pendingJobActions: new Map<number, never>(),
+    writable: true,
+    paneOpen: true,
+    onRecord: vi.fn(),
+    onImport: vi.fn(),
+    onCancel: vi.fn(),
+    onRetry: vi.fn(),
+  };
+  const view = render(
+    <AudioRouteFeature {...props} recordingCompletionToken={null} />,
+  );
+  await waitFor(() => expect(listAudios).toHaveBeenCalledOnce());
+
+  view.rerender(
+    <AudioRouteFeature
+      {...props}
+      recordingCompletionToken="capture-session-while-loading"
+    />,
+  );
+  await act(async () => staleList.resolve([]));
+
+  expect(await screen.findByText("选择一段音频")).toBeVisible();
+  expect(listAudios).toHaveBeenCalledTimes(2);
 });
 
 it("recovers first-use recording after a failed microphone preflight", async () => {
