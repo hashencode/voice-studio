@@ -1,9 +1,11 @@
 import "@testing-library/jest-dom/vitest";
 import { cleanup } from "@testing-library/react";
 import { afterEach } from "vitest";
+import { resetSectionRoutersForTests } from "../src/renderer/features/shell/section-router-registry";
 
-afterEach(() => {
+afterEach(async () => {
   if (typeof document !== "undefined") cleanup();
+  await resetSectionRoutersForTests();
   if (typeof window !== "undefined") {
     window.localStorage.clear();
     Object.defineProperty(window, "innerWidth", {

@@ -61,6 +61,23 @@ it("renders the authoritative first-use state only after an empty list succeeds"
   expect(main).toHaveTextContent(
     "录制一段新音频，或导入已有文件开始转写和整理。",
   );
+  const frame = main.querySelector('[data-audio-first-use="frame"]');
+  expect(frame).toBeInTheDocument();
+  expect(frame).not.toHaveAttribute("data-slot", "card");
+  expect(frame?.querySelector('[data-slot="card"]')).not.toBeInTheDocument();
+  expect(
+    frame?.querySelector('[data-audio-first-use="content"]'),
+  ).toBeInTheDocument();
+  const preview = frame?.querySelector('[data-audio-first-use="preview"]');
+  expect(preview).toHaveAttribute("aria-hidden", "true");
+  expect(
+    preview?.querySelector('[data-audio-first-use="preview-surface"]'),
+  ).toBeEmptyDOMElement();
+  expect(
+    preview?.querySelectorAll(
+      'button, a, input, select, textarea, [tabindex], [contenteditable="true"]',
+    ),
+  ).toHaveLength(0);
   expect(
     screen.queryByRole("searchbox", { name: "搜索音频" }),
   ).not.toBeInTheDocument();
@@ -81,6 +98,51 @@ it("renders the authoritative first-use state only after an empty list succeeds"
     .setup()
     .click(within(main).getByRole("button", { name: "开始录制" }));
   expect(onRecord).toHaveBeenCalledOnce();
+});
+
+it("keeps first-use write actions disabled when the workspace is read-only", async () => {
+  render(
+    <AudioRouteFeature
+      api={firstUseApi()}
+      tasks={[]}
+      pendingJobActions={new Map()}
+      writable={false}
+      paneOpen
+      onRecord={vi.fn()}
+      onImport={vi.fn()}
+      onCancel={vi.fn()}
+      onRetry={vi.fn()}
+    />,
+  );
+
+  expect(
+    await screen.findByRole("button", { name: "开始录制" }),
+  ).toBeDisabled();
+  expect(screen.getByRole("button", { name: "导入音频" })).toBeDisabled();
+  expect(screen.getByRole("button", { name: "测试麦克风" })).toBeEnabled();
+});
+
+it("keeps first-use recording controls disabled during active recording", async () => {
+  render(
+    <AudioRouteFeature
+      api={firstUseApi()}
+      tasks={[]}
+      pendingJobActions={new Map()}
+      writable
+      paneOpen
+      recordingActive
+      onRecord={vi.fn()}
+      onImport={vi.fn()}
+      onCancel={vi.fn()}
+      onRetry={vi.fn()}
+    />,
+  );
+
+  expect(
+    await screen.findByRole("button", { name: "开始录制" }),
+  ).toBeDisabled();
+  expect(screen.getByRole("button", { name: "导入音频" })).toBeEnabled();
+  expect(screen.getByRole("button", { name: "测试麦克风" })).toBeDisabled();
 });
 
 it("allows recording and pure audio import without local processing", async () => {
@@ -264,6 +326,9 @@ it("keeps initial loading out of the list and first-use states", async () => {
     screen.queryByRole("button", { name: "导入音频" }),
   ).not.toBeInTheDocument();
   expect(screen.queryByText("开始你的第一段音频")).not.toBeInTheDocument();
+  expect(
+    main.querySelector('[data-audio-first-use="frame"]'),
+  ).not.toBeInTheDocument();
 
   await act(async () => listAudios.resolve([]));
 
@@ -291,6 +356,11 @@ it("shows only the workspace error and retry after an initial list failure", asy
     screen.queryByRole("button", { name: "开始录制" }),
   ).not.toBeInTheDocument();
   expect(screen.queryByText("开始你的第一段音频")).not.toBeInTheDocument();
+  expect(
+    screen
+      .getByRole("region", { name: "音频工作区" })
+      .querySelector('[data-audio-first-use="frame"]'),
+  ).not.toBeInTheDocument();
 
   await userEvent
     .setup()
@@ -323,6 +393,11 @@ it("preserves a populated workspace during background refresh and query-empty", 
 
   const search = await screen.findByRole("searchbox", { name: "搜索音频" });
   expect(screen.getByText("选择一段音频")).toBeVisible();
+  expect(
+    screen
+      .getByRole("region", { name: "音频工作区" })
+      .querySelector('[data-audio-first-use="frame"]'),
+  ).not.toBeInTheDocument();
   view.rerender(<AudioRouteFeature {...props} libraryRefreshToken="ready:2" />);
   expect(await screen.findByText("正在刷新音频…")).toBeVisible();
   expect(search).toBeVisible();
@@ -332,6 +407,61 @@ it("preserves a populated workspace during background refresh and query-empty", 
   await userEvent.setup().type(search, "不存在");
   expect(screen.getByText("没有匹配的音频")).toBeVisible();
   expect(screen.getByText("选择一段音频")).toBeVisible();
+});
+
+it("combines truthful processing filters with search without clearing selection", async () => {
+  const processingAudio = {
+    ...audioB,
+    processingState: "running" as const,
+  };
+  const openAudio = vi.fn(async (audioId: number) =>
+    workspace(audioId === audioA.audioId ? audioA : processingAudio),
+  );
+  render(
+    <AudioRouteFeature
+      api={api({
+        listAudios: vi.fn(async () => [audioA, processingAudio, audioC]),
+        openAudio,
+      })}
+      tasks={[
+        {
+          id: 22,
+          audioId: processingAudio.audioId,
+          displayName: processingAudio.displayName,
+          state: "running",
+          phase: "asr",
+          progressFraction: 0.4,
+          attempt: 1,
+          errorCode: null,
+        },
+      ]}
+      pendingJobActions={new Map()}
+      writable
+      paneOpen
+      onRecord={vi.fn()}
+      onImport={vi.fn()}
+      onCancel={vi.fn()}
+      onRetry={vi.fn()}
+    />,
+  );
+  const user = userEvent.setup();
+
+  await user.click(await screen.findByRole("button", { name: /打开 音频 A/ }));
+  const workspaceRegion = screen.getByRole("region", { name: "音频工作区" });
+  expect(await within(workspaceRegion).findByText("音频 A.wav")).toBeVisible();
+  await user.click(screen.getByRole("button", { name: "处理中 1" }));
+  expect(
+    screen.queryByRole("button", { name: /打开 音频 A/ }),
+  ).not.toBeInTheDocument();
+  expect(within(workspaceRegion).getByText("音频 A.wav")).toBeVisible();
+  expect(screen.getByRole("button", { name: /打开 音频 B/ })).toBeVisible();
+
+  await user.type(screen.getByRole("searchbox", { name: "搜索音频" }), "C");
+  expect(screen.getByText("没有匹配的音频")).toBeVisible();
+  expect(within(workspaceRegion).getByText("音频 A.wav")).toBeVisible();
+  await user.clear(screen.getByRole("searchbox", { name: "搜索音频" }));
+  await user.click(screen.getByRole("button", { name: "全部 3" }));
+  expect(screen.getByRole("button", { name: /打开 音频 A/ })).toBeVisible();
 });
 
 it.each([true, false])(
@@ -1000,6 +1130,7 @@ it("cancels a late microphone start exactly once after the dialog closes", async
     within(starting).queryByRole("button", { name: "结束测试" }),
   ).not.toBeInTheDocument();
   await user.click(within(starting).getByRole("button", { name: "取消" }));
+  expect(screen.getByRole("button", { name: "开始录制" })).toBeDisabled();
   expect(screen.getByRole("button", { name: "测试麦克风" })).toBeDisabled();
   pendingStart.resolve({
     testId: "mic-test-late-start-123456",

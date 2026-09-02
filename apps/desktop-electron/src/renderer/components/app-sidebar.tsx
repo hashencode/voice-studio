@@ -1,8 +1,16 @@
 import type * as React from "react";
-import { AudioLines, Bell, Cog, SendHorizontal, Waves } from "lucide-react";
+import {
+  AudioLines,
+  Bell,
+  Cog,
+  SendHorizontal,
+  UserRound,
+  Waves,
+} from "lucide-react";
 
 import { NavMain, type ShellNavigationItem } from "@/components/nav-main";
-import { Sidebar, SidebarHeader } from "@/components/ui/sidebar";
+import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { Sidebar, SidebarFooter, SidebarHeader } from "@/components/ui/sidebar";
 import type {
   ContextPanePresentation,
   RendererShellSection,
@@ -79,6 +87,19 @@ export function AppSidebar({
           current={current}
           onNavigate={onNavigate}
         />
+        <SidebarFooter className="items-center px-2 pt-0 pb-3">
+          <div
+            aria-label="个人中心（即将推出）"
+            data-shell-profile-placeholder="true"
+            className="flex size-7 items-center justify-center"
+          >
+            <Avatar className="size-7" size="sm">
+              <AvatarFallback>
+                <UserRound className="size-3.5" aria-hidden="true" />
+              </AvatarFallback>
+            </Avatar>
+          </div>
+        </SidebarFooter>
       </Sidebar>
       {children}
     </Sidebar>

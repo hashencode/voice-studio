@@ -29,7 +29,7 @@ type Peer = CompanionSnapshot["peers"][number];
 
 let requestSequence = 0;
 
-type CompanionView =
+export type CompanionView =
   | { kind: "choose" }
   | { kind: "pairing" }
   | { kind: "history" }
@@ -44,6 +44,7 @@ export interface CompanionRouteController {
   selectedPeer: Peer | null;
   selectedTransfers: Transfer[];
   view: CompanionView;
+  applyRouteView: (view: CompanionView) => void;
   selectDevice: (deviceId: string) => void;
   showPairing: () => void;
   showHistory: () => void;
@@ -60,9 +61,11 @@ export interface CompanionRouteController {
 export function useCompanionRouteController({
   api = window.voice2text,
   enabled = true,
+  onNavigate,
 }: {
   api?: Voice2TextDesktopApi;
   enabled?: boolean;
+  onNavigate?: (view: CompanionView) => void;
 } = {}): CompanionRouteController {
   const [snapshot, setSnapshot] = React.useState<CompanionSnapshot | null>(
     null,
@@ -108,6 +111,13 @@ export function useCompanionRouteController({
     () => snapshot?.peers.filter((peer) => peer.trustState !== "revoked") ?? [],
     [snapshot],
   );
+  const navigateView = React.useCallback(
+    (next: CompanionView) => {
+      setView(next);
+      onNavigate?.(next);
+    },
+    [onNavigate],
+  );
 
   const run = React.useCallback(
     async (key: string, operation: () => Promise<CompanionSnapshot>) => {
@@ -150,9 +160,10 @@ export function useCompanionRouteController({
     selectedPeer,
     selectedTransfers,
     view,
-    selectDevice: (deviceId) => setView({ kind: "device", deviceId }),
-    showPairing: () => setView({ kind: "pairing" }),
-    showHistory: () => setView({ kind: "history" }),
+    applyRouteView: setView,
+    selectDevice: (deviceId) => navigateView({ kind: "device", deviceId }),
+    showPairing: () => navigateView({ kind: "pairing" }),
+    showHistory: () => navigateView({ kind: "history" }),
     setOptIn: () => {
       if (!snapshot) return;
       void run("opt-in", () =>

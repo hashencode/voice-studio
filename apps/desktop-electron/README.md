@@ -47,15 +47,16 @@ directory and verifies the real worker health handshake.
 
 `bun run check:ui:visual` launches the repository-pinned Electron runtime through a
 test-only Main/Preload harness, exercises the production Renderer entry, checks
-sidebar geometry, and runs seven deterministic scenarios with six canonical
-screenshots, including the 320 x 96 desktop floating capture control. It also checks the 320 px compact
-shell without adding a host-sensitive full-shell pixel baseline.
+sidebar geometry, and runs ten deterministic scenarios with ten canonical
+screenshots, including the 1280 x 720 ReUI comparison state and the 320 x 96
+desktop floating capture control. It also checks the fixed-column shell at the
+880 px production minimum.
 Canonical pixel baselines are macOS arm64 only; every host still runs the
 semantic and 1 px geometry assertions. Run
 `bun run check:ui:visual:update` only after an explicit baseline-update request.
 Baseline updates require the environment recorded in
 `tests/visual/goldens/README.md` and a side-by-side review against the pinned
-official `sidebar-09` demo.
+ReUI App Shell 4 reference.
 
 ## Frozen resource cache
 
@@ -81,8 +82,10 @@ by versioned serializable contracts in `src/shared`.
 
 ## Electron UI authority and registry provenance
 
-Electron renderer primitives use the official shadcn `radix-nova` composite
-style as their sole component and typography baseline. The value in
+Electron shell composition and density follow the pinned ReUI App Shell 4
+reference in `tests/visual/references`; Electron renderer primitives use the
+official shadcn `radix-nova` composite style as their component, interaction,
+and typography baseline. The value in
 `components.json` selects both the Radix primitive base and the Nova visual
 recipe; do not add a separate `base` field. Goo remains the Flutter-only design
 authority and does not govern Electron.

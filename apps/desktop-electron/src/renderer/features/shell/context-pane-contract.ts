@@ -9,3 +9,14 @@ export const SHELL_SECTION_LABELS: Record<RendererShellSection, string> = {
   settings: "设置",
 };
 export type ContextPanePresentation = "docked" | "overlay";
+
+export const SHELL_GEOMETRY = {
+  primaryRailWidth: 49,
+  contextPaneWidth: 391,
+  expandedPrefixWidth: 440,
+  headerHeight: 50,
+  searchBandHeight: 45,
+  headerControlSize: 28,
+  midpointRailWidth: 28,
+  midpointRailHeight: 48,
+} as const;
