@@ -39,6 +39,8 @@ export type ActivityItemView = Pick<
   | "createdAt"
 >;
 
+export type ActivityFilter = "all" | "unread" | "attention";
+
 const formatter = new Intl.DateTimeFormat("zh-CN", {
   month: "numeric",
   day: "numeric",
@@ -54,6 +56,8 @@ export function ActivityContextPane({
   markAllPending = false,
   operationError = null,
   onMarkAllRead = () => undefined,
+  query: controlledQuery,
+  filter: controlledFilter,
 }: {
   items: ActivityItemView[];
   selectedId: string | null;
@@ -62,49 +66,30 @@ export function ActivityContextPane({
   markAllPending?: boolean;
   operationError?: string | null;
   onMarkAllRead?: () => void;
+  query?: string;
+  filter?: ActivityFilter;
 }) {
   const [query, setQuery] = React.useState("");
-  const normalizedQuery = query.trim().toLocaleLowerCase("zh-CN");
-  const visibleItems = normalizedQuery
-    ? items.filter((item) =>
-        item.title.toLocaleLowerCase("zh-CN").includes(normalizedQuery),
-      )
-    : items;
+  const effectiveQuery = controlledQuery ?? query;
+  const effectiveFilter = controlledFilter ?? "all";
+  const visibleItems = filterActivityItems(
+    items,
+    effectiveQuery,
+    effectiveFilter,
+  );
+  const embeddedControls = controlledQuery === undefined;
   return (
     <div className="flex min-h-0 flex-1 flex-col">
-      <div className="flex shrink-0 items-center gap-2 p-2">
-        <div className="relative min-w-0 flex-1">
-          <Search
-            aria-hidden="true"
-            className="pointer-events-none absolute top-2 left-2.5 size-4 text-muted-foreground"
-          />
-          <SidebarInput
-            type="search"
-            aria-label="搜索消息"
-            value={query}
-            onChange={(event) => setQuery(event.currentTarget.value)}
-            className="pl-8"
+      {embeddedControls ? (
+        <div className="flex shrink-0 items-center gap-2 p-2">
+          <ActivityContextPaneSearch value={query} onValueChange={setQuery} />
+          <ActivityContextPaneHead
+            unreadCount={unreadCount}
+            markAllPending={markAllPending}
+            onMarkAllRead={onMarkAllRead}
           />
         </div>
-        <TooltipProvider>
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <Button
-                type="button"
-                size="icon-sm"
-                variant="ghost"
-                aria-label="全部标记为已读"
-                aria-busy={markAllPending}
-                disabled={unreadCount === 0 || markAllPending}
-                onClick={onMarkAllRead}
-              >
-                <MailOpen aria-hidden="true" />
-              </Button>
-            </TooltipTrigger>
-            <TooltipContent side="bottom">全部标记为已读</TooltipContent>
-          </Tooltip>
-        </TooltipProvider>
-      </div>
+      ) : null}
       {operationError ? (
         <p role="alert" className="border-b px-3 py-2 text-sm">
           {operationError}
@@ -162,6 +147,116 @@ export function ActivityContextPane({
       )}
     </div>
   );
+}
+
+export function ActivityContextPaneHead({
+  unreadCount,
+  markAllPending,
+  onMarkAllRead,
+}: {
+  unreadCount: number;
+  markAllPending: boolean;
+  onMarkAllRead: () => void;
+}) {
+  return (
+    <TooltipProvider>
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <Button
+            type="button"
+            size="icon-sm"
+            variant="ghost"
+            aria-label="全部标记为已读"
+            aria-busy={markAllPending}
+            disabled={unreadCount === 0 || markAllPending}
+            onClick={onMarkAllRead}
+          >
+            <MailOpen aria-hidden="true" />
+          </Button>
+        </TooltipTrigger>
+        <TooltipContent side="bottom">全部标记为已读</TooltipContent>
+      </Tooltip>
+    </TooltipProvider>
+  );
+}
+
+export function ActivityContextPaneSearch({
+  value,
+  onValueChange,
+}: {
+  value: string;
+  onValueChange: (value: string) => void;
+}) {
+  return (
+    <div className="relative min-w-0 flex-1">
+      <Search
+        aria-hidden="true"
+        className="pointer-events-none absolute top-1.5 left-2.5 size-4 text-muted-foreground"
+      />
+      <SidebarInput
+        type="search"
+        aria-label="搜索消息"
+        value={value}
+        onChange={(event) => onValueChange(event.currentTarget.value)}
+        className="h-7 rounded-md pl-8 text-xs md:text-xs"
+      />
+    </div>
+  );
+}
+
+export function ActivityContextPaneFilters({
+  items,
+  value,
+  onValueChange,
+}: {
+  items: readonly ActivityItemView[];
+  value: ActivityFilter;
+  onValueChange: (value: ActivityFilter) => void;
+}) {
+  const filters: readonly { value: ActivityFilter; label: string }[] = [
+    { value: "all", label: "全部" },
+    { value: "unread", label: "未读" },
+    { value: "attention", label: "需处理" },
+  ];
+  const counts: Record<ActivityFilter, number> = {
+    all: items.length,
+    unread: items.filter((item) => !item.read).length,
+    attention: items.filter((item) => item.severity === "warning").length,
+  };
+  return (
+    <div role="group" aria-label="消息筛选" className="flex items-center gap-1">
+      {filters.map((item) => (
+        <Button
+          key={item.value}
+          type="button"
+          variant="ghost"
+          size="sm"
+          aria-pressed={value === item.value}
+          className="h-6 rounded-md px-2 text-xs aria-pressed:bg-muted aria-pressed:font-medium"
+          onClick={() => onValueChange(item.value)}
+        >
+          {item.label} {counts[item.value]}
+        </Button>
+      ))}
+    </div>
+  );
+}
+
+function filterActivityItems(
+  items: readonly ActivityItemView[],
+  query: string,
+  filter: ActivityFilter,
+): ActivityItemView[] {
+  const normalizedQuery = query.trim().toLocaleLowerCase("zh-CN");
+  return items.filter((item) => {
+    const matchesQuery =
+      !normalizedQuery ||
+      item.title.toLocaleLowerCase("zh-CN").includes(normalizedQuery);
+    const matchesFilter =
+      filter === "all" ||
+      (filter === "unread" ? !item.read : item.severity === "warning");
+    return matchesQuery && matchesFilter;
+  });
 }
 
 export function ActivityMainWorkspace({

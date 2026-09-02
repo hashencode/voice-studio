@@ -54,13 +54,15 @@ type AudioRouteOptions = {
   recordingCompletionToken?: string | null;
   active?: boolean;
   enabled?: boolean;
-  onAudioSelected?: () => void;
+  onAudioSelected?: (audioId: number) => void;
   onRecord: () => void;
   onImport: () => Promise<ImportAudioResponse | undefined>;
   onProcessingUnavailable?: (reason?: string) => void;
   onCancel: (jobId: number) => void | Promise<void>;
   onRetry: (jobId: number, attempt: number) => void | Promise<void>;
 };
+
+type AudioFilter = "all" | "attention" | "processing" | "completed";
 
 export type AudioRouteController = ReturnType<typeof useAudioRouteController>;
 
@@ -87,6 +89,7 @@ export function useAudioRouteController({
 }: AudioRouteOptions) {
   const [audios, setAudios] = React.useState<AudioSummary[] | null>(null);
   const [query, setQuery] = React.useState("");
+  const [filter, setFilter] = React.useState<AudioFilter>("all");
   const [listError, setListError] = React.useState<string | null>(null);
   const [listPending, setListPending] = React.useState(true);
   const [workspace, setWorkspaceState] =
@@ -317,6 +320,7 @@ export function useAudioRouteController({
     activeRef.current = active;
     const current = workspaceRef.current;
     if (wasActive && !active && current) {
+      selectionIntentRef.current += 1;
       void requestPlaybackClose(current.summary.audioId).catch((cause) => {
         setTransitionError(
           userFacingError(cause, "离开音频工作区时无法关闭播放"),
@@ -328,11 +332,11 @@ export function useAudioRouteController({
   }, [active, requestPlaybackClose]);
 
   const selectAudio = React.useCallback(
-    async (audioId: number) => {
+    async (audioId: number, options?: { fromRoute?: boolean }) => {
       const current = workspaceRef.current;
       if (current?.summary.audioId === audioId) {
         setTransitionError(null);
-        onAudioSelected?.();
+        if (!options?.fromRoute) onAudioSelected?.(audioId);
         return;
       }
       const intent = ++selectionIntentRef.current;
@@ -359,7 +363,7 @@ export function useAudioRouteController({
         workspaceRef.current = next;
         setWorkspaceState(next);
         closeRef.current = null;
-        onAudioSelected?.();
+        if (!options?.fromRoute) onAudioSelected?.(audioId);
       } catch (cause) {
         if (intent === selectionIntentRef.current) {
           setTransitionError(userFacingError(cause, "无法打开音频"));
@@ -379,6 +383,24 @@ export function useAudioRouteController({
     },
     [api, onAudioSelected, requestPlaybackClose],
   );
+
+  const clearSelection = React.useCallback(async () => {
+    const current = workspaceRef.current;
+    if (!current) return;
+    const intent = ++selectionIntentRef.current;
+    try {
+      await requestPlaybackClose(current.summary.audioId);
+    } catch (cause) {
+      if (intent === selectionIntentRef.current) {
+        setTransitionError(userFacingError(cause, "无法关闭音频播放"));
+      }
+      return;
+    }
+    if (intent !== selectionIntentRef.current) return;
+    workspaceRef.current = null;
+    setWorkspaceState(null);
+    closeRef.current = null;
+  }, [requestPlaybackClose]);
 
   const importAudio = React.useCallback(async () => {
     if (!writable || importPendingRef.current) return;
@@ -486,13 +508,37 @@ export function useAudioRouteController({
     capturePreflight.microphones.length > 0,
   );
 
+  const filterCounts = React.useMemo(() => {
+    const counts: Record<AudioFilter, number> = {
+      all: audios?.length ?? 0,
+      attention: 0,
+      processing: 0,
+      completed: 0,
+    };
+    for (const audio of audios ?? []) {
+      const category = audioFilterFor(
+        audio,
+        selectCurrentTask(tasksByAudioId.get(audio.audioId)),
+      );
+      counts[category] += 1;
+    }
+    return counts;
+  }, [audios, tasksByAudioId]);
   const filteredAudios = React.useMemo(() => {
     const normalized = query.trim().toLocaleLowerCase();
-    if (!normalized) return audios ?? [];
-    return (audios ?? []).filter((audio) =>
-      audio.displayName.toLocaleLowerCase().includes(normalized),
-    );
-  }, [audios, query]);
+    return (audios ?? []).filter((audio) => {
+      const matchesQuery =
+        !normalized ||
+        audio.displayName.toLocaleLowerCase().includes(normalized);
+      const matchesFilter =
+        filter === "all" ||
+        audioFilterFor(
+          audio,
+          selectCurrentTask(tasksByAudioId.get(audio.audioId)),
+        ) === filter;
+      return matchesQuery && matchesFilter;
+    });
+  }, [audios, filter, query, tasksByAudioId]);
   const libraryPresentation = !enabled
     ? "inactive"
     : audios === null || audios.length === 0
@@ -508,12 +554,16 @@ export function useAudioRouteController({
     filteredAudios,
     query,
     setQuery,
+    filter,
+    setFilter,
+    filterCounts,
     listError,
     listPending,
     reload: loadAudios,
     workspace,
     setWorkspace,
     selectAudio,
+    clearSelection,
     transitionError,
     transitionPending,
     importPending,
@@ -560,24 +610,29 @@ export function AudioRouteFeature({
           className="flex h-full min-h-0 flex-col"
         >
           {controller.libraryPresentation === "populated" ? (
+            <div className="flex h-[50px] shrink-0 items-center justify-between border-b px-3">
+              <h2 className="text-sm font-semibold">音频</h2>
+              {controller.workspace !== null ? (
+                <AudioContextPaneHeader controller={controller} />
+              ) : null}
+            </div>
+          ) : null}
+          {controller.libraryPresentation === "populated" ? (
             <div
-              data-context-pane-fixed-header="true"
-              className="flex h-12 shrink-0 items-center border-b p-2"
+              data-context-pane-search="true"
+              className="flex h-[45px] shrink-0 items-center border-b px-3 py-2"
             >
               <AudioContextPaneSearch controller={controller} />
+            </div>
+          ) : null}
+          {controller.libraryPresentation === "populated" ? (
+            <div className="shrink-0 border-b px-3 py-2">
+              <AudioContextPaneFilters controller={controller} />
             </div>
           ) : null}
           <div className="min-h-0 flex-1">
             <AudioContextPane controller={controller} />
           </div>
-          {controller.workspace !== null ? (
-            <div
-              data-context-pane-fixed-footer="true"
-              className="shrink-0 border-t p-2"
-            >
-              <AudioContextPaneHeader controller={controller} />
-            </div>
-          ) : null}
         </section>
       ) : null}
       <section role="region" aria-label="音频工作区">
@@ -601,8 +656,10 @@ export function AudioContextPaneHeader({
     <div role="group" aria-label="录音操作">
       <Button
         type="button"
-        size="sm"
-        className="w-full"
+        size="icon-sm"
+        variant="ghost"
+        className="size-7"
+        aria-label={controller.recordingActive ? "正在录音" : "新录音"}
         disabled={
           !controller.captureReadyWithMicrophone ||
           controller.recordingActive ||
@@ -612,7 +669,6 @@ export function AudioContextPaneHeader({
         onClick={() => controller.record()}
       >
         <Mic aria-hidden="true" />
-        {controller.recordingActive ? "正在录音" : "新录音"}
       </Button>
     </div>
   );
@@ -689,11 +745,18 @@ export function AudioContextPane({
                       onClick={() => void controller.selectAudio(audio.audioId)}
                     >
                       <ItemContent>
-                        <ItemTitle className="max-w-full truncate">
+                        <ItemTitle className="max-w-full truncate text-sm font-semibold">
                           {audio.displayName}
                         </ItemTitle>
-                        <ItemDescription>
-                          {audio.segmentCount} 个片段
+                        <ItemDescription className="text-xs leading-4">
+                          <span className="block">
+                            {formatAudioDate(audio.createdAtMs)} ·{" "}
+                            {formatAudioDuration(audio.durationMs)}
+                          </span>
+                          <span className="block">
+                            {audio.segmentCount} 个片段 ·{" "}
+                            {audioProcessingLabel(audio, task)}
+                          </span>
                         </ItemDescription>
                         {state ? (
                           <span className="mt-1 inline-flex w-fit items-center gap-1.5 rounded-full border px-2 py-0.5 text-xs font-medium">
@@ -730,8 +793,42 @@ export function AudioContextPaneSearch({
         aria-label="搜索音频"
         value={controller.query}
         onChange={(event) => controller.setQuery(event.currentTarget.value)}
-        className="pl-8"
+        className="h-7 rounded-md pl-8 text-xs md:text-xs"
       />
+    </div>
+  );
+}
+
+export function AudioContextPaneFilters({
+  controller,
+}: {
+  controller: AudioRouteController;
+}) {
+  const filters: readonly { value: AudioFilter; label: string }[] = [
+    { value: "all", label: "全部" },
+    { value: "attention", label: "需处理" },
+    { value: "processing", label: "处理中" },
+    { value: "completed", label: "已完成" },
+  ];
+  return (
+    <div
+      role="group"
+      aria-label="音频筛选"
+      className="flex min-w-0 items-center gap-1 overflow-x-auto"
+    >
+      {filters.map((item) => (
+        <Button
+          key={item.value}
+          type="button"
+          variant="ghost"
+          size="sm"
+          aria-pressed={controller.filter === item.value}
+          className="h-6 rounded-md px-2 text-xs aria-pressed:bg-muted aria-pressed:font-medium"
+          onClick={() => controller.setFilter(item.value)}
+        >
+          {item.label} {controller.filterCounts[item.value]}
+        </Button>
+      ))}
     </div>
   );
 }
@@ -1138,6 +1235,46 @@ function processingStateForRow(
   )
     return null;
   return state;
+}
+
+function audioFilterFor(
+  audio: AudioSummary,
+  task: ProcessingTask | null,
+): Exclude<AudioFilter, "all"> {
+  const state = task?.state ?? audio.processingState;
+  if (state === "completed") return "completed";
+  if (state === "queued" || state === "running" || state === "canceling") {
+    return "processing";
+  }
+  return "attention";
+}
+
+function audioProcessingLabel(
+  audio: AudioSummary,
+  task: ProcessingTask | null,
+): string {
+  const state = task?.state ?? audio.processingState;
+  if (state === "not-started") return "未转写";
+  if (state === "partial-success") return "部分完成";
+  return taskStateLabel(state);
+}
+
+const audioDateFormatter = new Intl.DateTimeFormat("zh-CN", {
+  month: "numeric",
+  day: "numeric",
+  hour: "2-digit",
+  minute: "2-digit",
+});
+
+function formatAudioDate(value: number): string {
+  return audioDateFormatter.format(value);
+}
+
+function formatAudioDuration(value: number): string {
+  const totalSeconds = Math.max(0, Math.floor(value / 1000));
+  const minutes = Math.floor(totalSeconds / 60);
+  const seconds = totalSeconds % 60;
+  return `${minutes}:${seconds.toString().padStart(2, "0")}`;
 }
 
 function ProcessingIcon({ state }: { state: ProcessingTask["state"] }) {

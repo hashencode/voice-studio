@@ -6,10 +6,13 @@ import { describe, expect, it, vi } from "vitest";
 
 import {
   ActivityContextPane,
+  ActivityContextPaneFilters,
+  ActivityContextPaneSearch,
   ActivityErrorDialog,
   ActivityMainWorkspace,
   type ActivityItemView,
 } from "../../../src/renderer/features/activity/activity-center";
+import { useState } from "react";
 
 const failed: ActivityItemView = {
   id: "failed",
@@ -100,6 +103,54 @@ describe("activity pages", () => {
     await user.clear(screen.getByRole("searchbox", { name: "搜索消息" }));
     await user.click(screen.getByRole("button", { name: "全部标记为已读" }));
     expect(markAll).toHaveBeenCalledOnce();
+  });
+
+  it("combines real unread and attention counts with search", async () => {
+    const complete: ActivityItemView = {
+      ...failed,
+      id: "complete",
+      kind: "capture_completed",
+      title: "Project Alpha",
+      severity: "info",
+      read: true,
+    };
+    function Harness() {
+      const [query, setQuery] = useState("");
+      const [filter, setFilter] = useState<"all" | "unread" | "attention">(
+        "all",
+      );
+      return (
+        <>
+          <ActivityContextPaneSearch value={query} onValueChange={setQuery} />
+          <ActivityContextPaneFilters
+            items={[failed, complete]}
+            value={filter}
+            onValueChange={setFilter}
+          />
+          <ActivityContextPane
+            items={[failed, complete]}
+            selectedId="complete"
+            onSelect={vi.fn()}
+            query={query}
+            filter={filter}
+          />
+        </>
+      );
+    }
+    render(<Harness />);
+    const user = userEvent.setup();
+
+    expect(screen.getByRole("button", { name: "全部 2" })).toBeVisible();
+    expect(screen.getByRole("button", { name: "未读 1" })).toBeVisible();
+    expect(screen.getByRole("button", { name: "需处理 1" })).toBeVisible();
+    await user.click(screen.getByRole("button", { name: "未读 1" }));
+    expect(screen.getByText("录制需要处理")).toBeVisible();
+    expect(screen.queryByText("Project Alpha")).not.toBeInTheDocument();
+    await user.type(
+      screen.getByRole("searchbox", { name: "搜索消息" }),
+      "alpha",
+    );
+    expect(screen.getByText("没有匹配的消息")).toBeVisible();
   });
 
   it("keeps the all-read action disabled without unread items and exposes failures", () => {
