@@ -1202,7 +1202,7 @@ describe("application shell", () => {
     ).toBeEnabled();
     await userEvent
       .setup()
-      .click(screen.getByRole("button", { name: "导入音频" }));
+      .click(screen.getByRole("button", { name: "导入外部音频" }));
     expect(
       screen.queryByRole("dialog", { name: "本地处理不可用" }),
     ).not.toBeInTheDocument();

@@ -1,5 +1,6 @@
 import * as React from "react";
 import {
+  AudioLines,
   Ban,
   CircleAlert,
   Clock3,
@@ -26,10 +27,6 @@ import {
   SidebarInput,
 } from "@/components/ui/sidebar";
 import { AudioDetailWorkspace } from "@/features/audios/audio-workspace-feature";
-import {
-  MicrophoneTestDialog,
-  useMicrophoneTestController,
-} from "@/features/capture/microphone-test-dialog";
 import {
   resolveRecordingMicrophone,
   useRecordingPreference,
@@ -868,21 +865,23 @@ export function AudioMainHeaderActions({
 
 function AudioImportButton({
   controller,
-  variant = "outline",
+  label = "导入音频",
+  showIcon = true,
 }: {
   controller: AudioRouteController;
-  variant?: "outline" | "secondary";
+  label?: string;
+  showIcon?: boolean;
 }) {
   return (
     <Button
       type="button"
-      variant={variant}
+      variant="outline"
       aria-busy={controller.importPending}
       disabled={!controller.writable || controller.importPending}
       onClick={() => void controller.importAudio()}
     >
-      <FileInput aria-hidden="true" />
-      导入音频
+      {showIcon ? <FileInput aria-hidden="true" /> : null}
+      {label}
     </Button>
   );
 }
@@ -910,102 +909,125 @@ function AudioSelectionPrompt() {
   );
 }
 
+function AudioFirstUsePreview() {
+  return (
+    <div
+      data-audio-first-use="preview"
+      aria-hidden="true"
+      className="-mr-10 -mb-30 ml-auto flex min-w-0 items-end bg-muted/10 px-6 pt-2 pb-0 sm:px-7 lg:absolute lg:top-[calc(50%-146px)] lg:right-0 lg:bottom-0 lg:left-[calc(50%+10px)] lg:m-0 lg:block lg:p-0"
+    >
+      <div
+        data-audio-first-use="preview-surface"
+        className="flex min-h-[350px] min-w-[450px] overflow-hidden rounded-tl-xl border-t border-l border-border/60 bg-background sm:min-h-[360px] lg:h-full lg:min-h-0 lg:w-full lg:min-w-0"
+      />
+    </div>
+  );
+}
+
 function RecordingReadyState({
   controller,
 }: {
   controller: AudioRouteController;
 }) {
-  const { capturePreflight: preflight, refreshCapturePreflight } = controller;
+  const { capturePreflight: preflight } = controller;
   const recordingPreference = useRecordingPreference();
   const microphone = resolveRecordingMicrophone(
     preflight?.microphones ?? [],
     recordingPreference.microphoneDeviceId,
   );
-  const microphoneTest = useMicrophoneTestController({
-    api: controller.api,
-    preferredMicrophoneDeviceId: recordingPreference.microphoneDeviceId,
-    refreshCapturePreflight,
-  });
 
   return (
     <section
+      data-audio-first-use="frame"
       aria-label="首次使用音频"
       aria-busy={
-        microphoneTest.busy ||
-        controller.capturePreflightPending ||
-        controller.transitionPending
+        controller.capturePreflightPending || controller.transitionPending
       }
-      className="flex min-h-72 flex-1 flex-col justify-center"
+      className="relative mx-auto flex min-h-0 w-full flex-1 items-center justify-center overflow-hidden"
     >
-      <EmptyState
-        title="开始你的第一段音频"
-        description="录制一段新音频，或导入已有文件开始转写和整理。"
-        icon={false}
-        className="min-h-0 flex-1"
-        actions={
-          <div className="flex min-w-56 flex-col gap-2">
-            <Button
-              type="button"
-              disabled={
-                controller.capturePreflightPending ||
-                !controller.captureReadyWithMicrophone ||
-                !microphone ||
-                controller.recordingActive ||
-                controller.newRecordingBlocked ||
-                microphoneTest.busy ||
-                microphoneTest.teardownPending
-              }
-              onClick={() => controller.record()}
+      <div
+        data-audio-first-use="layout"
+        className="mx-auto grid min-h-[440px] w-full max-w-4xl min-w-0 grid-cols-1 items-center lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]"
+      >
+        <div
+          data-audio-first-use="content"
+          className="flex min-w-0 items-center px-7 py-8 sm:px-9 sm:py-10 lg:pr-5"
+        >
+          <div className="flex w-full min-w-0 flex-1 flex-col items-start justify-center gap-6 p-6 text-left text-balance">
+            <div className="flex max-w-md flex-col items-start gap-4 text-left">
+              <span className="flex size-8 shrink-0 items-center justify-center self-start rounded-[10px] bg-muted text-foreground">
+                <AudioLines className="size-4" aria-hidden="true" />
+              </span>
+              <div className="flex flex-col gap-2">
+                <h2 className="text-xl leading-7 font-semibold tracking-tight sm:text-2xl sm:leading-8">
+                  开始你的第一段音频
+                </h2>
+                <p className="max-w-md text-sm leading-5 text-muted-foreground">
+                  <span className="block">录制一段新音频，或导入已有文件</span>
+                  <span className="block">开始转写和整理。</span>
+                </p>
+              </div>
+            </div>
+            <div
+              data-audio-first-use="actions"
+              className="flex w-full min-w-0 items-center gap-2 max-[420px]:flex-wrap"
             >
-              {controller.capturePreflightPending ? (
-                <LoaderCircle
-                  className="size-4 animate-spin"
-                  aria-hidden="true"
-                />
-              ) : (
-                <Mic aria-hidden="true" />
-              )}
-              {controller.capturePreflightPending
-                ? "正在检查麦克风…"
-                : "开始录制"}
-            </Button>
-            <AudioImportButton controller={controller} variant="secondary" />
-            <Button
-              type="button"
-              variant="ghost"
-              disabled={
-                microphoneTest.busy ||
-                microphoneTest.teardownPending ||
-                controller.capturePreflightPending ||
-                controller.recordingActive
-              }
-              onClick={() => void microphoneTest.start()}
-            >
-              测试麦克风
-            </Button>
-            <AudioImportError controller={controller} />
-            {controller.capturePreflightError ? (
-              <div role="alert" className="space-y-2 text-sm">
-                <p>{controller.capturePreflightError}</p>
-                <Button
-                  type="button"
-                  size="sm"
-                  variant="outline"
-                  onClick={() =>
-                    void controller
-                      .refreshCapturePreflight(true)
-                      .catch(() => undefined)
-                  }
-                >
-                  <RotateCcw aria-hidden="true" />
-                  重试
-                </Button>
+              <Button
+                type="button"
+                disabled={
+                  controller.capturePreflightPending ||
+                  !controller.captureReadyWithMicrophone ||
+                  !microphone ||
+                  controller.recordingActive ||
+                  controller.newRecordingBlocked
+                }
+                onClick={() => controller.record()}
+              >
+                {controller.capturePreflightPending ? (
+                  <LoaderCircle
+                    className="size-4 animate-spin"
+                    aria-hidden="true"
+                  />
+                ) : (
+                  <Mic aria-hidden="true" />
+                )}
+                {controller.capturePreflightPending
+                  ? "正在检查麦克风…"
+                  : "开始录制"}
+              </Button>
+              <AudioImportButton
+                controller={controller}
+                label="导入外部音频"
+                showIcon={false}
+              />
+            </div>
+            {controller.importError || controller.capturePreflightError ? (
+              <div className="min-w-0 space-y-2">
+                <AudioImportError controller={controller} />
+                {controller.capturePreflightError ? (
+                  <div role="alert" className="space-y-2 text-sm">
+                    <p>{controller.capturePreflightError}</p>
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="outline"
+                      onClick={() =>
+                        void controller
+                          .refreshCapturePreflight(true)
+                          .catch(() => undefined)
+                      }
+                    >
+                      <RotateCcw aria-hidden="true" />
+                      重试
+                    </Button>
+                  </div>
+                ) : null}
               </div>
             ) : null}
           </div>
-        }
-      />
-      <MicrophoneTestDialog controller={microphoneTest} />
+        </div>
+        <AudioFirstUsePreview />
+      </div>
     </section>
   );
 }

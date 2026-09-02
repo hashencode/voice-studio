@@ -98,24 +98,30 @@ test.describe("sidebar-09 production Renderer", () => {
         page.getByRole("button", { name: /音频上下文面板/ }),
       ).toHaveCount(0);
 
-      const layout = await emptyHeading.evaluate((heading) => {
-        const mainContent =
-          document.querySelector<HTMLElement>("#main-content")!;
-        const empty = heading.closest("section")!;
-        const mainContentRect = mainContent.getBoundingClientRect();
-        const emptyRect = empty.getBoundingClientRect();
-        return {
-          emptyCenterRatio:
-            (emptyRect.y + emptyRect.height / 2 - mainContentRect.y) /
-            mainContentRect.height,
-        };
-      });
-      expect(layout.emptyCenterRatio).toBeGreaterThan(0.46);
-      expect(layout.emptyCenterRatio).toBeLessThan(0.54);
+      await assertAudioFirstUseDesktopGeometry(page);
 
       await assertRuntimeContract(page, 1240, 820);
-      await assertRailOnlyGeometry(page, 1240, 820);
+      await assertRailOnlyGeometry(page, 1240, 820, false);
       await screenshot(session, "audio-empty-recording-ready.png", 1240, 820);
+    });
+  });
+
+  test("880x620 Empty audio library respects the production minimum window", async () => {
+    await withVisualSession("audio-empty", 880, 620, async (session) => {
+      const { page } = session;
+      await expect(
+        page.getByRole("heading", { name: "开始你的第一段音频" }),
+      ).toBeVisible();
+
+      await assertAudioFirstUseMinimumGeometry(page);
+      await assertRuntimeContract(page, 880, 620);
+      await assertRailOnlyGeometry(page, 880, 620, false);
+      await screenshot(
+        session,
+        "audio-empty-recording-ready-minimum.png",
+        880,
+        620,
+      );
     });
   });
 
@@ -399,6 +405,7 @@ async function assertRailOnlyGeometry(
   page: Awaited<ReturnType<typeof launch>>["page"],
   width: number,
   height: number,
+  collapsedPaneMounted = true,
 ) {
   await expect
     .poll(async () => {
@@ -413,9 +420,13 @@ async function assertRailOnlyGeometry(
   expectRect(geometry.rail, { x: 0, y: 0, width: 49, height });
   expectWithin(geometry.railContentWidth, 48);
   expectWithin(geometry.railBorderRight, 1);
-  if (!geometry.pane)
-    throw new Error("Expected the collapsed pane to remain mounted");
-  expectRect(geometry.pane, { x: 49, y: 0, width: 0, height });
+  if (collapsedPaneMounted) {
+    if (!geometry.pane)
+      throw new Error("Expected the collapsed pane to remain mounted");
+    expectRect(geometry.pane, { x: 49, y: 0, width: 0, height });
+  } else {
+    expect(geometry.pane).toBeNull();
+  }
   expectWithin(geometry.inset.x, 48);
   expectWithin(geometry.inset.width, width - 48);
 }
@@ -487,6 +498,173 @@ async function assertCaptureContainment(
     expect(metrics.rect.bottom).toBeLessThanOrEqual(height);
     expect(metrics.rect.height).toBeGreaterThan(0);
   }
+}
+
+async function assertAudioFirstUseDesktopGeometry(
+  page: Awaited<ReturnType<typeof launch>>["page"],
+) {
+  const geometry = await audioFirstUseGeometry(page);
+  const frameCenter = geometry.frame.x + geometry.frame.width / 2;
+  const mainCenter = geometry.main.x + geometry.main.width / 2;
+  const frameCenterRatio =
+    (geometry.frame.y + geometry.frame.height / 2 - geometry.main.y) /
+    geometry.main.height;
+
+  expectWithin(frameCenter, mainCenter, 2);
+  expect(frameCenterRatio).toBeGreaterThan(0.45);
+  expect(frameCenterRatio).toBeLessThan(0.55);
+  expectRect(geometry.frame, geometry.main);
+  expectMainPaddingRemoved(geometry.mainPadding);
+  expect(geometry.layout.width).toBeGreaterThanOrEqual(895);
+  expect(geometry.layout.width).toBeLessThanOrEqual(897);
+  expectWithin(geometry.content.width, geometry.layout.width / 2, 2);
+  expect(geometry.preview.x).toBeGreaterThanOrEqual(geometry.content.right);
+  expect(geometry.preview.x - geometry.content.right).toBeLessThanOrEqual(12);
+  expectWithin(geometry.preview.right, geometry.frame.right, 2);
+  expectWithin(geometry.previewSurface.x, geometry.preview.x);
+  expectWithin(geometry.previewSurface.y, geometry.preview.y);
+  expectWithin(geometry.previewSurface.right, geometry.frame.right);
+  expectWithin(geometry.previewSurface.bottom, geometry.frame.bottom);
+  expect(geometry.previewSurfaceBorders.top).toBeGreaterThan(0);
+  expect(geometry.previewSurfaceBorders.left).toBeGreaterThan(0);
+  expectWithin(geometry.previewSurfaceBorders.right, 0);
+  expectWithin(geometry.previewSurfaceBorders.bottom, 0);
+  expectWithin(geometry.primaryAction.y, geometry.importAction.y);
+  expect(geometry.previewFocusTargetCount).toBe(0);
+}
+
+async function assertAudioFirstUseMinimumGeometry(
+  page: Awaited<ReturnType<typeof launch>>["page"],
+) {
+  const geometry = await audioFirstUseGeometry(page);
+
+  expect(geometry.frame.width).toBeLessThan(1024);
+  expectRect(geometry.frame, geometry.main);
+  expectMainPaddingRemoved(geometry.mainPadding);
+  expectWithin(geometry.layout.width, geometry.frame.width);
+  expectWithin(geometry.content.width, geometry.layout.width);
+  expectWithin(geometry.content.bottom, geometry.preview.y);
+  expectWithin(geometry.preview.right, geometry.frame.right + 40, 2);
+  expect(geometry.previewSurface.width).toBeGreaterThanOrEqual(450);
+  expect(geometry.previewSurface.height).toBeGreaterThanOrEqual(360);
+  expect(geometry.previewSurfaceBorders.top).toBeGreaterThan(0);
+  expect(geometry.previewSurfaceBorders.left).toBeGreaterThan(0);
+  expectWithin(geometry.previewSurfaceBorders.right, 0);
+  expectWithin(geometry.previewSurfaceBorders.bottom, 0);
+  expect(geometry.frame.x).toBeGreaterThanOrEqual(geometry.main.x);
+  expect(geometry.frame.right).toBeLessThanOrEqual(geometry.main.right + 1);
+  expect(geometry.documentScrollWidth).toBeLessThanOrEqual(
+    geometry.documentClientWidth,
+  );
+  expect(geometry.mainScrollWidth).toBeLessThanOrEqual(
+    geometry.mainClientWidth,
+  );
+  expect(geometry.actionGroupScrollWidth).toBeLessThanOrEqual(
+    geometry.actionGroupClientWidth,
+  );
+  expect(geometry.primaryAction.right).toBeLessThanOrEqual(
+    geometry.actionGroup.right + 1,
+  );
+  expect(geometry.importAction.right).toBeLessThanOrEqual(
+    geometry.actionGroup.right + 1,
+  );
+  expect(geometry.previewFocusTargetCount).toBe(0);
+}
+
+async function audioFirstUseGeometry(
+  page: Awaited<ReturnType<typeof launch>>["page"],
+) {
+  return await page.evaluate(() => {
+    const main = required("#main-content");
+    const frame = required('[data-audio-first-use="frame"]');
+    const layout = required('[data-audio-first-use="layout"]');
+    const content = required('[data-audio-first-use="content"]');
+    const preview = required('[data-audio-first-use="preview"]');
+    const previewSurface = required('[data-audio-first-use="preview-surface"]');
+    const primaryAction = button("开始录制");
+    const importAction = button("导入外部音频");
+    const actionGroup = required('[data-audio-first-use="actions"]');
+    const mainRect = main.getBoundingClientRect();
+    const mainStyle = getComputedStyle(main);
+    const previewRect = preview.getBoundingClientRect();
+    const previewSurfaceStyle = getComputedStyle(previewSurface);
+
+    return {
+      main: rect(main),
+      mainPadding: {
+        top: parseFloat(mainStyle.paddingTop),
+        right: parseFloat(mainStyle.paddingRight),
+        bottom: parseFloat(mainStyle.paddingBottom),
+        left: parseFloat(mainStyle.paddingLeft),
+      },
+      frame: rect(frame),
+      layout: rect(layout),
+      content: rect(content),
+      preview: rect(preview),
+      previewSurface: rect(previewSurface),
+      previewSurfaceBorders: {
+        top: parseFloat(previewSurfaceStyle.borderTopWidth),
+        right: parseFloat(previewSurfaceStyle.borderRightWidth),
+        bottom: parseFloat(previewSurfaceStyle.borderBottomWidth),
+        left: parseFloat(previewSurfaceStyle.borderLeftWidth),
+      },
+      actionGroup: rect(actionGroup),
+      primaryAction: rect(primaryAction),
+      importAction: rect(importAction),
+      documentClientWidth: document.documentElement.clientWidth,
+      documentScrollWidth: document.documentElement.scrollWidth,
+      mainClientWidth: main.clientWidth,
+      mainScrollWidth: main.scrollWidth,
+      mainClientHeight: main.clientHeight,
+      mainScrollHeight: main.scrollHeight,
+      previewReachableBottom:
+        previewRect.bottom - mainRect.top + main.scrollTop,
+      actionGroupClientWidth: actionGroup.clientWidth,
+      actionGroupScrollWidth: actionGroup.scrollWidth,
+      previewFocusTargetCount: preview.querySelectorAll(
+        'a[href], button, input, select, textarea, [tabindex]:not([tabindex="-1"])',
+      ).length,
+    };
+
+    function required(selector: string) {
+      const element = document.querySelector<HTMLElement>(selector);
+      if (!element)
+        throw new Error(`Missing audio first-use geometry target: ${selector}`);
+      return element;
+    }
+
+    function button(name: string) {
+      const element = Array.from(
+        content.querySelectorAll<HTMLButtonElement>("button"),
+      ).find((candidate) => candidate.textContent?.trim() === name);
+      if (!element) throw new Error(`Missing audio first-use action: ${name}`);
+      return element;
+    }
+
+    function rect(element: Element) {
+      const value = element.getBoundingClientRect();
+      return {
+        x: value.x,
+        y: value.y,
+        width: value.width,
+        height: value.height,
+        right: value.right,
+        bottom: value.bottom,
+      };
+    }
+  });
+}
+
+function expectMainPaddingRemoved(padding: {
+  top: number;
+  right: number;
+  bottom: number;
+  left: number;
+}) {
+  expectWithin(padding.top, 0);
+  expectWithin(padding.right, 0);
+  expectWithin(padding.bottom, 0);
+  expectWithin(padding.left, 0);
 }
 
 async function shellGeometry(page: Awaited<ReturnType<typeof launch>>["page"]) {

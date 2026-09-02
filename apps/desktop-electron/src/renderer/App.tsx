@@ -482,6 +482,10 @@ function App() {
   const effectivePaneOpen = pane.open && paneStructurallyAvailable;
   const audioWorkspacePresentation =
     current === "audio" && !captureDetailVisible;
+  const audioFirstUsePresentation =
+    audioWorkspacePresentation &&
+    audio.libraryPresentation === "true-empty" &&
+    snapshot.capture.phase === "idle";
   const standalonePaneTriggerVisible =
     paneStructurallyAvailable && !effectivePaneOpen && !presentation.title;
 
@@ -613,7 +617,9 @@ function App() {
           className={cn(
             "flex min-h-0 flex-1 flex-col overflow-auto",
             presentation.contentMode === "padded" &&
-              (audioWorkspacePresentation ? "p-4" : "p-4 sm:p-6"),
+              (audioWorkspacePresentation
+                ? !audioFirstUsePresentation && "p-4"
+                : "p-4 sm:p-6"),
             current === "settings" && "bg-muted/20",
             current === "settings" && standalonePaneTriggerVisible && "pt-12",
           )}
