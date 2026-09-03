@@ -12,10 +12,12 @@ export type ContextPanePresentation = "docked" | "overlay";
 
 export const SHELL_GEOMETRY = {
   primaryRailWidth: 49,
-  contextPaneWidth: 391,
+  contextPaneWidth: 390,
   expandedPrefixWidth: 440,
+  collapsedPrefixWidth: 48,
   headerHeight: 50,
   searchBandHeight: 45,
+  filtersBandHeight: 37,
   headerControlSize: 28,
   midpointRailWidth: 28,
   midpointRailHeight: 48,

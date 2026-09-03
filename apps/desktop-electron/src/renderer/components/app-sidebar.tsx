@@ -54,7 +54,6 @@ export function AppSidebar({
     <Sidebar
       collapsible="icon"
       mobileMode="inline"
-      overlayContent
       data-presentation={presentation}
       className="z-20 overflow-hidden *:data-[sidebar=sidebar]:flex-row data-[presentation=overlay]:!w-[min(var(--sidebar-width),100vw)]"
     >
@@ -62,7 +61,7 @@ export function AppSidebar({
         collapsible="none"
         role="navigation"
         aria-label="工作站主导航"
-        className="w-[calc(var(--sidebar-width-icon)+1px)]! border-r"
+        className="w-[calc(var(--sidebar-width-icon)+1px)]! shrink-0 border-r"
       >
         <SidebarHeader>
           <div className="flex min-h-8 items-center justify-center">

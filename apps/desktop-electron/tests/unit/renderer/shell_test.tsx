@@ -1,5 +1,6 @@
 // @vitest-environment jsdom
 
+import * as React from "react";
 import {
   act,
   fireEvent,
@@ -14,6 +15,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import App from "../../../src/renderer/App";
 import { SidebarProvider } from "../../../src/renderer/components/ui/sidebar";
 import { ContextPaneShell } from "../../../src/renderer/features/shell/context-pane-shell";
+import { AppShellFrame } from "../../../src/renderer/features/shell/app-shell-frame";
 import type {
   ApplicationSnapshot,
   ProcessingTask,
@@ -28,6 +30,182 @@ function deferred<T>() {
   });
   return { promise, resolve };
 }
+
+describe("render-backed shell frame", () => {
+  it("owns source-order slots without feature controllers", () => {
+    const { container } = render(
+      <AppShellFrame
+        section="audio"
+        onNavigate={vi.fn()}
+        unreadActivityCount={0}
+        contextPane={{
+          open: true,
+          section: "audio",
+          presentation: "docked",
+          onRequestClose: vi.fn(),
+          head: <button type="button">新录音</button>,
+          search: <input type="search" aria-label="搜索夹具" />,
+          filters: <button type="button">全部 3</button>,
+          footer: <span>列表页脚</span>,
+          children: <button type="button">夹具音频</button>,
+        }}
+        onTogglePane={vi.fn()}
+        title="夹具标题"
+        history={{
+          canGoBack: false,
+          canGoForward: false,
+          onBack: vi.fn(),
+          onForward: vi.fn(),
+        }}
+        actions={<button type="button">页面操作</button>}
+        notice={<span>状态提示</span>}
+      >
+        <p>内容夹具</p>
+      </AppShellFrame>,
+    );
+
+    const wrapper = container.querySelector('[data-slot="sidebar-wrapper"]')!;
+    expect(
+      Array.from(wrapper.children).map((child) =>
+        child.getAttribute("data-slot"),
+      ),
+    ).toEqual(["sidebar", "sidebar-rail", "sidebar-inset"]);
+    const sidebarInner = wrapper.querySelector('[data-slot="sidebar-inner"]')!;
+    const navigation = screen.getByRole("navigation", { name: "工作站主导航" });
+    const context = screen.getByRole("complementary", {
+      name: "音频上下文面板",
+    });
+    expect(Array.from(sidebarInner.children)).toEqual([navigation, context]);
+    expect(
+      Array.from(context.children).map((child) =>
+        child.getAttribute("data-shell-slot"),
+      ),
+    ).toEqual([
+      "context-head",
+      "context-search",
+      "context-filters",
+      "context-list",
+      "context-footer",
+    ]);
+    const main = screen.getByRole("main");
+    expect(
+      Array.from(main.children).map((child) =>
+        child.getAttribute("data-shell-slot"),
+      ),
+    ).toEqual(["content-head", "content-notice", "content"]);
+    expect(
+      main.querySelector('[data-shell-slot="page-actions"]'),
+    ).toContainElement(screen.getByRole("button", { name: "页面操作" }));
+    expect(main.querySelector('[data-shell-slot="content"]')).toContainElement(
+      screen.getByText("内容夹具"),
+    );
+    expect(main.querySelector('[data-shell-slot="content-head"]')).toHaveClass(
+      "px-4",
+      "gap-1.5",
+    );
+    expect(screen.getByRole("heading", { level: 1 })).toHaveClass(
+      "min-w-0",
+      "flex-1",
+      "font-semibold",
+      "leading-snug",
+    );
+    expect(wrapper).toHaveStyle({
+      "--sidebar-width": "440px",
+      "--sidebar-width-icon": "48px",
+    });
+    expect(context).toHaveClass(
+      "w-[calc(var(--sidebar-width)-var(--sidebar-width-icon)-2px)]!",
+    );
+    expect(
+      context.querySelector('[data-shell-slot="context-filters"]'),
+    ).toHaveClass("h-[37px]");
+    // The public render uses a 48px collapsed prefix, not the previous +1px overlay gap.
+    expect(wrapper.querySelector('[data-slot="sidebar-gap"]')).not.toHaveClass(
+      "!w-[calc(var(--sidebar-width-icon)+1px)]",
+    );
+    expect(main).not.toHaveClass(
+      "ml-[calc(var(--sidebar-width)-var(--sidebar-width-icon)-1px)]",
+    );
+  });
+
+  it("keeps controlled pane contents mounted and omits empty optional bands", async () => {
+    const onTogglePane = vi.fn();
+    const onRequestClose = vi.fn();
+    const onBack = vi.fn();
+    const titleRef = React.createRef<HTMLHeadingElement>();
+    const paneTriggerRef = React.createRef<HTMLButtonElement>();
+    const contentRef = React.createRef<HTMLDivElement>();
+    const frame = (open: boolean) => (
+      <AppShellFrame
+        section="settings"
+        onNavigate={vi.fn()}
+        unreadActivityCount={0}
+        contextPane={{
+          open,
+          section: "settings",
+          presentation: "docked",
+          onRequestClose,
+          children: <input aria-label="持久输入" defaultValue="初始值" />,
+        }}
+        onTogglePane={onTogglePane}
+        paneTriggerRef={paneTriggerRef}
+        title="设置夹具"
+        titleRef={titleRef}
+        contentRef={contentRef}
+        history={{
+          canGoBack: true,
+          canGoForward: false,
+          onBack,
+          onForward: vi.fn(),
+        }}
+      >
+        内容夹具
+      </AppShellFrame>
+    );
+    const view = render(frame(true));
+    const input = screen.getByRole("textbox", { name: "持久输入" });
+    fireEvent.change(input, { target: { value: "保留值" } });
+    for (const slot of [
+      "context-search",
+      "context-filters",
+      "context-footer",
+      "page-actions",
+      "content-notice",
+    ]) {
+      expect(
+        view.container.querySelector(`[data-shell-slot="${slot}"]`),
+      ).toBeNull();
+    }
+    await userEvent.setup().click(screen.getByRole("button", { name: "后退" }));
+    expect(onBack).toHaveBeenCalledOnce();
+    await userEvent
+      .setup()
+      .click(screen.getByRole("button", { name: "收起设置上下文面板" }));
+    expect(onTogglePane).toHaveBeenCalledOnce();
+    expect(screen.getByRole("complementary")).toHaveAttribute(
+      "aria-hidden",
+      "false",
+    );
+    view.rerender(frame(false));
+    const pane = input.closest('[role="complementary"]');
+    expect(pane).toHaveClass("bg-background", "text-foreground");
+    expect(pane).toHaveAttribute("inert");
+    expect(pane).toHaveAttribute("aria-hidden", "true");
+    expect(input).toHaveValue("保留值");
+    expect(paneTriggerRef.current).toHaveStyle({
+      left: "var(--sidebar-width-icon)",
+    });
+    paneTriggerRef.current?.focus();
+    expect(paneTriggerRef.current).toHaveFocus();
+    view.rerender(frame(true));
+    expect(screen.getByRole("textbox", { name: "持久输入" })).toBe(input);
+    expect(pane).not.toHaveAttribute("inert");
+    expect(titleRef.current).toBe(screen.getByRole("heading", { level: 1 }));
+    expect(contentRef.current).toBe(document.getElementById("main-content"));
+    fireEvent.keyDown(window, { key: "Escape" });
+    expect(onRequestClose).toHaveBeenCalledOnce();
+  });
+});
 
 const readySnapshot: ApplicationSnapshot = {
   protocolVersion: 2,
@@ -288,7 +466,7 @@ describe("application shell", () => {
     expect(document.querySelector('[data-mobile="true"]')).toBeNull();
   });
 
-  it("uses the official nested sidebar-09 shell geometry and landmarks", async () => {
+  it("uses the render-backed nested shell geometry and landmarks", async () => {
     const api = installApi({ ...readySnapshot, capture: { phase: "idle" } });
     const user = userEvent.setup();
     render(<App />);
@@ -381,7 +559,7 @@ describe("application shell", () => {
     expect(pane).toBe(nestedSidebars[1]);
     expect(pane).toHaveAttribute("data-presentation", "docked");
     expect(pane).toHaveClass(
-      "w-[calc(var(--sidebar-width)-var(--sidebar-width-icon)-1px)]!",
+      "w-[calc(var(--sidebar-width)-var(--sidebar-width-icon)-2px)]!",
       "shrink-0",
     );
     expect(pane).not.toHaveClass("flex-1");
@@ -421,12 +599,7 @@ describe("application shell", () => {
     const mains = screen.getAllByRole("main");
     expect(mains).toHaveLength(1);
     expect(mains[0]!).toHaveAttribute("data-slot", "sidebar-inset");
-    expect(mains[0]).toHaveClass(
-      "z-30",
-      "transition-[margin]",
-      "duration-200",
-      "ease-linear",
-    );
+    expect(mains[0]).toHaveClass("z-30", "min-w-0", "overflow-hidden");
     expect(document.querySelector('[data-slot="sidebar-gap"]')).toHaveClass(
       "transition-[width]",
       "duration-200",
@@ -717,7 +890,7 @@ describe("application shell", () => {
       screen.queryByRole("button", { name: /音频上下文面板/ }),
     ).not.toBeInTheDocument();
     expect(document.querySelector('[data-slot="sidebar-gap"]')).toHaveClass(
-      "!w-[calc(var(--sidebar-width-icon)+1px)]",
+      "group-data-[collapsible=icon]:w-(--sidebar-width-icon)",
     );
     expect(screen.getByRole("main")).not.toHaveClass(
       "ml-[calc(var(--sidebar-width)-var(--sidebar-width-icon)-1px)]",
@@ -765,9 +938,11 @@ describe("application shell", () => {
             name: "音频上下文面板",
           }),
         ).toBeVisible();
-        expect(screen.getByRole("main")).toHaveClass(
-          "ml-[calc(var(--sidebar-width)-var(--sidebar-width-icon)-1px)]",
-        );
+        expect(
+          document.querySelector(
+            '[data-slot="sidebar-wrapper"] > [data-slot="sidebar"]',
+          ),
+        ).toHaveAttribute("data-state", "expanded");
       } else {
         expect(
           await screen.findByRole("button", { name: "打开音频上下文面板" }),
@@ -948,6 +1123,9 @@ describe("application shell", () => {
     await user.click(
       screen.getByRole("button", { name: "收起互联上下文面板" }),
     );
+    expect(
+      screen.getByRole("button", { name: "打开互联上下文面板" }),
+    ).toHaveFocus();
     expect(writes).toHaveBeenCalledTimes(1);
 
     await user.click(within(navigation).getByRole("button", { name: "音频" }));
@@ -1022,7 +1200,6 @@ describe("application shell", () => {
           open
           section="audio"
           presentation="overlay"
-          variant="audio"
           onRequestClose={onRequestClose}
           head={<button type="button">新录音</button>}
           search={<input type="search" aria-label="搜索音频" />}

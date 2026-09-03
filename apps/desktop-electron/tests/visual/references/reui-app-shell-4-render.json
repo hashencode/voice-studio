@@ -5,7 +5,7 @@
   "source": {
     "name": "ReUI App Shell 4",
     "url": "https://reui.io/preview/base/app-shell-4",
-    "capturedAt": "2026-09-03T01:45:00Z",
+    "capturedOn": "2026-09-03",
     "captureSurface": "Codex in-app Chromium browser",
     "browserVersion": "not exposed",
     "theme": "light",
@@ -29,6 +29,8 @@
     ]
   },
   "referenceImage": {
+    "capturedOn": "2026-09-02",
+    "relationship": "Historical image retained unchanged; a new same-session reference-to-product comparison has not been accepted.",
     "path": "reui-app-shell-4-1280x720.png",
     "viewport": {
       "width": 1280,
@@ -136,6 +138,6 @@
       "50px content header"
     ]
   },
-  "evidenceCanonicalization": "RFC 8785-style recursively key-sorted compact JSON of the evidence object encoded as UTF-8",
+  "evidenceCanonicalization": "jq -cS '.evidence': recursively key-sorted compact JSON, UTF-8, including the trailing LF; not RFC 8785",
   "evidenceSha256": "828384d679f4047bf64e6be5c54df12390d2077793498401eb8ed1cfab9dab23"
 }

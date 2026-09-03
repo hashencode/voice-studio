@@ -10,14 +10,12 @@ import type {
   ContextPaneSection,
 } from "@/features/shell/context-pane-contract";
 import { SHELL_SECTION_LABELS } from "@/features/shell/context-pane-contract";
-import { cn } from "@/lib/utils";
 
 export function ContextPaneShell({
   open,
   section,
   presentation,
   onRequestClose,
-  variant = "default",
   head,
   search,
   filters,
@@ -28,7 +26,6 @@ export function ContextPaneShell({
   section: ContextPaneSection;
   presentation: ContextPanePresentation;
   onRequestClose: () => void;
-  variant?: "default" | "audio";
   head?: React.ReactNode;
   search?: React.ReactNode;
   filters?: React.ReactNode;
@@ -55,12 +52,10 @@ export function ContextPaneShell({
       aria-hidden={!open}
       inert={!open}
       data-presentation={presentation}
-      className={cn(
-        "w-[calc(var(--sidebar-width)-var(--sidebar-width-icon)-1px)]! shrink-0",
-        variant === "audio" && "bg-background text-foreground",
-      )}
+      className="w-[calc(var(--sidebar-width)-var(--sidebar-width-icon)-2px)]! shrink-0 bg-background text-foreground"
     >
       <SidebarHeader
+        data-shell-slot="context-head"
         data-context-pane-head="true"
         data-context-pane-fixed-header="true"
         className="h-[50px] shrink-0 gap-0 border-b p-0"
@@ -72,21 +67,24 @@ export function ContextPaneShell({
       </SidebarHeader>
       {search ? (
         <div
+          data-shell-slot="context-search"
           data-context-pane-search="true"
-          className="flex h-[45px] shrink-0 items-center border-b px-3 py-2"
+          className="flex h-[45px] shrink-0 items-center border-b border-border/60 px-3 py-2"
         >
           <div className="min-w-0 flex-1">{search}</div>
         </div>
       ) : null}
       {filters ? (
         <div
+          data-shell-slot="context-filters"
           data-context-pane-filters="true"
-          className="flex h-[35px] shrink-0 items-center border-b px-3 py-1.5"
+          className="flex h-[37px] shrink-0 items-center border-b border-border/60 px-2 py-1.5"
         >
           {filters}
         </div>
       ) : null}
       <SidebarContent
+        data-shell-slot="context-list"
         data-context-pane-scrolling-content="true"
         className="gap-0"
       >
@@ -94,6 +92,7 @@ export function ContextPaneShell({
       </SidebarContent>
       {footer ? (
         <SidebarFooter
+          data-shell-slot="context-footer"
           data-context-pane-fixed-footer="true"
           className="shrink-0 border-t p-2"
         >

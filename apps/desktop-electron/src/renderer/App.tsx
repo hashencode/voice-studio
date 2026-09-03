@@ -1,18 +1,7 @@
 import * as React from "react";
-import {
-  Cloud,
-  ArrowLeft,
-  ArrowRight,
-  HardDrive,
-  Mic,
-  PanelLeftClose,
-  PanelLeftOpen,
-  Settings2,
-} from "lucide-react";
+import { Cloud, HardDrive, Mic, Settings2 } from "lucide-react";
 
-import { AppSidebar } from "@/components/app-sidebar";
 import { Button } from "@/components/ui/button";
-import { Separator } from "@/components/ui/separator";
 import {
   ActivityContextPane,
   ActivityContextPaneFilters,
@@ -24,16 +13,12 @@ import {
   type ActivityFilter,
 } from "@/features/activity/activity-center";
 import {
-  SidebarInset,
-  SidebarProvider,
   SidebarGroup,
   SidebarGroupContent,
   SidebarMenu,
   SidebarMenuButton,
   SidebarMenuItem,
-  SidebarRail,
 } from "@/components/ui/sidebar";
-import { cn } from "@/lib/utils";
 import {
   AudioContextPane,
   AudioContextPaneFilters,
@@ -53,7 +38,7 @@ import {
   type CompanionView,
   useCompanionRouteController,
 } from "@/features/companion/companion-feature";
-import { ContextPaneShell } from "@/features/shell/context-pane-shell";
+import { AppShellFrame } from "@/features/shell/app-shell-frame";
 import { SectionContentProvider } from "@/features/shell/content-routes";
 import {
   navigateSection,
@@ -61,14 +46,7 @@ import {
   SectionRouterProvider,
   useSectionRouteSnapshot,
 } from "@/features/shell/section-router-registry";
-import type {
-  ContextPaneSection,
-  RendererShellSection,
-} from "@/features/shell/context-pane-contract";
-import {
-  SHELL_GEOMETRY,
-  SHELL_SECTION_LABELS,
-} from "@/features/shell/context-pane-contract";
+import type { RendererShellSection } from "@/features/shell/context-pane-contract";
 import { useContextPaneShell } from "@/features/shell/use-context-pane-shell";
 import {
   CapabilityUnavailableDialog,
@@ -650,250 +628,189 @@ function App() {
     audio.libraryPresentation === "true-empty" &&
     snapshot.capture.phase === "idle";
   return (
-    <SidebarProvider
-      open={effectivePaneOpen}
-      persistState={false}
-      enableKeyboardShortcut={false}
-      className="relative h-svh overflow-hidden"
-      style={
-        {
-          "--sidebar-width": `${SHELL_GEOMETRY.expandedPrefixWidth}px`,
-          "--sidebar-width-icon": `${SHELL_GEOMETRY.primaryRailWidth - 1}px`,
-        } as React.CSSProperties
+    <AppShellFrame
+      section={current}
+      onNavigate={navigatePrimary}
+      unreadActivityCount={unreadActivityItems.length}
+      contextPane={
+        paneStructurallyAvailable
+          ? {
+              open: effectivePaneOpen,
+              section: pane.paneSection,
+              presentation: pane.presentation,
+              onRequestClose: requestPaneClose,
+              search:
+                pane.paneSection === "audio" ? (
+                  <AudioContextPaneSearch controller={audio} />
+                ) : pane.paneSection === "messages" ? (
+                  <ActivityContextPaneSearch
+                    value={activityQuery}
+                    onValueChange={setActivityQuery}
+                  />
+                ) : undefined,
+              head:
+                pane.paneSection === "audio" && audio.workspace !== null ? (
+                  <AudioContextPaneHeader controller={audio} />
+                ) : pane.paneSection === "messages" ? (
+                  <ActivityContextPaneHead
+                    unreadCount={unreadActivityItems.length}
+                    markAllPending={markAllActivityPending}
+                    onMarkAllRead={() => void markAllActivityRead()}
+                  />
+                ) : null,
+              filters:
+                pane.paneSection === "audio" ? (
+                  <AudioContextPaneFilters controller={audio} />
+                ) : pane.paneSection === "messages" ? (
+                  <ActivityContextPaneFilters
+                    items={activityItems}
+                    value={activityFilter}
+                    onValueChange={setActivityFilter}
+                  />
+                ) : undefined,
+              footer:
+                pane.paneSection === "companion" &&
+                companion.view.kind === "device" ? (
+                  <CompanionContextPaneFooter controller={companion} />
+                ) : null,
+              children:
+                pane.paneSection === "audio" ? (
+                  <AudioContextPane controller={audio} />
+                ) : pane.paneSection === "companion" ? (
+                  <CompanionContextPane controller={companion} />
+                ) : pane.paneSection === "messages" ? (
+                  <ActivityContextPane
+                    items={activityItems}
+                    selectedId={selectedActivity?.id ?? null}
+                    onSelect={(item) => {
+                      setSelectedActivityId(item.id);
+                      void markActivityRead(item);
+                      void navigateSection(
+                        "messages",
+                        `/messages/${encodeURIComponent(item.id)}`,
+                      );
+                      if (item.kind === "capture_failed") {
+                        setActivityError(item);
+                      }
+                    }}
+                    unreadCount={unreadActivityItems.length}
+                    markAllPending={markAllActivityPending}
+                    operationError={activityOperationError}
+                    onMarkAllRead={() => void markAllActivityRead()}
+                    query={activityQuery}
+                    filter={activityFilter}
+                  />
+                ) : (
+                  <SettingsContextPane
+                    value={settingsSection}
+                    onValueChange={navigateSettingsSection}
+                  />
+                ),
+            }
+          : null
       }
+      paneTriggerRef={paneTriggerRef}
+      onTogglePane={requestPaneToggle}
+      title={contentTitle}
+      titleRef={contentTitleRef}
+      history={{
+        canGoBack: activeRoute.canGoBack,
+        canGoForward: activeRoute.canGoForward,
+        onBack: () => void navigateSectionDelta(current, -1),
+        onForward: () => void navigateSectionDelta(current, 1),
+      }}
+      actions={
+        audioWorkspacePresentation ? (
+          <AudioMainHeaderActions controller={audio} />
+        ) : null
+      }
+      notice={snapshot.connectivity === "offline" ? <OfflineBanner /> : null}
+      contentRef={mainContentRef}
+      contentPadding={
+        presentation.contentMode === "padded"
+          ? audioWorkspacePresentation
+            ? audioFirstUsePresentation
+              ? "none"
+              : "compact"
+            : "page"
+          : "none"
+      }
+      contentTone={current === "settings" ? "muted" : "default"}
     >
-      <AppSidebar
-        current={current}
-        onNavigate={navigatePrimary}
-        presentation={effectivePaneOpen ? pane.presentation : "closed"}
-        unreadActivityCount={unreadActivityItems.length}
-      >
-        {paneStructurallyAvailable ? (
-          <ContextPaneShell
-            open={effectivePaneOpen}
-            section={pane.paneSection}
-            presentation={pane.presentation}
-            variant={pane.paneSection === "audio" ? "audio" : "default"}
-            onRequestClose={requestPaneClose}
-            search={
-              pane.paneSection === "audio" ? (
-                <AudioContextPaneSearch controller={audio} />
-              ) : pane.paneSection === "messages" ? (
-                <ActivityContextPaneSearch
-                  value={activityQuery}
-                  onValueChange={setActivityQuery}
-                />
-              ) : undefined
-            }
-            head={
-              pane.paneSection === "audio" && audio.workspace !== null ? (
-                <AudioContextPaneHeader controller={audio} />
-              ) : pane.paneSection === "messages" ? (
-                <ActivityContextPaneHead
-                  unreadCount={unreadActivityItems.length}
-                  markAllPending={markAllActivityPending}
-                  onMarkAllRead={() => void markAllActivityRead()}
-                />
-              ) : null
-            }
-            filters={
-              pane.paneSection === "audio" ? (
-                <AudioContextPaneFilters controller={audio} />
-              ) : pane.paneSection === "messages" ? (
-                <ActivityContextPaneFilters
-                  items={activityItems}
-                  value={activityFilter}
-                  onValueChange={setActivityFilter}
-                />
-              ) : undefined
-            }
-            footer={
-              pane.paneSection === "companion" &&
-              companion.view.kind === "device" ? (
-                <CompanionContextPaneFooter controller={companion} />
-              ) : null
-            }
-          >
-            {pane.paneSection === "audio" ? (
-              <AudioContextPane controller={audio} />
-            ) : pane.paneSection === "companion" ? (
-              <CompanionContextPane controller={companion} />
-            ) : pane.paneSection === "messages" ? (
-              <ActivityContextPane
-                items={activityItems}
-                selectedId={selectedActivity?.id ?? null}
-                onSelect={(item) => {
-                  setSelectedActivityId(item.id);
-                  void markActivityRead(item);
-                  void navigateSection(
-                    "messages",
-                    `/messages/${encodeURIComponent(item.id)}`,
-                  );
-                  if (item.kind === "capture_failed") {
-                    setActivityError(item);
+      <SectionContentProvider
+        content={
+          <>
+            {!captureDetailVisible && presentation.renderContent ? (
+              <ShellContent
+                snapshot={snapshot}
+                operationError={operationError}
+                audio={audio}
+                companion={companion}
+                onOpenCompanionPane={openPane}
+                current={current}
+                selectedActivity={selectedActivity}
+                onOpenActivityDetails={openActivityDetails}
+              />
+            ) : null}
+            <CaptureWorkspace
+              capture={snapshot.capture}
+              recordRequest={recordRequest}
+              detailOpen={captureDetailVisible}
+              focusSessionId={routedCaptureSessionId ?? captureDetailSessionId}
+              autoOpenRecoveries={current === "audio"}
+              onPreflightResolved={audio.acceptCapturePreflight}
+              onDetailOpenChange={(open) => {
+                if (!open && routedCaptureSessionId) {
+                  if (activeRoute.canGoBack) {
+                    void navigateSectionDelta(current, -1);
+                  } else {
+                    void navigateSection(
+                      current,
+                      captureOwnerPath(routeDestination),
+                      { replace: true },
+                    );
                   }
-                }}
-                unreadCount={unreadActivityItems.length}
-                markAllPending={markAllActivityPending}
-                operationError={activityOperationError}
-                onMarkAllRead={() => void markAllActivityRead()}
-                query={activityQuery}
-                filter={activityFilter}
-              />
-            ) : (
-              <SettingsContextPane
-                value={settingsSection}
-                onValueChange={navigateSettingsSection}
-              />
-            )}
-          </ContextPaneShell>
-        ) : null}
-      </AppSidebar>
-      {paneStructurallyAvailable ? (
-        <ContextPaneRail
-          ref={paneTriggerRef}
-          section={pane.paneSection}
-          open={effectivePaneOpen}
-          onToggle={requestPaneToggle}
+                  return;
+                }
+                changeCaptureDetail(open);
+              }}
+              onOpenLocalModels={() => {
+                openLocalModels();
+              }}
+            />
+          </>
+        }
+      >
+        <SectionRouterProvider section={current} />
+      </SectionContentProvider>
+      <ActivityErrorDialog
+        item={activityError}
+        open={activityError !== null}
+        onOpenChange={(open) => {
+          if (!open) setActivityError(null);
+        }}
+        onOpenDetails={openActivityDetails}
+      />
+      <CapabilityUnavailableDialog
+        reason={processingUnavailableReason ?? ""}
+        open={processingUnavailableReason !== null}
+        onOpenChange={(open) => {
+          if (!open) setProcessingUnavailableReason(null);
+        }}
+        onOpenLocalModels={() => {
+          setProcessingUnavailableReason(null);
+          openLocalModels();
+        }}
+      />
+      {profileBlocker ? (
+        <ProfileBlocker
+          profile={profileBlocker.profile}
+          pending={bootstrapPending}
+          error={bootstrapError}
+          onRecheck={requestBootstrapAction}
         />
       ) : null}
-      <SidebarInset
-        className={`z-30 min-h-0 min-w-0 overflow-hidden transition-[margin] duration-200 ease-linear ${
-          effectivePaneOpen
-            ? "ml-[calc(var(--sidebar-width)-var(--sidebar-width-icon)-1px)]"
-            : ""
-        }`}
-      >
-        <header className="sticky top-0 z-10 flex h-[50px] shrink-0 items-center gap-1 border-b bg-background px-3">
-          <Button
-            type="button"
-            variant="ghost"
-            size="icon-sm"
-            className="size-7"
-            aria-label="后退"
-            disabled={!activeRoute.canGoBack}
-            onClick={() => void navigateSectionDelta(current, -1)}
-          >
-            <ArrowLeft aria-hidden="true" />
-          </Button>
-          <Button
-            type="button"
-            variant="ghost"
-            size="icon-sm"
-            className="size-7"
-            aria-label="前进"
-            disabled={!activeRoute.canGoForward}
-            onClick={() => void navigateSectionDelta(current, 1)}
-          >
-            <ArrowRight aria-hidden="true" />
-          </Button>
-          <Separator orientation="vertical" className="mx-2 h-4" />
-          <h1
-            ref={contentTitleRef}
-            tabIndex={-1}
-            className="truncate text-sm font-medium"
-            data-slot="content-title"
-          >
-            {contentTitle}
-          </h1>
-          {audioWorkspacePresentation ? (
-            <div className="ml-auto">
-              <AudioMainHeaderActions controller={audio} />
-            </div>
-          ) : null}
-        </header>
-        {snapshot.connectivity === "offline" ? <OfflineBanner /> : null}
-        <div
-          ref={mainContentRef}
-          id="main-content"
-          data-context-pane-background="true"
-          className={cn(
-            "flex min-h-0 flex-1 flex-col overflow-auto",
-            presentation.contentMode === "padded" &&
-              (audioWorkspacePresentation
-                ? !audioFirstUsePresentation && "p-4"
-                : "p-4 sm:p-6"),
-            current === "settings" && "bg-muted/20",
-          )}
-        >
-          <SectionContentProvider
-            content={
-              <>
-                {!captureDetailVisible && presentation.renderContent ? (
-                  <ShellContent
-                    snapshot={snapshot}
-                    operationError={operationError}
-                    audio={audio}
-                    companion={companion}
-                    onOpenCompanionPane={openPane}
-                    current={current}
-                    selectedActivity={selectedActivity}
-                    onOpenActivityDetails={openActivityDetails}
-                  />
-                ) : null}
-                <CaptureWorkspace
-                  capture={snapshot.capture}
-                  recordRequest={recordRequest}
-                  detailOpen={captureDetailVisible}
-                  focusSessionId={
-                    routedCaptureSessionId ?? captureDetailSessionId
-                  }
-                  autoOpenRecoveries={current === "audio"}
-                  onPreflightResolved={audio.acceptCapturePreflight}
-                  onDetailOpenChange={(open) => {
-                    if (!open && routedCaptureSessionId) {
-                      if (activeRoute.canGoBack) {
-                        void navigateSectionDelta(current, -1);
-                      } else {
-                        void navigateSection(
-                          current,
-                          captureOwnerPath(routeDestination),
-                          { replace: true },
-                        );
-                      }
-                      return;
-                    }
-                    changeCaptureDetail(open);
-                  }}
-                  onOpenLocalModels={() => {
-                    openLocalModels();
-                  }}
-                />
-              </>
-            }
-          >
-            <SectionRouterProvider section={current} />
-          </SectionContentProvider>
-          <ActivityErrorDialog
-            item={activityError}
-            open={activityError !== null}
-            onOpenChange={(open) => {
-              if (!open) setActivityError(null);
-            }}
-            onOpenDetails={openActivityDetails}
-          />
-          <CapabilityUnavailableDialog
-            reason={processingUnavailableReason ?? ""}
-            open={processingUnavailableReason !== null}
-            onOpenChange={(open) => {
-              if (!open) setProcessingUnavailableReason(null);
-            }}
-            onOpenLocalModels={() => {
-              setProcessingUnavailableReason(null);
-              openLocalModels();
-            }}
-          />
-          {profileBlocker ? (
-            <ProfileBlocker
-              profile={profileBlocker.profile}
-              pending={bootstrapPending}
-              error={bootstrapError}
-              onRecheck={requestBootstrapAction}
-            />
-          ) : null}
-        </div>
-      </SidebarInset>
-    </SidebarProvider>
+    </AppShellFrame>
   );
 }
 
@@ -1082,46 +999,6 @@ const SettingsContent = React.memo(function SettingsContent() {
         <AiSettingsFeature settingsPage />
       </div>
     </div>
-  );
-});
-
-const ContextPaneRail = React.forwardRef<
-  HTMLButtonElement,
-  {
-    section: ContextPaneSection;
-    open: boolean;
-    onToggle: () => void;
-    className?: string;
-  }
->(function ContextPaneRail({ section, open, onToggle, className }, ref) {
-  const sectionLabel = SHELL_SECTION_LABELS[section];
-  const label = `${open ? "收起" : "打开"}${sectionLabel}上下文面板`;
-  return (
-    <SidebarRail
-      ref={ref}
-      data-context-pane-midpoint-rail="true"
-      type="button"
-      aria-label={label}
-      title={label}
-      tabIndex={0}
-      aria-expanded={open}
-      onClick={onToggle}
-      style={{
-        left: open
-          ? "var(--sidebar-width)"
-          : "calc(var(--sidebar-width-icon) + 1px)",
-      }}
-      className={cn(
-        "!top-1/2 right-auto !bottom-auto z-40 flex h-12 w-7 !translate-x-0 -translate-y-1/2 items-center justify-center rounded-md border bg-background text-muted-foreground after:hidden hover:bg-muted hover:text-foreground focus-visible:ring-1 disabled:pointer-events-none disabled:opacity-50",
-        className,
-      )}
-    >
-      {open ? (
-        <PanelLeftClose className="size-4" aria-hidden="true" />
-      ) : (
-        <PanelLeftOpen className="size-4" aria-hidden="true" />
-      )}
-    </SidebarRail>
   );
 });
 

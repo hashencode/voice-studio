@@ -156,7 +156,7 @@ The first diagram shows the authority split and component flow.
 ```mermaid
 flowchart TB
   Preview[ReUI App Shell 4 public preview render] --> Provenance[Pinned DOM style geometry and state evidence]
-  Provenance --> Frame[Source-backed Shell frame and visual slots]
+  Provenance --> Frame[Render-backed Shell frame and visual slots]
   Radix[Local Radix Nova primitives] --> Frame
   Routers[Per-section MemoryRouter registry] --> App[App composition and feature controllers]
   Controllers[Audio Activity Companion Settings controllers] --> App
@@ -168,9 +168,9 @@ The second diagram defines the gated migration and acceptance sequence.
 
 ```mermaid
 flowchart TB
-  Start[Start implementation] --> Access{Authenticated source available and licensed}
-  Access -->|no| Stop[Stop with access blocker]
-  Access -->|yes| Pin[Pin payload configuration and checksum]
+  Start[Start implementation] --> Access{Public preview observable}
+  Access -->|no| Stop[Stop with capture blocker]
+  Access -->|yes| Pin[Pin public-render evidence and checksum]
   Pin --> Primitives[Align scoped primitives tokens and font]
   Primitives --> Fixture[Build deterministic source-structure fixture]
   Fixture --> Shell[Integrate shared Shell frame]
@@ -186,9 +186,9 @@ flowchart TB
 
 ### Dependencies and Prerequisites
 
-- A ReUI Pro or Ultimate entitlement that grants App Shell 4 source access.
-- ReUI MCP OAuth or a process-local `REUI_LICENSE_KEY`; no credential is stored in the repository.
-- A successful source inspection using the official item and its resolved dependency manifest.
+- A publicly accessible App Shell 4 preview with sufficient observable layout and state evidence.
+- Local implementations and licensed assets; premium Registry access is no longer a prerequisite.
+- Explicitly distinguish current render measurements from the historical reference image until same-session comparison is accepted.
 - Explicit visual-validation authorization in the implementation task before any Electron, browser, screenshot, golden or watcher command runs.
 - The canonical macOS arm64 Electron environment described in `apps/desktop-electron/tests/visual/goldens/README.md` for final pixel evidence.
 
@@ -200,9 +200,9 @@ If local Radix mechanics differ from the Base preview, the public preview remain
 
 | Risk | Impact | Mitigation |
 | --- | --- | --- |
-| Registry item changes after planning | Source and screenshot describe different designs | Pin payload identity, resolved configuration and checksum before editing. |
-| Premium access is unavailable | Implementer falls back to guessing | Enforce the U1 stop gate and leave the worktree unchanged. |
-| ReUI Base UI examples conflict with local Radix behavior | Keyboard or focus regressions | Reuse Block JSX and classes while retaining the local Radix primitive APIs and tests. |
+| Public preview changes after planning | Measurements and screenshot describe different designs | Pin render evidence and require deliberate same-session recapture before acceptance. |
+| Public evidence is incomplete | Implementer falls back to guessing | Record missing states and stop affected implementation until observable evidence exists. |
+| ReUI Base UI examples conflict with local Radix behavior | Keyboard or focus regressions | Independently implement observed appearance while retaining local Radix primitive APIs and tests. |
 | Primitive installation overwrites customized files | Modal, focus or controlled-state regressions | Use `view`, dry-run and scoped diffs; merge by hand; reject whole-directory writes. |
 | Inter changes Chinese rendering unexpectedly | Mixed-language rows drift or clip | Test Latin, numbers and Chinese together; retain PingFang SC and system fallbacks. |
 | Real Voice2Text data changes reference density | Visual fidelity erodes during adaptation | Prove the source-structure fixture first, then map real fields into fixed visual slots. |
