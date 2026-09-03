@@ -238,7 +238,7 @@ If local Radix mechanics differ from the Base preview, the public preview remain
 
 ### U2. Align required primitives, tokens and typography
 
-- **Goal:** Supply the exact primitive surface needed by the pinned Block without replacing local Radix behavior.
+- **Goal:** Supply the exact local primitive surface needed to reproduce the pinned render without replacing local Radix behavior.
 - **Requirements:** R5–R8, R12–R13, R17–R18; KTD4–KTD7, KTD11.
 - **Dependencies:** U1.
 - **Files:**
@@ -258,9 +258,9 @@ If local Radix mechanics differ from the Base preview, the public preview remain
   - `apps/desktop-electron/src/renderer/index.css`
   - `apps/desktop-electron/tests/unit/renderer/ui_primitives_test.tsx`
 - **Approach:**
-  1. Compare the payload's primitive dependencies with local files and classify each as reuse, scoped class merge or new component.
-  2. Add only missing components used by the Block and retain local Radix state and accessibility contracts.
-  3. Flatten only load-bearing Nova classes into local primitives; keep the three Electron visual exceptions.
+  1. Compare the observed rendered controls with local files and classify each as reuse, scoped class merge or new component.
+  2. Add only missing components needed by the independent implementation and retain local Radix state and accessibility contracts.
+  3. Apply only load-bearing Nova-compatible classes supported by the render evidence; keep the three Electron visual exceptions.
   4. Add locally hosted, licensed Inter assets and a mixed-language font stack compatible with the Renderer CSP.
 - **Execution note:** Add characterization coverage for customized primitives before changing their load-bearing class or structure.
 - **Patterns to follow:** The scoped shadcn alignment workflow and SHA provenance in `apps/desktop-electron/README.md`; existing local primitives under `apps/desktop-electron/src/renderer/components/ui`.
@@ -270,7 +270,7 @@ If local Radix mechanics differ from the Base preview, the public preview remain
   3. Shadow, focus-visible and Dialog overlay assertions retain the Electron exceptions.
   4. The Renderer resolves Inter locally for Latin text and falls back to PingFang SC for Chinese without a network request.
   5. Reduced-motion and forced-colors behavior remains available after class alignment.
-- **Verification:** Component tests prove behavioral preservation, and the final diff contains only payload-required primitives and token/font changes.
+- **Verification:** Component tests prove behavioral preservation, and the final diff contains only render-required primitives and token/font changes.
 
 ### U3. Build the render-backed Shell frame
 

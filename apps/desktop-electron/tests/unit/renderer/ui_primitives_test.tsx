@@ -13,6 +13,12 @@ import { useState } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { Checkbox } from "@/components/ui/checkbox";
+import { Badge } from "@/components/ui/badge";
+import {
+  ButtonGroup,
+  ButtonGroupSeparator,
+} from "@/components/ui/button-group";
+import { Button } from "@/components/ui/button";
 import {
   Card,
   CardAction,
@@ -81,6 +87,8 @@ import {
   ItemTitle,
 } from "@/components/ui/item";
 import { Input } from "@/components/ui/input";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   ModalCoordinatorProvider,
   useModalCoordinator,
@@ -121,6 +129,44 @@ describe("current shadcn primitives", () => {
   it("pins the composite Radix Nova registry style without a separate base", () => {
     expect(componentConfig.style).toBe("radix-nova");
     expect(componentConfig).not.toHaveProperty("base");
+  });
+
+  it("exposes the compact render-backed badge, button group, tabs, and scroll area parts", async () => {
+    const user = userEvent.setup();
+    render(
+      <>
+        <Badge variant="muted">4 条</Badge>
+        <ButtonGroup aria-label="分页操作">
+          <Button variant="ghost" size="icon-sm" aria-label="上一项" />
+          <ButtonGroupSeparator />
+          <Button variant="ghost" size="icon-sm" aria-label="下一项" />
+        </ButtonGroup>
+        <Tabs defaultValue="all">
+          <TabsList aria-label="筛选">
+            <TabsTrigger value="all">全部</TabsTrigger>
+            <TabsTrigger value="unread">未读</TabsTrigger>
+          </TabsList>
+          <TabsContent value="all">全部内容</TabsContent>
+          <TabsContent value="unread">未读内容</TabsContent>
+        </Tabs>
+        <ScrollArea aria-label="滚动内容" className="h-20">
+          <div className="h-40">长内容</div>
+        </ScrollArea>
+      </>,
+    );
+
+    expect(screen.getByText("4 条")).toHaveAttribute("data-slot", "badge");
+    expect(screen.getByRole("group", { name: "分页操作" })).toHaveAttribute(
+      "data-orientation",
+      "horizontal",
+    );
+    expect(screen.getByText("全部内容")).toBeVisible();
+    await user.click(screen.getByRole("tab", { name: "未读" }));
+    expect(screen.getByText("未读内容")).toBeVisible();
+    expect(screen.getByLabelText("滚动内容")).toHaveAttribute(
+      "data-slot",
+      "scroll-area",
+    );
   });
 
   it("uses a shadowless Nova Card surface with default and small spacing", () => {
