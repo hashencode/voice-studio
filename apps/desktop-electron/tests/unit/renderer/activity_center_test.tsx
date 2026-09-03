@@ -62,9 +62,12 @@ describe("activity pages", () => {
     const user = userEvent.setup();
     const messageRow = screen.getByRole("button", { name: /录制需要处理/ });
     expect(messageRow).toHaveAttribute("data-slot", "item");
+    expect(messageRow).toHaveAttribute("data-variant", "context");
+    expect(messageRow).toHaveAttribute("aria-current", "true");
     expect(messageRow.querySelector('[data-slot="item-media"]')).not.toBeNull();
     await user.click(messageRow);
     expect(select).toHaveBeenCalledWith(failed);
+    expect(select).toHaveBeenCalledOnce();
     const detail = screen.getByRole("region", { name: "消息详情" });
     expect(detail).not.toHaveTextContent("录制需要处理");
     expect(detail).not.toHaveTextContent("这次录制未能正常完成");
@@ -140,10 +143,25 @@ describe("activity pages", () => {
     render(<Harness />);
     const user = userEvent.setup();
 
-    expect(screen.getByRole("button", { name: "全部 2" })).toBeVisible();
+    const allFilter = screen.getByRole("button", { name: "全部 2" });
+    expect(allFilter).toHaveAttribute("data-variant", "filter");
+    expect(allFilter).toHaveAttribute("aria-pressed", "true");
+    expect(allFilter.querySelector('[data-slot="badge"]')).toHaveTextContent(
+      "2",
+    );
+    expect(screen.queryByRole("tablist")).not.toBeInTheDocument();
+    expect(screen.getByRole("searchbox", { name: "搜索消息" })).toHaveAttribute(
+      "data-variant",
+      "context-search",
+    );
     expect(screen.getByRole("button", { name: "未读 1" })).toBeVisible();
     expect(screen.getByRole("button", { name: "需处理 1" })).toBeVisible();
     await user.click(screen.getByRole("button", { name: "未读 1" }));
+    expect(allFilter).toHaveAttribute("aria-pressed", "false");
+    expect(screen.getByRole("button", { name: "未读 1" })).toHaveAttribute(
+      "aria-pressed",
+      "true",
+    );
     expect(screen.getByText("录制需要处理")).toBeVisible();
     expect(screen.queryByText("Project Alpha")).not.toBeInTheDocument();
     await user.type(

@@ -1,6 +1,7 @@
 import * as React from "react";
-import { CheckCircle2, MailOpen, Search, TriangleAlert } from "lucide-react";
+import { CheckCircle2, MailOpen, TriangleAlert } from "lucide-react";
 
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -19,7 +20,10 @@ import {
   ItemMedia,
   ItemTitle,
 } from "@/components/ui/item";
-import { SidebarInput } from "@/components/ui/sidebar";
+import {
+  ContextPaneFilter,
+  ContextPaneSearch,
+} from "@/features/shell/context-pane-controls";
 import {
   Tooltip,
   TooltipContent,
@@ -102,17 +106,14 @@ export function ActivityContextPane({
           className="min-h-0 flex-1"
         />
       ) : (
-        <ul
-          className="divide-y"
-          aria-label="消息列表"
-          data-flat-row-list="true"
-        >
+        <ul aria-label="消息列表" data-flat-row-list="true">
           {visibleItems.map((item) => (
             <li key={item.id}>
               <Item
                 asChild
-                size="sm"
-                className="w-full rounded-none border-0 text-left hover:bg-accent aria-current:bg-muted"
+                variant="context"
+                size="context"
+                className="text-left"
               >
                 <button
                   type="button"
@@ -124,19 +125,14 @@ export function ActivityContextPane({
                     <ActivityIcon severity={item.severity} />
                   </ItemMedia>
                   <ItemContent>
-                    <ItemTitle className="max-w-full truncate">
-                      {item.title}
-                    </ItemTitle>
+                    <ItemTitle>{item.title}</ItemTitle>
                     <ItemDescription>
                       {formatter.format(item.createdAt)}
                     </ItemDescription>
                   </ItemContent>
                   {!item.read ? (
                     <ItemActions>
-                      <span
-                        className="size-2 rounded-full bg-primary"
-                        aria-label="未读"
-                      />
+                      <Badge variant="dot" aria-label="未读" />
                     </ItemActions>
                   ) : null}
                 </button>
@@ -166,6 +162,7 @@ export function ActivityContextPaneHead({
             type="button"
             size="icon-sm"
             variant="ghost"
+            className="size-7"
             aria-label="全部标记为已读"
             aria-busy={markAllPending}
             disabled={unreadCount === 0 || markAllPending}
@@ -188,19 +185,11 @@ export function ActivityContextPaneSearch({
   onValueChange: (value: string) => void;
 }) {
   return (
-    <div className="relative min-w-0 flex-1">
-      <Search
-        aria-hidden="true"
-        className="pointer-events-none absolute top-1.5 left-2.5 size-4 text-muted-foreground"
-      />
-      <SidebarInput
-        type="search"
-        aria-label="搜索消息"
-        value={value}
-        onChange={(event) => onValueChange(event.currentTarget.value)}
-        className="h-7 rounded-md pl-8 text-xs md:text-xs"
-      />
-    </div>
+    <ContextPaneSearch
+      aria-label="搜索消息"
+      value={value}
+      onChange={(event) => onValueChange(event.currentTarget.value)}
+    />
   );
 }
 
@@ -224,19 +213,19 @@ export function ActivityContextPaneFilters({
     attention: items.filter((item) => item.severity === "warning").length,
   };
   return (
-    <div role="group" aria-label="消息筛选" className="flex items-center gap-1">
+    <div
+      role="group"
+      aria-label="消息筛选"
+      className="flex min-w-0 items-center gap-0.5 overflow-x-auto"
+    >
       {filters.map((item) => (
-        <Button
+        <ContextPaneFilter
           key={item.value}
-          type="button"
-          variant="ghost"
-          size="sm"
+          label={item.label}
+          count={counts[item.value]}
           aria-pressed={value === item.value}
-          className="h-6 rounded-md px-2 text-xs aria-pressed:bg-muted aria-pressed:font-medium"
           onClick={() => onValueChange(item.value)}
-        >
-          {item.label} {counts[item.value]}
-        </Button>
+        />
       ))}
     </div>
   );

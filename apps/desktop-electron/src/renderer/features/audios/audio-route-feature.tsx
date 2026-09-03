@@ -8,11 +8,11 @@ import {
   LoaderCircle,
   Mic,
   RotateCcw,
-  Search,
   Square,
 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 import { EmptyState } from "@/components/ui/empty-state";
 import {
   Item,
@@ -21,11 +21,11 @@ import {
   ItemTitle,
 } from "@/components/ui/item";
 import { Progress } from "@/components/ui/progress";
+import { SidebarGroup, SidebarGroupContent } from "@/components/ui/sidebar";
 import {
-  SidebarGroup,
-  SidebarGroupContent,
-  SidebarInput,
-} from "@/components/ui/sidebar";
+  ContextPaneFilter,
+  ContextPaneSearch,
+} from "@/features/shell/context-pane-controls";
 import { AudioDetailWorkspace } from "@/features/audios/audio-workspace-feature";
 import {
   resolveRecordingMicrophone,
@@ -717,11 +717,7 @@ export function AudioContextPane({
             className="min-h-0 flex-1"
           />
         ) : (
-          <ul
-            aria-label="音频列表"
-            data-flat-row-list="true"
-            className="divide-y divide-sidebar-border border-b border-sidebar-border"
-          >
+          <ul aria-label="音频列表" data-flat-row-list="true">
             {controller.filteredAudios.map((audio) => {
               const task = selectCurrentTask(
                 controller.tasksByAudioId.get(audio.audioId),
@@ -733,8 +729,9 @@ export function AudioContextPane({
                 <li key={audio.audioId}>
                   <Item
                     asChild
-                    size="sm"
-                    className="w-full rounded-none border-0 px-3 text-left hover:bg-sidebar-accent aria-current:bg-muted"
+                    variant="context"
+                    size="context"
+                    className="text-left"
                   >
                     <button
                       type="button"
@@ -745,10 +742,8 @@ export function AudioContextPane({
                       onClick={() => void controller.selectAudio(audio.audioId)}
                     >
                       <ItemContent>
-                        <ItemTitle className="max-w-full truncate text-sm font-semibold">
-                          {audio.displayName}
-                        </ItemTitle>
-                        <ItemDescription className="text-xs leading-4">
+                        <ItemTitle>{audio.displayName}</ItemTitle>
+                        <ItemDescription>
                           <span className="block">
                             {formatAudioDate(audio.createdAtMs)} ·{" "}
                             {formatAudioDuration(audio.durationMs)}
@@ -759,10 +754,10 @@ export function AudioContextPane({
                           </span>
                         </ItemDescription>
                         {state ? (
-                          <span className="mt-1 inline-flex w-fit items-center gap-1.5 rounded-full border px-2 py-0.5 text-xs font-medium">
+                          <Badge variant="outline" className="mt-1 gap-1.5">
                             <ProcessingIcon state={state} />
                             {taskStateLabel(state)}
-                          </span>
+                          </Badge>
                         ) : null}
                       </ItemContent>
                     </button>
@@ -783,19 +778,11 @@ export function AudioContextPaneSearch({
   controller: AudioRouteController;
 }) {
   return (
-    <div className="relative min-w-0">
-      <Search
-        aria-hidden="true"
-        className="pointer-events-none absolute top-2 left-2.5 size-4 text-muted-foreground"
-      />
-      <SidebarInput
-        type="search"
-        aria-label="搜索音频"
-        value={controller.query}
-        onChange={(event) => controller.setQuery(event.currentTarget.value)}
-        className="h-7 rounded-md pl-8 text-xs md:text-xs"
-      />
-    </div>
+    <ContextPaneSearch
+      aria-label="搜索音频"
+      value={controller.query}
+      onChange={(event) => controller.setQuery(event.currentTarget.value)}
+    />
   );
 }
 
@@ -814,20 +801,16 @@ export function AudioContextPaneFilters({
     <div
       role="group"
       aria-label="音频筛选"
-      className="flex min-w-0 items-center gap-1 overflow-x-auto"
+      className="flex min-w-0 items-center gap-0.5 overflow-x-auto"
     >
       {filters.map((item) => (
-        <Button
+        <ContextPaneFilter
           key={item.value}
-          type="button"
-          variant="ghost"
-          size="sm"
+          label={item.label}
+          count={controller.filterCounts[item.value]}
           aria-pressed={controller.filter === item.value}
-          className="h-6 rounded-md px-2 text-xs aria-pressed:bg-muted aria-pressed:font-medium"
           onClick={() => controller.setFilter(item.value)}
-        >
-          {item.label} {controller.filterCounts[item.value]}
-        </Button>
+        />
       ))}
     </div>
   );

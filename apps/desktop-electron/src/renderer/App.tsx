@@ -1,7 +1,7 @@
 import * as React from "react";
 import { Cloud, HardDrive, Mic, Settings2 } from "lucide-react";
 
-import { Button } from "@/components/ui/button";
+import { Item, ItemContent, ItemMedia, ItemTitle } from "@/components/ui/item";
 import {
   ActivityContextPane,
   ActivityContextPaneFilters,
@@ -12,13 +12,7 @@ import {
   type ActivityItemView,
   type ActivityFilter,
 } from "@/features/activity/activity-center";
-import {
-  SidebarGroup,
-  SidebarGroupContent,
-  SidebarMenu,
-  SidebarMenuButton,
-  SidebarMenuItem,
-} from "@/components/ui/sidebar";
+import { SidebarGroup, SidebarGroupContent } from "@/components/ui/sidebar";
 import {
   AudioContextPane,
   AudioContextPaneFilters,
@@ -620,7 +614,6 @@ function App() {
   );
   const paneStructurallyAvailable =
     current !== "audio" || audio.libraryPresentation === "populated";
-  const effectivePaneOpen = pane.open && paneStructurallyAvailable;
   const audioWorkspacePresentation =
     current === "audio" && !captureDetailVisible;
   const audioFirstUsePresentation =
@@ -635,7 +628,7 @@ function App() {
       contextPane={
         paneStructurallyAvailable
           ? {
-              open: effectivePaneOpen,
+              open: pane.open,
               section: pane.paneSection,
               presentation: pane.presentation,
               onRequestClose: requestPaneClose,
@@ -952,17 +945,23 @@ function SettingsContextPane({
   onValueChange: (value: SettingsSection) => void;
 }) {
   return (
-    <SidebarGroup className="p-2">
+    <SidebarGroup className="p-0">
       <SidebarGroupContent>
         <nav aria-label="设置分类">
-          <SidebarMenu>
+          <ul data-flat-row-list="true">
             {SETTINGS_SECTIONS.map((item) => {
               const Icon = item.icon;
               return (
-                <SidebarMenuItem key={item.value}>
-                  <SidebarMenuButton asChild isActive={value === item.value}>
+                <li key={item.value}>
+                  <Item
+                    asChild
+                    variant="context"
+                    size="context"
+                    data-active={value === item.value}
+                  >
                     <a
                       href={`#${settingsSectionHeadingId(item.value)}`}
+                      data-flat-row="true"
                       aria-current={
                         value === item.value ? "location" : undefined
                       }
@@ -971,14 +970,18 @@ function SettingsContextPane({
                         onValueChange(item.value);
                       }}
                     >
-                      <Icon aria-hidden="true" />
-                      {item.label}
+                      <ItemMedia variant="icon">
+                        <Icon aria-hidden="true" />
+                      </ItemMedia>
+                      <ItemContent>
+                        <ItemTitle>{item.label}</ItemTitle>
+                      </ItemContent>
                     </a>
-                  </SidebarMenuButton>
-                </SidebarMenuItem>
+                  </Item>
+                </li>
               );
             })}
-          </SidebarMenu>
+          </ul>
         </nav>
       </SidebarGroupContent>
     </SidebarGroup>

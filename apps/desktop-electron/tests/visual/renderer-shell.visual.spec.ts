@@ -1,7 +1,10 @@
 import path from "node:path";
+import { createHash } from "node:crypto";
+import { readFileSync } from "node:fs";
 
 import { _electron as electron, expect, test } from "@playwright/test";
 import electronExecutable from "electron";
+import renderReference from "./references/reui-app-shell-4-render.json";
 
 import {
   buildVisualFixture,
@@ -12,12 +15,33 @@ import {
 const harnessMain = path.resolve("tests/visual/.harness-build/main.js");
 const harnessPreload = path.resolve("tests/visual/.harness-build/preload.js");
 const rendererUrl = "http://127.0.0.1:4179";
-const expectedFontStack =
-  '-apple-system, "system-ui", "SF Pro Text", "PingFang SC", sans-serif';
 const canonicalScreenshots =
   process.platform === "darwin" && process.arch === "arm64";
 
 test.describe("sidebar-09 production Renderer", () => {
+  test.beforeAll(() => {
+    // This guards evidence integrity, not same-session visual acceptance.
+    const image = readFileSync(
+      path.resolve(
+        "tests/visual/references",
+        renderReference.referenceImage.path,
+      ),
+    );
+    expect(createHash("sha256").update(image).digest("hex")).toBe(
+      renderReference.referenceImage.sha256,
+    );
+    const rawEvidence = readFileSync(
+      path.resolve("tests/visual/references", renderReference.rawEvidence.path),
+    );
+    expect(createHash("sha256").update(rawEvidence).digest("hex")).toBe(
+      renderReference.rawEvidence.sha256,
+    );
+    const canonicalEvidence = `${JSON.stringify(sortEvidenceKeys(renderReference.evidence))}\n`;
+    expect(createHash("sha256").update(canonicalEvidence).digest("hex")).toBe(
+      renderReference.evidenceSha256,
+    );
+  });
+
   test("1280x720 Audio App Shell 4 baseline", async () => {
     await withVisualSession("audio-closed", 1280, 720, async (session) => {
       const { page } = session;
@@ -72,6 +96,51 @@ test.describe("sidebar-09 production Renderer", () => {
         1280,
         720,
       );
+    });
+  });
+
+  test("context chrome preserves hover, selection, focus and disabled states", async () => {
+    await withVisualSession("audio-closed", 1280, 720, async ({ page }) => {
+      await expect(
+        page.getByRole("button", { name: "前进", exact: true }),
+      ).toBeDisabled();
+      const filters = page.getByRole("group", { name: "音频筛选" });
+      const selectedFilter = filters.locator('[aria-pressed="true"]');
+      await expect(selectedFilter).toHaveCSS(
+        "background-color",
+        renderReference.evidence.tokens.primary,
+      );
+      const rows = page
+        .getByRole("list", { name: "音频列表" })
+        .locator("button[data-flat-row]");
+      const row = rows.nth(1);
+      await row.hover();
+      await expect(row).toHaveCSS(
+        "background-color",
+        renderReference.evidence.controls.listRow.hoverBackground,
+      );
+      await row.click();
+      await page.mouse.move(1200, 10);
+      await expect(row).toHaveAttribute("aria-current", "true");
+      await expect(row).toHaveCSS(
+        "background-color",
+        renderReference.evidence.controls.listRow.selectedBackground,
+      );
+      const search = page.getByRole("searchbox", {
+        name: "搜索音频",
+        exact: true,
+      });
+      await search.focus();
+      await page.keyboard.press("Tab");
+      await page.keyboard.press("Shift+Tab");
+      await expect(search).toBeFocused();
+      const focus = await search.evaluate((element) => ({
+        visible: element.matches(":focus-visible"),
+        shadow: getComputedStyle(element).boxShadow,
+      }));
+      expect(focus.visible).toBe(true);
+      expect(focus.shadow).toContain("0px 0px 0px 1px");
+      expect(focus.shadow).not.toContain("0px 0px 0px 3px");
     });
   });
 
@@ -267,6 +336,7 @@ async function withVisualSession(
   const session = await launch(scenario, width, height);
   try {
     await run(session);
+    expect(session.rendererErrors).toEqual([]);
   } finally {
     await session.app.close();
   }
@@ -293,6 +363,25 @@ async function launch(
   });
   try {
     const page = await app.firstWindow();
+    const rendererErrors: string[] = [];
+    page.on("pageerror", (error) => rendererErrors.push(error.message));
+    page.on("console", (message) => {
+      if (message.type() !== "error") return;
+      const text = message.text();
+      // index.html:7 predates this change; Chromium rejects frame-ancestors in meta.
+      // Keep that known diagnostic visible without changing the product CSP here.
+      if (
+        text ===
+        "The Content Security Policy directive 'frame-ancestors' is ignored when delivered via a <meta> element."
+      ) {
+        test.info().annotations.push({
+          type: "known-console-diagnostic",
+          description: text,
+        });
+      } else {
+        rendererErrors.push(text);
+      }
+    });
     const electronRuntime = await app.evaluate(({ app: electronApp }) => ({
       electronVersion: process.versions.electron,
       chromiumVersion: process.versions.chrome,
@@ -342,6 +431,7 @@ async function launch(
       await window.loadURL(url);
     }, targetUrl);
     await page.waitForLoadState("networkidle");
+    await page.evaluate(() => document.fonts.ready.then(() => undefined));
     await app.evaluate(({ BrowserWindow }) => {
       const window = BrowserWindow.getAllWindows()[0];
       if (!window) throw new Error("Visual BrowserWindow is unavailable");
@@ -353,7 +443,7 @@ async function launch(
       if (!window) throw new Error("Visual BrowserWindow is unavailable");
       window.webContents.setZoomFactor(zoomFactor);
     }, 1 / nativeDpr);
-    return { app, page };
+    return { app, page, rendererErrors };
   } catch (error) {
     await app.close();
     throw error;
@@ -372,7 +462,11 @@ async function assertRuntimeContract(
     language: navigator.language,
     colorScheme: getComputedStyle(document.documentElement).colorScheme,
     reducedMotion: matchMedia("(prefers-reduced-motion: reduce)").matches,
-    fontFamily: getComputedStyle(document.body).fontFamily,
+    fontFamily: getComputedStyle(document.body)
+      .fontFamily.split(",")
+      .slice(0, 3)
+      .map((family) => family.trim().replaceAll('"', "")),
+    interLoaded: document.fonts.check('14px "Inter Variable"'),
     frozenNow: Date.now(),
   }));
   expect(runtime).toEqual({
@@ -382,7 +476,8 @@ async function assertRuntimeContract(
     language: "zh-CN",
     colorScheme: "light",
     reducedMotion: true,
-    fontFamily: expectedFontStack,
+    fontFamily: ["Inter Variable", "Inter", "PingFang SC"],
+    interLoaded: true,
     frozenNow: Date.UTC(2026, 7, 19, 3, 20, 0),
   });
 }
@@ -394,13 +489,13 @@ async function assertDockedGeometry(
 ) {
   const geometry = await shellGeometry(page);
   expectRect(geometry.wrapper, { x: 0, y: 0, width, height });
-  expectHorizontalRect(geometry.gap, { x: 0, width: 49 });
+  expectHorizontalRect(geometry.gap, { x: 0, width: 440 });
   expectRect(geometry.container, { x: 0, y: 0, width: 440, height });
   expectRect(geometry.rail, { x: 0, y: 0, width: 49, height });
   expectWithin(geometry.railContentWidth, 48);
   expectWithin(geometry.railBorderRight, 1);
   if (!geometry.pane) throw new Error("Expected a docked context pane");
-  expectRect(geometry.pane, { x: 49, y: 0, width: 391, height });
+  expectRect(geometry.pane, { x: 49, y: 0, width: 390, height });
   if (!geometry.midpointRail)
     throw new Error("Expected a docked midpoint rail");
   expectRect(geometry.midpointRail, {
@@ -422,24 +517,24 @@ async function assertRailOnlyGeometry(
   await expect
     .poll(async () => {
       const geometry = await shellGeometry(page);
-      return Math.abs(geometry.gap.width - 49);
+      return Math.abs(geometry.gap.width - 48);
     })
-    .toBeLessThanOrEqual(1);
+    .toBeLessThan(0.5);
   const geometry = await shellGeometry(page);
   expectRect(geometry.wrapper, { x: 0, y: 0, width, height });
-  expectHorizontalRect(geometry.gap, { x: 0, width: 49 });
-  expectRect(geometry.container, { x: 0, y: 0, width: 49, height });
+  expectHorizontalRect(geometry.gap, { x: 0, width: 48 });
+  expectRect(geometry.container, { x: 0, y: 0, width: 48, height });
   expectRect(geometry.rail, { x: 0, y: 0, width: 49, height });
   expectWithin(geometry.railContentWidth, 48);
   expectWithin(geometry.railBorderRight, 1);
   if (collapsedPaneMounted) {
     if (!geometry.pane)
       throw new Error("Expected the collapsed pane to remain mounted");
-    expectRect(geometry.pane, { x: 49, y: 0, width: 391, height });
+    expectRect(geometry.pane, { x: 49, y: 0, width: 390, height });
     if (!geometry.midpointRail)
       throw new Error("Expected the collapsed midpoint rail to remain mounted");
     expectRect(geometry.midpointRail, {
-      x: 49,
+      x: 48,
       y: height / 2 - 24,
       width: 28,
       height: 48,
@@ -448,8 +543,8 @@ async function assertRailOnlyGeometry(
     expect(geometry.pane).toBeNull();
     expect(geometry.midpointRail).toBeNull();
   }
-  expectWithin(geometry.inset.x, 49);
-  expectWithin(geometry.inset.width, width - 49);
+  expectWithin(geometry.inset.x, 48);
+  expectWithin(geometry.inset.width, width - 48);
 }
 
 async function assertReferenceChrome(
@@ -469,6 +564,11 @@ async function assertReferenceChrome(
         width: value.width,
         height: value.height,
         boxShadow: style.boxShadow,
+        fontSize: style.fontSize,
+        fontWeight: style.fontWeight,
+        borderRadius: style.borderRadius,
+        paddingLeft: style.paddingLeft,
+        gap: style.gap,
       };
     };
     return {
@@ -479,6 +579,12 @@ async function assertReferenceChrome(
       selectedFilter: rect(
         '[data-context-pane-filters] button[aria-pressed="true"]',
       ),
+      filtersBand: rect("[data-context-pane-filters]"),
+      title: rect('[data-slot="content-title"]'),
+      separator: rect(
+        '[data-shell-slot="content-head"] [data-slot="separator"]',
+      ),
+      railStroke: rect('[data-slot="sidebar-rail-stroke"]'),
       back: rect('button[aria-label="后退"]'),
       forward: rect('button[aria-label="前进"]'),
       avatar: rect('[data-shell-profile-placeholder="true"]'),
@@ -489,6 +595,17 @@ async function assertReferenceChrome(
   });
 
   expectWithin(geometry.contentHead!.height, 50);
+  expect(geometry.contentHead!.paddingLeft).toBe("16px");
+  expect(geometry.contentHead!.gap).toBe("6px");
+  expect(geometry.title!.fontSize).toBe("14px");
+  expect(geometry.title!.fontWeight).toBe("600");
+  expectWithin(geometry.separator!.height, 20);
+  if (geometry.railStroke) {
+    expectWithin(geometry.railStroke.width, 2);
+    expectWithin(geometry.railStroke.height, 16);
+  } else if (paneOpen) {
+    throw new Error("Expected the midpoint rail stroke");
+  }
   expectWithin(geometry.back!.width, 28);
   expectWithin(geometry.back!.height, 28);
   expectWithin(geometry.forward!.width, 28);
@@ -512,8 +629,14 @@ async function assertReferenceChrome(
     expectWithin(geometry.searchInput!.x, 61);
     expectWithin(geometry.searchInput!.width, 366);
     expectWithin(geometry.searchInput!.height, 28);
+    expect(geometry.searchInput!.fontSize).toBe("12px");
+    expect(geometry.searchInput!.borderRadius).toBe("10px");
+    expect(geometry.searchInput!.paddingLeft).toBe("28px");
     expectShadowless(geometry.searchInput!.boxShadow);
+    expectWithin(geometry.filtersBand!.height, 37);
     expectWithin(geometry.selectedFilter!.height, 24);
+    expect(geometry.selectedFilter!.fontSize).toBe("12px");
+    expect(geometry.selectedFilter!.fontWeight).toBe("500");
     expectShadowless(geometry.selectedFilter!.boxShadow);
   } else {
     expect(geometry.searchBand).toBeNull();
@@ -545,12 +668,16 @@ async function assertFlatRows(
       return {
         borderRadius: style.borderRadius,
         boxShadow: style.boxShadow,
+        padding: style.padding,
+        gap: style.gap,
       };
     }),
   );
   for (const style of styles) {
     expect(parseFloat(style.borderRadius) || 0).toBeLessThanOrEqual(1);
     expect(style.boxShadow).toBe("none");
+    expect(style.padding).toBe("12px");
+    expect(style.gap).toBe("10px");
   }
 }
 
@@ -840,7 +967,19 @@ function expectHorizontalRect(
   expectWithin(actual.width, expected.width);
 }
 
-function expectWithin(actual: number, expected: number, tolerance = 1) {
+function sortEvidenceKeys(value: unknown): unknown {
+  if (Array.isArray(value)) return value.map(sortEvidenceKeys);
+  if (value !== null && typeof value === "object") {
+    return Object.fromEntries(
+      Object.entries(value)
+        .sort(([left], [right]) => (left < right ? -1 : left > right ? 1 : 0))
+        .map(([key, entry]) => [key, sortEvidenceKeys(entry)]),
+    );
+  }
+  return value;
+}
+
+function expectWithin(actual: number, expected: number, tolerance = 0.5) {
   expect(Math.abs(actual - expected)).toBeLessThanOrEqual(tolerance);
 }
 

@@ -240,17 +240,14 @@ export function CompanionContextPane({
             className="min-h-0 flex-1"
           />
         ) : (
-          <ul
-            aria-label="已信任设备列表"
-            data-flat-row-list="true"
-            className="divide-y divide-sidebar-border border-y border-sidebar-border"
-          >
+          <ul aria-label="已信任设备列表" data-flat-row-list="true">
             {controller.peers.map((peer) => (
               <li key={peer.deviceId}>
                 <Item
                   asChild
-                  size="sm"
-                  className="w-full rounded-none border-0 px-3 text-left hover:bg-sidebar-accent aria-pressed:bg-muted"
+                  variant="context"
+                  size="context"
+                  className="text-left"
                 >
                   <button
                     type="button"

@@ -47,12 +47,12 @@ directory and verifies the real worker health handshake.
 
 `bun run check:ui:visual` launches the repository-pinned Electron runtime through a
 test-only Main/Preload harness, exercises the production Renderer entry, checks
-sidebar geometry, and runs ten deterministic scenarios with ten canonical
+sidebar geometry, and runs eleven deterministic tests with ten canonical
 screenshots, including the 1280 x 720 ReUI comparison state and the 320 x 96
 desktop floating capture control. It also checks the fixed-column shell at the
 880 px production minimum.
 Canonical pixel baselines are macOS arm64 only; every host still runs the
-semantic and 1 px geometry assertions. Run
+semantic and 0.5 px geometry assertions. Run
 `bun run check:ui:visual:update` only after an explicit baseline-update request.
 Baseline updates require the environment recorded in
 `tests/visual/goldens/README.md` and a side-by-side review against the pinned

@@ -242,19 +242,17 @@ If local Radix mechanics differ from the Base preview, the public preview remain
 - **Requirements:** R5–R8, R12–R13, R17–R18; KTD4–KTD7, KTD11.
 - **Dependencies:** U1.
 - **Files:**
-  - `apps/desktop-electron/src/renderer/components/reui/badge.tsx`
+  - `apps/desktop-electron/src/renderer/components/ui/badge.tsx`
   - `apps/desktop-electron/src/renderer/components/ui/avatar.tsx`
   - `apps/desktop-electron/src/renderer/components/ui/button.tsx`
-  - `apps/desktop-electron/src/renderer/components/ui/button-group.tsx`
   - `apps/desktop-electron/src/renderer/components/ui/dropdown-menu.tsx`
   - `apps/desktop-electron/src/renderer/components/ui/input.tsx`
   - `apps/desktop-electron/src/renderer/components/ui/item.tsx`
-  - `apps/desktop-electron/src/renderer/components/ui/scroll-area.tsx`
   - `apps/desktop-electron/src/renderer/components/ui/separator.tsx`
   - `apps/desktop-electron/src/renderer/components/ui/sidebar.tsx`
-  - `apps/desktop-electron/src/renderer/components/ui/tabs.tsx`
   - `apps/desktop-electron/src/renderer/components/ui/tooltip.tsx`
-  - `apps/desktop-electron/src/renderer/assets/fonts/`
+  - `apps/desktop-electron/package.json` (`@fontsource-variable/inter`)
+  - `apps/desktop-electron/public/licenses/inter-OFL.txt`
   - `apps/desktop-electron/src/renderer/index.css`
   - `apps/desktop-electron/tests/unit/renderer/ui_primitives_test.tsx`
 - **Approach:**
@@ -266,7 +264,7 @@ If local Radix mechanics differ from the Base preview, the public preview remain
 - **Patterns to follow:** The scoped shadcn alignment workflow and SHA provenance in `apps/desktop-electron/README.md`; existing local primitives under `apps/desktop-electron/src/renderer/components/ui`.
 - **Test scenarios:**
   1. Existing controlled, disabled, keyboard, portal and focus-restoration behavior remains unchanged for every touched primitive.
-  2. New Button Group, Scroll Area and Tabs primitives expose the exact parts used by the Block and preserve native/Radix semantics.
+  2. Add only primitives actually consumed by the independent implementation. Preserve existing native scrolling and filter-button semantics; the preview's dependency list does not require unused Button Group, Scroll Area or Tabs wrappers.
   3. Shadow, focus-visible and Dialog overlay assertions retain the Electron exceptions.
   4. The Renderer resolves Inter locally for Latin text and falls back to PingFang SC for Chinese without a network request.
   5. Reduced-motion and forced-colors behavior remains available after class alignment.
@@ -319,7 +317,7 @@ If local Radix mechanics differ from the Base preview, the public preview remain
   3. Keep query, filters, scroll and selection in their current long-lived owners.
   4. Remove feature-level surface, radius and interaction-state classes that duplicate the new shared grammar.
 - **Execution note:** Migrate one representative populated module first, then reuse the accepted grammar for the remaining modules.
-- **Patterns to follow:** Current data and state ownership in the four feature projections; the pinned Block's Item, Tabs and Scroll Area composition.
+- **Patterns to follow:** Current data and state ownership in the four feature projections; observed row, pill and search styling with the existing Item, filter-button and native scrolling semantics.
 - **Test scenarios:**
   1. Covers AE3. Audio search, filters, counts, selection and recording action keep their callbacks and state while using the render-backed regions.
   2. Messages preserve exact read and mark-all behavior across all, unread and attention filters.

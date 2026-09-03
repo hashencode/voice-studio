@@ -113,6 +113,9 @@ describe("render-backed shell frame", () => {
       "--sidebar-width": "440px",
       "--sidebar-width-icon": "48px",
     });
+    expect(
+      screen.getByRole("button", { name: "收起音频上下文面板" }),
+    ).toHaveAttribute("data-variant", "handle");
     expect(context).toHaveClass(
       "w-[calc(var(--sidebar-width)-var(--sidebar-width-icon)-2px)]!",
     );
@@ -707,10 +710,11 @@ describe("application shell", () => {
     expect(generalSetting).toHaveAttribute("data-active", "true");
     expect(generalSetting).toHaveAttribute("aria-current", "location");
     expect(generalSetting).toHaveClass(
-      "data-[active=true]:bg-muted",
-      "data-[active=true]:font-medium",
+      "aria-[current=location]:bg-accent/60",
+      "rounded-none",
     );
-    expect(generalSetting).toHaveAttribute("data-slot", "sidebar-menu-button");
+    expect(generalSetting).toHaveAttribute("data-slot", "item");
+    expect(generalSetting).toHaveAttribute("data-variant", "context");
     expect(localModelsSetting).toHaveAttribute("data-active", "false");
     const recordingHeading = screen.getByRole("heading", {
       name: "录制",

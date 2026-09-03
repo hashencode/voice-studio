@@ -6,8 +6,8 @@
     "name": "ReUI App Shell 4",
     "url": "https://reui.io/preview/base/app-shell-4",
     "capturedOn": "2026-09-03",
-    "captureSurface": "Codex in-app Chromium browser",
-    "browserVersion": "not exposed",
+    "captureSurface": "agent-browser Chromium (fallback; in-app browser unavailable in acceptance turn)",
+    "browserVersion": "HeadlessChrome/151.0.0.0",
     "theme": "light",
     "style": "nova",
     "primitiveBaseObserved": "base-ui",
@@ -29,16 +29,16 @@
     ]
   },
   "referenceImage": {
-    "capturedOn": "2026-09-02",
-    "relationship": "Historical image retained unchanged; a new same-session reference-to-product comparison has not been accepted.",
-    "path": "reui-app-shell-4-1280x720.png",
+    "capturedOn": "2026-09-03",
+    "relationship": "Same-task public reference used for the authorized regional comparison; historical image retained separately.",
+    "path": "reui-app-shell-4-2026-09-03-1280x720.png",
     "viewport": {
       "width": 1280,
       "height": 720,
       "devicePixelRatio": 1,
       "zoom": 1
     },
-    "sha256": "cf275b5f8dfd390bce85529b00ed4b1b67993bb2b906944e8fce06be9fcf798f"
+    "sha256": "157dc7bc100b4922516de8fdc60cbd470fbf6277d75a1bb46a99c25703a4a58e"
   },
   "responsiveReference": {
     "viewport": {
@@ -114,6 +114,17 @@
         "borderOpacity": 0.4,
         "selectedBackground": "oklab(0.97 0 0 / 0.6)",
         "hoverBackground": "oklab(0.97 0 0 / 0.6)"
+      },
+      "headerSeparator": {
+        "height": 20,
+        "width": 1
+      },
+      "collapseStroke": {
+        "width": 2,
+        "height": 16,
+        "segments": 2,
+        "segmentHeight": 8,
+        "background": "oklab(0.145 0 0 / 0.4)"
       }
     },
     "states": {
@@ -139,5 +150,45 @@
     ]
   },
   "evidenceCanonicalization": "jq -cS '.evidence': recursively key-sorted compact JSON, UTF-8, including the trailing LF; not RFC 8785",
-  "evidenceSha256": "828384d679f4047bf64e6be5c54df12390d2077793498401eb8ed1cfab9dab23"
+  "evidenceSha256": "2bfe47dfdd4c424249f4200381b737e76ae2483e44f94ebcd075ee296ea976e4",
+  "historicalReferenceImage": {
+    "capturedOn": "2026-09-02",
+    "relationship": "Historical image retained unchanged; superseded for active acceptance by the 2026-09-03 same-session capture.",
+    "path": "reui-app-shell-4-1280x720.png",
+    "viewport": {
+      "width": 1280,
+      "height": 720,
+      "devicePixelRatio": 1,
+      "zoom": 1
+    },
+    "sha256": "cf275b5f8dfd390bce85529b00ed4b1b67993bb2b906944e8fce06be9fcf798f"
+  },
+  "rawEvidence": {
+    "path": "reui-app-shell-4-dom-2026-09-03.json",
+    "sha256": "e004c4b1b08a24b7b5a95081addeaff3f27316fd765d76d0f24f55571a3e7dbc",
+    "scope": "298 rendered non-SVG shell elements: hierarchy, classes, rects and selected computed properties; resource URLs only, no downloaded bundles."
+  },
+  "acceptance": {
+    "date": "2026-09-03",
+    "scope": "Shared shell chrome and context projections; not mail content or unchanged business workspaces.",
+    "referenceBrowser": "Chromium 151",
+    "productBrowser": "Electron 43.4.0 / Chromium 150.0.7871.224",
+    "productGolden": "../goldens/audio-app-shell-4.png",
+    "comparison": "Regional geometry/computed-style assertions plus direct image inspection at 1280x720; not a whole-page pixel-equality claim.",
+    "productDeltas": [
+      "Voice2Text navigation, logo, labels, data, counts and business content retained.",
+      "Radix and native button semantics retained instead of Base UI tabs.",
+      "Chinese uses PingFang SC; target is English.",
+      "History arrow icons retained instead of message chevrons.",
+      "Native title retained on collapse handle; no demo hover label.",
+      "Thin 1px keyboard focus retained instead of target input 3px ring.",
+      "880px docked minimum retained instead of target mobile sheet."
+    ],
+    "verification": {
+      "visual": "11 tests passed without updating snapshots; 10 accepted product goldens.",
+      "ui": "check:ui:quick and final check:ui passed: formatting, lint, TypeScript and 204 tests across 19 files.",
+      "review": "Five read-only review perspectives completed; the sole proposed coverage gap was independently rejected because existing integration tests exercise reopening. No actionable findings remain."
+    },
+    "remaining": "No pending shared-chrome acceptance work. Original-source equivalence, whole-page pixel equality, packaged resources and animated-transition correctness are not claimed."
+  }
 }

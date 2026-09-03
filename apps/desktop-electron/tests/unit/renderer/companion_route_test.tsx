@@ -86,6 +86,8 @@ describe("Companion route composition", () => {
     const alphaRow = within(list).getByRole("button", { name: /Alpha Phone/ });
     expect(alphaRow).toHaveAttribute("data-flat-row", "true");
     expect(alphaRow).toHaveAttribute("data-slot", "item");
+    expect(alphaRow).toHaveAttribute("data-variant", "context");
+    expect(alphaRow).toHaveAttribute("aria-pressed", "false");
     expect(alphaRow).not.toHaveClass("rounded-lg", "border");
     expect(
       within(pane).getByRole("button", { name: /Beta Phone/ }),
@@ -99,6 +101,7 @@ describe("Companion route composition", () => {
     ).toBeVisible();
 
     await user.click(within(pane).getByRole("button", { name: /Alpha Phone/ }));
+    expect(alphaRow).toHaveAttribute("aria-pressed", "true");
     expect(
       screen.getByRole("heading", { name: "Alpha Phone", level: 1 }),
     ).toBeVisible();
@@ -118,6 +121,10 @@ describe("Companion route composition", () => {
     expect(connectCompanionPeer).not.toHaveBeenCalled();
 
     await user.click(within(pane).getByRole("button", { name: /Beta Phone/ }));
+    expect(alphaRow).toHaveAttribute("aria-pressed", "false");
+    expect(
+      within(pane).getByRole("button", { name: /Beta Phone/ }),
+    ).toHaveAttribute("aria-pressed", "true");
     expect(
       screen.getByRole("heading", { name: "Beta Phone", level: 1 }),
     ).toBeVisible();

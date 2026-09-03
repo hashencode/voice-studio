@@ -1,10 +1,5 @@
 import type * as React from "react";
-import {
-  ArrowLeft,
-  ArrowRight,
-  PanelLeftClose,
-  PanelLeftOpen,
-} from "lucide-react";
+import { ArrowLeft, ArrowRight } from "lucide-react";
 
 import { AppSidebar } from "@/components/app-sidebar";
 import { Button } from "@/components/ui/button";
@@ -90,6 +85,7 @@ export function AppShellFrame({
       {contextPane ? (
         <SidebarRail
           ref={paneTriggerRef}
+          variant="handle"
           data-context-pane-midpoint-rail="true"
           type="button"
           aria-label={paneLabel}
@@ -100,14 +96,7 @@ export function AppShellFrame({
           style={{
             left: open ? "var(--sidebar-width)" : "var(--sidebar-width-icon)",
           }}
-          className="!top-1/2 right-auto !bottom-auto z-40 flex h-12 w-7 !translate-x-0 -translate-y-1/2 items-center justify-center rounded-md border bg-background text-muted-foreground after:hidden hover:bg-muted hover:text-foreground focus-visible:ring-1 disabled:pointer-events-none disabled:opacity-50"
-        >
-          {open ? (
-            <PanelLeftClose className="size-4" aria-hidden="true" />
-          ) : (
-            <PanelLeftOpen className="size-4" aria-hidden="true" />
-          )}
-        </SidebarRail>
+        />
       ) : null}
       <SidebarInset className="z-30 min-h-0 min-w-0 overflow-hidden">
         <header
@@ -136,7 +125,10 @@ export function AppShellFrame({
           >
             <ArrowRight aria-hidden="true" />
           </Button>
-          <Separator orientation="vertical" className="h-4" />
+          <Separator
+            orientation="vertical"
+            className="data-[orientation=vertical]:h-5"
+          />
           <h1
             ref={titleRef}
             tabIndex={-1}

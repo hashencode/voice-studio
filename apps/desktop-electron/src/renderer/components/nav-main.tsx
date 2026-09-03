@@ -60,10 +60,12 @@ export function NavMain({
   return (
     <>
       <SidebarContent>
-        <SidebarGroup>
+        <SidebarGroup className="pt-2.5">
           <SidebarGroupLabel className="sr-only">工作台</SidebarGroupLabel>
           <SidebarGroupContent className="px-1.5 md:px-0">
-            <SidebarMenu>{primaryItems.map(renderItem)}</SidebarMenu>
+            <SidebarMenu className="gap-0.5">
+              {primaryItems.map(renderItem)}
+            </SidebarMenu>
           </SidebarGroupContent>
         </SidebarGroup>
       </SidebarContent>

@@ -42,11 +42,14 @@ const itemVariants = cva(
         flat: "rounded-none border-0",
         outline: "border-border",
         muted: "border-transparent bg-muted/50",
+        context:
+          "flex-nowrap items-start rounded-none border-0 border-b border-border/40 [a]:hover:bg-accent/60 [button]:hover:bg-accent/60 aria-current:bg-accent/60 aria-[current=location]:bg-accent/60 aria-selected:bg-accent/60 aria-pressed:bg-accent/60",
       },
       size: {
         default: "gap-2.5 px-3 py-2.5",
         sm: "gap-2.5 px-3 py-2.5",
         xs: "gap-2 px-2.5 py-2",
+        context: "gap-2.5 p-3",
       },
     },
     defaultVariants: { variant: "default", size: "default" },
@@ -121,7 +124,7 @@ function ItemTitle({ className, ...props }: React.ComponentProps<"div">) {
     <div
       data-slot="item-title"
       className={cn(
-        "line-clamp-1 flex w-fit items-center gap-2 text-sm leading-snug font-medium underline-offset-4",
+        "line-clamp-1 flex w-fit items-center gap-2 text-sm leading-snug font-medium underline-offset-4 group-data-[variant=context]/item:block group-data-[variant=context]/item:max-w-full group-data-[variant=context]/item:truncate group-data-[variant=context]/item:leading-5 group-data-[variant=context]/item:font-semibold",
         className,
       )}
       {...props}
@@ -134,7 +137,7 @@ function ItemDescription({ className, ...props }: React.ComponentProps<"p">) {
     <p
       data-slot="item-description"
       className={cn(
-        "line-clamp-2 text-left text-sm leading-normal font-normal text-muted-foreground group-data-[size=xs]/item:text-xs [&>a]:underline [&>a]:underline-offset-4 [&>a:hover]:text-primary",
+        "line-clamp-2 text-left text-sm leading-normal font-normal text-muted-foreground group-data-[size=xs]/item:text-xs group-data-[variant=context]/item:text-xs group-data-[variant=context]/item:leading-4 [&>a]:underline [&>a]:underline-offset-4 [&>a:hover]:text-primary",
         className,
       )}
       {...props}

@@ -63,7 +63,7 @@ export function AppSidebar({
         aria-label="工作站主导航"
         className="w-[calc(var(--sidebar-width-icon)+1px)]! shrink-0 border-r"
       >
-        <SidebarHeader>
+        <SidebarHeader className="h-[50px] shrink-0">
           <div className="flex min-h-8 items-center justify-center">
             <span
               aria-label="Voice2Text"

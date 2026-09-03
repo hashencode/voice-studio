@@ -765,7 +765,12 @@ it("filters Audio summaries and projects every non-completed processing state", 
     />,
   );
 
-  await screen.findByRole("button", { name: /打开 音频 1/ });
+  const firstRow = await screen.findByRole("button", { name: /打开 音频 1/ });
+  expect(firstRow).toHaveAttribute("data-variant", "context");
+  const allFilter = screen.getByRole("button", { name: "全部 6" });
+  expect(allFilter).toHaveAttribute("data-variant", "filter");
+  expect(allFilter).toHaveAttribute("aria-pressed", "true");
+  expect(allFilter.querySelector('[data-slot="badge"]')).toHaveTextContent("6");
   for (const label of [
     "等待处理",
     "正在处理",
@@ -777,6 +782,7 @@ it("filters Audio summaries and projects every non-completed processing state", 
     expect(screen.getByText(label, { selector: "span" })).toBeVisible();
   }
   const search = screen.getByRole("searchbox", { name: "搜索音频" });
+  expect(search).toHaveAttribute("data-variant", "context-search");
   await userEvent.setup().type(search, "音频 4");
   expect(screen.getByRole("button", { name: /打开 音频 4/ })).toBeVisible();
   expect(
