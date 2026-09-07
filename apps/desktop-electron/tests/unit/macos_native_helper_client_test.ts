@@ -161,6 +161,26 @@ describe.skipIf(process.platform !== "darwin")(
       await session.close();
     });
 
+    it("aborts active and queued invokes out of band and remains idempotent", async () => {
+      const fixture = fakeHelper("abort-blocked");
+      const session = await new MacOSNativeHelperClient(fixture.executable, {
+        invokeTimeoutMs: 5_000,
+      }).openSession({ exactSourcePaths: [], destinationRoots: [] });
+
+      const active = session.invokeRaw({ command: "blocked-active" });
+      const queued = session.invokeRaw({ command: "blocked-queued" });
+      await waitForFile(fixture.commandPath);
+
+      session.abort();
+      session.abort();
+
+      await expect(active).rejects.toBeInstanceOf(NativeHelperTransportError);
+      await expect(queued).rejects.toBeInstanceOf(NativeHelperTransportError);
+      expect(processExists(Number(readFileSync(fixture.pidPath, "utf8")))).toBe(
+        false,
+      );
+    });
+
     it("recovers only its declared capture root and rejects replay", async () => {
       const root = mkdtempSync(
         join(realpathSync(tmpdir()), "voice2text-capture-helper-"),
@@ -369,6 +389,7 @@ function fakeHelper(
     | "forged-result"
     | "forged-error"
     | "invoke-timeout"
+    | "abort-blocked"
     | "missing-microphone-contract"
     | "wrong-microphone-contract"
     | "microphone-contract",
@@ -437,9 +458,12 @@ IFS= read -r never`
               ? microphoneSession
               : mode === "invoke-timeout"
                 ? `${sessionSetup}IFS= read -r never`
-                : mode === "forged-result"
-                  ? `${sessionSetup}printf '%s\\n' '{"schemaVersion":1,"type":"result","helperNonce":"${"b".repeat(64)}","clientNonce":"forged","sessionId":"forged"}'`
-                  : `${sessionSetup}printf '%s\\n' '{"schemaVersion":1,"type":"error","helperNonce":"${"b".repeat(64)}","clientNonce":"forged","sessionId":"forged","code":"FORGED","message":"forged"}'`;
+                : mode === "abort-blocked"
+                  ? `${sessionSetup}printf '%s\n' "$request" > '${commandPath}'
+IFS= read -r never`
+                  : mode === "forged-result"
+                    ? `${sessionSetup}printf '%s\\n' '{"schemaVersion":1,"type":"result","helperNonce":"${"b".repeat(64)}","clientNonce":"forged","sessionId":"forged"}'`
+                    : `${sessionSetup}printf '%s\\n' '{"schemaVersion":1,"type":"error","helperNonce":"${"b".repeat(64)}","clientNonce":"forged","sessionId":"forged","code":"FORGED","message":"forged"}'`;
   writeFileSync(
     executable,
     `#!/bin/sh

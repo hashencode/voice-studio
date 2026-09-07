@@ -3,16 +3,21 @@ import type {
   CaptureStartCommand,
 } from "../../../shared/contracts";
 import {
+  NativeHelperCommandError,
   NativeHelperTransportError,
   type MacOSNativeHelperSession,
 } from "../../features/importing/macos_native_helper_client";
 import {
+  CaptureNativeStopError,
   MicrophoneTestNativeError,
   type CaptureNativePort,
 } from "./capture_native_port";
 
 export class MacOSCaptureNativePort implements CaptureNativePort {
-  constructor(private readonly session: MacOSNativeHelperSession) {}
+  constructor(
+    private session: MacOSNativeHelperSession,
+    private readonly reopenSession?: () => Promise<MacOSNativeHelperSession>,
+  ) {}
 
   preflight(command: Parameters<CaptureNativePort["preflight"]>[0]) {
     return this.session.capturePreflight(command);
@@ -30,8 +35,15 @@ export class MacOSCaptureNativePort implements CaptureNativePort {
     return this.session.captureControl(command);
   }
 
-  stop(command: CaptureControlCommand) {
-    return this.session.captureControl(command);
+  async stop(command: CaptureControlCommand) {
+    try {
+      return await this.session.captureControl(command);
+    } catch (error) {
+      throw new CaptureNativeStopError(
+        error instanceof NativeHelperCommandError ? "command" : "transport",
+        { cause: error },
+      );
+    }
   }
 
   systemSleep(command: CaptureControlCommand) {
@@ -60,6 +72,26 @@ export class MacOSCaptureNativePort implements CaptureNativePort {
 
   discard(sessionId: string, idempotencyKey: string) {
     return this.session.captureDiscard(sessionId, idempotencyKey);
+  }
+
+  async recreateAfterTransportLoss(): Promise<void> {
+    if (!this.reopenSession) {
+      throw new Error("capture native session cannot be recreated");
+    }
+    this.session.abort();
+    this.session = await this.reopenSession();
+  }
+
+  abort(): void {
+    this.session.abort();
+  }
+
+  currentSession(): MacOSNativeHelperSession {
+    return this.session;
+  }
+
+  async close(): Promise<void> {
+    await this.session.close();
   }
 
   async startMicrophoneTest(testId: string, microphoneDeviceId?: string) {

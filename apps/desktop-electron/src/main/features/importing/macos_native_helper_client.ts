@@ -161,6 +161,7 @@ export class MacOSNativeHelperClient {
 export class MacOSNativeHelperSession {
   readonly transport = "inherited-stdio" as const;
   private queue: Promise<unknown> = Promise.resolve();
+  private abortedError: NativeHelperTransportError | null = null;
 
   constructor(
     private readonly protocol: HelperLineProtocol,
@@ -316,10 +317,19 @@ export class MacOSNativeHelperSession {
     await this.protocol.close();
   }
 
+  abort(): void {
+    if (this.abortedError) return;
+    this.abortedError = new NativeHelperTransportError(
+      "native helper session aborted",
+    );
+    this.protocol.abort(this.abortedError);
+  }
+
   private async invoke(command: Record<string, unknown>): Promise<HelperFrame> {
     const next = this.queue
       .catch(() => undefined)
       .then(async () => {
+        if (this.abortedError) throw this.abortedError;
         let response: HelperFrame;
         try {
           this.protocol.send({
@@ -453,6 +463,15 @@ class HelperLineProtocol {
       this.child.kill("SIGKILL");
     }
     await this.closed;
+  }
+
+  abort(error: NativeHelperTransportError): void {
+    this.fail(error);
+    this.lines.close();
+    this.child.stdin.destroy();
+    if (this.child.exitCode === null && this.child.signalCode === null) {
+      this.child.kill("SIGKILL");
+    }
   }
 
   private accept(line: string): void {

@@ -9,6 +9,7 @@ import {
 } from "../../src/main/domain/capture/desktop_capture_service";
 import { finalizeCommittedCaptureTranscript } from "../../src/main/domain/captions/capture_formal_completion";
 import type { CaptureNativePort } from "../../src/main/domain/capture/capture_native_port";
+import { CaptureNativeStopError } from "../../src/main/domain/capture/capture_native_port";
 import { MicrophoneTestService } from "../../src/main/domain/capture/microphone_test_service";
 import { openAudioDatabase } from "../../src/main/storage/audio_database";
 import { CaptureRepository } from "../../src/main/storage/repositories/capture_repository";
@@ -403,18 +404,22 @@ describe("macOS capture parity flow", () => {
         sessionId: started.sessionId,
         idempotencyKey: "resume-after-wake-123456",
       });
-      const stopped = await service.control({
+      const stopped = await service.stopAndReconcile({
         action: "stop",
         sessionId: started.sessionId,
         idempotencyKey: "stop-capture-123456",
       });
-      const repeated = await service.control({
+      const repeated = await service.stopAndReconcile({
         action: "stop",
         sessionId: started.sessionId,
         idempotencyKey: "stop-capture-123456",
       });
-      expect(stopped.state).toBe("completed");
-      expect(repeated).toEqual(stopped);
+      expect(stopped).toMatchObject({
+        capability: "recovered-terminal",
+        failureKind: null,
+        snapshot: { state: "completed" },
+      });
+      expect(repeated.snapshot).toEqual(stopped.snapshot);
       expect(native.stop).toHaveBeenCalledOnce();
       expect(service.snapshot()?.recordingSha256).toMatch(/^[a-f0-9]{64}$/);
       expect(
@@ -749,6 +754,249 @@ describe("macOS capture parity flow", () => {
       database.close();
     }
   });
+
+  it("reconciles a rejected stop against the live session before allowing retry", async () => {
+    const database = openAudioDatabase(":memory:");
+    const repository = new CaptureRepository(database);
+    const native = nativeFixture();
+    native.stop.mockRejectedValueOnce(new CaptureNativeStopError("command"));
+    native.snapshot.mockResolvedValueOnce(
+      runtimeSnapshot({ sessionId: "session-stop-rejected-123456" }),
+    );
+    repository.beginSession({
+      sessionId: "session-stop-rejected-123456",
+      title: "Stop rejected",
+      workspacePath:
+        "/tmp/voice2text-capture-test-root/session-stop-rejected-123456",
+      nowMs: 1,
+    });
+    const service = new DesktopCaptureService(
+      repository,
+      native,
+      "/tmp/voice2text-capture-test-root",
+      () => 6_000,
+    );
+    try {
+      await expect(
+        service.stopAndReconcile({
+          action: "stop",
+          sessionId: "session-stop-rejected-123456",
+          idempotencyKey: "stop-rejected-123456",
+        }),
+      ).resolves.toMatchObject({
+        capability: "live-stoppable",
+        failureKind: "command",
+        snapshot: { state: "recording" },
+      });
+      expect(
+        repository.hasActionReceipt("session-stop-rejected-123456", "stop"),
+      ).toBe(false);
+    } finally {
+      database.close();
+    }
+  });
+
+  it("persists one stop receipt when a rejected stop reconciles terminal authority", async () => {
+    const database = openAudioDatabase(":memory:");
+    const repository = new CaptureRepository(database);
+    const native = nativeFixture();
+    native.stop.mockRejectedValueOnce(new CaptureNativeStopError("command"));
+    native.snapshot.mockResolvedValueOnce(
+      runtimeSnapshot({
+        sessionId: "session-stop-terminal-123456",
+        state: "completed",
+        systemAudioHealthy: false,
+        microphoneHealthy: false,
+        finalizedChunkCount: 1,
+        recordingSha256: "d".repeat(64),
+        journalSha256: "d".repeat(64),
+      }),
+    );
+    repository.beginSession({
+      sessionId: "session-stop-terminal-123456",
+      title: "Terminal stop",
+      workspacePath:
+        "/tmp/voice2text-capture-test-root/session-stop-terminal-123456",
+      nowMs: 1,
+    });
+    const service = new DesktopCaptureService(
+      repository,
+      native,
+      "/tmp/voice2text-capture-test-root",
+      () => 6_500,
+      async (options) => authorityFixture(options.sessionId),
+    );
+    const command = {
+      action: "stop" as const,
+      sessionId: "session-stop-terminal-123456",
+      idempotencyKey: "stop-terminal-123456",
+    };
+    try {
+      const first = await service.stopAndReconcile(command);
+      const repeated = await service.stopAndReconcile(command);
+      expect(first).toMatchObject({
+        capability: "recovered-terminal",
+        failureKind: "command",
+        snapshot: { state: "completed" },
+      });
+      expect(repeated.snapshot).toEqual(first.snapshot);
+      expect(
+        database
+          .prepare(
+            "SELECT COUNT(*) count FROM capture_command_receipts WHERE action = 'stop'",
+          )
+          .get()?.count,
+      ).toBe(1);
+    } finally {
+      database.close();
+    }
+  });
+
+  it("recreates after transport loss and persists recoverable truth without a stop receipt", async () => {
+    const database = openAudioDatabase(":memory:");
+    const repository = new CaptureRepository(database);
+    const native = nativeFixture();
+    const sessionId = "session-stop-transport-123456";
+    native.stop.mockRejectedValueOnce(new CaptureNativeStopError("transport"));
+    native.recreateAfterTransportLoss.mockResolvedValueOnce(undefined);
+    native.recover.mockResolvedValueOnce([
+      snapshot({
+        sessionId,
+        state: "recoverable",
+        systemAudioHealthy: false,
+        microphoneHealthy: false,
+        partialCapture: true,
+        finalizedChunkCount: 1,
+        journalSha256: "c".repeat(64),
+      }),
+    ]);
+    repository.beginSession({
+      sessionId,
+      title: "Transport loss",
+      workspacePath: `/tmp/voice2text-capture-test-root/${sessionId}`,
+      nowMs: 1,
+    });
+    const service = new DesktopCaptureService(
+      repository,
+      native,
+      "/tmp/voice2text-capture-test-root",
+      () => 7_000,
+      async (options) => authorityFixture(options.sessionId),
+    );
+    try {
+      await expect(
+        service.stopAndReconcile({
+          action: "stop",
+          sessionId,
+          idempotencyKey: "stop-transport-123456",
+        }),
+      ).resolves.toMatchObject({
+        capability: "recovered-terminal",
+        failureKind: "transport",
+        snapshot: { state: "recoverable", recordingSha256: null },
+      });
+      expect(native.recreateAfterTransportLoss).toHaveBeenCalledOnce();
+      expect(repository.find(sessionId)?.state).toBe("recoverable");
+      expect(repository.hasActionReceipt(sessionId, "stop")).toBe(false);
+    } finally {
+      database.close();
+    }
+  });
+
+  it("commits a recreated terminal snapshot exactly once after stop response loss", async () => {
+    const database = openAudioDatabase(":memory:");
+    const repository = new CaptureRepository(database);
+    const native = nativeFixture();
+    const sessionId = "session-stop-response-lost-123456";
+    native.stop.mockRejectedValueOnce(new CaptureNativeStopError("transport"));
+    native.recover.mockResolvedValueOnce([
+      snapshot({
+        sessionId,
+        state: "completed",
+        systemAudioHealthy: false,
+        microphoneHealthy: false,
+        finalizedChunkCount: 1,
+        recordingSha256: "d".repeat(64),
+        journalSha256: "d".repeat(64),
+      }),
+    ]);
+    repository.beginSession({
+      sessionId,
+      title: "Response lost",
+      workspacePath: `/tmp/voice2text-capture-test-root/${sessionId}`,
+      nowMs: 1,
+    });
+    const service = new DesktopCaptureService(
+      repository,
+      native,
+      "/tmp/voice2text-capture-test-root",
+      () => 7_500,
+      async (options) => authorityFixture(options.sessionId),
+    );
+    const command = {
+      action: "stop" as const,
+      sessionId,
+      idempotencyKey: "stop-response-lost-123456",
+    };
+    try {
+      const first = await service.stopAndReconcile(command);
+      const repeated = await service.stopAndReconcile(command);
+
+      expect(first).toMatchObject({
+        capability: "recovered-terminal",
+        failureKind: "transport",
+        snapshot: { state: "completed" },
+      });
+      expect(repeated.snapshot).toEqual(first.snapshot);
+      expect(native.recreateAfterTransportLoss).toHaveBeenCalledOnce();
+      expect(
+        database
+          .prepare(
+            "SELECT COUNT(*) count FROM capture_command_receipts WHERE action = 'stop'",
+          )
+          .get()?.count,
+      ).toBe(1);
+    } finally {
+      database.close();
+    }
+  });
+
+  it("reports bounded unknown authority when transport recreation fails", async () => {
+    const database = openAudioDatabase(":memory:");
+    const repository = new CaptureRepository(database);
+    const native = nativeFixture();
+    const sessionId = "session-stop-unknown-123456";
+    native.stop.mockRejectedValueOnce(new CaptureNativeStopError("transport"));
+    native.recreateAfterTransportLoss.mockRejectedValueOnce(
+      new Error("replacement unavailable"),
+    );
+    repository.beginSession({
+      sessionId,
+      title: "Unknown stop",
+      workspacePath: `/tmp/voice2text-capture-test-root/${sessionId}`,
+      nowMs: 1,
+    });
+    const service = new DesktopCaptureService(
+      repository,
+      native,
+      "/tmp/voice2text-capture-test-root",
+    );
+    try {
+      await expect(
+        service.stopAndReconcile({
+          action: "stop",
+          sessionId,
+          idempotencyKey: "stop-unknown-123456",
+        }),
+      ).resolves.toEqual({
+        capability: "unknown",
+        failureKind: "transport",
+        snapshot: null,
+      });
+    } finally {
+      database.close();
+    }
+  });
 });
 
 function nativeFixture() {
@@ -808,6 +1056,8 @@ function nativeFixture() {
     cancelMicrophoneTest: vi.fn(async (testId: string) =>
       microphoneTestSnapshot(testId, "cancelled"),
     ),
+    recreateAfterTransportLoss: vi.fn(async () => undefined),
+    abort: vi.fn(),
   } satisfies CaptureNativePort;
 }
 

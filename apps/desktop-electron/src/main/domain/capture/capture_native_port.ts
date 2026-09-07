@@ -17,6 +17,18 @@ export class MicrophoneTestNativeError extends Error {
   }
 }
 
+export type CaptureNativeStopFailureKind = "command" | "transport";
+
+export class CaptureNativeStopError extends Error {
+  constructor(
+    readonly kind: CaptureNativeStopFailureKind,
+    options?: ErrorOptions,
+  ) {
+    super(`capture stop native ${kind} failure`, options);
+    this.name = "CaptureNativeStopError";
+  }
+}
+
 export interface CaptureNativePort {
   preflight(command: {
     minimumFreeBytes: number;
@@ -39,4 +51,6 @@ export interface CaptureNativePort {
   microphoneTestSnapshot(testId: string): Promise<MicrophoneTestSnapshot>;
   finishMicrophoneTest(testId: string): Promise<MicrophoneTestSnapshot>;
   cancelMicrophoneTest(testId: string): Promise<MicrophoneTestSnapshot>;
+  recreateAfterTransportLoss?(): Promise<void>;
+  abort?(): void;
 }

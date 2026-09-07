@@ -19,7 +19,11 @@ import type {
   CaptureRepository,
   StoredCaptureSession,
 } from "../../storage/repositories/capture_repository";
-import type { CaptureNativePort } from "./capture_native_port";
+import {
+  CaptureNativeStopError,
+  type CaptureNativePort,
+  type CaptureNativeStopFailureKind,
+} from "./capture_native_port";
 import {
   validateCaptureAuthority,
   type CaptureAuthority,
@@ -134,6 +138,52 @@ export class DesktopCaptureService {
       this.now(),
       authority,
     );
+  }
+
+  async stopAndReconcile(
+    raw: CaptureControlCommand,
+  ): Promise<CaptureStopReconciliation> {
+    const command = captureControlCommandSchema.parse(raw);
+    if (command.action !== "stop") {
+      throw new Error("stop reconciliation requires a stop command");
+    }
+    const cached = this.cached(
+      command.sessionId,
+      command.idempotencyKey,
+      "stop",
+    );
+    if (cached) {
+      return {
+        snapshot: cached,
+        capability: "recovered-terminal",
+        failureKind: null,
+      };
+    }
+    try {
+      const snapshot = await this.control(command);
+      return {
+        snapshot,
+        capability: "recovered-terminal",
+        failureKind: null,
+      };
+    } catch (error) {
+      if (!(error instanceof CaptureNativeStopError)) throw error;
+      return error.kind === "command"
+        ? await this.reconcileOnLiveSession(
+            command.sessionId,
+            command,
+            error.kind,
+          )
+        : await this.reconcileAfterTransportLoss(
+            command.sessionId,
+            command,
+            error.kind,
+          );
+    }
+  }
+
+  abortNativeSession(): void {
+    this.native.abort?.();
   }
 
   async lifecycle(
@@ -369,6 +419,136 @@ export class DesktopCaptureService {
       expectedJournalSha256: snapshot.journalSha256,
     });
   }
+
+  private async reconcileOnLiveSession(
+    sessionId: string,
+    command: CaptureControlCommand,
+    failureKind: CaptureNativeStopFailureKind,
+  ): Promise<CaptureStopReconciliation> {
+    try {
+      const snapshot = this.acceptRuntime(
+        await this.native.snapshot(sessionId),
+      );
+      this.assertSession(sessionId, snapshot);
+      return await this.persistStopReconciliation(
+        snapshot,
+        command,
+        failureKind,
+        true,
+      );
+    } catch {
+      this.currentAudioActivity = 0;
+      return { snapshot: null, capability: "unknown", failureKind };
+    }
+  }
+
+  private async reconcileAfterTransportLoss(
+    sessionId: string,
+    command: CaptureControlCommand,
+    failureKind: CaptureNativeStopFailureKind,
+  ): Promise<CaptureStopReconciliation> {
+    if (!this.native.recreateAfterTransportLoss) {
+      return { snapshot: null, capability: "unknown", failureKind };
+    }
+    try {
+      await this.native.recreateAfterTransportLoss();
+      const recovered = captureSnapshotSchema
+        .array()
+        .max(256)
+        .parse(await this.native.recover())
+        .find((snapshot) => snapshot.sessionId === sessionId);
+      if (!recovered) {
+        return { snapshot: null, capability: "unknown", failureKind };
+      }
+      return await this.persistStopReconciliation(
+        recovered,
+        command,
+        failureKind,
+        false,
+      );
+    } catch {
+      this.currentAudioActivity = 0;
+      return { snapshot: null, capability: "unknown", failureKind };
+    }
+  }
+
+  private async persistStopReconciliation(
+    snapshot: CaptureSnapshot,
+    command: CaptureControlCommand,
+    failureKind: CaptureNativeStopFailureKind,
+    originalSessionIsLive: boolean,
+  ): Promise<CaptureStopReconciliation> {
+    if (isDurableTerminal(snapshot)) {
+      const authority = await this.validatedAuthority(snapshot);
+      const stored = this.repository.saveSnapshotAndReceipt(
+        snapshot,
+        "stop",
+        command.idempotencyKey,
+        this.now(),
+        authority,
+      );
+      return {
+        snapshot: stored,
+        capability: "recovered-terminal",
+        failureKind,
+      };
+    }
+    if (snapshot.state === "recoverable" || snapshot.state === "failed") {
+      const authority =
+        snapshot.finalizedChunkCount > 0
+          ? await this.validatedAuthority(snapshot)
+          : undefined;
+      const recoveryKey = `stop-reconcile-${snapshot.journalSha256 ?? snapshot.sessionId}`;
+      const prior = this.repository.receipt(snapshot.sessionId, recoveryKey);
+      const stored = prior
+        ? prior.result
+        : this.repository.saveSnapshotAndReceipt(
+            snapshot,
+            "recover",
+            recoveryKey,
+            this.now(),
+            authority,
+          );
+      return {
+        snapshot: stored,
+        capability: "recovered-terminal",
+        failureKind,
+      };
+    }
+    const stored = this.repository.saveSnapshot(snapshot, this.now());
+    return {
+      snapshot: stored,
+      capability:
+        originalSessionIsLive && isLiveStoppable(snapshot)
+          ? "live-stoppable"
+          : "unknown",
+      failureKind,
+    };
+  }
+}
+
+export type CaptureStopCapability =
+  "live-stoppable" | "recovered-terminal" | "unknown";
+
+export interface CaptureStopReconciliation {
+  snapshot: CaptureSnapshot | null;
+  capability: CaptureStopCapability;
+  failureKind: CaptureNativeStopFailureKind | null;
+}
+
+function isDurableTerminal(snapshot: CaptureSnapshot): boolean {
+  return (
+    (snapshot.state === "completed" || snapshot.state === "partial_capture") &&
+    snapshot.recordingSha256 !== null
+  );
+}
+
+function isLiveStoppable(snapshot: CaptureSnapshot): boolean {
+  return (
+    snapshot.state === "recording" ||
+    snapshot.state === "paused" ||
+    (snapshot.state === "partial_capture" && snapshot.recordingSha256 === null)
+  );
 }
 
 export function localCaptureDay(nowMs: number): {
