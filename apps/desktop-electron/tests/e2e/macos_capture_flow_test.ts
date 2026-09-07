@@ -1,4 +1,5 @@
-import { readFileSync } from "node:fs";
+import { mkdtempSync, readFileSync, rmSync } from "node:fs";
+import { tmpdir } from "node:os";
 import { join } from "node:path";
 
 import { describe, expect, it, vi } from "vitest";
@@ -7,6 +8,11 @@ import {
   DesktopCaptureService,
   localCaptureDay,
 } from "../../src/main/domain/capture/desktop_capture_service";
+import {
+  CaptureQuitCoordinator,
+  type CaptureQuitCoordinatorPorts,
+  type QuitDecision,
+} from "../../src/main/domain/capture/capture_quit_coordinator";
 import { finalizeCommittedCaptureTranscript } from "../../src/main/domain/captions/capture_formal_completion";
 import type { CaptureNativePort } from "../../src/main/domain/capture/capture_native_port";
 import { CaptureNativeStopError } from "../../src/main/domain/capture/capture_native_port";
@@ -900,6 +906,118 @@ describe("macOS capture parity flow", () => {
       expect(repository.hasActionReceipt(sessionId, "stop")).toBe(false);
     } finally {
       database.close();
+    }
+  });
+
+  it("preserves a zero-chunk failed stop across exit and makes it discoverable after restart", async () => {
+    const temporaryRoot = mkdtempSync(
+      join(tmpdir(), "voice2text-quit-recovery-"),
+    );
+    const databasePath = join(temporaryRoot, "audio.sqlite3");
+    const sessionId = "session-preserved-exit-123456";
+    const native = nativeFixture();
+    native.stop.mockRejectedValueOnce(new CaptureNativeStopError("transport"));
+    native.recover.mockResolvedValueOnce([
+      snapshot({
+        sessionId,
+        state: "recoverable",
+        systemAudioHealthy: false,
+        microphoneHealthy: false,
+        finalizedChunkCount: 0,
+        recordingSha256: null,
+        journalSha256: "e".repeat(64),
+      }),
+    ]);
+    let database = openAudioDatabase(databasePath);
+    try {
+      const service = new DesktopCaptureService(
+        new CaptureRepository(database),
+        native,
+        temporaryRoot,
+        () => 8_000,
+      );
+      await service.start({
+        sessionId,
+        title: "Preserved recovery",
+        idempotencyKey: "start-preserved-exit-123456",
+        minimumFreeBytes: 1,
+        captionEnabled: false,
+      });
+
+      const decisions: QuitDecision[] = ["stop-and-exit", "preserve-and-exit"];
+      const exit = vi.fn();
+      const teardown = vi.fn(async () => undefined);
+      const ports = {
+        currentCapture: () => service.snapshot(),
+        activate: vi.fn(),
+        dialogParent: () => undefined,
+        showDecision: vi.fn(async () => decisions.shift()!),
+        stopAndReconcile: async (options) =>
+          await service.stopAndReconcile({ action: "stop", ...options }),
+        publishCapture: vi.fn(),
+        showSafeReturn: vi.fn(),
+        suppressCapturePublications: vi.fn(),
+        abortCapture: () => service.abortNativeSession(),
+        teardown,
+        quit: vi.fn(),
+        exit,
+      } satisfies CaptureQuitCoordinatorPorts;
+      const coordinator = new CaptureQuitCoordinator(ports);
+
+      await expect(coordinator.requestInteractive()).resolves.toBe(
+        "recoverable-exit",
+      );
+      expect(native.abort).toHaveBeenCalledOnce();
+      expect(teardown).toHaveBeenCalledWith({
+        skipCaptureControlMutation: true,
+      });
+      expect(exit).toHaveBeenCalledOnce();
+      expect(
+        database
+          .prepare(
+            "SELECT COUNT(*) count FROM capture_command_receipts WHERE session_id = ? AND action = 'stop'",
+          )
+          .get(sessionId)?.count,
+      ).toBe(0);
+      expect(new CaptureRepository(database).find(sessionId)).toMatchObject({
+        state: "recoverable",
+        finalizedChunkCount: 0,
+        recordingSha256: null,
+      });
+
+      database.close();
+      database = openAudioDatabase(databasePath);
+      const restartedNative = nativeFixture();
+      restartedNative.recover.mockResolvedValueOnce([
+        snapshot({
+          sessionId,
+          state: "recoverable",
+          systemAudioHealthy: false,
+          microphoneHealthy: false,
+          finalizedChunkCount: 0,
+          recordingSha256: null,
+          journalSha256: "e".repeat(64),
+        }),
+      ]);
+      const restarted = new DesktopCaptureService(
+        new CaptureRepository(database),
+        restartedNative,
+        temporaryRoot,
+        () => 9_000,
+      );
+      await expect(restarted.recover()).resolves.toHaveLength(1);
+      expect(restarted.listRecoveries()).toEqual([
+        expect.objectContaining({ sessionId, state: "recoverable" }),
+      ]);
+      expect(restarted.snapshot()).toMatchObject({
+        sessionId,
+        state: "recoverable",
+        finalizedChunkCount: 0,
+        recordingSha256: null,
+      });
+    } finally {
+      database.close();
+      rmSync(temporaryRoot, { recursive: true, force: true });
     }
   });
 

@@ -46,8 +46,29 @@ it("ends capture smoke phases with their intended cleanup semantics", () => {
   expect(mainSource).not.toContain("app.exit(86)");
 });
 
-it("offers an explicit tray quit action through the guarded application lifecycle", () => {
+it("converges tray, menu/window, and signal exits through the quit coordinator", () => {
   expect(mainSource).toMatch(
     /label: "退出 Voice2Text",\s*click: \(\) => app\.quit\(\),/,
   );
+  expect(mainSource).toMatch(
+    /app\.on\("window-all-closed", \(\) => \{\s*if \(process\.platform !== "darwin"\) app\.quit\(\);\s*\}\);/,
+  );
+  expect(mainSource).toMatch(
+    /app\.on\("before-quit", \(event\) => \{[\s\S]*?event\.preventDefault\(\);[\s\S]*?captureQuitCoordinator\.requestInteractive\(\)/,
+  );
+  expect(mainSource).toMatch(
+    /process\.once\("SIGTERM", \(\) => \{\s*void captureQuitCoordinator\.requestNonInteractive\(\);\s*\}\);/,
+  );
+  expect(mainSource).toMatch(
+    /process\.once\("SIGINT", \(\) => \{\s*void captureQuitCoordinator\.requestNonInteractive\(\);\s*\}\);/,
+  );
+});
+
+it("keeps quit lifecycle evidence aggregate and omits raw session/workspace identifiers", () => {
+  const evidenceWriter = mainSource.slice(
+    mainSource.indexOf("async function recordCaptureSmokeQuitCommit"),
+    mainSource.indexOf("function bindDesktopIpc"),
+  );
+  expect(evidenceWriter).toContain("stopReceiptObservedBeforeTeardown");
+  expect(evidenceWriter).not.toMatch(/\n\s*(?:sessionId|workspacePath)\s*:/);
 });
