@@ -1143,7 +1143,9 @@ describe("capture workspace", () => {
   it("allows a failed stop confirmation to be retried", async () => {
     const controlCapture = vi
       .fn()
-      .mockRejectedValueOnce(new Error("capture service unavailable"))
+      .mockRejectedValueOnce(
+        new Error("native helper failed at /private/capture/session.json"),
+      )
       .mockResolvedValueOnce(recording);
     installCaptureApi({ controlCapture });
     render(
@@ -1162,10 +1164,60 @@ describe("capture workspace", () => {
     fireEvent.click(confirm);
 
     await waitFor(() => expect(confirm).toBeEnabled());
+    expect(
+      screen.getByText(
+        "停止录制未完成，请重试；如需退出，可保留录音数据并在下次启动时恢复。",
+      ),
+    ).toBeInTheDocument();
+    expect(screen.queryByText(/native helper|private\/capture/)).toBeNull();
     expect(screen.getByRole("alertdialog")).toBeInTheDocument();
     fireEvent.click(confirm);
     expect(controlCapture).toHaveBeenCalledTimes(2);
   });
+
+  it.each(["completed", "recovery"] as const)(
+    "clears a failed stop after a later %s snapshot",
+    async (phase) => {
+      const controlCapture = vi
+        .fn()
+        .mockRejectedValue(
+          new Error("native helper failed at /private/capture/session.json"),
+        );
+      installCaptureApi({ controlCapture });
+      const view = render(
+        <CaptureWorkspace
+          capture={{
+            phase: "recording",
+            sessionId: recording.sessionId,
+            title: "访谈录制",
+            elapsedMs: 5_000,
+          }}
+        />,
+      );
+
+      fireEvent.click(
+        await screen.findByRole("button", { name: "停止并保存" }),
+      );
+      fireEvent.click(screen.getByRole("button", { name: "确认停止并保存" }));
+      expect(
+        await screen.findByText("停止录制未完成", { exact: false }),
+      ).toBeInTheDocument();
+
+      view.rerender(
+        <CaptureWorkspace
+          capture={{
+            phase,
+            sessionId: recording.sessionId,
+            title: "访谈录制",
+            elapsedMs: 5_000,
+          }}
+        />,
+      );
+
+      await waitFor(() => expect(screen.queryByRole("alert")).toBeNull());
+      expect(screen.queryByRole("alertdialog")).toBeNull();
+    },
+  );
 
   it("pauses once and renders the returned state", async () => {
     const paused: CaptureSnapshot = { ...recording, state: "paused" };
@@ -1308,12 +1360,7 @@ describe("capture workspace", () => {
     expect(screen.queryByText(recoverable.title)).toBeNull();
     expect(screen.queryByText(anotherRecovery.title)).toBeNull();
     expect(screen.queryByText(/00:15|00:04|时间缺口/)).toBeNull();
-    expect(
-      screen.queryByRole("button", { name: /丢弃/ }),
-    ).not.toBeInTheDocument();
-
-    await user.click(screen.getByRole("button", { name: "管理恢复录制" }));
-    await user.click(screen.getByRole("button", { name: "丢弃所有恢复录音" }));
+    await user.click(screen.getByRole("button", { name: "丢弃" }));
     await waitFor(() => expect(actOnCaptureRecovery).toHaveBeenCalledTimes(2));
     expect(actOnCaptureRecovery).toHaveBeenNthCalledWith(
       1,
@@ -1337,9 +1384,7 @@ describe("capture workspace", () => {
       anotherRecovery,
     ]);
     render(<CaptureWorkspace capture={idle} applicationRevision={6} />);
-    await user.click(
-      await screen.findByRole("button", { name: "恢复所有录音" }),
-    );
+    await user.click(await screen.findByRole("button", { name: "恢复数据" }));
     await waitFor(() => expect(actOnCaptureRecovery).toHaveBeenCalledTimes(2));
     expect(actOnCaptureRecovery).toHaveBeenNthCalledWith(
       1,
@@ -1357,47 +1402,59 @@ describe("capture workspace", () => {
     );
   });
 
-  it("retries only the recoveries left after a partial batch failure", async () => {
-    const firstRecovery: CaptureRecoveryItem = {
-      ...recording,
-      sessionId: "session-recovery-first-123456",
-      title: "Recover-第一段录音",
-      state: "recoverable",
-    };
-    const secondRecovery: CaptureRecoveryItem = {
-      ...firstRecovery,
-      sessionId: "session-recovery-second-123456",
-      title: "Recover-第二段录音",
-    };
-    const actOnCaptureRecovery = vi
-      .fn()
-      .mockResolvedValueOnce(null)
-      .mockRejectedValueOnce(new Error("native recovery failed"))
-      .mockResolvedValueOnce(null);
-    installCaptureApi({
-      listCaptureRecoveries: vi.fn(async () => [firstRecovery, secondRecovery]),
-      actOnCaptureRecovery,
-    });
-    const user = userEvent.setup();
-    render(<CaptureWorkspace capture={idle} />);
+  it.each([
+    { action: "keep" as const, buttonName: "恢复数据" },
+    { action: "discard" as const, buttonName: "丢弃" },
+  ])(
+    "retries only the recoveries left after a partial $action batch failure",
+    async ({ action, buttonName }) => {
+      const firstRecovery: CaptureRecoveryItem = {
+        ...recording,
+        sessionId: "session-recovery-first-123456",
+        title: "Recover-第一段录音",
+        state: "recoverable",
+      };
+      const secondRecovery: CaptureRecoveryItem = {
+        ...firstRecovery,
+        sessionId: "session-recovery-second-123456",
+        title: "Recover-第二段录音",
+      };
+      const actOnCaptureRecovery = vi
+        .fn()
+        .mockResolvedValueOnce(null)
+        .mockRejectedValueOnce(new Error("native recovery failed"))
+        .mockResolvedValueOnce(null);
+      installCaptureApi({
+        listCaptureRecoveries: vi.fn(async () => [
+          firstRecovery,
+          secondRecovery,
+        ]),
+        actOnCaptureRecovery,
+      });
+      const user = userEvent.setup();
+      render(<CaptureWorkspace capture={idle} />);
 
-    await user.click(
-      await screen.findByRole("button", { name: "恢复所有录音" }),
-    );
-    expect(await screen.findByRole("alert")).toHaveTextContent(
-      "录制操作未完成",
-    );
-    expect(
-      screen.getByText("发现 1 段未完成的录音，可一次恢复并保存。"),
-    ).toBeVisible();
+      await user.click(await screen.findByRole("button", { name: buttonName }));
+      expect(await screen.findByRole("alert")).toHaveTextContent(
+        "录制操作未完成",
+      );
+      expect(
+        screen.getByText("发现 1 段未完成的录音，可一次恢复并保存。"),
+      ).toBeVisible();
 
-    await user.click(screen.getByRole("button", { name: "恢复所有录音" }));
-    await waitFor(() => expect(actOnCaptureRecovery).toHaveBeenCalledTimes(3));
-    expect(actOnCaptureRecovery).toHaveBeenNthCalledWith(
-      3,
-      expect.objectContaining({ sessionId: secondRecovery.sessionId }),
-    );
-  });
+      await user.click(screen.getByRole("button", { name: buttonName }));
+      await waitFor(() =>
+        expect(actOnCaptureRecovery).toHaveBeenCalledTimes(3),
+      );
+      expect(actOnCaptureRecovery).toHaveBeenNthCalledWith(
+        3,
+        expect.objectContaining({
+          action,
+          sessionId: secondRecovery.sessionId,
+        }),
+      );
+    },
+  );
 
   it("recovers from an action failure and unlocks the control", async () => {
     installCaptureApi({
@@ -1470,9 +1527,7 @@ describe("capture workspace", () => {
       <CaptureWorkspace capture={idle} applicationRevision={7} />,
     );
 
-    await user.click(
-      await screen.findByRole("button", { name: "恢复所有录音" }),
-    );
+    await user.click(await screen.findByRole("button", { name: "恢复数据" }));
     view.rerender(
       <CaptureWorkspace
         capture={{

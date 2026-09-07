@@ -1,5 +1,5 @@
 import * as React from "react";
-import { CheckCircle2, Mic, Pencil, Trash2 } from "lucide-react";
+import { Mic, Pencil } from "lucide-react";
 
 import { ApplicationBlocker } from "@/components/application-blocker";
 import { Button } from "@/components/ui/button";
@@ -49,6 +49,9 @@ import {
 type CaptureControlAction = CaptureCompactAction;
 
 let commandSequence = 0;
+
+const STOP_CAPTURE_FAILURE_MESSAGE =
+  "停止录制未完成，请重试；如需退出，可保留录音数据并在下次启动时恢复。";
 
 type CaptureWorkspaceProps = {
   capture: ApplicationSnapshot["capture"];
@@ -117,7 +120,6 @@ export function CaptureWorkspaceController({
   const [loadedRecoveryTarget, setLoadedRecoveryTarget] = React.useState<
     string | null
   >(null);
-  const [managementOpen, setManagementOpen] = React.useState(false);
   const [dismissedSessionId, setDismissedSessionId] = React.useState<
     string | null
   >(null);
@@ -128,6 +130,9 @@ export function CaptureWorkspaceController({
     React.useState<string | null>(null);
   const [successfulTerminalStopSessionId, setSuccessfulTerminalStopSessionId] =
     React.useState<string | null>(null);
+  const [failedStopSessionId, setFailedStopSessionId] = React.useState<
+    string | null
+  >(null);
   const pendingRef = React.useRef(new Set<string>());
   const terminalActionRef = React.useRef<HTMLButtonElement>(null);
   const focusedTerminalStopSessionRef = React.useRef<string | null>(null);
@@ -155,7 +160,6 @@ export function CaptureWorkspaceController({
       .then((values) => {
         if (!active) return;
         setError(null);
-        setManagementOpen(false);
         setRecoveries(
           prioritizedRecoverySessionId
             ? [...values].sort((left, right) =>
@@ -333,6 +337,24 @@ export function CaptureWorkspaceController({
   );
 
   React.useEffect(() => {
+    if (
+      !failedStopSessionId ||
+      capture.phase === "idle" ||
+      capture.sessionId !== failedStopSessionId
+    )
+      return;
+    const stopSettled =
+      ["completed", "failed", "recovery"].includes(capture.phase) ||
+      (capture.phase === "partial_capture" &&
+        !capture.systemAudioHealthy &&
+        !capture.microphoneHealthy);
+    if (!stopSettled) return;
+    setError(null);
+    setStopConfirmationSessionId(null);
+    setFailedStopSessionId(null);
+  }, [capture, failedStopSessionId]);
+
+  React.useEffect(() => {
     if (!successfulTerminalStopSessionId) return;
     if (
       !activeCapture ||
@@ -350,7 +372,12 @@ export function CaptureWorkspaceController({
   }, [activeCapture, pendingAction, successfulTerminalStopSessionId]);
 
   const runExclusive = React.useCallback(
-    async (identity: string, label: string, operation: () => Promise<void>) => {
+    async (
+      identity: string,
+      label: string,
+      operation: () => Promise<void>,
+      failureMessage = "录制操作未完成",
+    ) => {
       if (pendingRef.current.has(identity)) return;
       pendingRef.current.add(identity);
       setPendingAction(identity);
@@ -359,7 +386,7 @@ export function CaptureWorkspaceController({
       try {
         await operation();
       } catch (reason: unknown) {
-        setError(userFacingError(reason, "录制操作未完成"));
+        setError(userFacingError(reason, failureMessage));
       } finally {
         pendingRef.current.delete(identity);
         setPendingAction((current) => (current === identity ? null : current));
@@ -453,15 +480,23 @@ export function CaptureWorkspaceController({
         resume: "正在继续录制",
         stop: "正在停止并保存",
       }[action];
+      const sessionId = activeCapture.sessionId;
+      if (action === "stop") setFailedStopSessionId(null);
       void runExclusive(
-        `control-${activeCapture.sessionId}`,
+        `control-${sessionId}`,
         operationLabel,
         async () => {
-          const result = await window.voice2text.controlCapture({
-            action,
-            sessionId: activeCapture.sessionId,
-            idempotencyKey: commandKey(action),
-          });
+          let result: CaptureSnapshot;
+          try {
+            result = await window.voice2text.controlCapture({
+              action,
+              sessionId,
+              idempotencyKey: commandKey(action),
+            });
+          } catch (reason: unknown) {
+            if (action === "stop") setFailedStopSessionId(sessionId);
+            throw reason;
+          }
           setOperationMessage(
             capturePhaseLabel(
               toApplicationPhase(result.state),
@@ -474,6 +509,7 @@ export function CaptureWorkspaceController({
             setStopConfirmationSessionId(null);
           }
         },
+        action === "stop" ? STOP_CAPTURE_FAILURE_MESSAGE : undefined,
       );
     },
     [activeCapture, runExclusive, successfulTerminalStopSessionId],
@@ -520,7 +556,7 @@ export function CaptureWorkspaceController({
     (items: CaptureRecoveryItem[], action: "keep" | "discard") => {
       void runExclusive(
         "recovery-all",
-        action === "keep" ? "正在恢复所有录音" : "正在丢弃所有恢复录音",
+        action === "keep" ? "正在恢复数据" : "正在丢弃数据",
         async () => {
           const completedSessionIds = new Set<string>();
           try {
@@ -541,9 +577,8 @@ export function CaptureWorkspaceController({
               );
             }
           }
-          setManagementOpen(false);
           setOperationMessage(
-            action === "keep" ? "所有录音已恢复" : "所有恢复录音已丢弃",
+            action === "keep" ? "数据已恢复" : "待恢复数据已丢弃",
           );
         },
       );
@@ -662,8 +697,6 @@ export function CaptureWorkspaceController({
         busy={busy}
         error={error}
         operationMessage={operationMessage}
-        discardActionVisible={managementOpen}
-        onRevealDiscard={() => setManagementOpen(true)}
         onRestoreAll={() => recoverAll(recoveries, "keep")}
         onDiscardAll={() => recoverAll(recoveries, "discard")}
       />
@@ -1061,8 +1094,6 @@ function RecoveryDialog({
   busy,
   error,
   operationMessage,
-  discardActionVisible,
-  onRevealDiscard,
   onRestoreAll,
   onDiscardAll,
 }: {
@@ -1071,8 +1102,6 @@ function RecoveryDialog({
   busy: boolean;
   error: string | null;
   operationMessage: string;
-  discardActionVisible: boolean;
-  onRevealDiscard: () => void;
   onRestoreAll: () => void;
   onDiscardAll: () => void;
 }) {
@@ -1098,29 +1127,16 @@ function RecoveryDialog({
         ) : null}
       </div>
       <DialogFooter>
-        {discardActionVisible ? (
-          <Button
-            type="button"
-            variant="destructive"
-            disabled={busy}
-            onClick={onDiscardAll}
-          >
-            <Trash2 aria-hidden="true" />
-            丢弃所有恢复录音
-          </Button>
-        ) : (
-          <Button
-            type="button"
-            variant="outline"
-            disabled={busy}
-            onClick={onRevealDiscard}
-          >
-            管理恢复录制
-          </Button>
-        )}
+        <Button
+          type="button"
+          variant="outline"
+          disabled={busy}
+          onClick={onDiscardAll}
+        >
+          丢弃
+        </Button>
         <Button type="button" disabled={busy} onClick={onRestoreAll}>
-          <CheckCircle2 aria-hidden="true" />
-          {busy ? "正在恢复…" : "恢复所有录音"}
+          {busy ? "正在恢复…" : "恢复数据"}
         </Button>
       </DialogFooter>
     </ApplicationBlocker>
