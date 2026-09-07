@@ -343,6 +343,38 @@ final class CaptureControllerTests: XCTestCase {
     }
   }
 
+  func testTerminalRecordingAuthorityExcludesRecoverableAndFailedSnapshots() {
+    let journalHash = String(repeating: "a", count: 64)
+
+    XCTAssertEqual(
+      CaptureController.terminalRecordingSha256(
+        state: "completed", journalSha256: journalHash
+      ),
+      journalHash
+    )
+    XCTAssertEqual(
+      CaptureController.terminalRecordingSha256(
+        state: "partial_capture", journalSha256: journalHash
+      ),
+      journalHash
+    )
+    XCTAssertNil(
+      CaptureController.terminalRecordingSha256(
+        state: "recoverable", journalSha256: journalHash
+      )
+    )
+    XCTAssertNil(
+      CaptureController.terminalRecordingSha256(
+        state: "failed", journalSha256: journalHash
+      )
+    )
+    XCTAssertNil(
+      CaptureController.terminalRecordingSha256(
+        state: "completed", journalSha256: nil
+      )
+    )
+  }
+
   func testJournalSyncsFileBeforeItsParentDirectory() throws {
     let root = try temporaryRoot().appendingPathComponent(
       "session-durability-123456", isDirectory: true

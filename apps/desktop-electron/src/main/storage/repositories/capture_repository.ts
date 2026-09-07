@@ -33,8 +33,22 @@ export interface StoredCaptureSession {
   title: string;
 }
 
+export interface CaptureRecoveryMarkerDiagnostics {
+  repaired: number;
+  unchanged: number;
+}
+
 export class CaptureRepository {
+  private readonly recoveryMarkerDiagnostics = {
+    repaired: 0,
+    unchanged: 0,
+  };
+
   constructor(private readonly database: DatabaseSync) {}
+
+  recoveryMarkerRepairDiagnostics(): CaptureRecoveryMarkerDiagnostics {
+    return { ...this.recoveryMarkerDiagnostics };
+  }
 
   beginSession(command: {
     sessionId: string;
@@ -145,7 +159,12 @@ export class CaptureRepository {
     ) {
       throw new Error("finalized capture omitted its recording hash");
     }
-    return withTransaction(this.database, () => {
+    const transaction = withTransaction(this.database, () => {
+      const repairOutcome = this.reconcileHistoricalRecoveryMarker(
+        value,
+        action,
+        authority,
+      );
       if (authority) this.replaceAuthority(value.sessionId, authority);
       const changes = this.database
         .prepare(
@@ -193,7 +212,65 @@ export class CaptureRepository {
           JSON.stringify(value),
           nowMs,
         );
-      return value;
+      return { result: value, repairOutcome };
+    });
+    if (transaction.repairOutcome) {
+      this.recoveryMarkerDiagnostics[transaction.repairOutcome] += 1;
+    }
+    return transaction.result;
+  }
+
+  private reconcileHistoricalRecoveryMarker(
+    snapshot: CaptureSnapshot,
+    action: string,
+    authority: CaptureAuthority | undefined,
+  ): keyof CaptureRecoveryMarkerDiagnostics | null {
+    if (
+      action !== "recover" ||
+      (snapshot.state !== "recoverable" && snapshot.state !== "failed") ||
+      snapshot.recordingSha256 !== null ||
+      !snapshot.journalSha256 ||
+      !authority ||
+      authority.sessionId !== snapshot.sessionId ||
+      authority.chunks.length !== snapshot.finalizedChunkCount
+    ) {
+      return null;
+    }
+    if (this.hasValidStopReceipt(snapshot.sessionId)) {
+      return "unchanged";
+    }
+    const changes = this.database
+      .prepare(
+        `UPDATE capture_sessions
+         SET recording_sha256 = NULL
+         WHERE session_id = ?
+           AND state IN ('recoverable', 'failed')
+           AND recovery_disposition IS NULL
+           AND recording_sha256 IS NOT NULL
+           AND journal_sha256 = ?`,
+      )
+      .run(snapshot.sessionId, snapshot.journalSha256).changes;
+    return changes === 1 ? "repaired" : "unchanged";
+  }
+
+  private hasValidStopReceipt(sessionId: string): boolean {
+    const receipts = this.database
+      .prepare(
+        `SELECT result_json FROM capture_command_receipts
+         WHERE session_id = ? AND action = 'stop'`,
+      )
+      .all(sessionId);
+    return receipts.some((receipt) => {
+      const parsed = captureSnapshotSchema.safeParse(
+        JSON.parse(String(receipt.result_json)),
+      );
+      return (
+        parsed.success &&
+        parsed.data.sessionId === sessionId &&
+        (parsed.data.state === "completed" ||
+          parsed.data.state === "partial_capture") &&
+        parsed.data.recordingSha256 !== null
+      );
     });
   }
 

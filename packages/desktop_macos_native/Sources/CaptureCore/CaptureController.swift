@@ -671,7 +671,10 @@ public final class CaptureController {
     if let root = sessionRoot {
       let journalURL = root.appendingPathComponent("journal.json")
       journalSha256 = try? CaptureChunkJournal.sha256(journalURL)
-      recordingSha256 = journalSha256
+      recordingSha256 = Self.terminalRecordingSha256(
+        state: state,
+        journalSha256: journalSha256
+      )
     }
     return snapshot()
   }
@@ -806,6 +809,16 @@ public final class CaptureController {
     return max(system, microphone)
   }
 
+  static func terminalRecordingSha256(
+    state: String,
+    journalSha256: String?
+  ) -> String? {
+    guard state == "completed" || state == "partial_capture" else {
+      return nil
+    }
+    return journalSha256
+  }
+
   private static func snapshot(
     report: CaptureRecoveryReport,
     journalHash: String?
@@ -878,7 +891,10 @@ public final class CaptureController {
     if let root = sessionRoot {
       let journalURL = root.appendingPathComponent("journal.json")
       journalSha256 = try? CaptureChunkJournal.sha256(journalURL)
-      recordingSha256 = journalSha256
+      recordingSha256 = Self.terminalRecordingSha256(
+        state: state,
+        journalSha256: journalSha256
+      )
     }
   }
 
