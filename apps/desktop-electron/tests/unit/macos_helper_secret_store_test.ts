@@ -60,4 +60,26 @@ describe("U10 private Keychain helper adapter", () => {
     expect(await denied.read("deepseek")).toEqual({ state: "denied" });
     expect(await corrupt.read("deepseek")).toEqual({ state: "corrupt" });
   });
+
+  it("resolves the current helper session for every operation", async () => {
+    const firstInvoke = vi.fn(async () => ({
+      secret: { schemaVersion: 1, state: "stored" },
+    }));
+    const secondInvoke = vi.fn(async () => ({
+      secret: { schemaVersion: 1, state: "deleted" },
+    }));
+    let current = {
+      invokeRaw: firstInvoke,
+    } as unknown as MacOSNativeHelperSession;
+    const store = new MacOSHelperSecretStore(() => current);
+
+    await store.replace("deepseek", "key");
+    current = {
+      invokeRaw: secondInvoke,
+    } as unknown as MacOSNativeHelperSession;
+    await expect(store.delete("deepseek")).resolves.toBe("deleted");
+
+    expect(firstInvoke).toHaveBeenCalledOnce();
+    expect(secondInvoke).toHaveBeenCalledOnce();
+  });
 });

@@ -170,24 +170,43 @@ export class CaptureQuitCoordinator {
       if (first === timedOut) {
         if (!interactive) return await this.recoveryExit(generation);
         this.currentPhase = "unresolved-choice";
-        const decision = this.ports.showDecision(
+        let decision = this.ports.showDecision(
           "unresolved",
           this.ports.dialogParent(),
         );
-        const next = await Promise.race([
-          settled.then((value) => ({ kind: "stop" as const, value })),
-          decision.then((value) => ({ kind: "decision" as const, value })),
-        ]);
-        if (!this.isActive(generation)) return "cancelled";
-        if (next.kind === "decision") {
-          if (next.value === "preserve-and-exit") {
+        while (true) {
+          const next = await Promise.race([
+            settled.then((value) => ({ kind: "stop" as const, value })),
+            decision.then((value) => ({ kind: "decision" as const, value })),
+          ]);
+          if (!this.isActive(generation)) return "cancelled";
+          if (next.kind === "decision") {
+            if (next.value === "preserve-and-exit") {
+              return await this.recoveryExit(generation);
+            }
+            // A native MessageBox cannot remain open after its button resolves.
+            // Reopen the same decision sequentially so preserve-and-exit stays
+            // available without issuing another stop request or watchdog.
+            decision = this.ports.showDecision(
+              "unresolved",
+              this.ports.dialogParent(),
+            );
+            continue;
+          }
+
+          stop = next.value;
+          const result =
+            stop.kind === "result" ? stop.value : unknownStopResult();
+          if (result.snapshot && isDurableTerminal(result.snapshot)) break;
+
+          // The outstanding native dialog has no cancellable handle. Wait for
+          // it to close before presenting the result-specific decision.
+          const pendingDecision = await decision;
+          if (!this.isActive(generation)) return "cancelled";
+          if (pendingDecision === "preserve-and-exit") {
             return await this.recoveryExit(generation);
           }
-          // Continuing waits on the original invocation. It deliberately does
-          // not create another watchdog, stop request, or dialog.
-          stop = await settled;
-        } else {
-          stop = next.value;
+          break;
         }
       } else {
         stop = first;
@@ -258,7 +277,14 @@ export class CaptureQuitCoordinator {
   ): Promise<CaptureQuitPreparationOutcome> {
     if (!this.isActive(generation)) return "cancelled";
     this.currentPhase = "tearing-down";
-    await this.ports.teardown("normal");
+    try {
+      await this.ports.teardown("normal");
+    } catch {
+      if (!this.isActive(generation)) return "cancelled";
+      this.currentPhase = "exiting";
+      this.issueFinalExit();
+      return "committed";
+    }
     if (!this.isActive(generation)) return "cancelled";
     this.currentPhase = "exiting";
     this.ports.quit();

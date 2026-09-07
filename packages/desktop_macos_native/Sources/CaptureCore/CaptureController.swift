@@ -835,8 +835,10 @@ public final class CaptureController {
       eventCount: report.snapshot["eventCount"] as? Int ?? 0,
       gapCount: report.snapshot["gapCount"] as? Int ?? 0,
       interruptionReason: "unexpected_exit",
-      recordingSha256:
-        report.snapshot["state"] as? String == "completed" ? journalHash : nil,
+      recordingSha256: terminalRecordingSha256(
+        state: report.snapshot["state"] as? String ?? "recoverable",
+        journalSha256: journalHash
+      ),
       journalSha256: journalHash,
       invalidFinalizedChunks: report.invalidFinalizedChunks,
       quarantinedTailChunks: report.quarantinedTailChunks

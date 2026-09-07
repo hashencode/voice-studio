@@ -43,12 +43,19 @@ const fileVaultReceiptSchema = z
   .strict();
 
 export class MacOSHelperSecretStore implements DesktopSecretStorePort {
-  constructor(private readonly session: MacOSNativeHelperSession) {}
+  private readonly resolveSession: () => MacOSNativeHelperSession;
+
+  constructor(
+    session: MacOSNativeHelperSession | (() => MacOSNativeHelperSession),
+  ) {
+    this.resolveSession =
+      typeof session === "function" ? session : () => session;
+  }
 
   async read(providerId: string): Promise<SecretReadResult> {
     assertProviderSecretInput(providerId);
     try {
-      const response = await this.session.invokeRaw({
+      const response = await this.resolveSession().invokeRaw({
         command: "secret-read",
         request: { providerId },
       });
@@ -63,7 +70,7 @@ export class MacOSHelperSecretStore implements DesktopSecretStorePort {
 
   async replace(providerId: string, secret: string): Promise<void> {
     assertProviderSecretInput(providerId, secret);
-    const response = await this.session.invokeRaw({
+    const response = await this.resolveSession().invokeRaw({
       command: "secret-replace",
       request: { providerId, secret: secret.trim() },
     });
@@ -73,7 +80,7 @@ export class MacOSHelperSecretStore implements DesktopSecretStorePort {
   async delete(providerId: string): Promise<"deleted" | "missing" | "denied"> {
     assertProviderSecretInput(providerId);
     try {
-      const response = await this.session.invokeRaw({
+      const response = await this.resolveSession().invokeRaw({
         command: "secret-delete",
         request: { providerId },
       });
@@ -91,7 +98,7 @@ export class MacOSHelperSecretStore implements DesktopSecretStorePort {
 
   async fileVaultStatus(): Promise<"enabled" | "disabled" | "unknown"> {
     try {
-      const response = await this.session.invokeRaw({
+      const response = await this.resolveSession().invokeRaw({
         command: "filevault-status",
       });
       return fileVaultReceiptSchema.parse(response.security).state;

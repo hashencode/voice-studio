@@ -50,7 +50,7 @@ describe("CaptureQuitCoordinator", () => {
     expect(harness.ports.quit).toHaveBeenCalledOnce();
   });
 
-  it("allows a live failure to return, retry, or preserve recovery", async () => {
+  it("retries a live failure and commits after a terminal result", async () => {
     const harness = createHarness();
     harness.decisions.push("stop-and-exit", "retry-stop");
     harness.ports.stopAndReconcile
@@ -71,6 +71,36 @@ describe("CaptureQuitCoordinator", () => {
     );
     expect(harness.kinds).toEqual(["initial", "live-failure"]);
     expect(harness.ports.stopAndReconcile).toHaveBeenCalledTimes(2);
+  });
+
+  it("returns to capture after a live failure", async () => {
+    const harness = createHarness();
+    harness.decisions.push("stop-and-exit", "return-to-app");
+    harness.ports.stopAndReconcile.mockResolvedValue({
+      snapshot: snapshot({ state: "recording" }),
+      capability: "live-stoppable",
+    });
+
+    await expect(harness.coordinator.requestInteractive()).resolves.toBe(
+      "cancelled",
+    );
+    expect(harness.ports.showSafeReturn).toHaveBeenCalledWith("capture");
+    expect(harness.ports.teardown).not.toHaveBeenCalled();
+  });
+
+  it("preserves recovery after a live failure", async () => {
+    const harness = createHarness();
+    harness.decisions.push("stop-and-exit", "preserve-and-exit");
+    harness.ports.stopAndReconcile.mockResolvedValue({
+      snapshot: snapshot({ state: "recording" }),
+      capability: "live-stoppable",
+    });
+
+    await expect(harness.coordinator.requestInteractive()).resolves.toBe(
+      "recoverable-exit",
+    );
+    expect(harness.ports.teardown).toHaveBeenCalledWith("recovery-exit");
+    expect(harness.ports.exit).toHaveBeenCalledOnce();
   });
 
   it.each([
@@ -126,30 +156,137 @@ describe("CaptureQuitCoordinator", () => {
     expect(harness.ports.quit).toHaveBeenCalledOnce();
   });
 
-  it("continues waiting without restarting the watchdog or opening another dialog", async () => {
+  it("keeps preserve-and-exit available after continuing to wait", async () => {
     const harness = createHarness();
     const stop =
       deferred<
         Awaited<ReturnType<CaptureQuitCoordinatorPorts["stopAndReconcile"]>>
       >();
-    harness.decisions.push("stop-and-exit", "continue-waiting");
+    harness.decisions.push(
+      "stop-and-exit",
+      "continue-waiting",
+      "preserve-and-exit",
+    );
     harness.ports.stopAndReconcile.mockReturnValue(stop.promise);
 
     const result = harness.coordinator.requestInteractive();
     await vi.advanceTimersByTimeAsync(15_000);
-    expect(harness.kinds).toEqual(["initial", "unresolved"]);
-    await vi.advanceTimersByTimeAsync(60_000);
-    expect(harness.kinds).toEqual(["initial", "unresolved"]);
+    expect(harness.kinds).toEqual(["initial", "unresolved", "unresolved"]);
     expect(harness.ports.stopAndReconcile).toHaveBeenCalledOnce();
+    await expect(result).resolves.toBe("recoverable-exit");
+    expect(harness.ports.exit).toHaveBeenCalledOnce();
+  });
 
+  it("waits for the unresolved dialog to close before showing a late failure", async () => {
+    const harness = createHarness();
+    const stop =
+      deferred<
+        Awaited<ReturnType<CaptureQuitCoordinatorPorts["stopAndReconcile"]>>
+      >();
+    const unresolved = deferred<"continue-waiting" | "preserve-and-exit">();
+    harness.ports.stopAndReconcile.mockReturnValue(stop.promise);
+    harness.ports.showDecision.mockImplementation(async (kind) => {
+      harness.kinds.push(kind);
+      if (kind === "initial") return "stop-and-exit";
+      if (kind === "unresolved") return await unresolved.promise;
+      return "return-to-app";
+    });
+
+    const result = harness.coordinator.requestInteractive();
+    await vi.advanceTimersByTimeAsync(15_000);
     stop.resolve({
+      snapshot: snapshot({ state: "recording" }),
+      capability: "live-stoppable",
+    });
+    await Promise.resolve();
+    expect(harness.kinds).toEqual(["initial", "unresolved"]);
+
+    unresolved.resolve("continue-waiting");
+    await expect(result).resolves.toBe("cancelled");
+    expect(harness.kinds).toEqual(["initial", "unresolved", "live-failure"]);
+  });
+
+  it("joins repeated quit requests while stopping, choosing, and recovery-exiting", async () => {
+    const harness = createHarness();
+    const stop =
+      deferred<
+        Awaited<ReturnType<CaptureQuitCoordinatorPorts["stopAndReconcile"]>>
+      >();
+    const unresolved = deferred<"continue-waiting" | "preserve-and-exit">();
+    harness.ports.stopAndReconcile.mockReturnValue(stop.promise);
+    harness.ports.teardown.mockReturnValue(new Promise(() => undefined));
+    harness.ports.showDecision.mockImplementation(async (kind) => {
+      harness.kinds.push(kind);
+      return kind === "initial" ? "stop-and-exit" : await unresolved.promise;
+    });
+
+    const first = harness.coordinator.requestInteractive();
+    const whileStopping = harness.coordinator.requestInteractive();
+    expect(whileStopping).toBe(first);
+    await vi.advanceTimersByTimeAsync(15_000);
+    const whileChoosing = harness.coordinator.requestNonInteractive();
+    expect(whileChoosing).toBe(first);
+
+    unresolved.resolve("preserve-and-exit");
+    await Promise.resolve();
+    const whileRecoveryExiting = harness.coordinator.requestInteractive();
+    expect(whileRecoveryExiting).toBe(first);
+    await vi.advanceTimersByTimeAsync(5_000);
+    await expect(
+      Promise.all([first, whileStopping, whileChoosing, whileRecoveryExiting]),
+    ).resolves.toEqual([
+      "recoverable-exit",
+      "recoverable-exit",
+      "recoverable-exit",
+      "recoverable-exit",
+    ]);
+    expect(harness.ports.stopAndReconcile).toHaveBeenCalledOnce();
+    expect(harness.ports.teardown).toHaveBeenCalledOnce();
+    expect(harness.ports.exit).toHaveBeenCalledOnce();
+  });
+
+  it("joins repeated quit requests during normal teardown", async () => {
+    const harness = createHarness();
+    const teardown = deferred<void>();
+    harness.decisions.push("stop-and-exit");
+    harness.ports.stopAndReconcile.mockResolvedValue({
       snapshot: snapshot({
         state: "completed",
-        recordingSha256: "e".repeat(64),
+        recordingSha256: "f".repeat(64),
       }),
       capability: "recovered-terminal",
     });
-    await expect(result).resolves.toBe("committed");
+    harness.ports.teardown.mockReturnValue(teardown.promise);
+
+    const first = harness.coordinator.requestInteractive();
+    await vi.waitFor(() =>
+      expect(harness.coordinator.phase).toBe("tearing-down"),
+    );
+    const second = harness.coordinator.requestNonInteractive();
+    expect(second).toBe(first);
+    teardown.resolve();
+
+    await expect(Promise.all([first, second])).resolves.toEqual([
+      "committed",
+      "committed",
+    ]);
+    expect(harness.ports.teardown).toHaveBeenCalledOnce();
+    expect(harness.ports.quit).toHaveBeenCalledOnce();
+  });
+
+  it("uses one final exit when normal teardown rejects", async () => {
+    const harness = createHarness();
+    harness.ports.currentCapture.mockReturnValue(null);
+    harness.ports.teardown.mockRejectedValue(new Error("teardown failed"));
+
+    const first = harness.coordinator.requestInteractive();
+    const second = harness.coordinator.requestNonInteractive();
+    await expect(Promise.all([first, second])).resolves.toEqual([
+      "committed",
+      "committed",
+    ]);
+    expect(harness.ports.quit).not.toHaveBeenCalled();
+    expect(harness.ports.exit).toHaveBeenCalledOnce();
   });
 
   it("invalidates a late result after recovery exit and enforces the absolute deadline", async () => {
@@ -221,7 +358,9 @@ function createHarness() {
   const decisions: string[] = [];
   const kinds: QuitDecisionKind[] = [];
   const ports = {
-    currentCapture: vi.fn(() => snapshot({ state: "recording" })),
+    currentCapture: vi.fn<CaptureQuitCoordinatorPorts["currentCapture"]>(() =>
+      snapshot({ state: "recording" }),
+    ),
     activate: vi.fn(),
     dialogParent: vi.fn(() => undefined),
     showDecision: vi.fn(async (kind: QuitDecisionKind) => {
@@ -233,7 +372,9 @@ function createHarness() {
     showSafeReturn: vi.fn(),
     suppressCapturePublications: vi.fn(),
     abortCapture: vi.fn(),
-    teardown: vi.fn(async () => undefined),
+    teardown: vi.fn<CaptureQuitCoordinatorPorts["teardown"]>(
+      async () => undefined,
+    ),
     quit: vi.fn(),
     exit: vi.fn(),
   } satisfies CaptureQuitCoordinatorPorts;

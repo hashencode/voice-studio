@@ -612,7 +612,7 @@ final class CaptureControllerTests: XCTestCase {
     XCTAssertEqual((document["spool"] as? [String: Any])?["formalEligible"] as? Bool, true)
   }
 
-  func testCompletedRecoveryQuarantinesInvalidChunksAndPublishesOnlyValidatedPrefix() throws {
+  func testCompletedRecoveryQuarantinesInvalidChunksAndRetainsPartialTerminalHash() throws {
     let root = try temporaryRoot()
     defer { try? FileManager.default.removeItem(at: root) }
     let session = root.appendingPathComponent("session-completed-corrupt-123456", isDirectory: true)
@@ -646,6 +646,8 @@ final class CaptureControllerTests: XCTestCase {
     XCTAssertEqual(recovered.first?.state, "partial_capture")
     XCTAssertEqual(recovered.first?.finalizedChunkCount, 1)
     XCTAssertEqual(recovered.first?.invalidFinalizedChunks, 1)
+    XCTAssertNotNil(recovered.first?.journalSha256)
+    XCTAssertEqual(recovered.first?.recordingSha256, recovered.first?.journalSha256)
     let rewritten = try JSONSerialization.jsonObject(
       with: Data(contentsOf: session.appendingPathComponent("journal.json"))
     ) as? [String: Any]

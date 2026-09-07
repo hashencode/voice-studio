@@ -287,6 +287,7 @@ let captureLifecycleBound = false;
 let capturePollTimer: ReturnType<typeof setInterval> | null = null;
 let capturePollInFlight = false;
 let capturePublicationsSuppressed = false;
+let captureControlsDisabled = false;
 let captureSmokeQuitChoices: number[] = [];
 let captureSmokeQuitEvidence: Record<string, unknown> | null = null;
 let captureSmokeBeforeQuitAttempts = 0;
@@ -338,11 +339,25 @@ const captureQuitDecisionConfigurations = {
 
 const captureQuitCoordinator = new CaptureQuitCoordinator({
   currentCapture: () => captureService?.snapshot() ?? null,
-  activate: () => app.focus({ steal: true }),
-  dialogParent: () => mainWindow,
+  activate: () => {
+    showMainWindow();
+    app.focus({ steal: true });
+  },
+  dialogParent: () =>
+    mainWindow && !mainWindow.isDestroyed() && mainWindow.isVisible()
+      ? mainWindow
+      : undefined,
   showDecision: showCaptureQuitDecision,
   stopAndReconcile: async (options) => {
     if (!captureService) throw new Error("macOS capture helper is unavailable");
+    await captureControlMutation;
+    const current = captureService.snapshot();
+    if (
+      current?.sessionId === options.sessionId &&
+      isDurableTerminal(current)
+    ) {
+      return { snapshot: current, capability: "recovered-terminal" };
+    }
     const result = await captureService.stopAndReconcile({
       action: "stop",
       ...options,
@@ -366,7 +381,12 @@ const captureQuitCoordinator = new CaptureQuitCoordinator({
   publishCapture,
   showSafeReturn: (destination) => {
     showMainWindow();
-    if (destination !== "capture") {
+    if (destination === "disabled") {
+      captureControlsDisabled = true;
+      if (capturePollTimer) clearInterval(capturePollTimer);
+      capturePollTimer = null;
+      publishCapture(captureService?.snapshot() ?? null);
+    } else if (destination !== "capture") {
       publishCapture(captureService?.snapshot() ?? null);
     }
   },
@@ -2002,11 +2022,11 @@ async function preflightCapture(options: {
   requestPermissions: boolean;
   captionEnabled: boolean;
 }) {
-  if (!captureService) throw new Error("macOS capture helper is unavailable");
+  const service = requireCaptureControlAuthority();
   if (options.requestPermissions) {
     await requestMicrophonePermissionIfNeeded(systemPreferences);
   }
-  return await captureService.preflight({
+  return await service.preflight({
     minimumFreeBytes: minimumCaptureFreeBytes,
     captionModelAvailable:
       !options.captionEnabled ||
@@ -2024,7 +2044,7 @@ async function startCapture(options: {
   captionEnabled: boolean;
   idempotencyKey: string;
 }): Promise<CaptureSnapshot> {
-  if (!captureService) throw new Error("macOS capture helper is unavailable");
+  const service = requireCaptureControlAuthority();
   await microphoneTestService?.stopBeforeFormalCapture();
   const preflight = await preflightCapture({
     requestPermissions: false,
@@ -2035,7 +2055,7 @@ async function startCapture(options: {
       `capture preflight failed: ${preflight.blockingReasons.join(",")}`,
     );
   }
-  const result = await captureService.start(
+  const result = await service.start(
     {
       sessionId: `session-${randomUUID()}`,
       title: options.title,
@@ -2081,8 +2101,8 @@ async function performCaptureControl(options: {
   sessionId: string;
   idempotencyKey: string;
 }): Promise<CaptureSnapshot> {
-  if (!captureService) throw new Error("macOS capture helper is unavailable");
-  const result = await captureService.control(options);
+  const service = requireCaptureControlAuthority();
+  const result = await service.control(options);
   if (options.action === "pause") {
     await liveCaptionService?.pause(options.sessionId);
   } else if (options.action === "resume") {
@@ -2094,7 +2114,7 @@ async function performCaptureControl(options: {
     await finalizeCommittedCaptureTranscript({
       handoff: formalTranscriptHandoff,
       sessionId: options.sessionId,
-      displayName: captureService.sessionTitle(options.sessionId),
+      displayName: service.sessionTitle(options.sessionId),
       processing: null,
       publish: publishCaption,
       reportFailure: () =>
@@ -2110,12 +2130,29 @@ function publishCapture(
   audioActivity = captureService?.audioActivity() ?? 0,
 ): void {
   if (capturePublicationsSuppressed) return;
+  if (captureControlsDisabled && snapshot) {
+    snapshot = {
+      ...snapshot,
+      state: "failed",
+      systemAudioHealthy: false,
+      microphoneHealthy: false,
+      interruptionReason: "capture_native_authority_unavailable",
+    };
+    audioActivity = 0;
+  }
   const title =
     snapshot && captureService
       ? captureService.sessionTitle(snapshot.sessionId)
       : "音频录制";
   applicationState.setCapture(snapshot, title, audioActivity);
   updateCaptureTray(snapshot, title);
+}
+
+function requireCaptureControlAuthority(): DesktopCaptureService {
+  if (!captureService || captureControlsDisabled) {
+    throw new Error("macOS capture helper is unavailable");
+  }
+  return captureService;
 }
 
 function suppressCapturePublications(): void {
@@ -2172,6 +2209,7 @@ async function pollCaptureSnapshot(): Promise<void> {
 async function applyCaptureLifecycle(
   action: "system-sleep" | "system-wake",
 ): Promise<void> {
+  if (captureControlsDisabled) return;
   const current = captureService?.snapshot();
   if (!captureService || !current) return;
   if (action === "system-sleep" && !captureIsRunning(current)) return;
@@ -3017,7 +3055,12 @@ async function initializeApplication(): Promise<void> {
     captureService = null;
   }
   const secretStore = captureNativeSession
-    ? new MacOSHelperSecretStore(captureNativeSession)
+    ? new MacOSHelperSecretStore(() => {
+        const session =
+          captureNativePort?.currentSession() ?? captureNativeSession;
+        if (!session) throw new Error("macOS capture helper is unavailable");
+        return session;
+      })
     : new UnavailableDesktopSecretStore();
   audioAiService = new AudioAiService(
     new AiJobRepository(profile.database),
@@ -3666,6 +3709,7 @@ async function initializeCapture(
     profile.captureDirectory,
   );
   const recoveries = await captureService.recover();
+  captureControlsDisabled = false;
   publishCapture(recoveries[0] ?? captureService.snapshot());
 }
 

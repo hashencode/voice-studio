@@ -49,4 +49,40 @@ describe("capture quit Main wiring", () => {
     );
     expect(mainSource).toContain("exit: () => app.exit(0)");
   });
+
+  it("shows quit decisions on a visible Main window", () => {
+    expect(mainSource).toMatch(
+      /activate: \(\) => \{\s*showMainWindow\(\);\s*app\.focus\(\{ steal: true \}\);\s*\}/,
+    );
+    expect(mainSource).toMatch(
+      /dialogParent: \(\) =>\s*mainWindow && !mainWindow\.isDestroyed\(\) && mainWindow\.isVisible\(\)/,
+    );
+  });
+
+  it("joins an in-flight Renderer control and reuses its terminal result", () => {
+    expect(mainSource).toMatch(
+      /stopAndReconcile: async \(options\) => \{[\s\S]*await captureControlMutation;[\s\S]*current\?\.sessionId === options\.sessionId[\s\S]*isDurableTerminal\(current\)[\s\S]*capability: "recovered-terminal"[\s\S]*captureService\.stopAndReconcile/,
+    );
+  });
+
+  it("disables stale capture controls after unknown recovery", () => {
+    expect(mainSource).toMatch(
+      /destination === "disabled"[\s\S]*captureControlsDisabled = true;[\s\S]*capturePollTimer = null;[\s\S]*publishCapture/,
+    );
+    expect(mainSource).toContain(
+      'interruptionReason: "capture_native_authority_unavailable"',
+    );
+    expect(mainSource).toMatch(
+      /function requireCaptureControlAuthority[\s\S]*!captureService \|\| captureControlsDisabled/,
+    );
+    expect(mainSource).toMatch(
+      /const recoveries = await captureService\.recover\(\);\s*captureControlsDisabled = false;/,
+    );
+  });
+
+  it("resolves secret operations against the recreated helper session", () => {
+    expect(mainSource).toMatch(
+      /new MacOSHelperSecretStore\(\(\) => \{[\s\S]*captureNativePort\?\.currentSession\(\)/,
+    );
+  });
 });

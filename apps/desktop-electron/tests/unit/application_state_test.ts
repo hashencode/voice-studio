@@ -13,8 +13,6 @@ it("projects and hands off the repository-backed capture title", () => {
   expect(mainSource).toContain(
     "captureService.sessionTitle(snapshot.sessionId)",
   );
-  expect(mainSource).toContain(
-    "captureService.sessionTitle(options.sessionId)",
-  );
+  expect(mainSource).toContain("service.sessionTitle(options.sessionId)");
   expect(mainSource).toContain("captureService.sessionTitle(kept.sessionId)");
 });
