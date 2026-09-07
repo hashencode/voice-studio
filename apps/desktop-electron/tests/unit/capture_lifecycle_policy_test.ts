@@ -2,6 +2,9 @@ import { describe, expect, it } from "vitest";
 
 import {
   activeCaptureQuitDialog,
+  liveCaptureStopFailureDialog,
+  recoveredCaptureStopFailureDialog,
+  unresolvedCaptureStopDialog,
   captureRequiresSnapshotPolling,
   captureRequiresQuitConfirmation,
 } from "../../src/main/domain/capture/capture_lifecycle_policy";
@@ -19,6 +22,25 @@ describe("capture lifecycle policy", () => {
       "选择停止后，应用会先保存当前录制再退出。",
     );
     expect(activeCaptureQuitDialog.detail).not.toMatch(/日志|哈希|hash/i);
+  });
+
+  it("keeps every post-stop recovery decision safe by default", () => {
+    expect(liveCaptureStopFailureDialog.defaultId).toBe(0);
+    expect(liveCaptureStopFailureDialog.cancelId).toBe(0);
+    expect(liveCaptureStopFailureDialog.buttons).toHaveLength(3);
+    expect(liveCaptureStopFailureDialog.buttons.join(" ")).not.toMatch(/丢弃/);
+
+    expect(recoveredCaptureStopFailureDialog.defaultId).toBe(0);
+    expect(recoveredCaptureStopFailureDialog.cancelId).toBe(0);
+    expect(recoveredCaptureStopFailureDialog.buttons.join(" ")).not.toMatch(
+      /重试|丢弃/,
+    );
+
+    expect(unresolvedCaptureStopDialog.defaultId).toBe(0);
+    expect(unresolvedCaptureStopDialog.cancelId).toBe(0);
+    expect(unresolvedCaptureStopDialog.buttons.join(" ")).not.toMatch(
+      /返回|重试|丢弃/,
+    );
   });
 
   it("confirms active and paused sessions but not finalized partial authority", () => {

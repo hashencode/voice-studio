@@ -79,8 +79,16 @@ import {
   activeCaptureQuitDialog,
   captureIsRunning,
   captureRequiresSnapshotPolling,
-  captureRequiresQuitConfirmation,
+  liveCaptureStopFailureDialog,
+  recoveredCaptureStopFailureDialog,
+  unknownCaptureStopFailureDialog,
+  unresolvedCaptureStopDialog,
 } from "./domain/capture/capture_lifecycle_policy";
+import {
+  CaptureQuitCoordinator,
+  type QuitDecision,
+  type QuitDecisionKind,
+} from "./domain/capture/capture_quit_coordinator";
 import {
   capturePreflightAllowsStart,
   hasVerifiedLiveCaptionCapability,
@@ -268,11 +276,13 @@ let modelLeaseCoordinator: ModelLeaseCoordinator | null = null;
 let modelStorageAccess: ModelStorageAccess | null = null;
 let captureService: DesktopCaptureService | null = null;
 let captureNativeSession: MacOSNativeHelperSession | null = null;
+let captureNativePort: MacOSCaptureNativePort | null = null;
 let microphoneTestService: MicrophoneTestService | null = null;
 let captureTray: Tray | null = null;
 let captureLifecycleBound = false;
 let capturePollTimer: ReturnType<typeof setInterval> | null = null;
 let capturePollInFlight = false;
+let capturePublicationsSuppressed = false;
 let captureSmokeQuitChoices: number[] = [];
 let captureSmokeQuitEvidence: Record<string, unknown> | null = null;
 let captureSmokeBeforeQuitAttempts = 0;
@@ -295,6 +305,55 @@ const localModelListeners = new Set<
 const floatingCaptureListeners = new Set<
   (snapshot: FloatingCaptureSnapshot) => void
 >();
+
+const captureQuitCoordinator = new CaptureQuitCoordinator({
+  currentCapture: () => captureService?.snapshot() ?? null,
+  activate: () => app.focus({ steal: true }),
+  dialogParent: () => mainWindow,
+  showDecision: showCaptureQuitDecision,
+  stopAndReconcile: async (options) => {
+    if (!captureService) throw new Error("macOS capture helper is unavailable");
+    const result = await captureService.stopAndReconcile({
+      action: "stop",
+      ...options,
+    });
+    captureNativeSession =
+      captureNativePort?.currentSession() ?? captureNativeSession;
+    if (
+      result.snapshot?.recordingSha256 &&
+      (result.snapshot.state === "completed" ||
+        result.snapshot.state === "partial_capture")
+    ) {
+      await recordCaptureSmokeQuitCommit(result.snapshot.sessionId);
+      void finalizeCommittedCaptureTranscript({
+        handoff: formalTranscriptHandoff,
+        sessionId: result.snapshot.sessionId,
+        displayName: captureService.sessionTitle(result.snapshot.sessionId),
+        processing: null,
+        publish: publishCaption,
+        reportFailure: () =>
+          console.error("Voice2Text formal transcript handoff failed"),
+      }).catch(() => undefined);
+    }
+    return result;
+  },
+  publishCapture,
+  showSafeReturn: (destination) => {
+    showMainWindow();
+    if (destination !== "capture") {
+      publishCapture(captureService?.snapshot() ?? null);
+    }
+  },
+  suppressCapturePublications: suppressCapturePublications,
+  abortCapture: () => captureNativePort?.abort(),
+  teardown: async ({ skipCaptureControlMutation }) => {
+    teardownPromise ??= teardownOwnedResources({ skipCaptureControlMutation });
+    await teardownPromise;
+    teardownComplete = true;
+  },
+  quit: () => app.quit(),
+  exit: () => app.exit(0),
+});
 
 applicationState.subscribe((snapshot) => {
   const floating = deriveFloatingCaptureSnapshot(snapshot);
@@ -2024,12 +2083,19 @@ function publishCapture(
   snapshot: CaptureSnapshot | null,
   audioActivity = captureService?.audioActivity() ?? 0,
 ): void {
+  if (capturePublicationsSuppressed) return;
   const title =
     snapshot && captureService
       ? captureService.sessionTitle(snapshot.sessionId)
       : "音频录制";
   applicationState.setCapture(snapshot, title, audioActivity);
   updateCaptureTray(snapshot, title);
+}
+
+function suppressCapturePublications(): void {
+  capturePublicationsSuppressed = true;
+  if (capturePollTimer) clearInterval(capturePollTimer);
+  capturePollTimer = null;
 }
 
 function setupCaptureLifecycle(): void {
@@ -2054,6 +2120,7 @@ function setupCaptureLifecycle(): void {
 async function pollCaptureSnapshot(): Promise<void> {
   const current = captureService?.snapshot();
   if (
+    capturePublicationsSuppressed ||
     !captureService ||
     !current ||
     capturePollInFlight ||
@@ -2160,59 +2227,72 @@ function updateCaptureTray(
   );
 }
 
-async function prepareCaptureForQuit(): Promise<boolean> {
-  const current = captureService?.snapshot();
-  const requiresConfirmation = captureRequiresQuitConfirmation(current ?? null);
-  if (!current || !requiresConfirmation) return true;
+async function showCaptureQuitDecision(
+  kind: QuitDecisionKind,
+  parent: unknown,
+): Promise<QuitDecision> {
   captureSmokeBeforeQuitAttempts += captureSmokeQuitEvidence ? 1 : 0;
   const injectedChoice = captureSmokeQuitEvidence
     ? captureSmokeQuitChoices.shift()
     : undefined;
+  const options =
+    kind === "initial"
+      ? activeCaptureQuitDialog
+      : kind === "live-failure"
+        ? liveCaptureStopFailureDialog
+        : kind === "recovered-failure"
+          ? recoveredCaptureStopFailureDialog
+          : kind === "unknown-failure"
+            ? unknownCaptureStopFailureDialog
+            : unresolvedCaptureStopDialog;
+  const owner = parent as BrowserWindow | null;
   const choice =
     injectedChoice === undefined
-      ? mainWindow
-        ? await dialog.showMessageBox(mainWindow, activeCaptureQuitDialog)
-        : await dialog.showMessageBox(activeCaptureQuitDialog)
+      ? owner
+        ? await dialog.showMessageBox(owner, options)
+        : await dialog.showMessageBox(options)
       : { response: injectedChoice };
-  if (choice.response === 0) {
-    if (captureSmokeQuitEvidence) {
-      captureSmokeContinueObserved =
+  if (kind === "initial") {
+    if (choice.response === 0 && captureSmokeQuitEvidence) {
+      const current = captureService?.snapshot();
+      captureSmokeContinueObserved = Boolean(
+        current &&
         !teardownStarted &&
         profileDatabase !== null &&
-        captureIsRunning(current);
+        captureIsRunning(current),
+      );
       setTimeout(() => app.quit(), 25);
     }
-    return false;
+    return choice.response === 1 ? "stop-and-exit" : "continue-recording";
   }
-  try {
-    await controlCapture({
-      action: "stop",
-      sessionId: current.sessionId,
-      idempotencyKey: `stop-quit-${current.sessionId}`,
-    });
-    if (captureSmokeQuitEvidence && captureSmokeRequest) {
-      const durableStop = profileDatabase
-        ?.prepare(
-          "SELECT COUNT(*) AS count FROM capture_command_receipts WHERE session_id = ? AND action = 'stop'",
-        )
-        .get(current.sessionId);
-      await writeCaptureSmokeReceipt(captureSmokeRequest.outputPath, {
-        ...captureSmokeQuitEvidence,
-        quitLifecycle: {
-          beforeQuitAttempts: captureSmokeBeforeQuitAttempts,
-          continueCanceledTeardown: captureSmokeContinueObserved,
-          stopCalls: captureSmokeStopCalls,
-          stopReceiptObservedBeforeTeardown:
-            Number(durableStop?.count ?? 0) === 1 && !teardownStarted,
-          databaseOpenBeforeTeardown: profileDatabase !== null,
-        },
-      });
-    }
-    return true;
-  } catch (error) {
-    console.error("Capture could not be committed; quit was stopped", error);
-    return false;
+  if (kind === "live-failure") {
+    if (choice.response === 1) return "retry-stop";
+    return choice.response === 2 ? "preserve-and-exit" : "return-to-app";
   }
+  if (kind === "unresolved") {
+    return choice.response === 1 ? "preserve-and-exit" : "continue-waiting";
+  }
+  return choice.response === 1 ? "preserve-and-exit" : "return-safe-view";
+}
+
+async function recordCaptureSmokeQuitCommit(sessionId: string): Promise<void> {
+  if (!captureSmokeQuitEvidence || !captureSmokeRequest) return;
+  const durableStop = profileDatabase
+    ?.prepare(
+      "SELECT COUNT(*) AS count FROM capture_command_receipts WHERE session_id = ? AND action = 'stop'",
+    )
+    .get(sessionId);
+  await writeCaptureSmokeReceipt(captureSmokeRequest.outputPath, {
+    ...captureSmokeQuitEvidence,
+    quitLifecycle: {
+      beforeQuitAttempts: captureSmokeBeforeQuitAttempts,
+      continueCanceledTeardown: captureSmokeContinueObserved,
+      stopCalls: captureSmokeStopCalls,
+      stopReceiptObservedBeforeTeardown:
+        Number(durableStop?.count ?? 0) === 1 && !teardownStarted,
+      databaseOpenBeforeTeardown: profileDatabase !== null,
+    },
+  });
 }
 
 function bindDesktopIpc(window: BrowserWindow): void {
@@ -2835,7 +2915,8 @@ async function resetPartialApplicationInitialization(): Promise<void> {
   liveCaptionService = null;
   await microphoneTestService?.stopBeforeFormalCapture().catch(() => undefined);
   microphoneTestService = null;
-  await captureNativeSession?.close().catch(() => undefined);
+  await captureNativePort?.close().catch(() => undefined);
+  captureNativePort = null;
   captureNativeSession = null;
   captureService = null;
   formalTranscriptHandoff = null;
@@ -2916,7 +2997,8 @@ async function initializeApplication(): Promise<void> {
     console.error("macOS capture initialization failed", error);
     await microphoneTestService?.stopBeforeFormalCapture();
     microphoneTestService = null;
-    await captureNativeSession?.close().catch(() => undefined);
+    await captureNativePort?.close().catch(() => undefined);
+    captureNativePort = null;
     captureNativeSession = null;
     captureService = null;
   }
@@ -3552,12 +3634,17 @@ async function initializeCapture(
     handshakeTimeoutMs: 10_000,
     invokeTimeoutMs: 30_000,
   });
-  captureNativeSession = await helper.openSession({
-    exactSourcePaths: [],
-    destinationRoots: [],
-    captureSessionRoot: profile.captureDirectory,
-  });
-  const captureNativePort = new MacOSCaptureNativePort(captureNativeSession);
+  const openCaptureSession = async () =>
+    await helper.openSession({
+      exactSourcePaths: [],
+      destinationRoots: [],
+      captureSessionRoot: profile.captureDirectory,
+    });
+  captureNativeSession = await openCaptureSession();
+  captureNativePort = new MacOSCaptureNativePort(
+    captureNativeSession,
+    openCaptureSession,
+  );
   microphoneTestService = new MicrophoneTestService(captureNativePort);
   captureService = new DesktopCaptureService(
     new CaptureRepository(database),
@@ -4114,8 +4201,12 @@ function traceCaptureSmoke(stage: string): void {
 }
 
 if (isPrimaryInstance) {
-  process.once("SIGTERM", () => app.quit());
-  process.once("SIGINT", () => app.quit());
+  process.once("SIGTERM", () => {
+    void captureQuitCoordinator.requestNonInteractive();
+  });
+  process.once("SIGINT", () => {
+    void captureQuitCoordinator.requestNonInteractive();
+  });
   void app
     .whenReady()
     .then(async () => {
@@ -4160,25 +4251,11 @@ if (isPrimaryInstance) {
       captureSmokeRequest?.phase === "crash"
     )
       return;
-    if (teardownComplete) return;
+    if (teardownComplete || captureQuitCoordinator.allowsNativeQuit) return;
     event.preventDefault();
-    teardownPromise ??= prepareCaptureForQuit()
-      .then(async (shouldQuit) => {
-        if (!shouldQuit) {
-          teardownPromise = null;
-          return;
-        }
-        await teardownOwnedResources();
-        teardownComplete = true;
-        app.quit();
-      })
-      .catch((error: unknown) => {
-        teardownPromise = null;
-        console.error(
-          "Voice2Text process teardown failed; quit was stopped",
-          error,
-        );
-      });
+    void captureQuitCoordinator.requestInteractive().catch((error: unknown) => {
+      console.error("Voice2Text quit coordination failed", error);
+    });
   });
 }
 
@@ -4211,10 +4288,12 @@ function reportBootstrapFailure(stage: string, error: unknown): void {
   }
 }
 
-async function teardownOwnedResources(): Promise<void> {
+async function teardownOwnedResources({
+  skipCaptureControlMutation = false,
+}: { skipCaptureControlMutation?: boolean } = {}): Promise<void> {
   teardownStarted = true;
   await floatingPreferenceMutation;
-  await captureControlMutation;
+  if (!skipCaptureControlMutation) await captureControlMutation;
   unregisterIpc?.();
   unregisterIpc = null;
   await processCoordinator?.shutdown();
@@ -4242,7 +4321,8 @@ async function teardownOwnedResources(): Promise<void> {
   liveCaptionService = null;
   await microphoneTestService?.stopBeforeFormalCapture();
   microphoneTestService = null;
-  await captureNativeSession?.close();
+  if (!skipCaptureControlMutation) await captureNativePort?.close();
+  captureNativePort = null;
   captureNativeSession = null;
   captureService = null;
   formalTranscriptHandoff = null;
