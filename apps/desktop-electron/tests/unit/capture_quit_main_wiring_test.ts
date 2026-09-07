@@ -43,9 +43,7 @@ describe("capture quit Main wiring", () => {
     expect(mainSource).toMatch(
       /suppressCapturePublications: suppressCapturePublications,[\s\S]*abortCapture: \(\) => captureNativePort\?\.abort\(\)/,
     );
-    expect(mainSource).toContain(
-      "teardownOwnedResources(mode)",
-    );
+    expect(mainSource).toContain("teardownOwnedResources(mode)");
     expect(mainSource).toContain(
       'if (mode === "normal") await captureControlMutation',
     );

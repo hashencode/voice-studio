@@ -166,14 +166,8 @@ export class DesktopCaptureService {
     } catch (error) {
       if (!(error instanceof CaptureNativeStopError)) throw error;
       return error.kind === "command"
-        ? await this.reconcileOnLiveSession(
-            command.sessionId,
-            command,
-          )
-        : await this.reconcileAfterTransportLoss(
-            command.sessionId,
-            command,
-          );
+        ? await this.reconcileOnLiveSession(command.sessionId, command)
+        : await this.reconcileAfterTransportLoss(command.sessionId, command);
     }
   }
 
@@ -424,11 +418,7 @@ export class DesktopCaptureService {
         await this.native.snapshot(sessionId),
       );
       this.assertSession(sessionId, snapshot);
-      return await this.persistStopReconciliation(
-        snapshot,
-        command,
-        true,
-      );
+      return await this.persistStopReconciliation(snapshot, command, true);
     } catch {
       this.currentAudioActivity = 0;
       return { snapshot: null, capability: "unknown" };
@@ -452,11 +442,7 @@ export class DesktopCaptureService {
       if (!recovered) {
         return { snapshot: null, capability: "unknown" };
       }
-      return await this.persistStopReconciliation(
-        recovered,
-        command,
-        false,
-      );
+      return await this.persistStopReconciliation(recovered, command, false);
     } catch {
       this.currentAudioActivity = 0;
       return { snapshot: null, capability: "unknown" };

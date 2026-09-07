@@ -130,9 +130,6 @@ export function CaptureWorkspaceController({
     React.useState<string | null>(null);
   const [successfulTerminalStopSessionId, setSuccessfulTerminalStopSessionId] =
     React.useState<string | null>(null);
-  const [failedStopSessionId, setFailedStopSessionId] = React.useState<
-    string | null
-  >(null);
   const pendingRef = React.useRef(new Set<string>());
   const terminalActionRef = React.useRef<HTMLButtonElement>(null);
   const focusedTerminalStopSessionRef = React.useRef<string | null>(null);
@@ -336,23 +333,13 @@ export function CaptureWorkspaceController({
     !["completed", "failed", "recovery"].includes(activeCapture.phase),
   );
 
-  React.useEffect(() => {
-    if (
-      !failedStopSessionId ||
-      capture.phase === "idle" ||
-      capture.sessionId !== failedStopSessionId
-    )
-      return;
-    const stopSettled =
-      ["completed", "failed", "recovery"].includes(capture.phase) ||
+  const stopFailureSettled =
+    error === STOP_CAPTURE_FAILURE_MESSAGE &&
+    (["completed", "failed", "recovery"].includes(capture.phase) ||
       (capture.phase === "partial_capture" &&
         !capture.systemAudioHealthy &&
-        !capture.microphoneHealthy);
-    if (!stopSettled) return;
-    setError(null);
-    setStopConfirmationSessionId(null);
-    setFailedStopSessionId(null);
-  }, [capture, failedStopSessionId]);
+        !capture.microphoneHealthy));
+  const visibleError = stopFailureSettled ? null : error;
 
   React.useEffect(() => {
     if (!successfulTerminalStopSessionId) return;
@@ -481,22 +468,15 @@ export function CaptureWorkspaceController({
         stop: "正在停止并保存",
       }[action];
       const sessionId = activeCapture.sessionId;
-      if (action === "stop") setFailedStopSessionId(null);
       void runExclusive(
         `control-${sessionId}`,
         operationLabel,
         async () => {
-          let result: CaptureSnapshot;
-          try {
-            result = await window.voice2text.controlCapture({
-              action,
-              sessionId,
-              idempotencyKey: commandKey(action),
-            });
-          } catch (reason: unknown) {
-            if (action === "stop") setFailedStopSessionId(sessionId);
-            throw reason;
-          }
+          const result = await window.voice2text.controlCapture({
+            action,
+            sessionId,
+            idempotencyKey: commandKey(action),
+          });
           setOperationMessage(
             capturePhaseLabel(
               toApplicationPhase(result.state),
@@ -631,12 +611,12 @@ export function CaptureWorkspaceController({
             {operationMessage}
           </p>
         ) : null}
-        {error ? (
+        {visibleError ? (
           <div
             role="alert"
             className="mb-3 border-y border-destructive/40 bg-destructive/5 py-3 text-sm"
           >
-            {error}
+            {visibleError}
           </div>
         ) : null}
 
@@ -695,7 +675,7 @@ export function CaptureWorkspaceController({
         open={recoveryDialogOpen}
         itemCount={recoveries.length}
         busy={busy}
-        error={error}
+        error={visibleError}
         operationMessage={operationMessage}
         onRestoreAll={() => recoverAll(recoveries, "keep")}
         onDiscardAll={() => recoverAll(recoveries, "discard")}

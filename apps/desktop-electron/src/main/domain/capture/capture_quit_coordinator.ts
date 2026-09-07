@@ -285,9 +285,9 @@ export class CaptureQuitCoordinator {
     }
     let cleanup: Promise<void>;
     try {
-      cleanup = Promise.resolve(
-        this.ports.teardown("recovery-exit"),
-      ).catch(() => undefined);
+      cleanup = Promise.resolve(this.ports.teardown("recovery-exit")).catch(
+        () => undefined,
+      );
     } catch {
       cleanup = Promise.resolve();
     }
