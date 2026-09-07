@@ -422,7 +422,6 @@ describe("macOS capture parity flow", () => {
       });
       expect(stopped).toMatchObject({
         capability: "recovered-terminal",
-        failureKind: null,
         snapshot: { state: "completed" },
       });
       expect(repeated.snapshot).toEqual(stopped.snapshot);
@@ -791,7 +790,6 @@ describe("macOS capture parity flow", () => {
         }),
       ).resolves.toMatchObject({
         capability: "live-stoppable",
-        failureKind: "command",
         snapshot: { state: "recording" },
       });
       expect(
@@ -842,7 +840,6 @@ describe("macOS capture parity flow", () => {
       const repeated = await service.stopAndReconcile(command);
       expect(first).toMatchObject({
         capability: "recovered-terminal",
-        failureKind: "command",
         snapshot: { state: "completed" },
       });
       expect(repeated.snapshot).toEqual(first.snapshot);
@@ -898,7 +895,6 @@ describe("macOS capture parity flow", () => {
         }),
       ).resolves.toMatchObject({
         capability: "recovered-terminal",
-        failureKind: "transport",
         snapshot: { state: "recoverable", recordingSha256: null },
       });
       expect(native.recreateAfterTransportLoss).toHaveBeenCalledOnce();
@@ -968,9 +964,7 @@ describe("macOS capture parity flow", () => {
         "recoverable-exit",
       );
       expect(native.abort).toHaveBeenCalledOnce();
-      expect(teardown).toHaveBeenCalledWith({
-        skipCaptureControlMutation: true,
-      });
+      expect(teardown).toHaveBeenCalledWith("recovery-exit");
       expect(exit).toHaveBeenCalledOnce();
       expect(
         database
@@ -1062,7 +1056,6 @@ describe("macOS capture parity flow", () => {
 
       expect(first).toMatchObject({
         capability: "recovered-terminal",
-        failureKind: "transport",
         snapshot: { state: "completed" },
       });
       expect(repeated.snapshot).toEqual(first.snapshot);
@@ -1108,7 +1101,6 @@ describe("macOS capture parity flow", () => {
         }),
       ).resolves.toEqual({
         capability: "unknown",
-        failureKind: "transport",
         snapshot: null,
       });
     } finally {

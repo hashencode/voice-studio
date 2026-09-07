@@ -1,5 +1,8 @@
 import type { CaptureSnapshot } from "../../../shared/contracts";
-import type { CaptureStopReconciliation } from "./desktop_capture_service";
+import {
+  isDurableTerminal,
+  type CaptureStopReconciliation,
+} from "./desktop_capture_service";
 import {
   captureRequiresQuitConfirmation,
   type CaptureQuitPreparationOutcome,
@@ -44,7 +47,7 @@ export interface CaptureQuitCoordinatorPorts {
   showSafeReturn(destination: "capture" | "recovery" | "disabled"): void;
   suppressCapturePublications(): void;
   abortCapture(): void;
-  teardown(options: { skipCaptureControlMutation: boolean }): Promise<void>;
+  teardown(mode: "normal" | "recovery-exit"): Promise<void>;
   quit(): void;
   exit(): void;
 }
@@ -192,7 +195,7 @@ export class CaptureQuitCoordinator {
 
       const result = stop.kind === "result" ? stop.value : unknownStopResult();
       if (result.snapshot) this.ports.publishCapture(result.snapshot);
-      if (isDurablyCommitted(result.snapshot)) {
+      if (result.snapshot && isDurableTerminal(result.snapshot)) {
         return await this.commitAndExit(generation);
       }
       if (!interactive) return await this.recoveryExit(generation);
@@ -255,7 +258,7 @@ export class CaptureQuitCoordinator {
   ): Promise<CaptureQuitPreparationOutcome> {
     if (!this.isActive(generation)) return "cancelled";
     this.currentPhase = "tearing-down";
-    await this.ports.teardown({ skipCaptureControlMutation: false });
+    await this.ports.teardown("normal");
     if (!this.isActive(generation)) return "cancelled";
     this.currentPhase = "exiting";
     this.ports.quit();
@@ -283,7 +286,7 @@ export class CaptureQuitCoordinator {
     let cleanup: Promise<void>;
     try {
       cleanup = Promise.resolve(
-        this.ports.teardown({ skipCaptureControlMutation: true }),
+        this.ports.teardown("recovery-exit"),
       ).catch(() => undefined);
     } catch {
       cleanup = Promise.resolve();
@@ -306,14 +309,6 @@ export class CaptureQuitCoordinator {
   }
 }
 
-function isDurablyCommitted(snapshot: CaptureSnapshot | null): boolean {
-  return Boolean(
-    snapshot &&
-    (snapshot.state === "completed" || snapshot.state === "partial_capture") &&
-    snapshot.recordingSha256,
-  );
-}
-
 function unknownStopResult(): CaptureStopReconciliation {
-  return { snapshot: null, capability: "unknown", failureKind: null };
+  return { snapshot: null, capability: "unknown" };
 }

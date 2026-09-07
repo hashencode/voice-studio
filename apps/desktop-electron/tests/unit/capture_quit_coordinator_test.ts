@@ -36,7 +36,6 @@ describe("CaptureQuitCoordinator", () => {
         recordingSha256: "a".repeat(64),
       }),
       capability: "recovered-terminal",
-      failureKind: null,
     });
 
     const first = harness.coordinator.requestInteractive();
@@ -58,7 +57,6 @@ describe("CaptureQuitCoordinator", () => {
       .mockResolvedValueOnce({
         snapshot: snapshot({ state: "recording" }),
         capability: "live-stoppable",
-        failureKind: "command",
       })
       .mockResolvedValueOnce({
         snapshot: snapshot({
@@ -66,7 +64,6 @@ describe("CaptureQuitCoordinator", () => {
           recordingSha256: "b".repeat(64),
         }),
         capability: "recovered-terminal",
-        failureKind: null,
       });
 
     await expect(harness.coordinator.requestInteractive()).resolves.toBe(
@@ -89,7 +86,6 @@ describe("CaptureQuitCoordinator", () => {
           state: capability === "unknown" ? "failed" : "recoverable",
         }),
         capability,
-        failureKind: "transport",
       });
 
       await expect(harness.coordinator.requestInteractive()).resolves.toBe(
@@ -125,7 +121,6 @@ describe("CaptureQuitCoordinator", () => {
         recordingSha256: "c".repeat(64),
       }),
       capability: "recovered-terminal",
-      failureKind: null,
     });
     await expect(result).resolves.toBe("committed");
     expect(harness.ports.quit).toHaveBeenCalledOnce();
@@ -153,7 +148,6 @@ describe("CaptureQuitCoordinator", () => {
         recordingSha256: "e".repeat(64),
       }),
       capability: "recovered-terminal",
-      failureKind: null,
     });
     await expect(result).resolves.toBe("committed");
   });
@@ -185,7 +179,6 @@ describe("CaptureQuitCoordinator", () => {
         recordingSha256: "d".repeat(64),
       }),
       capability: "recovered-terminal",
-      failureKind: null,
     });
     await Promise.resolve();
     expect(harness.ports.quit).not.toHaveBeenCalled();
@@ -219,9 +212,7 @@ describe("CaptureQuitCoordinator", () => {
     const result = harness.coordinator.requestNonInteractive();
     await vi.advanceTimersByTimeAsync(15_000);
     await expect(result).resolves.toBe("recoverable-exit");
-    expect(harness.ports.teardown).toHaveBeenCalledWith({
-      skipCaptureControlMutation: true,
-    });
+    expect(harness.ports.teardown).toHaveBeenCalledWith("recovery-exit");
     expect(harness.ports.exit).toHaveBeenCalledOnce();
   });
 });

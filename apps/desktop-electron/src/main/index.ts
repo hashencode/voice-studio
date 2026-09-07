@@ -26,6 +26,7 @@ import {
   shell,
   systemPreferences,
   Tray,
+  type MessageBoxOptions,
 } from "electron";
 
 import {
@@ -70,7 +71,10 @@ import {
   MacOSNativeHelperClient,
   type MacOSNativeHelperSession,
 } from "./features/importing/macos_native_helper_client";
-import { DesktopCaptureService } from "./domain/capture/desktop_capture_service";
+import {
+  DesktopCaptureService,
+  isDurableTerminal,
+} from "./domain/capture/desktop_capture_service";
 import type { CaptureNativePort } from "./domain/capture/capture_native_port";
 import { MacOSCaptureNativePort } from "./domain/capture/macos_capture_native_port";
 import { MicrophoneTestService } from "./domain/capture/microphone_test_service";
@@ -306,6 +310,32 @@ const floatingCaptureListeners = new Set<
   (snapshot: FloatingCaptureSnapshot) => void
 >();
 
+const captureQuitDecisionConfigurations = {
+  initial: {
+    options: activeCaptureQuitDialog,
+    decisions: ["continue-recording", "stop-and-exit"],
+  },
+  "live-failure": {
+    options: liveCaptureStopFailureDialog,
+    decisions: ["return-to-app", "retry-stop", "preserve-and-exit"],
+  },
+  "recovered-failure": {
+    options: recoveredCaptureStopFailureDialog,
+    decisions: ["return-safe-view", "preserve-and-exit"],
+  },
+  "unknown-failure": {
+    options: unknownCaptureStopFailureDialog,
+    decisions: ["return-safe-view", "preserve-and-exit"],
+  },
+  unresolved: {
+    options: unresolvedCaptureStopDialog,
+    decisions: ["continue-waiting", "preserve-and-exit"],
+  },
+} satisfies Record<
+  QuitDecisionKind,
+  { options: MessageBoxOptions; decisions: readonly QuitDecision[] }
+>;
+
 const captureQuitCoordinator = new CaptureQuitCoordinator({
   currentCapture: () => captureService?.snapshot() ?? null,
   activate: () => app.focus({ steal: true }),
@@ -319,11 +349,7 @@ const captureQuitCoordinator = new CaptureQuitCoordinator({
     });
     captureNativeSession =
       captureNativePort?.currentSession() ?? captureNativeSession;
-    if (
-      result.snapshot?.recordingSha256 &&
-      (result.snapshot.state === "completed" ||
-        result.snapshot.state === "partial_capture")
-    ) {
+    if (result.snapshot && isDurableTerminal(result.snapshot)) {
       await recordCaptureSmokeQuitCommit(result.snapshot.sessionId);
       void finalizeCommittedCaptureTranscript({
         handoff: formalTranscriptHandoff,
@@ -346,8 +372,8 @@ const captureQuitCoordinator = new CaptureQuitCoordinator({
   },
   suppressCapturePublications: suppressCapturePublications,
   abortCapture: () => captureNativePort?.abort(),
-  teardown: async ({ skipCaptureControlMutation }) => {
-    teardownPromise ??= teardownOwnedResources({ skipCaptureControlMutation });
+  teardown: async (mode) => {
+    teardownPromise ??= teardownOwnedResources(mode);
     await teardownPromise;
     teardownComplete = true;
   },
@@ -2235,16 +2261,8 @@ async function showCaptureQuitDecision(
   const injectedChoice = captureSmokeQuitEvidence
     ? captureSmokeQuitChoices.shift()
     : undefined;
-  const options =
-    kind === "initial"
-      ? activeCaptureQuitDialog
-      : kind === "live-failure"
-        ? liveCaptureStopFailureDialog
-        : kind === "recovered-failure"
-          ? recoveredCaptureStopFailureDialog
-          : kind === "unknown-failure"
-            ? unknownCaptureStopFailureDialog
-            : unresolvedCaptureStopDialog;
+  const configuration = captureQuitDecisionConfigurations[kind];
+  const { options } = configuration;
   const owner = parent as BrowserWindow | null;
   const choice =
     injectedChoice === undefined
@@ -2263,16 +2281,12 @@ async function showCaptureQuitDecision(
       );
       setTimeout(() => app.quit(), 25);
     }
-    return choice.response === 1 ? "stop-and-exit" : "continue-recording";
   }
-  if (kind === "live-failure") {
-    if (choice.response === 1) return "retry-stop";
-    return choice.response === 2 ? "preserve-and-exit" : "return-to-app";
-  }
-  if (kind === "unresolved") {
-    return choice.response === 1 ? "preserve-and-exit" : "continue-waiting";
-  }
-  return choice.response === 1 ? "preserve-and-exit" : "return-safe-view";
+  return (
+    configuration.decisions[choice.response] ??
+    configuration.decisions[options.cancelId ?? options.defaultId ?? 0] ??
+    configuration.decisions[0]!
+  );
 }
 
 async function recordCaptureSmokeQuitCommit(sessionId: string): Promise<void> {
@@ -4288,12 +4302,12 @@ function reportBootstrapFailure(stage: string, error: unknown): void {
   }
 }
 
-async function teardownOwnedResources({
-  skipCaptureControlMutation = false,
-}: { skipCaptureControlMutation?: boolean } = {}): Promise<void> {
+async function teardownOwnedResources(
+  mode: "normal" | "recovery-exit" = "normal",
+): Promise<void> {
   teardownStarted = true;
   await floatingPreferenceMutation;
-  if (!skipCaptureControlMutation) await captureControlMutation;
+  if (mode === "normal") await captureControlMutation;
   unregisterIpc?.();
   unregisterIpc = null;
   await processCoordinator?.shutdown();
@@ -4321,7 +4335,7 @@ async function teardownOwnedResources({
   liveCaptionService = null;
   await microphoneTestService?.stopBeforeFormalCapture();
   microphoneTestService = null;
-  if (!skipCaptureControlMutation) await captureNativePort?.close();
+  if (mode === "normal") await captureNativePort?.close();
   captureNativePort = null;
   captureNativeSession = null;
   captureService = null;

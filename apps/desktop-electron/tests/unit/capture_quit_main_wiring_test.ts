@@ -44,10 +44,10 @@ describe("capture quit Main wiring", () => {
       /suppressCapturePublications: suppressCapturePublications,[\s\S]*abortCapture: \(\) => captureNativePort\?\.abort\(\)/,
     );
     expect(mainSource).toContain(
-      "teardownOwnedResources({ skipCaptureControlMutation })",
+      "teardownOwnedResources(mode)",
     );
     expect(mainSource).toContain(
-      "if (!skipCaptureControlMutation) await captureControlMutation",
+      'if (mode === "normal") await captureControlMutation',
     );
     expect(mainSource).toContain("exit: () => app.exit(0)");
   });

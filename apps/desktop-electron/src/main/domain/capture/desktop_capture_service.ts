@@ -22,7 +22,6 @@ import type {
 import {
   CaptureNativeStopError,
   type CaptureNativePort,
-  type CaptureNativeStopFailureKind,
 } from "./capture_native_port";
 import {
   validateCaptureAuthority,
@@ -156,7 +155,6 @@ export class DesktopCaptureService {
       return {
         snapshot: cached,
         capability: "recovered-terminal",
-        failureKind: null,
       };
     }
     try {
@@ -164,7 +162,6 @@ export class DesktopCaptureService {
       return {
         snapshot,
         capability: "recovered-terminal",
-        failureKind: null,
       };
     } catch (error) {
       if (!(error instanceof CaptureNativeStopError)) throw error;
@@ -172,12 +169,10 @@ export class DesktopCaptureService {
         ? await this.reconcileOnLiveSession(
             command.sessionId,
             command,
-            error.kind,
           )
         : await this.reconcileAfterTransportLoss(
             command.sessionId,
             command,
-            error.kind,
           );
     }
   }
@@ -423,7 +418,6 @@ export class DesktopCaptureService {
   private async reconcileOnLiveSession(
     sessionId: string,
     command: CaptureControlCommand,
-    failureKind: CaptureNativeStopFailureKind,
   ): Promise<CaptureStopReconciliation> {
     try {
       const snapshot = this.acceptRuntime(
@@ -433,22 +427,20 @@ export class DesktopCaptureService {
       return await this.persistStopReconciliation(
         snapshot,
         command,
-        failureKind,
         true,
       );
     } catch {
       this.currentAudioActivity = 0;
-      return { snapshot: null, capability: "unknown", failureKind };
+      return { snapshot: null, capability: "unknown" };
     }
   }
 
   private async reconcileAfterTransportLoss(
     sessionId: string,
     command: CaptureControlCommand,
-    failureKind: CaptureNativeStopFailureKind,
   ): Promise<CaptureStopReconciliation> {
     if (!this.native.recreateAfterTransportLoss) {
-      return { snapshot: null, capability: "unknown", failureKind };
+      return { snapshot: null, capability: "unknown" };
     }
     try {
       await this.native.recreateAfterTransportLoss();
@@ -458,24 +450,22 @@ export class DesktopCaptureService {
         .parse(await this.native.recover())
         .find((snapshot) => snapshot.sessionId === sessionId);
       if (!recovered) {
-        return { snapshot: null, capability: "unknown", failureKind };
+        return { snapshot: null, capability: "unknown" };
       }
       return await this.persistStopReconciliation(
         recovered,
         command,
-        failureKind,
         false,
       );
     } catch {
       this.currentAudioActivity = 0;
-      return { snapshot: null, capability: "unknown", failureKind };
+      return { snapshot: null, capability: "unknown" };
     }
   }
 
   private async persistStopReconciliation(
     snapshot: CaptureSnapshot,
     command: CaptureControlCommand,
-    failureKind: CaptureNativeStopFailureKind,
     originalSessionIsLive: boolean,
   ): Promise<CaptureStopReconciliation> {
     if (isDurableTerminal(snapshot)) {
@@ -490,29 +480,31 @@ export class DesktopCaptureService {
       return {
         snapshot: stored,
         capability: "recovered-terminal",
-        failureKind,
       };
     }
     if (snapshot.state === "recoverable" || snapshot.state === "failed") {
+      const recoveryKey = `stop-reconcile-${snapshot.journalSha256 ?? snapshot.sessionId}`;
+      const prior = this.repository.receipt(snapshot.sessionId, recoveryKey);
+      if (prior) {
+        return {
+          snapshot: prior.result,
+          capability: "recovered-terminal",
+        };
+      }
       const authority =
         snapshot.finalizedChunkCount > 0
           ? await this.validatedAuthority(snapshot)
           : undefined;
-      const recoveryKey = `stop-reconcile-${snapshot.journalSha256 ?? snapshot.sessionId}`;
-      const prior = this.repository.receipt(snapshot.sessionId, recoveryKey);
-      const stored = prior
-        ? prior.result
-        : this.repository.saveSnapshotAndReceipt(
-            snapshot,
-            "recover",
-            recoveryKey,
-            this.now(),
-            authority,
-          );
+      const stored = this.repository.saveSnapshotAndReceipt(
+        snapshot,
+        "recover",
+        recoveryKey,
+        this.now(),
+        authority,
+      );
       return {
         snapshot: stored,
         capability: "recovered-terminal",
-        failureKind,
       };
     }
     const stored = this.repository.saveSnapshot(snapshot, this.now());
@@ -522,7 +514,6 @@ export class DesktopCaptureService {
         originalSessionIsLive && isLiveStoppable(snapshot)
           ? "live-stoppable"
           : "unknown",
-      failureKind,
     };
   }
 }
@@ -533,10 +524,9 @@ export type CaptureStopCapability =
 export interface CaptureStopReconciliation {
   snapshot: CaptureSnapshot | null;
   capability: CaptureStopCapability;
-  failureKind: CaptureNativeStopFailureKind | null;
 }
 
-function isDurableTerminal(snapshot: CaptureSnapshot): boolean {
+export function isDurableTerminal(snapshot: CaptureSnapshot): boolean {
   return (
     (snapshot.state === "completed" || snapshot.state === "partial_capture") &&
     snapshot.recordingSha256 !== null
