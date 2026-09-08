@@ -13,18 +13,25 @@ export function ApplicationBlocker({
   open,
   title,
   description,
+  onDismiss,
   children,
 }: React.PropsWithChildren<{
   open: boolean;
   title: React.ReactNode;
   description: React.ReactNode;
+  onDismiss?: () => void;
 }>) {
   useApplicationBlockerRegistration(open);
 
   return (
-    <Dialog open={open} onOpenChange={() => undefined}>
+    <Dialog
+      open={open}
+      onOpenChange={(nextOpen) => {
+        if (!nextOpen) onDismiss?.();
+      }}
+    >
       <DialogContent
-        showCloseButton={false}
+        showCloseButton={Boolean(onDismiss)}
         onEscapeKeyDown={(event) => event.preventDefault()}
         onPointerDownOutside={(event) => event.preventDefault()}
         onInteractOutside={(event) => event.preventDefault()}

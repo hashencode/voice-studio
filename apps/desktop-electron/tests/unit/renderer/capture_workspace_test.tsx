@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 
 import {
+  act,
   fireEvent,
   render,
   screen,
@@ -1357,10 +1358,14 @@ describe("capture workspace", () => {
     expect(
       screen.getByText("发现 2 段未完成的录音，可一次恢复并保存。"),
     ).toBeVisible();
+    const restoreButton = screen.getByRole("button", { name: "恢复数据" });
+    expect(restoreButton).toHaveFocus();
+    expect(restoreButton.querySelector("svg.lucide-rotate-ccw")).not.toBeNull();
+    expect(screen.queryByRole("button", { name: "丢弃" })).toBeNull();
     expect(screen.queryByText(recoverable.title)).toBeNull();
     expect(screen.queryByText(anotherRecovery.title)).toBeNull();
     expect(screen.queryByText(/00:15|00:04|时间缺口/)).toBeNull();
-    await user.click(screen.getByRole("button", { name: "丢弃" }));
+    await user.click(screen.getByRole("button", { name: "关闭" }));
     await waitFor(() => expect(actOnCaptureRecovery).toHaveBeenCalledTimes(2));
     expect(actOnCaptureRecovery).toHaveBeenNthCalledWith(
       1,
@@ -1402,9 +1407,39 @@ describe("capture workspace", () => {
     );
   });
 
+  it("hides the recovery close control while restore is pending", async () => {
+    const recoverable: CaptureRecoveryItem = {
+      ...recording,
+      title: "Recover-等待恢复的录音",
+      state: "recoverable",
+    };
+    let resolveRecovery!: (value: CaptureSnapshot | null) => void;
+    const pendingRecovery = new Promise<CaptureSnapshot | null>((resolve) => {
+      resolveRecovery = resolve;
+    });
+    installCaptureApi({
+      listCaptureRecoveries: vi.fn(async () => [recoverable]),
+      actOnCaptureRecovery: vi.fn(() => pendingRecovery),
+    });
+    const user = userEvent.setup();
+    render(<CaptureWorkspace capture={idle} />);
+
+    await user.click(await screen.findByRole("button", { name: "恢复数据" }));
+
+    expect(screen.getByRole("button", { name: "正在恢复…" })).toBeDisabled();
+    expect(screen.queryByRole("button", { name: "关闭" })).toBeNull();
+
+    await act(async () => resolveRecovery(null));
+    await waitFor(() =>
+      expect(
+        screen.queryByRole("dialog", { name: "发现可恢复录制" }),
+      ).toBeNull(),
+    );
+  });
+
   it.each([
     { action: "keep" as const, buttonName: "恢复数据" },
-    { action: "discard" as const, buttonName: "丢弃" },
+    { action: "discard" as const, buttonName: "关闭" },
   ])(
     "retries only the recoveries left after a partial $action batch failure",
     async ({ action, buttonName }) => {

@@ -1,5 +1,5 @@
 import * as React from "react";
-import { Mic, Pencil } from "lucide-react";
+import { Mic, Pencil, RotateCcw } from "lucide-react";
 
 import { ApplicationBlocker } from "@/components/application-blocker";
 import { Button } from "@/components/ui/button";
@@ -1090,6 +1090,7 @@ function RecoveryDialog({
       open={open}
       title="发现可恢复录制"
       description={`发现 ${itemCount} 段未完成的录音，可一次恢复并保存。`}
+      onDismiss={busy ? undefined : onDiscardAll}
     >
       <div className="space-y-2">
         {busy ? (
@@ -1107,15 +1108,8 @@ function RecoveryDialog({
         ) : null}
       </div>
       <DialogFooter>
-        <Button
-          type="button"
-          variant="outline"
-          disabled={busy}
-          onClick={onDiscardAll}
-        >
-          丢弃
-        </Button>
         <Button type="button" disabled={busy} onClick={onRestoreAll}>
+          <RotateCcw />
           {busy ? "正在恢复…" : "恢复数据"}
         </Button>
       </DialogFooter>
