@@ -80,20 +80,31 @@ describe("shared IPC contracts", () => {
     await expect(
       api.actOnCaptureRecovery({
         action: "discard",
+        intent: "automatic-discard-only-cleanup",
         sessionIds: [sessionId],
         idempotencyKey: "discard-contract-123456",
       }),
     ).resolves.toEqual(response);
     expect(invoke).toHaveBeenCalledWith(ipcChannels.captureRecoveryAction, {
       action: "discard",
+      intent: "automatic-discard-only-cleanup",
       sessionIds: [sessionId],
       idempotencyKey: "discard-contract-123456",
     });
     expect(() =>
       captureRecoveryActionRequestSchema.parse({
         action: "keep",
+        intent: "user-decision",
         sessionIds: [sessionId, sessionId],
         idempotencyKey: "keep-duplicate-123456",
+      }),
+    ).toThrow();
+    expect(() =>
+      captureRecoveryActionRequestSchema.parse({
+        action: "keep",
+        intent: "automatic-discard-only-cleanup",
+        sessionIds: [sessionId],
+        idempotencyKey: "keep-automatic-123456",
       }),
     ).toThrow();
     expect(() =>

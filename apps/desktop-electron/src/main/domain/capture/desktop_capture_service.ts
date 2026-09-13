@@ -14,6 +14,7 @@ import {
   type CaptureControlCommand,
   type CapturePreflight,
   type CaptureRecoveryItem,
+  type CaptureRecoveryActionRequest,
   type CaptureRecoveryActionResponse,
   type CaptureRecoveryOutcome,
   type CaptureRuntimeSnapshot,
@@ -37,6 +38,7 @@ import {
 
 export class DesktopCaptureService {
   private currentSessionId: string | null = null;
+  private recoveryProjectionSessionId: string | null = null;
   private currentAudioActivity = 0;
   private recoveryScanComplete = false;
   private readonly nativeRecoveries = new Map<string, CaptureSnapshot>();
@@ -224,7 +226,12 @@ export class DesktopCaptureService {
     if (this.currentSessionId) {
       return this.repository.find(this.currentSessionId);
     }
-    return this.recoveryScanComplete ? null : this.repository.active();
+    if (this.recoveryScanComplete) {
+      return this.recoveryProjectionSessionId
+        ? this.repository.find(this.recoveryProjectionSessionId)
+        : null;
+    }
+    return this.repository.active();
   }
 
   audioActivity(): number {
@@ -245,8 +252,7 @@ export class DesktopCaptureService {
   renameSession(sessionId: string, title: string): StoredCaptureSession {
     const currentSessionId =
       this.currentSessionId ??
-      this.repository.activeSession()?.snapshot.sessionId ??
-      this.repository.firstRecoverySessionId() ??
+      this.recoveryProjectionSessionId ??
       null;
     if (sessionId !== currentSessionId) {
       throw new Error("rename must target the current capture session");
@@ -323,7 +329,7 @@ export class DesktopCaptureService {
       }
     }
     this.recoveryScanComplete = true;
-    this.selectCurrentSession();
+    await this.refreshRecoveryProjection();
     return accepted;
   }
 
@@ -335,11 +341,9 @@ export class DesktopCaptureService {
     return recoveries;
   }
 
-  async actOnRecoveries(raw: {
-    action: "keep" | "discard";
-    sessionIds: string[];
-    idempotencyKey: string;
-  }): Promise<CaptureRecoveryActionResponse> {
+  async actOnRecoveries(
+    raw: CaptureRecoveryActionRequest,
+  ): Promise<CaptureRecoveryActionResponse> {
     const request = captureRecoveryActionRequestSchema.parse(raw);
     const outcomes: CaptureRecoveryOutcome[] = [];
     for (const sessionId of request.sessionIds) {
@@ -347,13 +351,16 @@ export class DesktopCaptureService {
         await this.runRecoveryAction(
           sessionId,
           request.action,
+          request.intent,
           request.idempotencyKey,
         ),
       );
     }
+    const recoveries = await this.listRecoveries();
+    this.refreshRecoveryProjectionFrom(recoveries);
     return captureRecoveryActionResponseSchema.parse({
       outcomes,
-      recoveries: await this.listRecoveries(),
+      recoveries,
     });
   }
 
@@ -365,7 +372,7 @@ export class DesktopCaptureService {
     if (cached) {
       if (cached.action !== "discard")
         throw new Error("capture idempotency conflict");
-      this.selectCurrentSession();
+      await this.refreshRecoveryProjection();
       return;
     }
     this.repository.discardRecoveryAndReceipt(
@@ -385,13 +392,15 @@ export class DesktopCaptureService {
         }),
       );
     }
-    this.selectCurrentSession();
+    await this.refreshRecoveryProjection();
   }
 
   keepRecovered(sessionId: string, idempotencyKey: string): CaptureSnapshot {
     const cached = this.cached(sessionId, idempotencyKey, "keep");
     if (cached) {
-      this.selectCurrentSession();
+      if (this.recoveryProjectionSessionId === sessionId) {
+        this.recoveryProjectionSessionId = null;
+      }
       return cached;
     }
     const result = this.repository.keepRecoveryAndReceipt(
@@ -399,7 +408,9 @@ export class DesktopCaptureService {
       idempotencyKey,
       this.now(),
     );
-    this.selectCurrentSession();
+    if (this.recoveryProjectionSessionId === sessionId) {
+      this.recoveryProjectionSessionId = null;
+    }
     return result;
   }
 
@@ -418,6 +429,7 @@ export class DesktopCaptureService {
   private async runRecoveryAction(
     sessionId: string,
     action: "keep" | "discard",
+    intent: CaptureRecoveryActionRequest["intent"],
     idempotencyKey: string,
   ): Promise<CaptureRecoveryOutcome> {
     const inFlight = this.recoveryActions.get(sessionId);
@@ -430,6 +442,7 @@ export class DesktopCaptureService {
     const operation = this.executeRecoveryAction(
       sessionId,
       action,
+      intent,
       idempotencyKey,
     ).finally(() => {
       if (this.recoveryActions.get(sessionId) === operation) {
@@ -443,6 +456,7 @@ export class DesktopCaptureService {
   private async executeRecoveryAction(
     sessionId: string,
     action: "keep" | "discard",
+    intent: CaptureRecoveryActionRequest["intent"],
     idempotencyKey: string,
   ): Promise<CaptureRecoveryOutcome> {
     const cached = this.repository.receipt(sessionId, idempotencyKey);
@@ -462,6 +476,8 @@ export class DesktopCaptureService {
     const assessed = await this.assessRecovery(candidate);
     if (
       assessed.capability === "preserve-only" ||
+      (intent === "automatic-discard-only-cleanup" &&
+        assessed.capability !== "discard-only") ||
       (action === "keep" && assessed.capability !== "restorable")
     ) {
       return recoveryOutcome(sessionId, action, "preserved");
@@ -589,17 +605,17 @@ export class DesktopCaptureService {
     return `新录音${day.dateStamp}${String(sequence).padStart(2, "0")}`;
   }
 
-  private selectCurrentSession(): void {
-    const recoverySessionId = this.repository.firstRecoverySessionId();
-    if (recoverySessionId) {
-      this.currentSessionId = recoverySessionId;
-      return;
-    }
-    const activeSessionId = this.repository.activeSession()?.snapshot.sessionId;
-    this.currentSessionId =
-      activeSessionId && this.nativeRecoveries.has(activeSessionId)
-        ? activeSessionId
-        : null;
+  private async refreshRecoveryProjection(): Promise<void> {
+    if (!this.recoveryScanComplete) return;
+    this.refreshRecoveryProjectionFrom(await this.listRecoveries());
+  }
+
+  private refreshRecoveryProjectionFrom(
+    recoveries: CaptureRecoveryItem[],
+  ): void {
+    this.recoveryProjectionSessionId =
+      recoveries.find((item) => item.capability === "restorable")?.sessionId ??
+      null;
   }
 
   private assertSession(expected: string, snapshot: CaptureSnapshot): void {

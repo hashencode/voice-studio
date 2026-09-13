@@ -18,6 +18,7 @@ import type {
 import { audioAiErrorCodeSchema, type AudioAiErrorCode } from "./audio_ai";
 import type {
   CapturePreflight,
+  CaptureRecoveryActionRequest,
   CaptureRecoveryActionResponse,
   CaptureRecoveryItem,
   CaptureSnapshot,
@@ -569,11 +570,9 @@ export interface Voice2TextDesktopApi {
     options: RenameCaptureSessionRequest,
   ): Promise<import("./application_state").ApplicationSnapshot>;
   listCaptureRecoveries(): Promise<CaptureRecoveryItem[]>;
-  actOnCaptureRecovery(options: {
-    action: "keep" | "discard";
-    sessionIds: string[];
-    idempotencyKey: string;
-  }): Promise<CaptureRecoveryActionResponse>;
+  actOnCaptureRecovery(
+    options: CaptureRecoveryActionRequest,
+  ): Promise<CaptureRecoveryActionResponse>;
   startMicrophoneTest(options: {
     microphoneDeviceId?: string;
   }): Promise<MicrophoneTestSnapshot>;

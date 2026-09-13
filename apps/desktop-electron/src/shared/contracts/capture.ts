@@ -175,6 +175,7 @@ export const captureControlRequestSchema = z
 export const captureRecoveryActionRequestSchema = z
   .object({
     action: z.enum(["keep", "discard"]),
+    intent: z.enum(["user-decision", "automatic-discard-only-cleanup"]),
     sessionIds: z.array(captureSessionIdSchema).min(1).max(256),
     idempotencyKey: z.string().min(12).max(160),
   })
@@ -185,6 +186,16 @@ export const captureRecoveryActionRequestSchema = z
         code: "custom",
         message: "capture recovery targets must be unique",
         path: ["sessionIds"],
+      });
+    }
+    if (
+      request.intent === "automatic-discard-only-cleanup" &&
+      request.action !== "discard"
+    ) {
+      context.addIssue({
+        code: "custom",
+        message: "automatic recovery cleanup can only discard",
+        path: ["action"],
       });
     }
   });
@@ -359,6 +370,9 @@ export type CaptureRecoveryCapability = z.infer<
 export type CaptureRecoveryReason = z.infer<typeof captureRecoveryReasonSchema>;
 export type CaptureRecoveryOutcome = z.infer<
   typeof captureRecoveryOutcomeSchema
+>;
+export type CaptureRecoveryActionRequest = z.infer<
+  typeof captureRecoveryActionRequestSchema
 >;
 export type CaptureRecoveryActionResponse = z.infer<
   typeof captureRecoveryActionResponseSchema

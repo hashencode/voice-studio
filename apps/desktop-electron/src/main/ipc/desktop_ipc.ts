@@ -47,6 +47,7 @@ import {
   microphoneTestControlRequestSchema,
   microphoneSettingsOpenRequestSchema,
   type CapturePreflight,
+  type CaptureRecoveryActionRequest,
   type CaptureRecoveryActionResponse,
   type CaptureSnapshot,
   type CaptureRecoveryItem,
@@ -248,11 +249,9 @@ export interface DesktopIpcServices {
     options: RenameCaptureSessionRequest,
   ): Promise<ApplicationSnapshot>;
   listCaptureRecoveries(): Promise<CaptureRecoveryItem[]>;
-  actOnCaptureRecovery(options: {
-    action: "keep" | "discard";
-    sessionIds: string[];
-    idempotencyKey: string;
-  }): Promise<CaptureRecoveryActionResponse>;
+  actOnCaptureRecovery(
+    options: CaptureRecoveryActionRequest,
+  ): Promise<CaptureRecoveryActionResponse>;
   startMicrophoneTest(options: {
     ownerId: number;
     microphoneDeviceId?: string;

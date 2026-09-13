@@ -2615,6 +2615,7 @@ function bindDesktopIpc(window: BrowserWindow): void {
             transcriptionHandoff: handoffFailed ? "failed" : "completed",
           });
         }
+        publishCapture(service.snapshot());
         return { ...response, outcomes };
       });
       captureRecoveryMutation = operation.then(
@@ -3632,8 +3633,8 @@ async function initializeCapture(
     captureNativePort,
     profile.captureDirectory,
   );
-  const recoveries = await captureService.recover();
-  publishCapture(recoveries[0] ?? captureService.snapshot());
+  await captureService.recover();
+  publishCapture(captureService.snapshot());
 }
 
 async function initializeCompanion(
