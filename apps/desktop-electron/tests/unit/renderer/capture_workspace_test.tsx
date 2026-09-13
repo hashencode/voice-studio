@@ -707,11 +707,9 @@ describe("capture workspace", () => {
     );
 
     const dialog = await screen.findByRole("dialog", {
-      name: "发现待处理的录音",
+      name: "发现可恢复的录音",
     });
-    expect(
-      within(dialog).getByText(/发现 1 段待处理录音：1 段可恢复/),
-    ).toBeVisible();
+    expect(within(dialog).getByText(/发现 1 段可恢复录音/)).toBeVisible();
     expect(within(dialog).queryByText(focusedRecovery.title)).toBeNull();
     expect(screen.queryByText("其他活动录制")).toBeNull();
     expect(screen.queryByRole("textbox", { name: "录制名称" })).toBeNull();
@@ -1413,158 +1411,37 @@ describe("capture workspace", () => {
     );
   });
 
-  it("opens the minimal recovery dialog on its container and restores only eligible items", async () => {
-    const recoverable: CaptureRecoveryItem = {
-      ...recording,
-      title: "Recover-音频录制",
-      state: "recoverable",
-      captureTimelineMs: 15_000,
-      interruptionReason: "renderer_reloaded",
-      finalizedChunkCount: 3,
-      gapCount: 1,
-      capability: "restorable",
-      reason: null,
-    };
-    const preserved: CaptureRecoveryItem = {
-      ...recoverable,
-      sessionId: "session-recovery-second-123456",
-      title: "Recover-另一段音频录制",
-      captureTimelineMs: 4_000,
-      capability: "preserve-only",
-      reason: "unfinished-audio-data",
-    };
-    const actOnCaptureRecovery = vi.fn(async () => ({
-      outcomes: [
-        {
-          sessionId: recoverable.sessionId,
-          action: "keep" as const,
-          result: "kept" as const,
-          completionCertainty: "completed" as const,
-          audioDurability: "durable" as const,
-          transcriptionHandoff: "completed" as const,
-          capture: recording,
-        },
-      ],
-      recoveries: [preserved],
-    }));
-    installCaptureApi({
-      listCaptureRecoveries: vi.fn(async () => [recoverable, preserved]),
-      actOnCaptureRecovery,
-    });
-    const user = userEvent.setup();
-    render(<CaptureWorkspace capture={idle} applicationRevision={5} />);
-
-    const dialog = await screen.findByRole("dialog", {
-      name: "发现待处理的录音",
-    });
-    expect(dialog).toHaveFocus();
-    const ignore = screen.getByRole("button", { name: "忽略" });
-    const restore = screen.getByRole("button", { name: "恢复" });
-    const close = screen.getByRole("button", { name: "关闭" });
-    expect(ignore).not.toHaveFocus();
-    expect(restore).not.toHaveFocus();
-    expect(close).not.toHaveFocus();
-    expect(ignore.querySelector("svg")).toBeNull();
-    expect(restore.querySelector("svg")).toBeNull();
-    await user.tab();
-    expect(ignore).toHaveFocus();
-
-    await user.click(restore);
-    await waitFor(() => expect(actOnCaptureRecovery).toHaveBeenCalledTimes(1));
-    expect(actOnCaptureRecovery).toHaveBeenCalledWith(
-      expect.objectContaining({
-        action: "keep",
-        sessionIds: [recoverable.sessionId],
-      }),
-    );
-    expect(
-      screen.getByText("发现未完成的音频数据，原始数据已保留。"),
-    ).toBeVisible();
-    expect(screen.queryByText("录制操作未完成")).toBeNull();
-  });
-
-  it("keeps restore pending single-flight and blocks close intentions", async () => {
-    const recoverable = recoveryItem({ title: "Recover-等待恢复的录音" });
-    let resolveRecovery!: (value: CaptureRecoveryActionResponse) => void;
-    const pendingRecovery = new Promise<CaptureRecoveryActionResponse>(
-      (resolve) => {
-        resolveRecovery = resolve;
-      },
-    );
-    const actOnCaptureRecovery = vi.fn(() => pendingRecovery);
-    installCaptureApi({
-      listCaptureRecoveries: vi.fn(async () => [recoverable]),
-      actOnCaptureRecovery,
-    });
-    const user = userEvent.setup();
-    render(<CaptureWorkspace capture={idle} />);
-
-    const restore = await screen.findByRole("button", { name: "恢复" });
-    await user.click(restore);
-    await user.click(restore);
-    fireEvent.keyDown(screen.getByRole("dialog"), { key: "Escape" });
-
-    expect(screen.getByRole("button", { name: "正在恢复…" })).toBeDisabled();
-    expect(screen.queryByRole("button", { name: "关闭" })).toBeNull();
-    expect(screen.getByRole("dialog")).toBeVisible();
-    expect(actOnCaptureRecovery).toHaveBeenCalledTimes(1);
-
-    await act(async () => resolveRecovery(recoveryResponse()));
-    await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
-  });
-
-  it("keeps ignore pending single-flight and blocks close intentions", async () => {
-    const recoverable = recoveryItem();
-    let resolveRecovery!: (value: CaptureRecoveryActionResponse) => void;
-    const pendingRecovery = new Promise<CaptureRecoveryActionResponse>(
-      (resolve) => {
-        resolveRecovery = resolve;
-      },
-    );
-    const actOnCaptureRecovery = vi.fn(() => pendingRecovery);
-    installCaptureApi({
-      listCaptureRecoveries: vi.fn(async () => [recoverable]),
-      actOnCaptureRecovery,
-    });
-    const user = userEvent.setup();
-    render(<CaptureWorkspace capture={idle} />);
-
-    await user.click(await screen.findByRole("button", { name: "忽略" }));
-    fireEvent.keyDown(screen.getByRole("dialog"), { key: "Escape" });
-
-    expect(screen.getByRole("button", { name: "正在忽略…" })).toBeDisabled();
-    expect(screen.queryByRole("button", { name: "关闭" })).toBeNull();
-    expect(screen.getByRole("dialog")).toBeVisible();
-    expect(actOnCaptureRecovery).toHaveBeenCalledTimes(1);
-
-    await act(async () => resolveRecovery(recoveryResponse()));
-    await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
-  });
-
-  it.each(["ignore", "close", "escape"] as const)(
-    "submits one identical frozen discard batch through $entry",
-    async (entry) => {
+  describe("explicit recovery decisions", () => {
+    it("partitions mixed candidates into a restorable dialog, automatic cleanup, and a preserve Toast", async () => {
       const restorable = recoveryItem({
-        sessionId: "session-recovery-first-123456",
+        sessionId: "session-recovery-restorable-123456",
       });
       const discardOnly = recoveryItem({
-        sessionId: "session-recovery-empty-123456",
+        sessionId: "session-recovery-discard-only-123456",
         capability: "discard-only",
         reason: "no-audio-data",
-        finalizedChunkCount: 0,
       });
       const preserveOnly = recoveryItem({
-        sessionId: "session-recovery-preserved-123456",
+        sessionId: "session-recovery-preserve-only-123456",
         capability: "preserve-only",
         reason: "currently-unverifiable",
       });
-      let resolveRecovery!: (value: CaptureRecoveryActionResponse) => void;
-      const pendingRecovery = new Promise<CaptureRecoveryActionResponse>(
-        (resolve) => {
-          resolveRecovery = resolve;
-        },
+      const actOnCaptureRecovery = vi.fn(async () =>
+        recoveryResponse({
+          outcomes: [
+            {
+              sessionId: discardOnly.sessionId,
+              action: "discard",
+              result: "discarded",
+              completionCertainty: "completed",
+              audioDurability: "discarded",
+              transcriptionHandoff: "not-requested",
+              capture: null,
+            },
+          ],
+          recoveries: [restorable, preserveOnly],
+        }),
       );
-      const actOnCaptureRecovery = vi.fn(() => pendingRecovery);
       installCaptureApi({
         listCaptureRecoveries: vi.fn(async () => [
           restorable,
@@ -1573,288 +1450,360 @@ describe("capture workspace", () => {
         ]),
         actOnCaptureRecovery,
       });
+
+      render(<CaptureWorkspace capture={idle} detailOpen={false} />);
+
+      const dialog = await screen.findByRole("dialog", {
+        name: "发现可恢复的录音",
+      });
+      expect(dialog).toHaveTextContent("发现 1 段可恢复录音");
+      expect(screen.getByRole("button", { name: "删除数据" })).toBeVisible();
+      expect(screen.getByRole("button", { name: "立即恢复" })).toBeVisible();
+      expect(screen.queryByRole("button", { name: "关闭" })).toBeNull();
+      expect(screen.queryByText("忽略")).toBeNull();
+      await waitFor(() =>
+        expect(actOnCaptureRecovery).toHaveBeenCalledTimes(1),
+      );
+      expect(actOnCaptureRecovery).toHaveBeenCalledWith({
+        action: "discard",
+        intent: "automatic-discard-only-cleanup",
+        sessionIds: [discardOnly.sessionId],
+        idempotencyKey: expect.any(String),
+      });
+      expect(toastSpies.success).toHaveBeenCalledWith(
+        "1 段无可恢复内容的录音数据已处理。",
+        expect.objectContaining({ id: "capture-recovery-cleanup-completed" }),
+      );
+      expect(toastSpies.warning).toHaveBeenCalledWith(
+        "1 段录音暂时无法验证，原始数据已保留。",
+        expect.objectContaining({ id: "capture-recovery-preserved" }),
+      );
+    });
+
+    it("requires an explicit delete and freezes the user-decision request while pending", async () => {
+      const first = recoveryItem({
+        sessionId: "session-recovery-delete-first-123456",
+      });
+      const second = recoveryItem({
+        sessionId: "session-recovery-delete-second-123456",
+      });
+      let resolveRecovery!: (value: CaptureRecoveryActionResponse) => void;
+      const actOnCaptureRecovery = vi.fn(
+        () =>
+          new Promise<CaptureRecoveryActionResponse>((resolve) => {
+            resolveRecovery = resolve;
+          }),
+      );
+      installCaptureApi({
+        listCaptureRecoveries: vi.fn(async () => [first, second]),
+        actOnCaptureRecovery,
+      });
       const user = userEvent.setup();
       render(<CaptureWorkspace capture={idle} />);
 
       const dialog = await screen.findByRole("dialog");
-      if (entry === "ignore") {
-        await user.click(screen.getByRole("button", { name: "忽略" }));
-      } else if (entry === "close") {
-        await user.click(screen.getByRole("button", { name: "关闭" }));
-      } else {
-        fireEvent.keyDown(dialog, { key: "Escape" });
-      }
+      fireEvent.keyDown(dialog, { key: "Escape" });
+      const overlay = document.querySelector('[data-slot="dialog-overlay"]');
+      fireEvent.pointerDown(overlay!);
+      fireEvent.click(overlay!);
+      expect(actOnCaptureRecovery).not.toHaveBeenCalled();
+      expect(dialog).toBeVisible();
 
+      await user.click(screen.getByRole("button", { name: "删除数据" }));
+      expect(screen.getByRole("button", { name: "正在删除…" })).toBeDisabled();
+      expect(screen.getByRole("button", { name: "立即恢复" })).toBeDisabled();
       expect(actOnCaptureRecovery).toHaveBeenCalledTimes(1);
       expect(actOnCaptureRecovery).toHaveBeenCalledWith({
         action: "discard",
-        sessionIds: [restorable.sessionId, discardOnly.sessionId],
+        intent: "user-decision",
+        sessionIds: [first.sessionId, second.sessionId],
         idempotencyKey: expect.any(String),
       });
-      expect(screen.queryByRole("alertdialog")).toBeNull();
-      await act(async () => resolveRecovery(recoveryResponse()));
-    },
-  );
 
-  it("does not add recoveries that appear after a discard batch starts", async () => {
-    const visible = recoveryItem({
-      sessionId: "session-recovery-visible-123456",
-    });
-    const later = recoveryItem({
-      sessionId: "session-recovery-later-123456",
-    });
-    let resolveRecovery!: (value: CaptureRecoveryActionResponse) => void;
-    const pendingRecovery = new Promise<CaptureRecoveryActionResponse>(
-      (resolve) => {
-        resolveRecovery = resolve;
-      },
-    );
-    let resolveLateList!: (value: CaptureRecoveryItem[]) => void;
-    const lateList = new Promise<CaptureRecoveryItem[]>((resolve) => {
-      resolveLateList = resolve;
-    });
-    const listCaptureRecoveries = vi
-      .fn<Voice2TextDesktopApi["listCaptureRecoveries"]>()
-      .mockResolvedValueOnce([visible])
-      .mockReturnValueOnce(lateList);
-    const actOnCaptureRecovery = vi.fn(() => pendingRecovery);
-    installCaptureApi({ listCaptureRecoveries, actOnCaptureRecovery });
-    const user = userEvent.setup();
-    const view = render(
-      <CaptureWorkspace capture={idle} autoOpenRecoveries={false} />,
-    );
-
-    const ignore = await screen.findByRole("button", { name: "忽略" });
-    view.rerender(<CaptureWorkspace capture={idle} autoOpenRecoveries />);
-    await waitFor(() => expect(listCaptureRecoveries).toHaveBeenCalledTimes(2));
-    await user.click(ignore);
-
-    expect(actOnCaptureRecovery).toHaveBeenCalledTimes(1);
-    expect(actOnCaptureRecovery).toHaveBeenCalledWith(
-      expect.objectContaining({ sessionIds: [visible.sessionId] }),
-    );
-    await act(async () => resolveRecovery(recoveryResponse()));
-    await act(async () => resolveLateList([visible, later]));
-    expect(screen.queryByRole("alertdialog")).toBeNull();
-  });
-
-  it("keeps the recovery dialog open when its mask is clicked", async () => {
-    const actOnCaptureRecovery = vi.fn(async () => recoveryResponse());
-    installCaptureApi({
-      listCaptureRecoveries: vi.fn(async () => [recoveryItem()]),
-      actOnCaptureRecovery,
-    });
-    render(<CaptureWorkspace capture={idle} />);
-    const dialog = await screen.findByRole("dialog");
-    const overlay = document.querySelector('[data-slot="dialog-overlay"]');
-    expect(overlay).not.toBeNull();
-
-    fireEvent.pointerDown(overlay!);
-    fireEvent.click(overlay!);
-
-    expect(dialog).toBeVisible();
-    expect(actOnCaptureRecovery).not.toHaveBeenCalled();
-  });
-
-  it("hides preserve-only data without submitting it", async () => {
-    const actOnCaptureRecovery = vi.fn(async () => recoveryResponse());
-    installCaptureApi({
-      listCaptureRecoveries: vi.fn(async () => [
-        recoveryItem({
-          capability: "preserve-only",
-          reason: "unfinished-audio-data",
-          finalizedChunkCount: 0,
-        }),
-      ]),
-      actOnCaptureRecovery,
-    });
-    const user = userEvent.setup();
-    render(<CaptureWorkspace capture={idle} />);
-
-    const dialog = await screen.findByRole("dialog");
-    expect(dialog).toHaveTextContent("发现未完成的音频数据");
-    expect(dialog).toHaveTextContent("数据已保留");
-    expect(screen.queryByRole("button", { name: "恢复" })).toBeNull();
-    expect(screen.queryByRole("button", { name: "忽略" })).toBeNull();
-    await user.click(screen.getByRole("button", { name: "关闭" }));
-
-    await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
-    expect(actOnCaptureRecovery).not.toHaveBeenCalled();
-  });
-
-  it.each([
-    ["no-audio-data", "没有可用音频数据"],
-    ["unfinished-audio-data", "发现未完成的音频数据"],
-    ["recovery-metadata-damaged", "恢复信息已损坏"],
-    ["audio-integrity-failed", "完整性校验失败"],
-    ["finalization-in-progress", "录音仍在保存中"],
-    ["currently-unverifiable", "当前无法确认"],
-  ] as const)(
-    "matches %s to its recovery result copy",
-    async (reason, copy) => {
-      installCaptureApi({
-        listCaptureRecoveries: vi.fn(async () => [
-          recoveryItem({
-            capability:
-              reason === "no-audio-data" ? "discard-only" : "preserve-only",
-            reason,
-            finalizedChunkCount: 0,
+      await act(async () =>
+        resolveRecovery(
+          recoveryResponse({
+            outcomes: [first, second].map((item) => ({
+              sessionId: item.sessionId,
+              action: "discard" as const,
+              result: "discarded" as const,
+              completionCertainty: "completed" as const,
+              audioDurability: "discarded" as const,
+              transcriptionHandoff: "not-requested" as const,
+              capture: null,
+            })),
           }),
-        ]),
+        ),
+      );
+      await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+    });
+
+    it("replays a lost restore response once and then exposes only the same action for retry", async () => {
+      const item = recoveryItem();
+      const actOnCaptureRecovery = vi
+        .fn<Voice2TextDesktopApi["actOnCaptureRecovery"]>()
+        .mockRejectedValueOnce(new Error("lost"))
+        .mockRejectedValueOnce(new Error("still lost"))
+        .mockResolvedValueOnce(
+          recoveryResponse({
+            outcomes: [
+              {
+                sessionId: item.sessionId,
+                action: "keep",
+                result: "kept",
+                completionCertainty: "completed",
+                audioDurability: "durable",
+                transcriptionHandoff: "completed",
+                capture: item,
+              },
+            ],
+          }),
+        );
+      installCaptureApi({
+        listCaptureRecoveries: vi.fn(async () => [item]),
+        actOnCaptureRecovery,
       });
+      const user = userEvent.setup();
       render(<CaptureWorkspace capture={idle} />);
 
-      const dialog = await screen.findByRole("dialog");
-      expect(dialog).toHaveTextContent(copy);
-      expect(dialog).not.toHaveTextContent("录制操作未完成");
-      if (reason === "no-audio-data") {
-        expect(screen.getByRole("button", { name: "忽略" })).toBeVisible();
-        expect(screen.queryByRole("button", { name: "恢复" })).toBeNull();
-      } else {
-        expect(screen.queryByRole("button", { name: "忽略" })).toBeNull();
-        expect(screen.queryByRole("button", { name: "恢复" })).toBeNull();
-      }
-    },
-  );
+      await user.click(await screen.findByRole("button", { name: "立即恢复" }));
+      expect(
+        await screen.findByText("数据状态尚未确认，请再次执行原操作。"),
+      ).toBeVisible();
+      expect(screen.getByRole("button", { name: "删除数据" })).toBeDisabled();
+      expect(screen.getByRole("button", { name: "立即恢复" })).toBeEnabled();
+      expect(actOnCaptureRecovery).toHaveBeenCalledTimes(2);
+      expect(actOnCaptureRecovery.mock.calls[1]?.[0]).toEqual(
+        actOnCaptureRecovery.mock.calls[0]?.[0],
+      );
 
-  it("uses batch outcomes and remaining recoveries without reloading", async () => {
-    const recoverable = recoveryItem();
-    const preserved = recoveryItem({
-      sessionId: "session-recovery-preserved-123456",
-      capability: "preserve-only",
-      reason: "audio-integrity-failed",
+      await user.click(screen.getByRole("button", { name: "立即恢复" }));
+      await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+      expect(actOnCaptureRecovery).toHaveBeenCalledTimes(3);
+      expect(actOnCaptureRecovery.mock.calls[2]?.[0]).toEqual(
+        actOnCaptureRecovery.mock.calls[0]?.[0],
+      );
     });
-    const listCaptureRecoveries = vi.fn(async () => [recoverable]);
-    const actOnCaptureRecovery = vi.fn(async () =>
-      recoveryResponse({
+
+    it("replays an unconfirmed automatic cleanup once with the same request and warns without success", async () => {
+      const item = recoveryItem({
+        capability: "discard-only",
+        reason: "no-audio-data",
+      });
+      const unknown = recoveryResponse({
         outcomes: [
           {
-            sessionId: recoverable.sessionId,
+            sessionId: item.sessionId,
+            action: "discard",
+            result: "failed",
+            completionCertainty: "unknown",
+            audioDurability: "unknown",
+            transcriptionHandoff: "not-requested",
+            capture: item,
+          },
+        ],
+        recoveries: [item],
+      });
+      const actOnCaptureRecovery = vi.fn(async () => unknown);
+      installCaptureApi({
+        listCaptureRecoveries: vi.fn(async () => [item]),
+        actOnCaptureRecovery,
+      });
+
+      render(<CaptureWorkspace capture={idle} />);
+
+      await waitFor(() =>
+        expect(actOnCaptureRecovery).toHaveBeenCalledTimes(2),
+      );
+      expect(actOnCaptureRecovery.mock.calls[1]?.[0]).toEqual(
+        actOnCaptureRecovery.mock.calls[0]?.[0],
+      );
+      expect(screen.queryByRole("dialog")).toBeNull();
+      expect(toastSpies.success).not.toHaveBeenCalled();
+      expect(toastSpies.warning).toHaveBeenCalledWith(
+        "数据尚未确认删除，下次启动将重新检查。",
+        expect.objectContaining({ id: "capture-recovery-cleanup-unconfirmed" }),
+      );
+    });
+
+    it("returns a confirmed conflict to the two-action choice using authoritative recoveries", async () => {
+      const item = recoveryItem();
+      const actOnCaptureRecovery = vi.fn(async () =>
+        recoveryResponse({
+          outcomes: [
+            {
+              sessionId: item.sessionId,
+              action: "discard",
+              result: "conflict",
+              completionCertainty: "not-completed",
+              audioDurability: "unchanged",
+              transcriptionHandoff: "not-requested",
+              capture: item,
+            },
+          ],
+          recoveries: [item],
+        }),
+      );
+      installCaptureApi({
+        listCaptureRecoveries: vi.fn(async () => [item]),
+        actOnCaptureRecovery,
+      });
+      const user = userEvent.setup();
+      render(<CaptureWorkspace capture={idle} />);
+
+      await user.click(await screen.findByRole("button", { name: "删除数据" }));
+
+      expect(
+        await screen.findByRole("button", { name: "删除数据" }),
+      ).toBeEnabled();
+      expect(screen.getByRole("button", { name: "立即恢复" })).toBeEnabled();
+      expect(actOnCaptureRecovery).toHaveBeenCalledTimes(1);
+    });
+
+    it("shows preserve-only candidates once without opening a dialog or mutating data", async () => {
+      const item = recoveryItem({
+        capability: "preserve-only",
+        reason: "audio-integrity-failed",
+      });
+      const api = installCaptureApi({
+        listCaptureRecoveries: vi.fn(async () => [item]),
+      });
+      const view = render(<CaptureWorkspace capture={idle} />);
+
+      await waitFor(() => expect(toastSpies.warning).toHaveBeenCalledTimes(1));
+      expect(screen.queryByRole("dialog")).toBeNull();
+      expect(api.actOnCaptureRecovery).not.toHaveBeenCalled();
+      view.rerender(<CaptureWorkspace capture={idle} autoOpenRecoveries />);
+      await waitFor(() =>
+        expect(api.listCaptureRecoveries).toHaveBeenCalledTimes(2),
+      );
+      expect(toastSpies.warning).toHaveBeenCalledTimes(1);
+      expect(api.actOnCaptureRecovery).not.toHaveBeenCalled();
+    });
+
+    it("routes an automatically reclassified cleanup target into the decision dialog", async () => {
+      const discardOnly = recoveryItem({
+        capability: "discard-only",
+        reason: "no-audio-data",
+      });
+      const restorable = recoveryItem({
+        sessionId: discardOnly.sessionId,
+      });
+      installCaptureApi({
+        listCaptureRecoveries: vi.fn(async () => [discardOnly]),
+        actOnCaptureRecovery: vi.fn(async () =>
+          recoveryResponse({
+            outcomes: [
+              {
+                sessionId: discardOnly.sessionId,
+                action: "discard",
+                result: "preserved",
+                completionCertainty: "not-completed",
+                audioDurability: "preserved",
+                transcriptionHandoff: "not-requested",
+                capture: discardOnly,
+              },
+            ],
+            recoveries: [restorable],
+          }),
+        ),
+      });
+
+      render(<CaptureWorkspace capture={idle} />);
+
+      expect(
+        await screen.findByRole("dialog", { name: "发现可恢复的录音" }),
+      ).toHaveTextContent("发现 1 段可恢复录音");
+      expect(toastSpies.success).not.toHaveBeenCalled();
+      expect(toastSpies.warning).not.toHaveBeenCalledWith(
+        "数据尚未确认删除，下次启动将重新检查。",
+        expect.anything(),
+      );
+    });
+
+    it("keeps the exact original request after a partial result while showing only the unresolved item", async () => {
+      const completed = recoveryItem({
+        sessionId: "session-recovery-partial-complete-123456",
+      });
+      const unresolved = recoveryItem({
+        sessionId: "session-recovery-partial-unknown-123456",
+      });
+      const unresolvedResponse = recoveryResponse({
+        outcomes: [
+          {
+            sessionId: completed.sessionId,
             action: "keep",
             result: "kept",
             completionCertainty: "completed",
             audioDurability: "durable",
             transcriptionHandoff: "completed",
-            capture: recoverable,
+            capture: completed,
           },
-        ],
-        recoveries: [preserved],
-      }),
-    );
-    installCaptureApi({ listCaptureRecoveries, actOnCaptureRecovery });
-    const user = userEvent.setup();
-    render(<CaptureWorkspace capture={idle} />);
-
-    await user.click(await screen.findByRole("button", { name: "恢复" }));
-
-    const result = await screen.findByRole("dialog", { name: "恢复结果" });
-    expect(result).toHaveTextContent("1 段录音已恢复并保存");
-    expect(result).toHaveTextContent("完整性校验失败");
-    expect(screen.queryByRole("button", { name: /重试|重新检查/ })).toBeNull();
-    expect(actOnCaptureRecovery).toHaveBeenCalledTimes(1);
-    expect(listCaptureRecoveries).toHaveBeenCalledTimes(1);
-  });
-
-  it("silently closes when an ignore response is lost", async () => {
-    installCaptureApi({
-      listCaptureRecoveries: vi.fn(async () => [recoveryItem()]),
-      actOnCaptureRecovery: vi.fn(async () => {
-        throw new Error("response lost after committed discard");
-      }),
-    });
-    const user = userEvent.setup();
-    render(<CaptureWorkspace capture={idle} />);
-
-    await user.click(await screen.findByRole("button", { name: "忽略" }));
-
-    await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
-    expect(screen.queryByRole("alert")).toBeNull();
-    expect(toastSpies.success).not.toHaveBeenCalled();
-    expect(toastSpies.warning).not.toHaveBeenCalled();
-  });
-
-  it("leaves restore pending without offering a retry when its response is lost", async () => {
-    installCaptureApi({
-      listCaptureRecoveries: vi.fn(async () => [recoveryItem()]),
-      actOnCaptureRecovery: vi.fn(async () => {
-        throw new Error("response lost after committed restore");
-      }),
-    });
-    const user = userEvent.setup();
-    render(<CaptureWorkspace capture={idle} />);
-
-    await user.click(await screen.findByRole("button", { name: "恢复" }));
-
-    await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
-    expect(screen.queryByRole("button", { name: /重试|重新检查/ })).toBeNull();
-    expect(toastSpies.success).not.toHaveBeenCalled();
-    expect(toastSpies.warning).not.toHaveBeenCalled();
-  });
-
-  it("auto-closes after restore, focuses recording entry, and emits stable Toasts", async () => {
-    const recoverable = recoveryItem();
-    const actOnCaptureRecovery = vi.fn(async () =>
-      recoveryResponse({
-        outcomes: [
           {
-            sessionId: recoverable.sessionId,
+            sessionId: unresolved.sessionId,
             action: "keep",
-            result: "kept",
-            completionCertainty: "completed",
-            audioDurability: "durable",
-            transcriptionHandoff: "failed",
-            capture: recoverable,
+            result: "failed",
+            completionCertainty: "unknown",
+            audioDurability: "unknown",
+            transcriptionHandoff: "not-requested",
+            capture: unresolved,
           },
         ],
-      }),
-    );
-    installCaptureApi({
-      listCaptureRecoveries: vi.fn(async () => [recoverable]),
-      actOnCaptureRecovery,
+        recoveries: [unresolved],
+      });
+      const actOnCaptureRecovery = vi
+        .fn<Voice2TextDesktopApi["actOnCaptureRecovery"]>()
+        .mockResolvedValueOnce(unresolvedResponse)
+        .mockResolvedValueOnce(unresolvedResponse)
+        .mockResolvedValueOnce(
+          recoveryResponse({
+            outcomes: [
+              {
+                sessionId: completed.sessionId,
+                action: "keep",
+                result: "kept",
+                completionCertainty: "completed",
+                audioDurability: "durable",
+                transcriptionHandoff: "completed",
+                capture: completed,
+              },
+              {
+                sessionId: unresolved.sessionId,
+                action: "keep",
+                result: "kept",
+                completionCertainty: "completed",
+                audioDurability: "durable",
+                transcriptionHandoff: "completed",
+                capture: unresolved,
+              },
+            ],
+          }),
+        );
+      installCaptureApi({
+        listCaptureRecoveries: vi.fn(async () => [completed, unresolved]),
+        actOnCaptureRecovery,
+      });
+      const user = userEvent.setup();
+      render(<CaptureWorkspace capture={idle} />);
+
+      await user.click(await screen.findByRole("button", { name: "立即恢复" }));
+
+      expect(await screen.findByText(/发现 1 段可恢复录音/)).toBeVisible();
+      expect(actOnCaptureRecovery).toHaveBeenCalledTimes(2);
+      expect(actOnCaptureRecovery.mock.calls[1]?.[0]).toEqual(
+        actOnCaptureRecovery.mock.calls[0]?.[0],
+      );
+      expect(actOnCaptureRecovery.mock.calls[0]?.[0].sessionIds).toEqual([
+        completed.sessionId,
+        unresolved.sessionId,
+      ]);
+
+      await user.click(screen.getByRole("button", { name: "立即恢复" }));
+      await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+      expect(actOnCaptureRecovery.mock.calls[2]?.[0]).toEqual(
+        actOnCaptureRecovery.mock.calls[0]?.[0],
+      );
     });
-    const user = userEvent.setup();
-    render(<CaptureWorkspace capture={idle} />);
-
-    await user.click(await screen.findByRole("button", { name: "恢复" }));
-
-    await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
-    expect(
-      screen.getByRole("button", { name: "检查并设置录制" }),
-    ).toHaveFocus();
-    expect(toastSpies.success).toHaveBeenCalledWith(
-      "录音已恢复并保存",
-      expect.objectContaining({ id: "capture-recovery-completed" }),
-    );
-    expect(toastSpies.warning).toHaveBeenCalledWith(
-      "录音已恢复；转写暂未开始，可稍后重试。",
-      expect.objectContaining({ id: "capture-recovery-transcription-failed" }),
-    );
-    expect(actOnCaptureRecovery).toHaveBeenCalledTimes(1);
-  });
-
-  it("returns focus to the route recording entry when capture detail is closed", async () => {
-    installCaptureApi({
-      listCaptureRecoveries: vi.fn(async () => [recoveryItem()]),
-      actOnCaptureRecovery: vi.fn(async () => recoveryResponse()),
-    });
-    const user = userEvent.setup();
-    render(
-      <>
-        <button type="button" data-recording-entry="test-route">
-          新录音
-        </button>
-        <CaptureWorkspace
-          capture={idle}
-          detailOpen={false}
-          autoOpenRecoveries
-        />
-      </>,
-    );
-
-    await user.click(await screen.findByRole("button", { name: "恢复" }));
-
-    await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
-    expect(screen.getByRole("button", { name: "新录音" })).toHaveFocus();
   });
 
   it("recovers from an action failure and unlocks the control", async () => {
@@ -1944,7 +1893,7 @@ describe("capture workspace", () => {
       <CaptureWorkspace capture={idle} applicationRevision={7} />,
     );
 
-    await user.click(await screen.findByRole("button", { name: "恢复" }));
+    await user.click(await screen.findByRole("button", { name: "立即恢复" }));
     view.rerender(
       <CaptureWorkspace
         capture={{
@@ -2005,7 +1954,7 @@ describe("capture workspace", () => {
       />,
     );
     expect(
-      await screen.findByRole("heading", { name: "发现待处理的录音" }),
+      await screen.findByRole("heading", { name: "发现可恢复的录音" }),
     ).toBeVisible();
     expect(screen.queryByText(/private\/capture/)).not.toBeInTheDocument();
     expect(listCaptureRecoveries).toHaveBeenCalledTimes(2);
@@ -2036,7 +1985,7 @@ describe("capture workspace", () => {
     );
 
     expect(
-      await screen.findByRole("dialog", { name: "发现待处理的录音" }),
+      await screen.findByRole("dialog", { name: "发现可恢复的录音" }),
     ).toBeVisible();
     expect(onDetailOpenChange).not.toHaveBeenCalled();
     expect(

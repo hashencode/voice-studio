@@ -10,59 +10,41 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import type { CaptureRecoveryItem } from "@shared/contracts";
-import { recoveryReasonMessage } from "./capture-presentation";
 
 export type RecoveryDialogState =
   | "assessing"
   | "choice"
+  | "pending-delete"
   | "pending-restore"
-  | "pending-ignore"
-  | "result"
+  | "retry-delete"
+  | "retry-restore"
   | "hidden";
 
 export function RecoveryDialog({
   state,
   items,
-  restoredCount,
   onRestore,
-  onIgnore,
-  onAcknowledge,
+  onDelete,
   onRequestFocusFallback,
 }: {
   state: RecoveryDialogState;
   items: CaptureRecoveryItem[];
-  restoredCount: number;
   onRestore: () => void;
-  onIgnore: () => void;
-  onAcknowledge: () => void;
+  onDelete: () => void;
   onRequestFocusFallback: () => void;
 }) {
   const contentRef = React.useRef<HTMLDivElement>(null);
   const open = state !== "assessing" && state !== "hidden";
-  const pending = state === "pending-restore" || state === "pending-ignore";
-  const restorableCount = items.filter(
-    (item) => item.capability === "restorable",
-  ).length;
-  const discardableCount = items.filter(
-    (item) => item.capability === "discard-only",
-  ).length;
-  const preservedCount = items.filter(
-    (item) => item.capability === "preserve-only",
-  ).length;
-  const discardTargetCount = restorableCount + discardableCount;
-
-  const requestClose = React.useCallback(() => {
-    if (pending) return;
-    if (discardTargetCount > 0) onIgnore();
-    else onAcknowledge();
-  }, [discardTargetCount, onAcknowledge, onIgnore, pending]);
+  const pending = state === "pending-restore" || state === "pending-delete";
+  const retryingDelete = state === "retry-delete";
+  const retryingRestore = state === "retry-restore";
 
   return (
-    <Dialog open={open} onOpenChange={(next) => !next && requestClose()}>
+    <Dialog open={open} onOpenChange={() => undefined}>
       <DialogContent
         ref={contentRef}
         tabIndex={-1}
-        showCloseButton={!pending}
+        showCloseButton={false}
         onOpenAutoFocus={(event) => {
           event.preventDefault();
           contentRef.current?.focus();
@@ -72,70 +54,46 @@ export function RecoveryDialog({
           onRequestFocusFallback();
         }}
         onEscapeKeyDown={(event) => {
-          if (pending) event.preventDefault();
+          event.preventDefault();
         }}
         onPointerDownOutside={(event) => event.preventDefault()}
         onInteractOutside={(event) => event.preventDefault()}
       >
         <DialogHeader>
-          <DialogTitle>
-            {state === "result" ? "恢复结果" : "发现待处理的录音"}
-          </DialogTitle>
+          <DialogTitle>发现可恢复的录音</DialogTitle>
           <DialogDescription>
-            {state === "result"
-              ? `${restoredCount} 段录音已恢复并保存。`
-              : `发现 ${items.length} 段待处理录音：${restorableCount} 段可恢复，${discardableCount} 段可忽略，${preservedCount} 段需要保留。忽略或关闭只会删除可丢弃的数据；暂时无法验证的数据会继续保留。`}
+            发现 {items.length} 段可恢复录音。下方操作会处理本批全部录音。
           </DialogDescription>
         </DialogHeader>
 
         {pending ? (
           <p className="border-y bg-muted/40 py-3 text-sm font-medium">
-            {state === "pending-restore" ? "正在恢复…" : "正在忽略…"}
+            {state === "pending-restore" ? "正在恢复…" : "正在删除…"}
           </p>
         ) : null}
 
-        {items.some((item) => item.reason !== null) ? (
-          <ul className="space-y-2 text-sm">
-            {items
-              .filter((item) => item.reason !== null)
-              .map((item) => (
-                <li key={item.sessionId}>
-                  {recoveryReasonMessage(item.reason!)}
-                </li>
-              ))}
-          </ul>
+        {retryingDelete || retryingRestore ? (
+          <p className="border-y border-destructive/40 bg-destructive/5 py-3 text-sm">
+            数据状态尚未确认，请再次执行原操作。
+          </p>
         ) : null}
 
         <DialogFooter className="sm:justify-between">
-          {state === "choice" ? (
-            <>
-              {discardTargetCount > 0 ? (
-                <Button type="button" onClick={onIgnore}>
-                  忽略
-                </Button>
-              ) : null}
-              {restorableCount > 0 ? (
-                <Button type="button" onClick={onRestore}>
-                  恢复
-                </Button>
-              ) : null}
-            </>
-          ) : pending ? (
-            <>
-              <Button type="button" disabled>
-                {state === "pending-ignore" ? "正在忽略…" : "忽略"}
-              </Button>
-              {state === "pending-restore" ? (
-                <Button type="button" disabled>
-                  正在恢复…
-                </Button>
-              ) : null}
-            </>
-          ) : state === "result" ? (
-            <Button type="button" onClick={requestClose}>
-              知道了
-            </Button>
-          ) : null}
+          <Button
+            type="button"
+            variant="destructive"
+            disabled={pending || retryingRestore}
+            onClick={onDelete}
+          >
+            {state === "pending-delete" ? "正在删除…" : "删除数据"}
+          </Button>
+          <Button
+            type="button"
+            disabled={pending || retryingDelete}
+            onClick={onRestore}
+          >
+            {state === "pending-restore" ? "正在恢复…" : "立即恢复"}
+          </Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>
