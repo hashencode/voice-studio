@@ -26,7 +26,15 @@ export function LoadingShell() {
   );
 }
 
-export function ShellLoadError({ message }: { message: string }) {
+export function ShellLoadError({
+  message,
+  pending,
+  onReload,
+}: {
+  message: string;
+  pending: boolean;
+  onReload: () => void;
+}) {
   return (
     <main className="grid min-h-svh place-items-center p-6">
       <section
@@ -39,6 +47,15 @@ export function ShellLoadError({ message }: { message: string }) {
         />
         <h1 className="mt-3 text-xl font-semibold">无法载入工作台</h1>
         <p className="mt-2 text-sm text-muted-foreground">{message}</p>
+        <Button
+          type="button"
+          className="mt-4"
+          disabled={pending}
+          onClick={onReload}
+        >
+          <RefreshCw aria-hidden="true" />
+          {pending ? "正在重新载入" : "重新载入"}
+        </Button>
       </section>
     </main>
   );

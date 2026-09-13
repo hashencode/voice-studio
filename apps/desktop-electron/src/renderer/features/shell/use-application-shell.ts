@@ -11,6 +11,10 @@ import { useModalCoordinator } from "@/components/ui/modal-coordinator";
 
 export function useApplicationShell() {
   const { modalOpen } = useModalCoordinator();
+  const modalOpenRef = React.useRef(modalOpen);
+  React.useLayoutEffect(() => {
+    modalOpenRef.current = modalOpen;
+  }, [modalOpen]);
   const [snapshot, setSnapshot] = React.useState<ApplicationSnapshot | null>(
     null,
   );
@@ -29,42 +33,78 @@ export function useApplicationShell() {
   const deepLinkApplied = React.useRef(false);
   const lastObservedNavigationSection = React.useRef<ShellSection | null>(null);
 
-  const accept = React.useCallback(
-    (next: ApplicationSnapshot) => {
-      const current = snapshotRef.current;
-      if (current && next.revision <= current.revision) return;
+  const accept = React.useCallback((next: ApplicationSnapshot) => {
+    const current = snapshotRef.current;
+    if (current && next.revision <= current.revision) return false;
 
-      const retainedBlocker = profileBlockerRef.current;
-      const wasApplicationBlocked = retainedBlocker !== null;
-      if (next.profile.phase === "blocked") {
-        const blocker = { profile: next.profile, revision: next.revision };
-        profileBlockerRef.current = blocker;
-        setProfileBlocker(blocker);
-      } else if (
-        retainedBlocker &&
-        next.profile.phase === "ready" &&
-        next.revision > retainedBlocker.revision
-      ) {
-        profileBlockerRef.current = null;
-        setProfileBlocker(null);
-        setBootstrapError(null);
-      }
+    const retainedBlocker = profileBlockerRef.current;
+    const wasApplicationBlocked = retainedBlocker !== null;
+    if (next.profile.phase === "blocked") {
+      const blocker = { profile: next.profile, revision: next.revision };
+      profileBlockerRef.current = blocker;
+      setProfileBlocker(blocker);
+    } else if (
+      retainedBlocker &&
+      next.profile.phase === "ready" &&
+      next.revision > retainedBlocker.revision
+    ) {
+      profileBlockerRef.current = null;
+      setProfileBlocker(null);
+      setBootstrapError(null);
+    }
 
-      const navigationChanged =
-        lastObservedNavigationSection.current !== next.navigation.section;
-      lastObservedNavigationSection.current = next.navigation.section;
-      const accepted =
-        current && (modalOpen || wasApplicationBlocked || !navigationChanged)
-          ? { ...next, navigation: current.navigation }
-          : next;
-      snapshotRef.current = accepted;
-      setSnapshot(accepted);
-    },
-    [modalOpen],
-  );
+    const navigationChanged =
+      lastObservedNavigationSection.current !== next.navigation.section;
+    lastObservedNavigationSection.current = next.navigation.section;
+    const accepted =
+      current &&
+      (modalOpenRef.current || wasApplicationBlocked || !navigationChanged)
+        ? { ...next, navigation: current.navigation }
+        : next;
+    snapshotRef.current = accepted;
+    setSnapshot(accepted);
+    setLoadError(null);
+    return true;
+  }, []);
   const processing = useProcessingTasks(
     accept,
     snapshot?.profile.phase === "ready",
+  );
+
+  const acceptLoadedSnapshot = React.useCallback(
+    async (restored: ApplicationSnapshot) => {
+      if (!accept(restored)) return;
+      const deepLink = parseShellDeepLink(window.location.hash);
+      if (isLegacyAudioDeepLink(window.location.hash)) {
+        window.history.replaceState(null, "", "#/audio");
+      }
+      const restoredSection = normalizeRendererSection(
+        restored.navigation.section,
+      );
+      if (restored.profile.phase !== "ready") {
+        deepLinkApplied.current = true;
+        window.history.replaceState(null, "", `#/${restoredSection}`);
+        return;
+      }
+      if (
+        ((deepLink && deepLink !== restoredSection) ||
+          restored.navigation.section === "tasks") &&
+        !deepLinkApplied.current
+      ) {
+        deepLinkApplied.current = true;
+        const destination = deepLink ?? restoredSection;
+        try {
+          accept(
+            await window.voice2text.navigate(
+              toApplicationSection(destination),
+            ),
+          );
+        } catch {
+          // The accepted snapshot can render even when optional deep-link navigation fails.
+        }
+      }
+    },
+    [accept],
   );
 
   React.useEffect(() => {
@@ -76,33 +116,10 @@ export function useApplicationShell() {
       .getApplicationSnapshot()
       .then(async (restored) => {
         if (!active) return;
-        accept(restored);
-        const deepLink = parseShellDeepLink(window.location.hash);
-        if (isLegacyAudioDeepLink(window.location.hash)) {
-          window.history.replaceState(null, "", "#/audio");
-        }
-        const restoredSection = normalizeRendererSection(
-          restored.navigation.section,
-        );
-        if (restored.profile.phase !== "ready") {
-          deepLinkApplied.current = true;
-          window.history.replaceState(null, "", `#/${restoredSection}`);
-          return;
-        }
-        if (
-          ((deepLink && deepLink !== restoredSection) ||
-            restored.navigation.section === "tasks") &&
-          !deepLinkApplied.current
-        ) {
-          deepLinkApplied.current = true;
-          const destination = deepLink ?? restoredSection;
-          accept(
-            await window.voice2text.navigate(toApplicationSection(destination)),
-          );
-        }
+        await acceptLoadedSnapshot(restored);
       })
       .catch(() => {
-        if (active) {
+        if (active && snapshotRef.current === null) {
           setLoadError("请重新打开应用。");
         }
       });
@@ -110,7 +127,7 @@ export function useApplicationShell() {
       active = false;
       unsubscribe();
     };
-  }, [accept]);
+  }, [accept, acceptLoadedSnapshot]);
 
   const navigateAuthorized = React.useCallback(
     async (section: PersistedShellSection) => {
@@ -139,19 +156,33 @@ export function useApplicationShell() {
     [modalOpen, navigateAuthorized],
   );
 
-  const requestBootstrapAction = React.useCallback(
-    async (action: BootstrapAction) => {
+  const runBootstrapAction = React.useCallback(
+    async (action: BootstrapAction, surface: "load" | "profile") => {
       if (bootstrapRequestRef.current) {
         await bootstrapRequestRef.current;
         return;
       }
-      setBootstrapError(null);
+      if (surface === "profile") setBootstrapError(null);
       setBootstrapPending(true);
+      const startingRevision = snapshotRef.current?.revision ?? null;
       const request = (async () => {
         try {
-          accept(await window.voice2text.requestBootstrapAction(action));
+          const restored =
+            await window.voice2text.requestBootstrapAction(action);
+          if (surface === "load") {
+            await acceptLoadedSnapshot(restored);
+          } else {
+            accept(restored);
+          }
         } catch {
-          setBootstrapError("无法重新检查，请重试。");
+          if ((snapshotRef.current?.revision ?? null) !== startingRevision) {
+            return;
+          }
+          if (surface === "load") {
+            setLoadError("无法重新载入，请重试。");
+          } else {
+            setBootstrapError("无法重新检查，请重试。");
+          }
         } finally {
           setBootstrapPending(false);
           bootstrapRequestRef.current = null;
@@ -160,8 +191,17 @@ export function useApplicationShell() {
       bootstrapRequestRef.current = request;
       await request;
     },
-    [accept],
+    [accept, acceptLoadedSnapshot],
   );
+  const requestBootstrapAction = React.useCallback(
+    async (action: BootstrapAction) => {
+      await runBootstrapAction(action, "profile");
+    },
+    [runBootstrapAction],
+  );
+  const reloadApplication = React.useCallback(async () => {
+    await runBootstrapAction("recheck", "load");
+  }, [runBootstrapAction]);
 
   return {
     snapshot,
@@ -172,6 +212,7 @@ export function useApplicationShell() {
     ...processing,
     navigate,
     navigateAuthorized,
+    reloadApplication,
     requestBootstrapAction,
   };
 }

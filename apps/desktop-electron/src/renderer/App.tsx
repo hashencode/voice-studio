@@ -102,6 +102,7 @@ function App() {
     pendingJobActions,
     navigate,
     navigateAuthorized,
+    reloadApplication,
     requestBootstrapAction,
     importAudio,
     cancelProcessing,
@@ -550,7 +551,15 @@ function App() {
     paneTriggerRef.current?.focus();
   }, [pane.open]);
 
-  if (loadError) return <ShellLoadError message={loadError} />;
+  if (loadError) {
+    return (
+      <ShellLoadError
+        message={loadError}
+        pending={bootstrapPending}
+        onReload={reloadApplication}
+      />
+    );
+  }
   if (!snapshot) return <LoadingShell />;
 
   const presentation = deriveContentPresentation({

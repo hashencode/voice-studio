@@ -28,10 +28,12 @@ import {
 
 function deferred<T>() {
   let resolve!: (value: T) => void;
-  const promise = new Promise<T>((accept) => {
+  let reject!: (reason?: unknown) => void;
+  const promise = new Promise<T>((accept, decline) => {
     resolve = accept;
+    reject = decline;
   });
-  return { promise, resolve };
+  return { promise, reject, resolve };
 }
 
 describe("render-backed shell frame", () => {
@@ -646,6 +648,129 @@ describe("application shell", () => {
     ).toBeVisible();
     expect(screen.getByText("请重新打开应用。")).toBeVisible();
     expect(screen.queryByText(/private\/application-state/)).toBeNull();
+    expect(screen.getByRole("button", { name: "重新载入" })).toBeEnabled();
+  });
+
+  it("reloads the failed shell through one bootstrap request and can retry", async () => {
+    const firstReload = deferred<ApplicationSnapshot>();
+    const secondReload = deferred<ApplicationSnapshot>();
+    const requestBootstrapAction = vi
+      .fn<Voice2TextDesktopApi["requestBootstrapAction"]>()
+      .mockImplementationOnce(() => firstReload.promise)
+      .mockImplementationOnce(() => secondReload.promise);
+    const onApplicationSnapshot = vi.fn(() => () => undefined);
+    const api = installApi(readySnapshot, {
+      getApplicationSnapshot: vi.fn(async () => {
+        throw new Error("initial load failed");
+      }),
+      requestBootstrapAction,
+      onApplicationSnapshot,
+    });
+    window.history.replaceState(null, "", "/#/settings");
+    render(<App />);
+
+    const reload = await screen.findByRole("button", { name: "重新载入" });
+    fireEvent.click(reload);
+    fireEvent.click(reload);
+
+    expect(api.requestBootstrapAction).toHaveBeenCalledTimes(1);
+    expect(api.requestBootstrapAction).toHaveBeenCalledWith("recheck");
+    expect(
+      screen.getByRole("button", { name: "正在重新载入" }),
+    ).toBeDisabled();
+
+    await act(async () => firstReload.reject(new Error("reload failed")));
+    expect(screen.getByText("无法重新载入，请重试。")).toBeVisible();
+    expect(screen.getByRole("button", { name: "重新载入" })).toBeEnabled();
+
+    fireEvent.click(screen.getByRole("button", { name: "重新载入" }));
+    await act(async () => secondReload.resolve(readySnapshot));
+
+    expect(
+      await screen.findByRole("navigation", { name: "工作站主导航" }),
+    ).toBeVisible();
+    expect(api.requestBootstrapAction).toHaveBeenCalledTimes(2);
+    expect(api.navigate).toHaveBeenCalledTimes(1);
+    expect(api.navigate).toHaveBeenCalledWith("settings");
+    expect(onApplicationSnapshot).toHaveBeenCalledTimes(1);
+  });
+
+  it("routes a successful shell reload to the existing profile blocker", async () => {
+    const blocked: ApplicationSnapshot = {
+      ...readySnapshot,
+      revision: readySnapshot.revision + 1,
+      profile: {
+        phase: "blocked",
+        code: "filesystem_unavailable",
+        message: "raw path detail",
+        repairable: true,
+      },
+    };
+    installApi(readySnapshot, {
+      getApplicationSnapshot: vi.fn(async () => {
+        throw new Error("initial load failed");
+      }),
+      requestBootstrapAction: vi.fn(async () => blocked),
+    });
+    render(<App />);
+
+    fireEvent.click(
+      await screen.findByRole("button", { name: "重新载入" }),
+    );
+
+    expect(
+      await screen.findByRole("dialog", { name: "本机资料库暂不可用" }),
+    ).toBeVisible();
+    expect(
+      screen.queryByRole("heading", { name: "无法载入工作台" }),
+    ).not.toBeInTheDocument();
+  });
+
+  it("keeps a newer subscription snapshot when a reload fails late", async () => {
+    const reload = deferred<ApplicationSnapshot>();
+    let publish: ((snapshot: ApplicationSnapshot) => void) | undefined;
+    installApi(readySnapshot, {
+      getApplicationSnapshot: vi.fn(async () => {
+        throw new Error("initial load failed");
+      }),
+      requestBootstrapAction: vi.fn(() => reload.promise),
+      onApplicationSnapshot: vi.fn((listener) => {
+        publish = listener;
+        return () => undefined;
+      }),
+    });
+    render(<App />);
+
+    fireEvent.click(
+      await screen.findByRole("button", { name: "重新载入" }),
+    );
+    act(() => publish?.({ ...readySnapshot, revision: 10 }));
+    await act(async () => reload.reject(new Error("late reload failure")));
+
+    expect(
+      await screen.findByRole("navigation", { name: "工作站主导航" }),
+    ).toBeVisible();
+    expect(
+      screen.queryByRole("heading", { name: "无法载入工作台" }),
+    ).not.toBeInTheDocument();
+  });
+
+  it("does not classify initial deep-link navigation failure as shell load failure", async () => {
+    window.history.replaceState(null, "", "/#/settings");
+    const api = installApi(readySnapshot, {
+      navigate: vi.fn(async () => {
+        throw new Error("deep-link navigation failed");
+      }),
+    });
+    render(<App />);
+
+    expect(
+      await screen.findByRole("navigation", { name: "工作站主导航" }),
+    ).toBeVisible();
+    await waitFor(() => expect(api.navigate).toHaveBeenCalledWith("settings"));
+    expect(
+      screen.queryByRole("heading", { name: "无法载入工作台" }),
+    ).not.toBeInTheDocument();
   });
 
   it("keeps the context pane docked when the window width changes", async () => {
