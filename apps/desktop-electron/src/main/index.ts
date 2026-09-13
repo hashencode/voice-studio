@@ -39,8 +39,6 @@ import {
   type CaptionSnapshot,
   type AudioAiSnapshot,
   type CompanionSnapshot,
-  type FloatingCaptureSnapshot,
-  type FloatingCaptureWindowAction,
 } from "../shared/contracts";
 import { DesktopApplicationState } from "./application/application_state";
 import {
@@ -48,10 +46,7 @@ import {
   runBootstrapTransaction,
 } from "./application/bootstrap_transaction";
 import { configureRuntimeIdentity } from "./application/runtime_identity";
-import {
-  deriveFloatingCaptureSnapshot,
-  hasSameFloatingCapturePresentation,
-} from "./application/floating_capture_projection";
+import { deriveFloatingCaptureSnapshot } from "./application/floating_capture_projection";
 import {
   runFloatingCaptureControl,
   runStopOnlyCapture,
@@ -104,6 +99,7 @@ import {
 } from "./domain/capture/capture_capability";
 import { requestMicrophonePermissionIfNeeded } from "./domain/capture/capture_permission";
 import { listAvailableCaptureRecoveries } from "./domain/capture/capture_availability";
+import { FloatingCaptureWindowController } from "./features/capture/floating_capture_window_controller";
 import { BrowserWindowPlaybackPort } from "./features/playback/browser_window_playback_port";
 import { AudioPlaybackService } from "./features/playback/audio_playback_service";
 import { AudioExportService } from "./domain/workspace/audio_export_service";
@@ -254,14 +250,8 @@ let captionFormalSmokeAuthority: {
 
 let mainWindow: BrowserWindow | null = null;
 let unregisterIpc: (() => void) | null = null;
-let floatingCaptureWindow: BrowserWindow | null = null;
-let unregisterFloatingIpc: (() => void) | null = null;
-let floatingCaptureEnabled = false;
-let floatingSuppressedSessionId: string | null = null;
-let floatingLoadFailedSessionId: string | null = null;
-let lastFloatingCapturePresentation: FloatingCaptureSnapshot | null = null;
-let floatingPresentedSessionId: string | null = null;
-let floatingPreferenceMutation: Promise<void> = Promise.resolve();
+let floatingCaptureController: FloatingCaptureWindowController<BrowserWindow> | null =
+  null;
 let captureControlMutation: Promise<void> = Promise.resolve();
 let captureRecoveryMutation: Promise<void> = Promise.resolve();
 let captureStopTransaction: {
@@ -316,9 +306,7 @@ const companionListeners = new Set<(snapshot: CompanionSnapshot) => void>();
 const localModelListeners = new Set<
   (snapshot: import("../shared/contracts").LocalModelSnapshot) => void
 >();
-const floatingCaptureListeners = new Set<
-  (snapshot: FloatingCaptureSnapshot) => void
->();
+const floatingCapturePresentationEnvironmentListeners = new Set<() => void>();
 
 const captureQuitDecisionConfigurations = {
   initial: {
@@ -364,35 +352,6 @@ const captureQuitCoordinator = new CaptureQuitCoordinator({
   exit: () => app.exit(0),
 });
 
-applicationState.subscribe((snapshot) => {
-  const floating = deriveFloatingCaptureSnapshot(snapshot);
-  if (
-    floating.sessionId === null ||
-    floating.sessionId !== floatingSuppressedSessionId
-  ) {
-    floatingSuppressedSessionId = null;
-  }
-  if (
-    floating.sessionId === null ||
-    floating.sessionId !== floatingLoadFailedSessionId
-  ) {
-    floatingLoadFailedSessionId = null;
-  }
-  if (
-    hasSameFloatingCapturePresentation(
-      lastFloatingCapturePresentation,
-      floating,
-    )
-  ) {
-    return;
-  }
-  lastFloatingCapturePresentation = floating;
-  reconcileFloatingCapturePresentation(floating);
-  if (floatingCaptureWindow?.isVisible()) {
-    for (const listener of floatingCaptureListeners) listener(floating);
-  }
-});
-
 function createMainWindow(): BrowserWindow {
   const window = new BrowserWindow({
     width: 1240,
@@ -412,22 +371,10 @@ function createMainWindow(): BrowserWindow {
     }
   });
   window.once("ready-to-show", () => window.show());
-  window.on("focus", () => floatingCaptureWindow?.hide());
-  window.on("blur", () =>
-    reconcileFloatingCapturePresentation(
-      deriveFloatingCaptureSnapshot(applicationState.snapshot()),
-    ),
-  );
-  window.on("minimize", () =>
-    reconcileFloatingCapturePresentation(
-      deriveFloatingCaptureSnapshot(applicationState.snapshot()),
-    ),
-  );
-  window.on("hide", () =>
-    reconcileFloatingCapturePresentation(
-      deriveFloatingCaptureSnapshot(applicationState.snapshot()),
-    ),
-  );
+  window.on("focus", () => floatingCaptureController?.hideWindow());
+  window.on("blur", notifyFloatingCapturePresentationEnvironment);
+  window.on("minimize", notifyFloatingCapturePresentationEnvironment);
+  window.on("hide", notifyFloatingCapturePresentationEnvironment);
   window.on("closed", () => {
     if (mainWindow === window) mainWindow = null;
     if (process.platform !== "darwin" && !teardownComplete) app.quit();
@@ -443,7 +390,7 @@ function createMainWindow(): BrowserWindow {
   return window;
 }
 
-function createFloatingCaptureWindow(): BrowserWindow {
+function createFloatingCaptureWindowRegistration() {
   const window = new BrowserWindow({
     width: 320,
     height: 96,
@@ -471,19 +418,6 @@ function createFloatingCaptureWindow(): BrowserWindow {
       event.preventDefault();
     }
   });
-  window.on("close", (event) => {
-    if (teardownStarted) return;
-    event.preventDefault();
-    floatingSuppressedSessionId = deriveFloatingCaptureSnapshot(
-      applicationState.snapshot(),
-    ).sessionId;
-    window.hide();
-  });
-  window.on("closed", () => {
-    unregisterFloatingIpc?.();
-    unregisterFloatingIpc = null;
-    if (floatingCaptureWindow === window) floatingCaptureWindow = null;
-  });
 
   let loadPromise: Promise<void>;
   if (FLOATING_CAPTURE_WINDOW_VITE_DEV_SERVER_URL) {
@@ -496,15 +430,23 @@ function createFloatingCaptureWindow(): BrowserWindow {
     );
     loadPromise = window.loadFile(filePath);
   }
-  unregisterFloatingIpc = registerFloatingCaptureIpc(window);
-  void loadPromise.catch(() => {
-    console.error("Floating capture controller failed to load");
-    floatingLoadFailedSessionId = deriveFloatingCaptureSnapshot(
-      applicationState.snapshot(),
-    ).sessionId;
-    if (!window.isDestroyed()) window.destroy();
-  });
-  return window;
+  return {
+    window: {
+      isVisible: () => window.isVisible(),
+      isDestroyed: () => window.isDestroyed(),
+      hide: () => window.hide(),
+      showInactive: () => window.showInactive(),
+      getBounds: () => window.getBounds(),
+      setPosition: (x: number, y: number, animate: boolean) =>
+        window.setPosition(x, y, animate),
+      destroy: () => window.destroy(),
+      onClose: (listener: (event: { preventDefault(): void }) => void) =>
+        window.on("close", listener),
+      onClosed: (listener: () => void) => window.on("closed", listener),
+    },
+    load: loadPromise,
+    registrationTarget: window,
+  };
 }
 
 function registerFloatingCaptureIpc(window: BrowserWindow): () => void {
@@ -526,112 +468,87 @@ function registerFloatingCaptureIpc(window: BrowserWindow): () => void {
   });
 }
 
-function reconcileFloatingCapturePresentation(
-  snapshot: FloatingCaptureSnapshot,
-  forcePosition = false,
-): void {
-  if (!app.isReady()) return;
-  const active = snapshot.phase !== "idle";
-  const mainProminent = Boolean(
-    mainWindow?.isVisible() &&
-    !mainWindow.isMinimized() &&
-    mainWindow.isFocused(),
-  );
-  if (
-    !floatingCaptureEnabled ||
-    !active ||
-    mainProminent ||
-    snapshot.sessionId === floatingSuppressedSessionId
-  ) {
-    if (floatingCaptureWindow?.isVisible()) floatingCaptureWindow.hide();
-    floatingPresentedSessionId = null;
-    return;
-  }
-  if (snapshot.sessionId === floatingLoadFailedSessionId) return;
-  floatingCaptureWindow ??= createFloatingCaptureWindow();
-  const visible = floatingCaptureWindow.isVisible();
-  if (
-    !forcePosition &&
-    visible &&
-    floatingPresentedSessionId === snapshot.sessionId
-  ) {
-    return;
-  }
-  const display = screen.getDisplayNearestPoint(screen.getCursorScreenPoint());
-  const bounds = floatingCaptureWindow.getBounds();
-  const x = display.workArea.x + display.workArea.width - bounds.width - 16;
-  const y = display.workArea.y + 16;
-  if (bounds.x !== x || bounds.y !== y) {
-    floatingCaptureWindow.setPosition(x, y, false);
-  }
-  if (!visible) floatingCaptureWindow.showInactive();
-  floatingPresentedSessionId = snapshot.sessionId;
-}
-
-function setFloatingCapturePreference(enabled: boolean): Promise<{
-  enabled: boolean;
-}> {
-  const operation = floatingPreferenceMutation.then(async () => {
-    const preferencePath = path.join(
-      app.getPath("userData"),
-      "floating-capture-preference.json",
-    );
-    const temporaryPath = `${preferencePath}.tmp-${process.pid}-${randomUUID()}`;
-    try {
-      await writeFile(temporaryPath, `${JSON.stringify({ enabled })}\n`, {
-        mode: 0o600,
-      });
-      await rename(temporaryPath, preferencePath);
-    } catch (error) {
-      await rm(temporaryPath, { force: true }).catch(() => undefined);
-      throw error;
-    }
-    floatingCaptureEnabled = enabled;
-    floatingSuppressedSessionId = null;
-    floatingLoadFailedSessionId = null;
-    if (!enabled) {
-      floatingCaptureWindow?.hide();
-    } else {
-      reconcileFloatingCapturePresentation(
-        deriveFloatingCaptureSnapshot(applicationState.snapshot()),
-      );
-    }
-    return { enabled };
-  });
-  floatingPreferenceMutation = operation.then(
-    () => undefined,
-    () => undefined,
-  );
-  return operation;
-}
-
-function loadFloatingCapturePreference(): void {
+function readFloatingCapturePreference(): boolean {
   const preferencePath = path.join(
     app.getPath("userData"),
     "floating-capture-preference.json",
   );
   try {
-    floatingCaptureEnabled =
-      JSON.parse(readFileSync(preferencePath, "utf8")).enabled === true;
+    return JSON.parse(readFileSync(preferencePath, "utf8")).enabled === true;
   } catch {
-    floatingCaptureEnabled = false;
+    return false;
   }
 }
 
-async function handleFloatingWindowAction(
-  action: FloatingCaptureWindowAction,
-): Promise<FloatingCaptureSnapshot> {
-  const snapshot = deriveFloatingCaptureSnapshot(applicationState.snapshot());
-  if (action === "hide") {
-    floatingSuppressedSessionId = snapshot.sessionId;
-    floatingCaptureWindow?.hide();
-  } else if (action === "turn-off") {
-    await setFloatingCapturePreference(false);
-  } else {
-    floatingCaptureWindow?.hide();
-    showMainWindow({ openCaptureDetails: true });
+async function writeFloatingCapturePreference(enabled: boolean): Promise<void> {
+  const preferencePath = path.join(
+    app.getPath("userData"),
+    "floating-capture-preference.json",
+  );
+  const temporaryPath = `${preferencePath}.tmp-${process.pid}-${randomUUID()}`;
+  try {
+    await writeFile(temporaryPath, `${JSON.stringify({ enabled })}\n`, {
+      mode: 0o600,
+    });
+    await rename(temporaryPath, preferencePath);
+  } catch (error) {
+    await rm(temporaryPath, { force: true }).catch(() => undefined);
+    throw error;
   }
-  return snapshot;
+}
+
+function notifyFloatingCapturePresentationEnvironment(): void {
+  for (const listener of floatingCapturePresentationEnvironmentListeners) {
+    listener();
+  }
+}
+
+function createFloatingCaptureController(): FloatingCaptureWindowController<BrowserWindow> {
+  return new FloatingCaptureWindowController<BrowserWindow>({
+    appIsReady: () => app.isReady(),
+    currentSnapshot: () =>
+      deriveFloatingCaptureSnapshot(applicationState.snapshot()),
+    mainIsProminent: () =>
+      Boolean(
+        mainWindow?.isVisible() &&
+        !mainWindow.isMinimized() &&
+        mainWindow.isFocused(),
+      ),
+    createWindow: () => createFloatingCaptureWindowRegistration(),
+    registerWindow: (window) => registerFloatingCaptureIpc(window),
+    readPreference: () => readFloatingCapturePreference(),
+    writePreference: (enabled) => writeFloatingCapturePreference(enabled),
+    cursorPoint: () => screen.getCursorScreenPoint(),
+    nearestDisplayWorkArea: (point) =>
+      screen.getDisplayNearestPoint(point).workArea,
+    subscribeSnapshot: (listener) =>
+      applicationState.subscribe((snapshot) =>
+        listener(deriveFloatingCaptureSnapshot(snapshot)),
+      ),
+    subscribePresentationEnvironment: (listener) => {
+      floatingCapturePresentationEnvironmentListeners.add(listener);
+      return () =>
+        floatingCapturePresentationEnvironmentListeners.delete(listener);
+    },
+    subscribeDisplayChanges: (listener) => {
+      screen.on("display-removed", listener);
+      screen.on("display-metrics-changed", listener);
+      return () => {
+        screen.off("display-removed", listener);
+        screen.off("display-metrics-changed", listener);
+      };
+    },
+    openCaptureDetails: () => showMainWindow({ openCaptureDetails: true }),
+    reportLoadFailure: () =>
+      console.error("Floating capture controller failed to load"),
+  });
+}
+
+function requireFloatingCaptureController(): FloatingCaptureWindowController<BrowserWindow> {
+  if (!floatingCaptureController) {
+    throw new Error("floating capture controller is unavailable");
+  }
+  return floatingCaptureController;
 }
 
 function showMainWindow({
@@ -2655,7 +2572,7 @@ function bindDesktopIpc(window: BrowserWindow): void {
     controlFloatingCapture: async (options) =>
       await runFloatingCaptureControl(options, {
         handoffToMain: () => {
-          floatingCaptureWindow?.hide();
+          floatingCaptureController?.hideWindow();
           showMainWindow({ openCaptureDetails: true });
         },
         reportHandoffFailure: () =>
@@ -2664,16 +2581,14 @@ function bindDesktopIpc(window: BrowserWindow): void {
         currentSnapshot: () =>
           deriveFloatingCaptureSnapshot(applicationState.snapshot()),
       }),
-    floatingCaptureWindowAction: (action) => handleFloatingWindowAction(action),
-    getFloatingCapturePreference: () => ({
-      enabled: floatingCaptureEnabled,
-    }),
+    floatingCaptureWindowAction: (action) =>
+      requireFloatingCaptureController().handleWindowAction(action),
+    getFloatingCapturePreference: () =>
+      requireFloatingCaptureController().getPreference(),
     setFloatingCapturePreference: (enabled) =>
-      setFloatingCapturePreference(enabled),
-    onFloatingCaptureSnapshot: (listener) => {
-      floatingCaptureListeners.add(listener);
-      return () => floatingCaptureListeners.delete(listener);
-    },
+      requireFloatingCaptureController().setPreference(enabled),
+    onFloatingCaptureSnapshot: (listener) =>
+      requireFloatingCaptureController().onSnapshot(listener),
     listCaptureRecoveries: async () => {
       return listAvailableCaptureRecoveries(captureService);
     },
@@ -2816,10 +2731,7 @@ function bindDesktopIpc(window: BrowserWindow): void {
   unregisterIpc = registerDesktopIpc(window, services, {
     failureAdapters: desktopFailureAdapters,
   });
-  if (floatingCaptureWindow && !floatingCaptureWindow.isDestroyed()) {
-    unregisterFloatingIpc?.();
-    unregisterFloatingIpc = registerFloatingCaptureIpc(floatingCaptureWindow);
-  }
+  floatingCaptureController?.rebindIpc();
 }
 
 function requireCompanionService(): CompanionService {
@@ -4293,14 +4205,8 @@ if (isPrimaryInstance) {
     .whenReady()
     .then(async () => {
       configureSessionSecurity();
-      loadFloatingCapturePreference();
-      const reconcileDisplays = () =>
-        reconcileFloatingCapturePresentation(
-          deriveFloatingCaptureSnapshot(applicationState.snapshot()),
-          true,
-        );
-      screen.on("display-removed", reconcileDisplays);
-      screen.on("display-metrics-changed", reconcileDisplays);
+      floatingCaptureController = createFloatingCaptureController();
+      floatingCaptureController.initialize();
       mainWindow = createMainWindow();
       bindDesktopIpc(mainWindow);
       await new Promise<void>((resolve) => setImmediate(resolve));
@@ -4374,9 +4280,10 @@ async function teardownOwnedResources(
   mode: "normal" | "recovery-exit" = "normal",
 ): Promise<void> {
   teardownStarted = true;
-  await floatingPreferenceMutation;
+  await floatingCaptureController?.beginTeardown();
   await captureRecoveryMutation;
   if (mode === "normal") await captureControlMutation;
+  await floatingCaptureController?.disposeAfterCaptureDrain();
   unregisterIpc?.();
   unregisterIpc = null;
   await processCoordinator?.shutdown();
