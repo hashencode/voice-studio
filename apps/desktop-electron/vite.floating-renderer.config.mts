@@ -9,6 +9,10 @@ const directory = path.dirname(fileURLToPath(import.meta.url));
 
 export default defineConfig({
   base: "./",
+  cacheDir: path.resolve(
+    directory,
+    "node_modules/.vite/floating_capture_window",
+  ),
   plugins: [react(), tailwindcss()],
   server: { hmr: false },
   resolve: {

@@ -10,6 +10,7 @@ const rendererRoot = path.resolve(directory, "src/renderer");
 
 export default defineConfig({
   base: "./",
+  cacheDir: path.resolve(directory, "node_modules/.vite/main_window"),
   plugins: [react(), tailwindcss()],
   // Electron keeps script-src locked to same-origin scripts. React Fast Refresh
   // injects an inline preamble in development, so use full renderer reloads

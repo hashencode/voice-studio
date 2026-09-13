@@ -13,6 +13,8 @@
     "src/**/*.tsx",
     "scripts/**/*.ts",
     "playwright.config.ts",
-    "vite.main.config.mts"
+    "vite.main.config.mts",
+    "vite.renderer.config.mts",
+    "vite.floating-renderer.config.mts"
   ]
 }
