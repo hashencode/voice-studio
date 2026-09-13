@@ -1,6 +1,7 @@
 import type {
   ApplicationSnapshot,
   CaptureControlRequest,
+  CaptureRecoveryReason,
 } from "@shared/contracts";
 
 export type CaptureView = Exclude<
@@ -9,6 +10,17 @@ export type CaptureView = Exclude<
 >;
 
 export type CaptureCompactAction = CaptureControlRequest["action"];
+
+export function recoveryReasonMessage(reason: CaptureRecoveryReason): string {
+  return {
+    "no-audio-data": "没有可用音频数据。",
+    "unfinished-audio-data": "发现未完成的音频数据，原始数据已保留。",
+    "recovery-metadata-damaged": "恢复信息已损坏，原始数据已保留。",
+    "audio-integrity-failed": "音频完整性校验失败，原始数据已保留。",
+    "finalization-in-progress": "录音仍在保存中，数据已保留。",
+    "currently-unverifiable": "当前无法确认录音状态，原始数据已保留。",
+  }[reason];
+}
 
 export interface CaptureCompactPresentation {
   sessionId: string;

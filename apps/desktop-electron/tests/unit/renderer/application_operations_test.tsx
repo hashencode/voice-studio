@@ -2,6 +2,7 @@
 
 import { act, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
+import { toast } from "sonner";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import App from "../../../src/renderer/App";
@@ -15,7 +16,7 @@ import type {
 import { companionRendererStubs } from "../../fixtures/companion";
 
 const tasksSnapshot: ApplicationSnapshot = {
-  protocolVersion: 2,
+  protocolVersion: 3,
   revision: 1,
   navigation: { section: "tasks" },
   profile: { phase: "ready", legacyDatabaseArchived: false },
@@ -148,8 +149,8 @@ function installOperationsApi(overrides: Partial<Voice2TextDesktopApi> = {}) {
 }
 
 function ProcessingTasksErrorHarness() {
-  const { operationError } = useProcessingTasks(vi.fn(), true);
-  return <div>{operationError}</div>;
+  useProcessingTasks(vi.fn(), true);
+  return null;
 }
 
 function ProcessingImportResultHarness({
@@ -204,7 +205,7 @@ function testAiProfile() {
 describe("renderer processing operation races", () => {
   it("returns the existing imported and canceled operation results", async () => {
     const imported = {
-      protocolVersion: 2 as const,
+      protocolVersion: 3 as const,
       state: "imported" as const,
       audioId: 37,
       mediaSha256: "b".repeat(64),
@@ -213,7 +214,7 @@ describe("renderer processing operation races", () => {
     const importAudio = vi
       .fn()
       .mockResolvedValueOnce(imported)
-      .mockResolvedValueOnce({ protocolVersion: 2, state: "canceled" });
+      .mockResolvedValueOnce({ protocolVersion: 3, state: "canceled" });
     installOperationsApi({ importAudio });
     const onResult = vi.fn();
     const onSnapshot = vi.fn();
@@ -231,7 +232,7 @@ describe("renderer processing operation races", () => {
     await user.click(screen.getByRole("button", { name: "导入" }));
     await waitFor(() =>
       expect(onResult).toHaveBeenCalledWith({
-        protocolVersion: 2,
+        protocolVersion: 3,
         state: "canceled",
       }),
     );
@@ -242,7 +243,7 @@ describe("renderer processing operation races", () => {
     const listAudios = vi.fn(async () => [runningAudio]);
     const openAudio = vi.fn(async () => runningWorkspace);
     const importAudio = vi.fn(async () => ({
-      protocolVersion: 2 as const,
+      protocolVersion: 3 as const,
       state: "imported" as const,
       audioId: runningAudio.audioId,
       mediaSha256: "c".repeat(64),
@@ -266,6 +267,7 @@ describe("renderer processing operation races", () => {
   });
 
   it("sanitizes an initial task refresh failure", async () => {
+    const toastError = vi.spyOn(toast, "error");
     const rawDiagnostic = "SQLITE_IOERR /private/profile/audio.sqlite3";
     installOperationsApi({
       listProcessingTasks: vi.fn(async () => {
@@ -275,7 +277,12 @@ describe("renderer processing operation races", () => {
 
     render(<ProcessingTasksErrorHarness />);
 
-    expect(await screen.findByText("无法读取转写任务，请重试。")).toBeVisible();
+    await waitFor(() =>
+      expect(toastError).toHaveBeenCalledWith(
+        "无法读取转写任务，请重试。",
+        expect.objectContaining({ id: "processing-task-refresh" }),
+      ),
+    );
     expect(screen.queryByText(rawDiagnostic)).not.toBeInTheDocument();
   });
 
@@ -326,6 +333,7 @@ describe("renderer processing operation races", () => {
   ])(
     "guards a double-clicked $name per job and clears pending in finally",
     async ({ state, button, pending, method, error }) => {
+      const toastError = vi.spyOn(toast, "error");
       const request = deferred<never>();
       const operation = vi.fn(() => request.promise);
       const { api } = installOperationsApi({
@@ -345,7 +353,17 @@ describe("renderer processing operation races", () => {
       expect(screen.getByRole("button", { name: pending })).toBeDisabled();
 
       request.reject(new Error("raw internal operation failure"));
-      expect(await screen.findByRole("alert")).toHaveTextContent(error);
+      await waitFor(() =>
+        expect(toastError).toHaveBeenCalledWith(
+          error,
+          expect.objectContaining({
+            id:
+              method === "cancelProcessing"
+                ? "processing-cancel:7"
+                : "processing-retry:7",
+          }),
+        ),
+      );
       expect(screen.getByRole("button", { name: button })).toBeEnabled();
     },
   );
@@ -361,7 +379,7 @@ describe("renderer processing operation races", () => {
     ).toHaveValue(0.1);
 
     const progress: OperationEvent = {
-      protocolVersion: 2,
+      protocolVersion: 3,
       jobId: 7,
       attempt: 2,
       state: "running",
@@ -401,7 +419,7 @@ describe("renderer processing operation races", () => {
       .click(await screen.findByRole("button", { name: /打开 项目周会/ }));
 
     emit({
-      protocolVersion: 2,
+      protocolVersion: 3,
       jobId: 7,
       attempt: 2,
       state: "running",
@@ -409,7 +427,7 @@ describe("renderer processing operation races", () => {
       progressFraction: 0.7,
     });
     emit({
-      protocolVersion: 2,
+      protocolVersion: 3,
       jobId: 7,
       attempt: 2,
       state: "completed",
@@ -425,7 +443,7 @@ describe("renderer processing operation races", () => {
       expect(api.listProcessingTasks).toHaveBeenCalledTimes(2),
     );
     emit({
-      protocolVersion: 2,
+      protocolVersion: 3,
       jobId: 7,
       attempt: 2,
       state: "running",
@@ -433,7 +451,7 @@ describe("renderer processing operation races", () => {
       progressFraction: 0.2,
     });
     const unknown: OperationEvent = {
-      protocolVersion: 2,
+      protocolVersion: 3,
       jobId: 8,
       attempt: 1,
       state: "queued",
@@ -469,7 +487,7 @@ describe("renderer processing operation races", () => {
     await waitFor(() => expect(api.listProcessingTasks).toHaveBeenCalledOnce());
     view.unmount();
     emit({
-      protocolVersion: 2,
+      protocolVersion: 3,
       jobId: 7,
       attempt: 2,
       state: "running",
@@ -497,7 +515,7 @@ describe("renderer processing operation races", () => {
       .mockResolvedValueOnce([queuedNext])
       .mockResolvedValue([queuedNext]);
     const retryProcessing = vi.fn(async () => ({
-      protocolVersion: 2 as const,
+      protocolVersion: 3 as const,
       jobId: 7,
       state: "queued" as const,
     }));
@@ -519,7 +537,7 @@ describe("renderer processing operation races", () => {
     expect(screen.getByText("等待处理", { selector: "span" })).toBeVisible();
 
     emit({
-      protocolVersion: 2,
+      protocolVersion: 3,
       jobId: 7,
       attempt: 2,
       state: "interrupted",
@@ -529,7 +547,7 @@ describe("renderer processing operation races", () => {
     expect(screen.getByText("等待处理", { selector: "span" })).toBeVisible();
 
     emit({
-      protocolVersion: 2,
+      protocolVersion: 3,
       jobId: 7,
       attempt: 3,
       state: "running",

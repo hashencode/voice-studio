@@ -40,7 +40,7 @@ export function buildVisualFixture(
 
   return {
     application: {
-      protocolVersion: 2,
+      protocolVersion: 3,
       revision: 42,
       navigation: {
         section:
@@ -349,5 +349,7 @@ function recoveryFixtures(): CaptureRecoveryItem[] {
     gapCount: index,
     interruptionReason: "renderer_reloaded",
     recordingSha256: null,
+    capability: "restorable" as const,
+    reason: null,
   }));
 }

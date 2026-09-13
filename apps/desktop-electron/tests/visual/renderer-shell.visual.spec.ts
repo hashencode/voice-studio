@@ -271,10 +271,10 @@ test.describe("sidebar-09 production Renderer", () => {
         recoveryDialog.getByText("Recover-产品设计评审 1"),
       ).toHaveCount(0);
       await expect(
-        recoveryDialog.getByRole("button", { name: "恢复所有录音" }),
+        recoveryDialog.getByRole("button", { name: "恢复数据" }),
       ).toBeVisible();
       await expect(
-        recoveryDialog.getByRole("button", { name: "管理恢复录制" }),
+        recoveryDialog.getByRole("button", { name: "丢弃" }),
       ).toBeVisible();
       await expect(page.getByRole("region", { name: "录制详情" })).toHaveCount(
         0,

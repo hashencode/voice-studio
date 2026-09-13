@@ -219,7 +219,10 @@ function footerPresentation(capture: CaptureView): {
   }
   if (capture.phase === "finalizing") {
     return {
-      status: "正在停止并保存",
+      status:
+        capture.interruptionReason === "capture_stop_slow"
+          ? "保存时间比预期长，仍在继续保存…"
+          : "正在保存录音…",
       action: "pause",
       actionLabel: "暂停录制",
       controlsDisabled: true,

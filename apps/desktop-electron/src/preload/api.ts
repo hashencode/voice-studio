@@ -1,3 +1,5 @@
+import { z } from "zod";
+
 import {
   applicationSnapshotSchema,
   markActivityReadRequestSchema,
@@ -43,6 +45,7 @@ import {
   suggestCaptureTitleResponseSchema,
   renameCaptureSessionRequestSchema,
   captureRecoveryActionRequestSchema,
+  captureRecoveryActionResponseSchema,
   capturePreflightSchema,
   captureSnapshotSchema,
   captureRecoveryItemSchema,
@@ -84,6 +87,8 @@ import {
   changeLocalModelRootRequestSchema,
   openLocalModelRootRequestSchema,
   type LocalModelSnapshot,
+  desktopTransportFailure,
+  unwrapDesktopIpcEnvelope,
 } from "../shared/contracts";
 
 export interface PreloadIpcBridge {
@@ -92,9 +97,84 @@ export interface PreloadIpcBridge {
   off(channel: string, listener: (payload: unknown) => void): void;
 }
 
+const ipcResponseSchemas: Readonly<Record<string, z.ZodType>> = Object.freeze({
+  [ipcChannels.localModelsSnapshotGet]: localModelSnapshotSchema,
+  [ipcChannels.localModelsIntent]: localModelSnapshotSchema,
+  [ipcChannels.localModelsChangeRoot]: localModelSnapshotSchema,
+  [ipcChannels.localModelsOpenRoot]: z.undefined(),
+  [ipcChannels.companionSnapshotGet]: companionSnapshotSchema,
+  [ipcChannels.companionOptInSet]: companionSnapshotSchema,
+  [ipcChannels.companionPairingInviteCreate]: companionSnapshotSchema,
+  [ipcChannels.companionPeerRevoke]: companionSnapshotSchema,
+  [ipcChannels.companionTransferCancel]: companionSnapshotSchema,
+  [ipcChannels.companionTransferRetry]: companionSnapshotSchema,
+  [ipcChannels.aiSettingsGet]: aiSettingsSnapshotSchema,
+  [ipcChannels.aiProviderProfileCreate]: aiSettingsSnapshotSchema,
+  [ipcChannels.aiProviderProfileUpdate]: aiSettingsSnapshotSchema,
+  [ipcChannels.aiProviderProfileSelect]: aiSettingsSnapshotSchema,
+  [ipcChannels.aiProviderProfileDelete]: aiSettingsSnapshotSchema,
+  [ipcChannels.audioAiPrepare]: audioAiConsentPreviewSchema,
+  [ipcChannels.audioAiSnapshotGet]: audioAiSnapshotSchema.nullable(),
+  [ipcChannels.audioAiGenerate]: audioAiSnapshotSchema,
+  [ipcChannels.audioAiRetry]: audioAiSnapshotSchema,
+  [ipcChannels.applicationSnapshot]: applicationSnapshotSchema,
+  [ipcChannels.applicationNavigate]: applicationSnapshotSchema,
+  [ipcChannels.applicationBootstrapAction]: applicationSnapshotSchema,
+  [ipcChannels.applicationActivityMarkRead]: applicationSnapshotSchema,
+  [ipcChannels.applicationActivityMarkAllRead]: applicationSnapshotSchema,
+  [ipcChannels.floatingCapturePreferenceGet]: floatingCapturePreferenceSchema,
+  [ipcChannels.floatingCapturePreferenceSet]: floatingCapturePreferenceSchema,
+  [ipcChannels.workerHealth]: workerHealthResponseSchema,
+  [ipcChannels.cancelProcessing]: cancelProcessingResponseSchema,
+  [ipcChannels.retryProcessing]: retryProcessingResponseSchema,
+  [ipcChannels.startTranscription]: startTranscriptionResponseSchema,
+  [ipcChannels.processingTasks]: processingTasksResponseSchema,
+  [ipcChannels.importAudio]: importAudioResponseSchema,
+  [ipcChannels.capturePreflight]: capturePreflightSchema,
+  [ipcChannels.captureStart]: captureSnapshotSchema,
+  [ipcChannels.captureControl]: captureSnapshotSchema,
+  [ipcChannels.captureTitleSuggest]: suggestCaptureTitleResponseSchema,
+  [ipcChannels.captureSessionRename]: applicationSnapshotSchema,
+  [ipcChannels.captureRecoveryList]: captureRecoveryItemSchema.array().max(256),
+  [ipcChannels.captureRecoveryAction]: captureRecoveryActionResponseSchema,
+  [ipcChannels.microphoneTestStart]: microphoneTestSnapshotSchema,
+  [ipcChannels.microphoneTestSnapshot]: microphoneTestSnapshotSchema,
+  [ipcChannels.microphoneTestFinish]: microphoneTestSnapshotSchema,
+  [ipcChannels.microphoneTestCancel]: microphoneTestSnapshotSchema,
+  [ipcChannels.microphoneSettingsOpen]: microphoneSettingsOpenResultSchema,
+  [ipcChannels.captionSnapshotGet]: captionSnapshotSchema.nullable(),
+  [ipcChannels.captionFormalRetry]: captionSnapshotSchema,
+  [ipcChannels.audioList]: listAudiosResponseSchema,
+  [ipcChannels.audioOpen]: openAudioResponseSchema,
+  [ipcChannels.audioSearch]: searchTranscriptResponseSchema,
+  [ipcChannels.audioEditSegment]: audioWorkspaceSnapshotSchema,
+  [ipcChannels.audioUndo]: audioWorkspaceSnapshotSchema,
+  [ipcChannels.audioRedo]: audioWorkspaceSnapshotSchema,
+  [ipcChannels.audioRenameSpeaker]: audioWorkspaceSnapshotSchema,
+  [ipcChannels.audioMergeSpeakers]: audioWorkspaceSnapshotSchema,
+  [ipcChannels.audioAssignSpeaker]: audioWorkspaceSnapshotSchema,
+  [ipcChannels.audioPlayback]: audioPlaybackSnapshotSchema,
+  [ipcChannels.audioExport]: exportAudioResponseSchema,
+});
+
 export function createDesktopApi(
   bridge: PreloadIpcBridge,
 ): Voice2TextDesktopApi {
+  const rawBridge = bridge;
+  bridge = {
+    ...rawBridge,
+    async invoke(channel, payload) {
+      let response: unknown;
+      try {
+        response = await rawBridge.invoke(channel, payload);
+      } catch {
+        throw desktopTransportFailure("IPC_DISCONNECTED");
+      }
+      const responseSchema = ipcResponseSchemas[channel];
+      if (!responseSchema) throw desktopTransportFailure("INVALID_RESPONSE");
+      return unwrapDesktopIpcEnvelope(response, responseSchema);
+    },
+  };
   const captureDetailsListeners = new Set<() => void>();
   let captureDetailsPending = false;
   bridge.on(ipcChannels.captureDetailsRequestedEvent, () => {
@@ -461,11 +541,9 @@ export function createDesktopApi(
       options: Parameters<Voice2TextDesktopApi["actOnCaptureRecovery"]>[0],
     ) {
       const payload = captureRecoveryActionRequestSchema.parse(options);
-      const response = await bridge.invoke(
-        ipcChannels.captureRecoveryAction,
-        payload,
+      return captureRecoveryActionResponseSchema.parse(
+        await bridge.invoke(ipcChannels.captureRecoveryAction, payload),
       );
-      return response === null ? null : captureSnapshotSchema.parse(response);
     },
     async startMicrophoneTest(
       options: Parameters<Voice2TextDesktopApi["startMicrophoneTest"]>[0],

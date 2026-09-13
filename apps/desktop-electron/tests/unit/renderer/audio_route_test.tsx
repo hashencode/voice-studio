@@ -2,9 +2,11 @@
 
 import { act, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
+import { toast } from "sonner";
 import { afterEach, expect, it, vi } from "vitest";
 
 import { AudioRouteFeature } from "../../../src/renderer/features/audios/audio-route-feature";
+import { DesktopFailure } from "../../../src/shared/contracts";
 import type {
   AudioSummary,
   AudioWorkspaceSnapshot,
@@ -33,7 +35,7 @@ afterEach(() => {
 
 it("renders the authoritative first-use state only after an empty list succeeds", async () => {
   const onImport = vi.fn(async () => ({
-    protocolVersion: 2 as const,
+    protocolVersion: 3 as const,
     state: "canceled" as const,
   }));
   const onRecord = vi.fn();
@@ -178,7 +180,7 @@ it("allows recording and pure audio import without local processing", async () =
 
 it("creates processing only after the user explicitly starts transcription", async () => {
   const startTranscription = vi.fn(async (audioId: number) => ({
-    protocolVersion: 2 as const,
+    protocolVersion: 3 as const,
     jobId: audioId + 100,
     state: "queued" as const,
   }));
@@ -212,6 +214,14 @@ it("creates processing only after the user explicitly starts transcription", asy
 
 it("routes processing capability failures without exposing diagnostics", async () => {
   const rawDiagnostic = "本地转写不可用：模型 /private/models/asr.bin 缺失";
+  const failure = new DesktopFailure({
+    protocolVersion: 3,
+    domain: "local-model",
+    code: "MODEL_BUSY",
+    retryable: true,
+    fallback: "try-again",
+  });
+  failure.message = rawDiagnostic;
   const onProcessingUnavailable = vi.fn();
   const untranscribed = {
     ...workspace(audioA),
@@ -229,7 +239,7 @@ it("routes processing capability failures without exposing diagnostics", async (
       api={api({
         openAudio: vi.fn(async () => untranscribed),
         startTranscription: vi.fn(async () => {
-          throw new Error(rawDiagnostic);
+          throw failure;
         }),
       })}
       tasks={[]}
@@ -415,6 +425,45 @@ it("preserves a populated workspace during background refresh and query-empty", 
   expect(screen.getByText("选择一段音频")).toBeVisible();
 });
 
+it("updates one background-refresh toast and dismisses it after success", async () => {
+  const toastError = vi.spyOn(toast, "error");
+  const toastDismiss = vi.spyOn(toast, "dismiss");
+  const listAudios = vi
+    .fn()
+    .mockResolvedValueOnce([audioA])
+    .mockRejectedValueOnce(new Error("localized refresh failure"))
+    .mockResolvedValueOnce([audioA]);
+  const props = {
+    api: api({ listAudios }),
+    tasks: [],
+    pendingJobActions: new Map<number, never>(),
+    writable: true,
+    paneOpen: true,
+    onRecord: vi.fn(),
+    onImport: vi.fn(),
+    onCancel: vi.fn(),
+    onRetry: vi.fn(),
+  };
+  const view = render(
+    <AudioRouteFeature {...props} libraryRefreshToken="ready:1" />,
+  );
+  await screen.findByRole("button", { name: /打开 音频 A/ });
+
+  view.rerender(<AudioRouteFeature {...props} libraryRefreshToken="ready:2" />);
+  await waitFor(() =>
+    expect(toastError).toHaveBeenCalledWith(
+      "无法刷新音频列表，仍显示上次内容。",
+      { id: "audio-library-refresh" },
+    ),
+  );
+  expect(screen.getByRole("button", { name: /打开 音频 A/ })).toBeVisible();
+
+  view.rerender(<AudioRouteFeature {...props} libraryRefreshToken="ready:3" />);
+  await waitFor(() =>
+    expect(toastDismiss).toHaveBeenCalledWith("audio-library-refresh"),
+  );
+});
+
 it.each([true, false])(
   "refreshes and selects the exact imported audio when inserted=%s",
   async (inserted) => {
@@ -424,7 +473,7 @@ it.each([true, false])(
       .mockResolvedValueOnce([audioB]);
     const openAudio = vi.fn(async () => workspace(audioB));
     const onImport = vi.fn(async () => ({
-      protocolVersion: 2 as const,
+      protocolVersion: 3 as const,
       state: "imported" as const,
       audioId: audioB.audioId,
       mediaSha256: "a".repeat(64),
@@ -465,7 +514,7 @@ it("waits for a trailing authoritative refresh when import overlaps a list reque
     .mockResolvedValueOnce([audioA, audioB]);
   const openAudio = vi.fn(async () => workspace(audioB));
   const onImport = vi.fn(async () => ({
-    protocolVersion: 2 as const,
+    protocolVersion: 3 as const,
     state: "imported" as const,
     audioId: audioB.audioId,
     mediaSha256: "a".repeat(64),
@@ -505,7 +554,7 @@ it("waits for a trailing authoritative refresh when import overlaps a list reque
 it("keeps canceled imports in first-use and reports retryable failures there", async () => {
   const onImport = vi
     .fn()
-    .mockResolvedValueOnce({ protocolVersion: 2, state: "canceled" })
+    .mockResolvedValueOnce({ protocolVersion: 3, state: "canceled" })
     .mockRejectedValueOnce(new Error("raw /private/import failure"));
   const listAudios = vi.fn(async () => []);
   render(
@@ -810,13 +859,14 @@ it("keeps A on failed A-to-B transition and keys detail after success", async ()
     "A 状态",
   );
   await user.click(screen.getByRole("button", { name: /打开 音频 B/ }));
-  expect(await screen.findByRole("alert")).toHaveTextContent(
-    "无法切换音频，请重试",
-  );
+  expect(
+    await screen.findByRole("dialog", { name: "音频操作未完成" }),
+  ).toHaveTextContent("无法切换音频，请重试");
   expect(
     screen.getByRole("region", { name: "音频 A.wav 工作区" }),
   ).toBeVisible();
 
+  await user.click(screen.getByRole("button", { name: "知道了" }));
   await user.click(screen.getByRole("button", { name: /打开 音频 B/ }));
   expect(
     await screen.findByRole("region", { name: "音频 B.wav 工作区" }),
@@ -878,7 +928,10 @@ it("closes A again after a successful close is followed by a failed B open", asy
   await user.click(await screen.findByRole("button", { name: /打开 音频 A/ }));
   await screen.findByRole("region", { name: "音频 A.wav 工作区" });
   await user.click(screen.getByRole("button", { name: /打开 音频 B/ }));
-  expect(await screen.findByRole("alert")).toHaveTextContent("无法打开音频");
+  expect(
+    await screen.findByRole("dialog", { name: "音频操作未完成" }),
+  ).toHaveTextContent("无法打开音频");
+  await user.click(screen.getByRole("button", { name: "知道了" }));
   await user.click(screen.getByRole("button", { name: /打开 音频 B/ }));
 
   expect(

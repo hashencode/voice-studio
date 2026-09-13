@@ -6,7 +6,10 @@ import { describe, expect, it, vi } from "vitest";
 
 import { AudioAiFeature } from "../../../src/renderer/features/audio-ai/audio-ai-feature";
 import type { Voice2TextDesktopApi } from "../../../src/shared/contracts";
-import type { AudioAiSnapshot } from "../../../src/shared/contracts";
+import {
+  DesktopFailure,
+  type AudioAiSnapshot,
+} from "../../../src/shared/contracts";
 
 const preview = {
   preparationId: "123e4567-e89b-12d3-a456-426614174000",
@@ -75,6 +78,34 @@ function api(overrides: Record<string, unknown> = {}) {
 }
 
 describe("per-generation audio AI consent", () => {
+  it("classifies a stale preparation by stable code after message localization", async () => {
+    const failure = new DesktopFailure({
+      protocolVersion: 3,
+      domain: "ai-provider",
+      code: "AI_PREPARATION_STALE",
+      retryable: false,
+      fallback: "continue",
+    });
+    failure.message = "localized provider response";
+    render(
+      <AudioAiFeature
+        api={api({
+          prepareAudioAi: vi.fn(async () => Promise.reject(failure)),
+        })}
+        audioId={4}
+        generationId={9}
+      />,
+    );
+
+    await userEvent
+      .setup()
+      .click(await screen.findByRole("button", { name: "生成云端音频草稿" }));
+    expect(
+      await screen.findByText("模型设置已变化，请重新确认。"),
+    ).toBeVisible();
+    expect(screen.queryByText("localized provider response")).toBeNull();
+  });
+
   it("sanitizes an initial draft-load failure", async () => {
     const rawDiagnostic = "ECONNRESET /private/audio-ai/draft.json";
     render(

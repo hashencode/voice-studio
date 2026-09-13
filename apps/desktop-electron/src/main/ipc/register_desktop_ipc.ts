@@ -15,6 +15,8 @@ import {
   IpcContractError,
   type DesktopIpcHandlers,
   type DesktopIpcServices,
+  type DesktopFailureAdapterRegistry,
+  type DesktopFailureDiagnostic,
   type IpcInvocationContext,
   type IpcTrustPolicy,
 } from "./desktop_ipc";
@@ -110,6 +112,11 @@ export interface DesktopIpcRegistry {
 
 type IpcMainRegistrar = Pick<IpcMain, "handle" | "removeHandler">;
 
+export interface DesktopIpcFailureBoundaryOptions {
+  failureAdapters?: DesktopFailureAdapterRegistry;
+  logFailure?: (diagnostic: DesktopFailureDiagnostic) => void;
+}
+
 interface RegisteredWindow {
   readonly window: BrowserWindow;
   readonly frameId: number;
@@ -150,6 +157,7 @@ const floatingEventChannels = new Set<DesktopIpcEventChannel>([
 export function createDesktopIpcRegistry(
   services: DesktopIpcServices,
   ipc: IpcMainRegistrar = ipcMain,
+  failureBoundary: DesktopIpcFailureBoundaryOptions = {},
 ): DesktopIpcRegistry {
   if (activeRegistries.has(ipc)) {
     throw new Error("desktop IPC handlers are already registered");
@@ -157,7 +165,10 @@ export function createDesktopIpcRegistry(
   activeRegistries.add(ipc);
 
   const windows = new Map<number, RegisteredWindow>();
-  const handlers: DesktopIpcHandlers = createDesktopIpcHandlers({ services });
+  const handlers: DesktopIpcHandlers = createDesktopIpcHandlers({
+    services,
+    ...failureBoundary,
+  });
   let disposed = false;
   const installedChannels: DesktopIpcInvokeChannel[] = [];
 
@@ -292,8 +303,9 @@ export function createDesktopIpcRegistry(
 export function registerDesktopIpc(
   window: BrowserWindow,
   services: DesktopIpcServices,
+  failureBoundary: DesktopIpcFailureBoundaryOptions = {},
 ): () => void {
-  const registry = createDesktopIpcRegistry(services);
+  const registry = createDesktopIpcRegistry(services, ipcMain, failureBoundary);
   compatibilityRegistry = registry;
   let unregisterWindow: () => void;
   try {

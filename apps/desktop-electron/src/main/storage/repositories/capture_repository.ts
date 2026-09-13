@@ -2,10 +2,8 @@ import path from "node:path";
 import type { DatabaseSync } from "node:sqlite";
 
 import {
-  captureRecoveryItemSchema,
   captureSnapshotSchema,
   captureTitleSchema,
-  type CaptureRecoveryItem,
   type CaptureSnapshot,
 } from "../../../shared/contracts";
 import { withTransaction } from "../audio_database";
@@ -26,11 +24,17 @@ interface CaptureSessionRow {
   interruption_reason: string | null;
   recording_sha256: string | null;
   journal_sha256: string | null;
+  workspace_path: string;
+  recovery_disposition: string | null;
 }
 
 export interface StoredCaptureSession {
   snapshot: CaptureSnapshot;
   title: string;
+}
+
+export interface StoredCaptureRecovery extends StoredCaptureSession {
+  workspacePath: string;
 }
 
 export interface CaptureRecoveryMarkerDiagnostics {
@@ -422,16 +426,62 @@ export class CaptureRepository {
     return row?.session_id ?? null;
   }
 
-  listRecoveries(): CaptureRecoveryItem[] {
+  listRecoveryCandidates(): StoredCaptureRecovery[] {
     return this.database
       .prepare(
         `SELECT * FROM capture_sessions
-         WHERE state IN ('recoverable', 'partial_capture', 'failed')
+         WHERE state IN ('preparing', 'recording', 'paused', 'finalizing', 'recoverable', 'partial_capture', 'failed')
            AND recovery_disposition IS NULL AND recording_sha256 IS NULL
          ORDER BY updated_at_ms, session_id`,
       )
       .all()
-      .map((row) => mapRecovery(row as unknown as CaptureSessionRow));
+      .map((row) => mapStoredRecovery(row as unknown as CaptureSessionRow));
+  }
+
+  findRecoveryCandidate(sessionId: string): StoredCaptureRecovery | null {
+    const row = this.database
+      .prepare(
+        `SELECT * FROM capture_sessions
+         WHERE session_id = ?
+           AND state IN ('preparing', 'recording', 'paused', 'finalizing', 'recoverable', 'partial_capture', 'failed')
+           AND recovery_disposition IS NULL AND recording_sha256 IS NULL`,
+      )
+      .get(sessionId) as CaptureSessionRow | undefined;
+    return row ? mapStoredRecovery(row) : null;
+  }
+
+  hasRecoveryAuthority(
+    sessionId: string,
+    finalizedChunkCount: number,
+  ): boolean {
+    if (
+      !Number.isSafeInteger(finalizedChunkCount) ||
+      finalizedChunkCount <= 0
+    ) {
+      return false;
+    }
+    const counts = this.database
+      .prepare(
+        `SELECT
+           (SELECT COUNT(*) FROM capture_chunks WHERE session_id = ?) AS chunks,
+           (SELECT COUNT(*) FROM capture_tracks WHERE session_id = ?) AS tracks`,
+      )
+      .get(sessionId, sessionId);
+    return (
+      Number(counts?.chunks ?? 0) === finalizedChunkCount &&
+      Number(counts?.tracks ?? 0) > 0
+    );
+  }
+
+  listDiscardedRecoverySessionIds(): string[] {
+    return this.database
+      .prepare(
+        `SELECT session_id FROM capture_sessions
+         WHERE recovery_disposition = 'discarded'
+         ORDER BY updated_at_ms, session_id`,
+      )
+      .all()
+      .map((row) => String(row.session_id));
   }
 
   renameSessionTitle(
@@ -480,8 +530,8 @@ export class CaptureRepository {
     sessionId: string,
     idempotencyKey: string,
     nowMs: number,
-  ): void {
-    withTransaction(this.database, () => {
+  ): CaptureSnapshot {
+    return withTransaction(this.database, () => {
       const snapshot = this.find(sessionId);
       if (!snapshot) throw new Error("capture recovery does not exist");
       if (!this.setRecoveryDisposition(sessionId, "discarded", nowMs)) {
@@ -494,6 +544,7 @@ export class CaptureRepository {
           ) VALUES (?, ?, 'discard', ?, ?)`,
         )
         .run(sessionId, idempotencyKey, JSON.stringify(snapshot), nowMs);
+      return snapshot;
     });
   }
 
@@ -507,7 +558,8 @@ export class CaptureRepository {
       if (
         !existing ||
         !existing.journalSha256 ||
-        existing.finalizedChunkCount === 0
+        existing.finalizedChunkCount === 0 ||
+        !this.hasRecoveryAuthority(sessionId, existing.finalizedChunkCount)
       ) {
         throw new Error("validated capture recovery is unavailable");
       }
@@ -565,9 +617,9 @@ function mapStoredSession(row: CaptureSessionRow): StoredCaptureSession {
   };
 }
 
-function mapRecovery(row: CaptureSessionRow): CaptureRecoveryItem {
-  return captureRecoveryItemSchema.parse({
-    ...mapSnapshot(row),
-    title: row.title,
-  });
+function mapStoredRecovery(row: CaptureSessionRow): StoredCaptureRecovery {
+  return {
+    ...mapStoredSession(row),
+    workspacePath: path.resolve(row.workspace_path),
+  };
 }

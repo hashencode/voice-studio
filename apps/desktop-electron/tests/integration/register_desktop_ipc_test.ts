@@ -7,13 +7,77 @@ import {
   createDesktopIpcRegistry,
   desktopIpcInvokeChannels,
 } from "../../src/main/ipc/register_desktop_ipc";
+import { createDesktopFailureAdapterRegistry } from "../../src/main/ipc/desktop_failure_adapter";
 import type { DesktopIpcServices } from "../../src/main/ipc/desktop_ipc";
+import { ModelBusyError } from "../../src/main/resources/model_lease_coordinator";
 import {
   ipcChannels,
   type FloatingCaptureSnapshot,
 } from "../../src/shared/contracts";
 
 describe("desktop IPC window registry", () => {
+  it("envelopes post-trust failures without exposing raw exception details", async () => {
+    const ipc = new FakeIpcMain();
+    const services = createServices();
+    services.value.getLocalModelSnapshot = vi
+      .fn()
+      .mockRejectedValueOnce(new ModelBusyError("/Users/private/model.bin"))
+      .mockRejectedValueOnce(
+        new Error("unexpected /Users/private/audio.wav\nstack: secret"),
+      );
+    const diagnostics: unknown[] = [];
+    const registry = createDesktopIpcRegistry(services.value, ipc, {
+      failureAdapters: createDesktopFailureAdapterRegistry(),
+      logFailure: (diagnostic) => diagnostics.push(diagnostic),
+    });
+    const main = createWindow(31, 7, "http://localhost:5173");
+    registry.registerWindow(main.window, {
+      capability: "main",
+      origins: new Set(["http://localhost:5173"]),
+    });
+
+    await expect(
+      ipc.invoke(ipcChannels.localModelsSnapshotGet, main.event, {}),
+    ).resolves.toEqual({
+      ok: false,
+      failure: {
+        protocolVersion: 3,
+        domain: "local-model",
+        code: "MODEL_BUSY",
+        retryable: true,
+        fallback: "try-again",
+      },
+    });
+    await expect(
+      ipc.invoke(ipcChannels.localModelsSnapshotGet, main.event, {}),
+    ).resolves.toMatchObject({
+      ok: false,
+      failure: {
+        domain: "internal",
+        code: "INTERNAL_ERROR",
+        retryable: false,
+        fallback: "continue",
+      },
+    });
+    expect(JSON.stringify(diagnostics)).not.toContain("/Users/private");
+    expect(diagnostics).toEqual([
+      expect.objectContaining({
+        operation: ipcChannels.localModelsSnapshotGet,
+        domain: "local-model",
+        code: "MODEL_BUSY",
+        errorKind: "model-busy",
+      }),
+      expect.objectContaining({
+        operation: ipcChannels.localModelsSnapshotGet,
+        domain: "internal",
+        code: "INTERNAL_ERROR",
+        errorKind: "unexpected",
+      }),
+    ]);
+
+    registry.dispose();
+  });
+
   it("registers process handlers once and authorizes each trusted window by capability", async () => {
     const ipc = new FakeIpcMain();
     const services = createServices();
@@ -33,22 +97,22 @@ describe("desktop IPC window registry", () => {
     expect(ipc.handle).toHaveBeenCalledTimes(desktopIpcInvokeChannels.length);
     await expect(
       ipc.invoke(ipcChannels.workerHealth, main.event, {
-        expectedProtocolVersion: 2,
+        expectedProtocolVersion: 3,
       }),
-    ).resolves.toMatchObject({ protocolVersion: 2 });
+    ).resolves.toMatchObject({ ok: true, value: { protocolVersion: 3 } });
     await expect(
       ipc.invoke(ipcChannels.applicationActivityMarkRead, main.event, {
         activityId: "activity-1",
       }),
-    ).resolves.toMatchObject({ revision: 1 });
+    ).resolves.toMatchObject({ ok: true, value: { revision: 1 } });
     await expect(
       ipc.invoke(ipcChannels.applicationActivityMarkAllRead, main.event, {}),
-    ).resolves.toMatchObject({ revision: 1 });
+    ).resolves.toMatchObject({ ok: true, value: { revision: 1 } });
     await expect(
       ipc.invoke(ipcChannels.applicationBootstrapAction, main.event, {
         action: "recheck",
       }),
-    ).resolves.toMatchObject({ revision: 1 });
+    ).resolves.toMatchObject({ ok: true, value: { revision: 1 } });
     expect(services.requestBootstrapAction).toHaveBeenCalledWith("recheck");
     await expect(
       ipc.invoke(ipcChannels.aiProviderProfileCreate, main.event, {
@@ -58,7 +122,7 @@ describe("desktop IPC window registry", () => {
         endpoint: "https://ai.example.com/v1",
         secret: "sk-create-secret",
       }),
-    ).resolves.toEqual(aiSettingsSnapshot());
+    ).resolves.toEqual({ ok: true, value: aiSettingsSnapshot() });
     expect(services.createAiProviderProfile).toHaveBeenCalledWith({
       expectedRevision: 2,
       protocol: "openai-compatible",
@@ -86,17 +150,40 @@ describe("desktop IPC window registry", () => {
     expect(services.controlCapture).not.toHaveBeenCalled();
     await expect(
       ipc.invoke(ipcChannels.captureTitleSuggest, main.event, {}),
-    ).resolves.toEqual({ title: "新录音2026070101" });
+    ).resolves.toEqual({ ok: true, value: { title: "新录音2026070101" } });
     await expect(
       ipc.invoke(ipcChannels.captureSessionRename, main.event, {
         sessionId: "session-capture-123456",
         title: "  产品回访  ",
       }),
-    ).resolves.toMatchObject({ revision: 2 });
+    ).resolves.toMatchObject({ ok: true, value: { revision: 2 } });
     expect(services.renameCaptureSession).toHaveBeenCalledWith({
       sessionId: "session-capture-123456",
       title: "产品回访",
     });
+    const recoveryCommand = {
+      action: "discard" as const,
+      sessionIds: ["session-recovery-123456"],
+      idempotencyKey: "discard-recovery-123456",
+    };
+    await expect(
+      ipc.invoke(
+        ipcChannels.captureRecoveryAction,
+        main.event,
+        recoveryCommand,
+      ),
+    ).resolves.toEqual({
+      ok: true,
+      value: { outcomes: [], recoveries: [] },
+    });
+    expect(services.actOnCaptureRecovery).toHaveBeenCalledWith(recoveryCommand);
+    await expect(
+      ipc.invoke(
+        ipcChannels.captureRecoveryAction,
+        floating.event,
+        recoveryCommand,
+      ),
+    ).rejects.toMatchObject({ code: "UNTRUSTED_SENDER" });
     await expect(
       ipc.invoke(ipcChannels.captureTitleSuggest, floating.event, {}),
     ).rejects.toMatchObject({ code: "UNTRUSTED_SENDER" });
@@ -108,22 +195,32 @@ describe("desktop IPC window registry", () => {
     ).rejects.toMatchObject({ code: "UNTRUSTED_SENDER" });
     await expect(
       ipc.invoke(ipcChannels.floatingCaptureSnapshotGet, floating.event, {}),
-    ).resolves.toEqual(
-      expect.objectContaining({ phase: "recording", sessionId: "opaque-1" }),
-    );
+    ).resolves.toEqual({
+      ok: true,
+      value: expect.objectContaining({
+        phase: "recording",
+        sessionId: "opaque-1",
+      }),
+    });
     await expect(
       ipc.invoke(ipcChannels.floatingCaptureControl, floating.event, {
         action: "pause",
         sessionId: "session-capture-123456",
         idempotencyKey: "floating-pause-123456",
       }),
-    ).resolves.toEqual(expect.objectContaining({ phase: "recording" }));
+    ).resolves.toEqual({
+      ok: true,
+      value: expect.objectContaining({ phase: "recording" }),
+    });
     expect(services.controlFloatingCapture).toHaveBeenCalledOnce();
     await expect(
       ipc.invoke(ipcChannels.floatingCaptureWindowAction, floating.event, {
         action: "open-details",
       }),
-    ).resolves.toEqual(expect.objectContaining({ sessionId: "opaque-1" }));
+    ).resolves.toEqual({
+      ok: true,
+      value: expect.objectContaining({ sessionId: "opaque-1" }),
+    });
     expect(services.floatingCaptureWindowAction).toHaveBeenCalledWith(
       "open-details",
     );
@@ -136,20 +233,20 @@ describe("desktop IPC window registry", () => {
     ).rejects.toMatchObject({ code: "UNTRUSTED_SENDER" });
     await expect(
       ipc.invoke(ipcChannels.workerHealth, floating.event, {
-        expectedProtocolVersion: 2,
+        expectedProtocolVersion: 3,
       }),
     ).rejects.toMatchObject({ code: "UNTRUSTED_SENDER" });
 
     const unregistered = createWindow(43, 11, "http://localhost:5175");
     await expect(
       ipc.invoke(ipcChannels.workerHealth, unregistered.event, {
-        expectedProtocolVersion: 2,
+        expectedProtocolVersion: 3,
       }),
     ).rejects.toMatchObject({ code: "UNTRUSTED_SENDER" });
     const senderIdImpersonator = createWindow(41, 12, "http://localhost:5173");
     await expect(
       ipc.invoke(ipcChannels.workerHealth, senderIdImpersonator.event, {
-        expectedProtocolVersion: 2,
+        expectedProtocolVersion: 3,
       }),
     ).rejects.toMatchObject({ code: "UNTRUSTED_SENDER" });
 
@@ -157,7 +254,7 @@ describe("desktop IPC window registry", () => {
     expect(ipc.removeHandler).not.toHaveBeenCalled();
     await expect(
       ipc.invoke(ipcChannels.workerHealth, floating.event, {
-        expectedProtocolVersion: 2,
+        expectedProtocolVersion: 3,
       }),
     ).rejects.toMatchObject({ code: "UNTRUSTED_SENDER" });
 
@@ -311,10 +408,15 @@ function createServices() {
   const createAiProviderProfile = vi.fn(async () => aiSettingsSnapshot());
   const requestBootstrapAction = vi.fn(async () => applicationSnapshot(1));
   const renameCaptureSession = vi.fn(async () => applicationSnapshot(2));
+  const actOnCaptureRecovery = vi.fn(async () => ({
+    outcomes: [],
+    recoveries: [],
+  }));
   const defined: Partial<DesktopIpcServices> = {
     applicationSnapshot: () => applicationSnapshot(1),
     suggestCaptureTitle: vi.fn(async () => ({ title: "新录音2026070101" })),
     renameCaptureSession,
+    actOnCaptureRecovery,
     requestBootstrapAction,
     markActivityRead: vi.fn(() => applicationSnapshot(1)),
     markAllActivityRead: vi.fn(() => applicationSnapshot(1)),
@@ -333,7 +435,7 @@ function createServices() {
       recordingSha256: null,
     })),
     workerHealth: vi.fn(async () => ({
-      protocolVersion: 2 as const,
+      protocolVersion: 3 as const,
       protocol: "desktop-sherpa-worker-health/v1" as const,
       runtime: "sherpa-onnx" as const,
       workerSha256: "b".repeat(64),
@@ -369,6 +471,7 @@ function createServices() {
     floatingCaptureWindowAction,
     requestBootstrapAction,
     renameCaptureSession,
+    actOnCaptureRecovery,
     emitApplicationSnapshot(snapshot: ReturnType<typeof applicationSnapshot>) {
       applicationListener?.(snapshot);
     },
@@ -425,7 +528,7 @@ function aiSettingsSnapshot() {
 
 function applicationSnapshot(revision: number) {
   return {
-    protocolVersion: 2 as const,
+    protocolVersion: 3 as const,
     revision,
     navigation: { section: "library" as const },
     profile: { phase: "ready" as const, legacyDatabaseArchived: false },

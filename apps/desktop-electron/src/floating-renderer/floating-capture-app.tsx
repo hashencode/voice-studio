@@ -52,6 +52,10 @@ export function FloatingCaptureApp() {
   }, [accept]);
 
   React.useEffect(() => {
+    setControlError(false);
+  }, [snapshot?.phase, snapshot?.revision]);
+
+  React.useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
       if (event.key !== "Escape") return;
       if (confirmStop) setConfirmStop(false);
@@ -65,16 +69,16 @@ export function FloatingCaptureApp() {
     if (!snapshot?.sessionId || pending) return;
     setPending(true);
     try {
-      accept(
-        await window.voice2textFloating.control({
-          action,
-          sessionId: snapshot.sessionId,
-          idempotencyKey: `${action}-floating-${Date.now()}-${++commandSequence}`,
-        }),
-      );
+      const next = await window.voice2textFloating.control({
+        action,
+        sessionId: snapshot.sessionId,
+        idempotencyKey: `${action}-floating-${Date.now()}-${++commandSequence}`,
+      });
+      accept(next);
+      if (!next.allowedActions.includes("stop")) setConfirmStop(false);
       setControlError(false);
     } catch {
-      setControlError(true);
+      if (action !== "stop") setControlError(true);
     } finally {
       setPending(false);
     }

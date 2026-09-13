@@ -53,13 +53,22 @@ import {
   hasSameFloatingCapturePresentation,
 } from "./application/floating_capture_projection";
 import {
+  runFloatingCaptureControl,
+  runStopOnlyCapture,
+} from "./application/floating_capture_stop_handoff";
+import {
   buildProcessingSmokeEvidence,
   parseProcessingSmokeReferenceBindings,
   type ProcessingSmokeReferenceBindings,
 } from "./application/processing_smoke_evidence";
 import { runPrimaryInstance } from "./application/single_instance";
 import { registerAdditionalDesktopIpcWindow, registerDesktopIpc } from "./ipc";
-import { canceledResponse, queuedResponse } from "./ipc/desktop_ipc";
+import { createDesktopFailureAdapterRegistry } from "./ipc/desktop_failure_adapter";
+import {
+  canceledResponse,
+  queuedResponse,
+  type DesktopIpcServices,
+} from "./ipc/desktop_ipc";
 import { DesktopDomainService } from "./domain/desktop_domain_service";
 import { SecureImportDomainService } from "./domain/importing/secure_import_domain_service";
 import {
@@ -83,10 +92,6 @@ import {
   activeCaptureQuitDialog,
   captureIsRunning,
   captureRequiresSnapshotPolling,
-  liveCaptureStopFailureDialog,
-  recoveredCaptureStopFailureDialog,
-  unknownCaptureStopFailureDialog,
-  unresolvedCaptureStopDialog,
 } from "./domain/capture/capture_lifecycle_policy";
 import {
   CaptureQuitCoordinator,
@@ -258,6 +263,11 @@ let lastFloatingCapturePresentation: FloatingCaptureSnapshot | null = null;
 let floatingPresentedSessionId: string | null = null;
 let floatingPreferenceMutation: Promise<void> = Promise.resolve();
 let captureControlMutation: Promise<void> = Promise.resolve();
+let captureRecoveryMutation: Promise<void> = Promise.resolve();
+let captureStopTransaction: {
+  sessionId: string;
+  promise: Promise<CaptureSnapshot>;
+} | null = null;
 let workerSupervisor: WorkerHealthSupervisor | null = null;
 let processCoordinator: DurableProcessCoordinator | null = null;
 let profileDatabase: DatabaseSync | null = null;
@@ -287,7 +297,6 @@ let captureLifecycleBound = false;
 let capturePollTimer: ReturnType<typeof setInterval> | null = null;
 let capturePollInFlight = false;
 let capturePublicationsSuppressed = false;
-let captureControlsDisabled = false;
 let captureSmokeQuitChoices: number[] = [];
 let captureSmokeQuitEvidence: Record<string, unknown> | null = null;
 let captureSmokeBeforeQuitAttempts = 0;
@@ -316,22 +325,6 @@ const captureQuitDecisionConfigurations = {
     options: activeCaptureQuitDialog,
     decisions: ["continue-recording", "stop-and-exit"],
   },
-  "live-failure": {
-    options: liveCaptureStopFailureDialog,
-    decisions: ["return-to-app", "retry-stop", "preserve-and-exit"],
-  },
-  "recovered-failure": {
-    options: recoveredCaptureStopFailureDialog,
-    decisions: ["return-safe-view", "preserve-and-exit"],
-  },
-  "unknown-failure": {
-    options: unknownCaptureStopFailureDialog,
-    decisions: ["return-safe-view", "preserve-and-exit"],
-  },
-  unresolved: {
-    options: unresolvedCaptureStopDialog,
-    decisions: ["continue-waiting", "preserve-and-exit"],
-  },
 } satisfies Record<
   QuitDecisionKind,
   { options: MessageBoxOptions; decisions: readonly QuitDecision[] }
@@ -349,46 +342,16 @@ const captureQuitCoordinator = new CaptureQuitCoordinator({
       : undefined,
   showDecision: showCaptureQuitDecision,
   stopAndReconcile: async (options) => {
-    if (!captureService) throw new Error("macOS capture helper is unavailable");
-    await captureControlMutation;
-    const current = captureService.snapshot();
-    if (
-      current?.sessionId === options.sessionId &&
-      isDurableTerminal(current)
-    ) {
-      return { snapshot: current, capability: "recovered-terminal" };
-    }
-    const result = await captureService.stopAndReconcile({
-      action: "stop",
-      ...options,
-    });
-    captureNativeSession =
-      captureNativePort?.currentSession() ?? captureNativeSession;
-    if (result.snapshot && isDurableTerminal(result.snapshot)) {
-      await recordCaptureSmokeQuitCommit(result.snapshot.sessionId);
-      void finalizeCommittedCaptureTranscript({
-        handoff: formalTranscriptHandoff,
-        sessionId: result.snapshot.sessionId,
-        displayName: captureService.sessionTitle(result.snapshot.sessionId),
-        processing: null,
-        publish: publishCaption,
-        reportFailure: () =>
-          console.error("Voice2Text formal transcript handoff failed"),
-      }).catch(() => undefined);
-    }
-    return result;
+    const snapshot = await runCaptureStopTransaction(options);
+    return {
+      snapshot,
+      capability: isDurableTerminal(snapshot)
+        ? "recovered-terminal"
+        : "unknown",
+    };
   },
-  publishCapture,
-  showSafeReturn: (destination) => {
+  returnToCapture: () => {
     showMainWindow();
-    if (destination === "disabled") {
-      captureControlsDisabled = true;
-      if (capturePollTimer) clearInterval(capturePollTimer);
-      capturePollTimer = null;
-      publishCapture(captureService?.snapshot() ?? null);
-    } else if (destination !== "capture") {
-      publishCapture(captureService?.snapshot() ?? null);
-    }
   },
   suppressCapturePublications: suppressCapturePublications,
   abortCapture: () => captureNativePort?.abort(),
@@ -2086,6 +2049,9 @@ async function controlCapture(options: {
   sessionId: string;
   idempotencyKey: string;
 }): Promise<CaptureSnapshot> {
+  if (options.action === "stop") {
+    return await runCaptureStopTransaction(options);
+  }
   const operation = captureControlMutation.then(
     async () => await performCaptureControl(options),
   );
@@ -2096,20 +2062,59 @@ async function controlCapture(options: {
   return await operation;
 }
 
+function runCaptureStopTransaction(options: {
+  sessionId: string;
+  idempotencyKey: string;
+}): Promise<CaptureSnapshot> {
+  if (captureStopTransaction?.sessionId === options.sessionId) {
+    return captureStopTransaction.promise;
+  }
+  const operation = captureControlMutation.then(
+    async () => await performCaptureControl({ action: "stop", ...options }),
+  );
+  const transaction = { sessionId: options.sessionId, promise: operation };
+  captureStopTransaction = transaction;
+  captureControlMutation = operation.then(
+    () => undefined,
+    () => undefined,
+  );
+  void operation.then(
+    () => {
+      if (captureStopTransaction === transaction) captureStopTransaction = null;
+    },
+    () => {
+      if (captureStopTransaction === transaction) captureStopTransaction = null;
+    },
+  );
+  return operation;
+}
+
 async function performCaptureControl(options: {
   action: "pause" | "resume" | "stop";
   sessionId: string;
   idempotencyKey: string;
 }): Promise<CaptureSnapshot> {
   const service = requireCaptureControlAuthority();
-  const result = await service.control(options);
+  const result =
+    options.action === "stop"
+      ? await runStopOnlyCapture(options, {
+          currentCapture: () => service.snapshot(),
+          publishCapture,
+          stopAndReconcile: async (request) =>
+            await service.stopAndReconcile({ action: "stop", ...request }),
+        })
+      : await service.control(options);
+  if (!result) {
+    throw new Error("capture stop authority is currently unavailable");
+  }
   if (options.action === "pause") {
     await liveCaptionService?.pause(options.sessionId);
   } else if (options.action === "resume") {
     await liveCaptionService?.resume(options.sessionId);
-  } else {
+  } else if (isDurableTerminal(result)) {
     // The native capture commit is already durable at this point. Surface it
     // before the separately retryable formal projection is attempted.
+    await recordCaptureSmokeQuitCommit(result.sessionId);
     publishCapture(result);
     await finalizeCommittedCaptureTranscript({
       handoff: formalTranscriptHandoff,
@@ -2130,16 +2135,6 @@ function publishCapture(
   audioActivity = captureService?.audioActivity() ?? 0,
 ): void {
   if (capturePublicationsSuppressed) return;
-  if (captureControlsDisabled && snapshot) {
-    snapshot = {
-      ...snapshot,
-      state: "failed",
-      systemAudioHealthy: false,
-      microphoneHealthy: false,
-      interruptionReason: "capture_native_authority_unavailable",
-    };
-    audioActivity = 0;
-  }
   const title =
     snapshot && captureService
       ? captureService.sessionTitle(snapshot.sessionId)
@@ -2149,7 +2144,7 @@ function publishCapture(
 }
 
 function requireCaptureControlAuthority(): DesktopCaptureService {
-  if (!captureService || captureControlsDisabled) {
+  if (!captureService) {
     throw new Error("macOS capture helper is unavailable");
   }
   return captureService;
@@ -2209,7 +2204,6 @@ async function pollCaptureSnapshot(): Promise<void> {
 async function applyCaptureLifecycle(
   action: "system-sleep" | "system-wake",
 ): Promise<void> {
-  if (captureControlsDisabled) return;
   const current = captureService?.snapshot();
   if (!captureService || !current) return;
   if (action === "system-sleep" && !captureIsRunning(current)) return;
@@ -2347,9 +2341,11 @@ async function recordCaptureSmokeQuitCommit(sessionId: string): Promise<void> {
   });
 }
 
+const desktopFailureAdapters = createDesktopFailureAdapterRegistry();
+
 function bindDesktopIpc(window: BrowserWindow): void {
   unregisterIpc?.();
-  unregisterIpc = registerDesktopIpc(window, {
+  const services: DesktopIpcServices = {
     getLocalModelSnapshot: async () => {
       if (!localModelService) throw new Error("本地模型服务暂不可用");
       synchronizeModelProcessingTasks();
@@ -2656,10 +2652,18 @@ function bindDesktopIpc(window: BrowserWindow): void {
     },
     floatingCaptureSnapshot: () =>
       deriveFloatingCaptureSnapshot(applicationState.snapshot()),
-    controlFloatingCapture: async (options) => {
-      await controlCapture(options);
-      return deriveFloatingCaptureSnapshot(applicationState.snapshot());
-    },
+    controlFloatingCapture: async (options) =>
+      await runFloatingCaptureControl(options, {
+        handoffToMain: () => {
+          floatingCaptureWindow?.hide();
+          showMainWindow({ openCaptureDetails: true });
+        },
+        reportHandoffFailure: () =>
+          console.error("Floating capture main-window handoff failed"),
+        controlCapture,
+        currentSnapshot: () =>
+          deriveFloatingCaptureSnapshot(applicationState.snapshot()),
+      }),
     floatingCaptureWindowAction: (action) => handleFloatingWindowAction(action),
     getFloatingCapturePreference: () => ({
       enabled: floatingCaptureEnabled,
@@ -2674,31 +2678,49 @@ function bindDesktopIpc(window: BrowserWindow): void {
       return listAvailableCaptureRecoveries(captureService);
     },
     actOnCaptureRecovery: async (options) => {
-      if (!captureService) throw new Error("capture recovery is unavailable");
-      if (options.action === "discard") {
-        await captureService.discardRecovered(
-          options.sessionId,
-          options.idempotencyKey,
-        );
-        const next = captureService.listRecoveries()[0] ?? null;
-        publishCapture(next);
-        return next;
-      }
-      const kept = captureService.keepRecovered(
-        options.sessionId,
-        options.idempotencyKey,
-      );
-      publishCapture(kept);
-      await finalizeCommittedCaptureTranscript({
-        handoff: formalTranscriptHandoff,
-        sessionId: kept.sessionId,
-        displayName: captureService.sessionTitle(kept.sessionId),
-        processing: null,
-        publish: publishCaption,
-        reportFailure: () =>
-          console.error("Voice2Text recovered formal handoff failed"),
+      if (teardownStarted)
+        throw new Error("capture recovery is unavailable during teardown");
+      const operation = Promise.all([
+        captureControlMutation,
+        captureRecoveryMutation,
+      ]).then(async () => {
+        if (teardownStarted)
+          throw new Error("capture recovery is unavailable during teardown");
+        if (!captureService) throw new Error("capture recovery is unavailable");
+        const service = captureService;
+        const response = await service.actOnRecoveries(options);
+        const outcomes: (typeof response.outcomes)[number][] = [];
+        for (const outcome of response.outcomes) {
+          if (outcome.result !== "kept" || !outcome.capture) {
+            outcomes.push(outcome);
+            continue;
+          }
+          publishCapture(outcome.capture);
+          let handoffFailed = false;
+          await finalizeCommittedCaptureTranscript({
+            handoff: formalTranscriptHandoff,
+            sessionId: outcome.capture.sessionId,
+            displayName: service.sessionTitle(outcome.capture.sessionId),
+            processing: null,
+            publish: publishCaption,
+            reportFailure: () => {
+              handoffFailed = true;
+              console.error("Voice2Text recovered formal handoff failed");
+            },
+          });
+          outcomes.push({
+            ...outcome,
+            transcriptionHandoff: handoffFailed ? "failed" : "completed",
+          });
+        }
+        return { ...response, outcomes };
       });
-      return kept;
+      captureRecoveryMutation = operation.then(
+        () => undefined,
+        () => undefined,
+      );
+      captureControlMutation = captureRecoveryMutation;
+      return await operation;
     },
     getCaptionSnapshot: async ({ sessionId }) =>
       transcriptRepository?.getSnapshot(sessionId) ?? null,
@@ -2790,6 +2812,9 @@ function bindDesktopIpc(window: BrowserWindow): void {
       if (!audioExportService) throw new Error("audio export is unavailable");
       return await audioExportService.exportAudio(audioId, format);
     },
+  };
+  unregisterIpc = registerDesktopIpc(window, services, {
+    failureAdapters: desktopFailureAdapters,
   });
   if (floatingCaptureWindow && !floatingCaptureWindow.isDestroyed()) {
     unregisterFloatingIpc?.();
@@ -3709,7 +3734,6 @@ async function initializeCapture(
     profile.captureDirectory,
   );
   const recoveries = await captureService.recover();
-  captureControlsDisabled = false;
   publishCapture(recoveries[0] ?? captureService.snapshot());
 }
 
@@ -4006,7 +4030,7 @@ async function runCaptureSmokeIfRequested(): Promise<void> {
     await exitInitializedCaptureSmoke(85);
     return;
   }
-  const recoveries = captureService.listRecoveries();
+  const recoveries = await captureService.listRecoveries();
   if (recoveries.length !== 1) {
     throw new Error("packaged capture smoke expected one recovery");
   }
@@ -4351,6 +4375,7 @@ async function teardownOwnedResources(
 ): Promise<void> {
   teardownStarted = true;
   await floatingPreferenceMutation;
+  await captureRecoveryMutation;
   if (mode === "normal") await captureControlMutation;
   unregisterIpc?.();
   unregisterIpc = null;

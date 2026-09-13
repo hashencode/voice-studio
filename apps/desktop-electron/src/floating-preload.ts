@@ -10,12 +10,24 @@ import {
   type FloatingCaptureControlRequest,
   type FloatingCaptureWindowAction,
   type Voice2TextFloatingApi,
+  desktopTransportFailure,
+  unwrapDesktopIpcEnvelope,
 } from "./shared/contracts";
+
+async function invoke(channel: string, payload: unknown): Promise<unknown> {
+  let response: unknown;
+  try {
+    response = await ipcRenderer.invoke(channel, payload);
+  } catch {
+    throw desktopTransportFailure("IPC_DISCONNECTED");
+  }
+  return unwrapDesktopIpcEnvelope(response, floatingCaptureSnapshotSchema);
+}
 
 const api: Voice2TextFloatingApi = Object.freeze({
   async getSnapshot() {
     return floatingCaptureSnapshotSchema.parse(
-      await ipcRenderer.invoke(
+      await invoke(
         ipcChannels.floatingCaptureSnapshotGet,
         floatingCapturePreferenceRequestSchema.parse({}),
       ),
@@ -23,7 +35,7 @@ const api: Voice2TextFloatingApi = Object.freeze({
   },
   async control(options: FloatingCaptureControlRequest) {
     return floatingCaptureSnapshotSchema.parse(
-      await ipcRenderer.invoke(
+      await invoke(
         ipcChannels.floatingCaptureControl,
         floatingCaptureControlRequestSchema.parse(options),
       ),
@@ -31,7 +43,7 @@ const api: Voice2TextFloatingApi = Object.freeze({
   },
   async windowAction(action: FloatingCaptureWindowAction) {
     return floatingCaptureSnapshotSchema.parse(
-      await ipcRenderer.invoke(
+      await invoke(
         ipcChannels.floatingCaptureWindowAction,
         floatingCaptureWindowActionRequestSchema.parse({ action }),
       ),

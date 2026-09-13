@@ -1,4 +1,5 @@
 import * as React from "react";
+import { toast } from "sonner";
 import {
   CheckCircle2,
   CircleAlert,
@@ -124,11 +125,14 @@ export function useCompanionRouteController({
       if (pendingActionRef.current) return;
       pendingActionRef.current = true;
       setPendingAction(key);
-      setError(null);
+      const toastId = `companion-action:${key}`;
       try {
         accept(await operation());
+        toast.dismiss(toastId);
       } catch (cause) {
-        setError(userFacingError(cause, "手机接收操作未完成"));
+        toast.error(userFacingError(cause, "手机接收操作未完成，请重试。"), {
+          id: toastId,
+        });
       } finally {
         pendingActionRef.current = false;
         setPendingAction(null);
@@ -225,7 +229,7 @@ export function CompanionContextPane({
     return (
       <SidebarGroup>
         <SidebarGroupContent>
-          <PaneStatus label={controller.error ?? "无法读取已信任设备"} alert />
+          <PaneStatus label={controller.error ?? "无法读取已信任设备"} />
         </SidebarGroupContent>
       </SidebarGroup>
     );
@@ -316,7 +320,7 @@ export function CompanionMainWorkspace({
         <div role="status" aria-label="正在读取手机接收状态">
           正在读取手机接收状态
         </div>
-      ) : !snapshot ? (
+      ) : !snapshot && !controller.error ? (
         <div role="alert">无法读取手机接收状态</div>
       ) : controller.view.kind === "history" ? (
         <HistoryWorkspace controller={controller} />

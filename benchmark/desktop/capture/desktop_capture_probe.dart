@@ -61,6 +61,11 @@ Future<void> main(List<String> arguments) async {
     final evidenceDecision = (evidence['decision'] as Map)
         .cast<String, Object?>();
     final duration = (probe['requestedDurationSeconds'] as num).toInt();
+    final stopLatency = _optionalLatency(probe['stopLatencyMs'], 'stop');
+    final recoveryLatency = _requiredLatency(
+      recovery['maximumRecoveryMs'],
+      'recovery',
+    );
     final faults = recovery['faultInjection'];
     if (evidence['status'] != 'PASS' ||
         evidence['admissibleForDeclaredClosureTarget'] != true ||
@@ -71,7 +76,7 @@ Future<void> main(List<String> arguments) async {
         duration > maximumMinutes * 60 ||
         observation['durationSeconds'] != duration ||
         recovery['invalidFinalizedChunks'] != 0 ||
-        (recovery['maximumRecoveryMs'] as num).toInt() > 30000 ||
+        recoveryLatency > 30000 ||
         (recovery['maximumTailChunksQuarantinedPerTrack'] as num).toInt() > 1 ||
         evidenceDecision['chunksValid'] != true ||
         evidenceDecision['recoveryValid'] != true ||
@@ -97,8 +102,76 @@ Future<void> main(List<String> arguments) async {
     })) {
       throw StateError('Capture fault-injection stages are incomplete');
     }
+    final latencySamples = _latencySamples(document['latencySamples']);
+    final hasShortAndLongSamples =
+        latencySamples.any((sample) => sample.durationSeconds <= 120) &&
+        latencySamples.any((sample) => sample.durationSeconds >= 20 * 60);
+    stdout.writeln(
+      jsonEncode(<String, Object?>{
+        'captureDurationSeconds': duration,
+        'stopLatencyMs': stopLatency,
+        'recoveryLatencyMs': recoveryLatency,
+        'hasShortAndTwentyMinuteSamples': hasShortAndLongSamples,
+        'hardFailureBoundarySupported': false,
+        'watchdogDisposition': 'soft-notice-only',
+      }),
+    );
   }
   stdout.writeln(
     'PASS: capture probe contract is bounded; status=${document['status']}',
   );
+}
+
+int? _optionalLatency(Object? value, String field) {
+  if (value == null) return null;
+  return _requiredLatency(value, field);
+}
+
+int _requiredLatency(Object? value, String field) {
+  if (value is! num || !value.isFinite) {
+    throw FormatException('$field latency must be finite');
+  }
+  final milliseconds = value.toInt();
+  if (milliseconds < 0 || milliseconds > 6 * 60 * 60 * 1000) {
+    throw FormatException('$field latency is outside the bounded range');
+  }
+  return milliseconds;
+}
+
+List<_LatencySample> _latencySamples(Object? value) {
+  if (value == null) return const [];
+  if (value is! List || value.length > 32) {
+    throw const FormatException('latencySamples must be a bounded list');
+  }
+  return value
+      .map((entry) {
+        if (entry is! Map) {
+          throw const FormatException('latency sample must be an object');
+        }
+        final sample = entry.cast<String, Object?>();
+        return _LatencySample(
+          durationSeconds: _requiredLatency(
+            sample['captureDurationSeconds'],
+            'capture duration',
+          ),
+          stopLatencyMs: _requiredLatency(sample['stopLatencyMs'], 'stop'),
+          recoveryLatencyMs: _requiredLatency(
+            sample['recoveryLatencyMs'],
+            'recovery',
+          ),
+        );
+      })
+      .toList(growable: false);
+}
+
+final class _LatencySample {
+  const _LatencySample({
+    required this.durationSeconds,
+    required this.stopLatencyMs,
+    required this.recoveryLatencyMs,
+  });
+
+  final int durationSeconds;
+  final int stopLatencyMs;
+  final int recoveryLatencyMs;
 }

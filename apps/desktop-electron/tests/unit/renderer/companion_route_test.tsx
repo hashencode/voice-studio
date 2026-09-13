@@ -1,10 +1,12 @@
 // @vitest-environment jsdom
 
-import { act, render, screen, within } from "@testing-library/react";
+import { act, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
+import { toast } from "sonner";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import App from "../../../src/renderer/App";
+import { useCompanionRouteController } from "../../../src/renderer/features/companion/companion-feature";
 import type {
   ApplicationSnapshot,
   CompanionSnapshot,
@@ -12,7 +14,7 @@ import type {
 } from "../../../src/shared/contracts";
 
 const application: ApplicationSnapshot = {
-  protocolVersion: 2,
+  protocolVersion: 3,
   revision: 12,
   navigation: { section: "companion" },
   profile: { phase: "ready", legacyDatabaseArchived: false },
@@ -51,6 +53,59 @@ afterEach(() => {
 });
 
 describe("Companion route composition", () => {
+  it("announces an initial receiver load failure only once", async () => {
+    installApi(baseSnapshot, {
+      getCompanionSnapshot: vi.fn(async () => {
+        throw new Error("private receiver diagnostic");
+      }),
+    });
+
+    render(<App />);
+
+    const workspace = await screen.findByRole("region", {
+      name: "互联工作区",
+    });
+    await waitFor(() => {
+      expect(screen.getAllByRole("alert")).toHaveLength(1);
+    });
+    expect(within(workspace).getByRole("alert")).toHaveTextContent(
+      "无法读取手机接收状态",
+    );
+    expect(screen.queryByText("private receiver diagnostic")).toBeNull();
+  });
+
+  it("uses one operation toast for a failed receiver action", async () => {
+    const toastError = vi.spyOn(toast, "error");
+    installApi(
+      { ...baseSnapshot, optIn: false },
+      {
+        setCompanionOptIn: vi.fn(async () => {
+          throw new Error("localized receiver failure");
+        }),
+      },
+    );
+    const user = userEvent.setup();
+    function Harness() {
+      const controller = useCompanionRouteController();
+      return controller.snapshot ? (
+        <button type="button" onClick={controller.setOptIn}>
+          切换接收
+        </button>
+      ) : null;
+    }
+    render(<Harness />);
+
+    await user.click(await screen.findByRole("button", { name: "切换接收" }));
+
+    await waitFor(() =>
+      expect(toastError).toHaveBeenCalledWith(
+        "手机接收操作未完成，请重试。",
+        expect.objectContaining({ id: "companion-action:opt-in" }),
+      ),
+    );
+    expect(screen.queryByText("localized receiver failure")).toBeNull();
+  });
+
   it("lists non-revoked devices and changes viewed detail without connecting", async () => {
     const connectCompanionPeer = vi.fn();
     const snapshot: CompanionSnapshot = {

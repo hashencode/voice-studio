@@ -2,6 +2,7 @@
 
 import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
+import { toast } from "sonner";
 import { expect, it, vi } from "vitest";
 
 import { AudioWorkspaceFeature } from "../../../src/renderer/features/audios/audio-workspace-feature";
@@ -362,6 +363,7 @@ it("closes playback once on workspace back and keeps close failures visible", as
 });
 
 it("surfaces a typed export write failure instead of reporting cancellation", async () => {
+  const toastError = vi.spyOn(toast, "error");
   const desktop = api({
     exportAudio: vi.fn(async () => ({
       state: "failed" as const,
@@ -377,12 +379,16 @@ it("surfaces a typed export write failure instead of reporting cancellation", as
 
   await user.click(screen.getByRole("button", { name: "导出" }));
   await user.click(screen.getByRole("menuitem", { name: "TXT" }));
-  expect(await screen.findByRole("alert")).toHaveTextContent(
-    "所选位置不可写，请选择其他位置",
+  await waitFor(() =>
+    expect(toastError).toHaveBeenCalledWith(
+      "音频导出失败，请重试。",
+      expect.objectContaining({ id: "audio-export" }),
+    ),
   );
   expect(
     screen.getByRole("status", { name: "音频工作区状态" }),
-  ).toHaveTextContent("音频导出失败");
+  ).not.toHaveTextContent("音频导出失败");
+  expect(screen.queryByRole("alert")).toBeNull();
   expect(screen.queryByText("已取消导出")).not.toBeInTheDocument();
 });
 

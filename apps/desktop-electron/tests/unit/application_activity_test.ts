@@ -21,6 +21,22 @@ function completedCapture(index: number): CaptureSnapshot {
 }
 
 describe("application capture activity", () => {
+  it("projects the soft stop threshold as a continuing save", () => {
+    const state = new DesktopApplicationState();
+    state.setCapture({
+      ...completedCapture(0),
+      state: "finalizing",
+      recordingSha256: null,
+      interruptionReason: "capture_stop_slow",
+    });
+
+    expect(state.snapshot().capture).toMatchObject({
+      phase: "finalizing",
+      interruptionReason: "capture_stop_slow",
+      message: "保存时间比预期长，仍在继续保存…",
+    });
+  });
+
   it("discards navigation until the application profile is ready", () => {
     const state = new DesktopApplicationState();
     const initial = state.snapshot();

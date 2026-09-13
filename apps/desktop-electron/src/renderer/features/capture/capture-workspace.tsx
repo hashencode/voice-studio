@@ -1,7 +1,7 @@
 import * as React from "react";
-import { Mic, Pencil, RotateCcw } from "lucide-react";
+import { Mic, Pencil } from "lucide-react";
+import { toast } from "sonner";
 
-import { ApplicationBlocker } from "@/components/application-blocker";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -41,6 +41,7 @@ import {
   type CaptureView,
 } from "./capture-presentation";
 import { CaptureFooter } from "./capture-footer";
+import { RecoveryDialog, type RecoveryDialogState } from "./recovery-dialog";
 import {
   resolveRecordingMicrophone,
   useRecordingPreference,
@@ -110,13 +111,17 @@ export function CaptureWorkspaceController({
   const [titleEditing, setTitleEditing] = React.useState(false);
   const [confirmedActiveTitle, setConfirmedActiveTitle] = React.useState("");
   const [titleDialog, setTitleDialog] = React.useState<
-    | { kind: "load" | "validation"; message: string }
+    | { kind: "load"; message: string }
+    | { kind: "validation"; message: string; value: string }
     | { kind: "save"; message: string; value: string }
     | null
   >(null);
   const [captionEnabled, setCaptionEnabled] = React.useState(true);
   const [microphoneDeviceId, setMicrophoneDeviceId] = React.useState("");
   const [recoveries, setRecoveries] = React.useState<CaptureRecoveryItem[]>([]);
+  const [recoveryDialogState, setRecoveryDialogState] =
+    React.useState<RecoveryDialogState>("assessing");
+  const [restoredRecoveryCount, setRestoredRecoveryCount] = React.useState(0);
   const [loadedRecoveryTarget, setLoadedRecoveryTarget] = React.useState<
     string | null
   >(null);
@@ -131,6 +136,9 @@ export function CaptureWorkspaceController({
   const [successfulTerminalStopSessionId, setSuccessfulTerminalStopSessionId] =
     React.useState<string | null>(null);
   const pendingRef = React.useRef(new Set<string>());
+  const recoveryListGenerationRef = React.useRef(0);
+  const recoveryDialogStateRef = React.useRef(recoveryDialogState);
+  const recoveryFocusFallbackRef = React.useRef<HTMLButtonElement>(null);
   const terminalActionRef = React.useRef<HTMLButtonElement>(null);
   const focusedTerminalStopSessionRef = React.useRef<string | null>(null);
   const lastRecordRequestRef = React.useRef(recordRequest ?? 0);
@@ -150,29 +158,42 @@ export function CaptureWorkspaceController({
   const recordingPreference = useRecordingPreference();
 
   React.useEffect(() => {
+    recoveryDialogStateRef.current = recoveryDialogState;
+  }, [recoveryDialogState]);
+
+  React.useEffect(() => {
+    if (recoveryDialogStateRef.current.startsWith("pending-")) return;
+
     let active = true;
+    const generation = ++recoveryListGenerationRef.current;
     const loadTarget = prioritizedRecoverySessionId ?? "all";
     void window.voice2text
       .listCaptureRecoveries()
       .then((values) => {
-        if (!active) return;
+        if (!active || generation !== recoveryListGenerationRef.current) return;
         setError(null);
-        setRecoveries(
-          prioritizedRecoverySessionId
-            ? [...values].sort((left, right) =>
-                left.sessionId === prioritizedRecoverySessionId
-                  ? -1
-                  : right.sessionId === prioritizedRecoverySessionId
-                    ? 1
-                    : 0,
-              )
-            : values,
-        );
+        const nextRecoveries = prioritizedRecoverySessionId
+          ? [...values].sort((left, right) =>
+              left.sessionId === prioritizedRecoverySessionId
+                ? -1
+                : right.sessionId === prioritizedRecoverySessionId
+                  ? 1
+                  : 0,
+            )
+          : values;
+        setRecoveries(nextRecoveries);
+        setRestoredRecoveryCount(0);
+        if (!recoveryDialogStateRef.current.startsWith("pending-")) {
+          setRecoveryDialogState(
+            nextRecoveries.length > 0 ? "choice" : "hidden",
+          );
+        }
         setLoadedRecoveryTarget(loadTarget);
       })
       .catch((reason: unknown) => {
-        if (active) {
+        if (active && generation === recoveryListGenerationRef.current) {
           setLoadedRecoveryTarget(loadTarget);
+          setRecoveryDialogState("hidden");
           setError(userFacingError(reason, "无法检查可恢复录制"));
         }
       });
@@ -259,7 +280,11 @@ export function CaptureWorkspaceController({
       const candidate = override ?? title;
       const validation = validateTitle(candidate);
       if (!validation.value) {
-        setTitleDialog({ kind: "validation", message: validation.message! });
+        setTitleDialog({
+          kind: "validation",
+          message: validation.message!,
+          value: candidate,
+        });
         return false;
       }
       const nextTitle = validation.value;
@@ -532,38 +557,65 @@ export function CaptureWorkspaceController({
     control("stop");
   }, [control]);
 
-  const recoverAll = React.useCallback(
-    (items: CaptureRecoveryItem[], action: "keep" | "discard") => {
-      void runExclusive(
-        "recovery-all",
-        action === "keep" ? "正在恢复数据" : "正在丢弃数据",
-        async () => {
-          const completedSessionIds = new Set<string>();
-          try {
-            for (const item of items) {
-              await window.voice2text.actOnCaptureRecovery({
-                action,
-                sessionId: item.sessionId,
-                idempotencyKey: commandKey(action),
-              });
-              completedSessionIds.add(item.sessionId);
-            }
-          } finally {
-            if (completedSessionIds.size > 0) {
-              setRecoveries((current) =>
-                current.filter(
-                  (candidate) => !completedSessionIds.has(candidate.sessionId),
-                ),
-              );
-            }
+  const actOnRecoveries = React.useCallback(
+    (action: "keep" | "discard") => {
+      if (recoveryDialogStateRef.current.startsWith("pending-")) return;
+      const frozenSessionIds = recoveries
+        .filter((item) =>
+          action === "keep"
+            ? item.capability === "restorable"
+            : item.capability !== "preserve-only",
+        )
+        .map((item) => item.sessionId);
+      if (frozenSessionIds.length === 0) {
+        setRecoveryDialogState("hidden");
+        return;
+      }
+      const pendingState =
+        action === "keep" ? "pending-restore" : "pending-ignore";
+      recoveryListGenerationRef.current += 1;
+      recoveryDialogStateRef.current = pendingState;
+      setRecoveryDialogState(pendingState);
+      void window.voice2text
+        .actOnCaptureRecovery({
+          action,
+          sessionIds: frozenSessionIds,
+          idempotencyKey: commandKey(action),
+        })
+        .then((response) => {
+          setRecoveries(response.recoveries);
+          if (action === "discard") {
+            setRecoveryDialogState("hidden");
+            return;
           }
-          setOperationMessage(
-            action === "keep" ? "数据已恢复" : "待恢复数据已丢弃",
+          const keptCount = response.outcomes.filter(
+            (outcome) => outcome.result === "kept",
+          ).length;
+          const transcriptionFailureCount = response.outcomes.filter(
+            (outcome) => outcome.transcriptionHandoff === "failed",
+          ).length;
+          setRestoredRecoveryCount(keptCount);
+          if (keptCount > 0 && response.recoveries.length === 0) {
+            toast.success("录音已恢复并保存", {
+              id: "capture-recovery-completed",
+            });
+          }
+          if (transcriptionFailureCount > 0) {
+            toast.warning("录音已恢复；转写暂未开始，可稍后重试。", {
+              id: "capture-recovery-transcription-failed",
+            });
+          }
+          setRecoveryDialogState(
+            response.recoveries.length > 0 ? "result" : "hidden",
           );
-        },
-      );
+        })
+        .catch(() => {
+          // Main persists recovery outcomes. A lost response is reconciled from
+          // those facts without offering a duplicate mutation in Renderer.
+          setRecoveryDialogState("hidden");
+        });
     },
-    [runExclusive],
+    [recoveries],
   );
 
   const busy = pendingAction !== null;
@@ -595,7 +647,8 @@ export function CaptureWorkspaceController({
     recoveries.length === 0 &&
     !focusSessionId;
   const recoveryDialogOpen =
-    recoveries.length > 0 &&
+    recoveryDialogState !== "assessing" &&
+    recoveryDialogState !== "hidden" &&
     (detailOpen || autoOpenRecoveries || Boolean(focusSessionId));
 
   const detail =
@@ -639,6 +692,7 @@ export function CaptureWorkspaceController({
             setupOpen={setupOpen}
             preflight={preflight}
             busy={busy}
+            recoveryFocusFallbackRef={recoveryFocusFallbackRef}
             onCheck={checkPreflight}
             onStart={start}
             titleReady={!titleLoading && Boolean(title)}
@@ -672,20 +726,26 @@ export function CaptureWorkspaceController({
   const dialogs = (
     <>
       <RecoveryDialog
-        open={recoveryDialogOpen}
-        itemCount={recoveries.length}
-        busy={busy}
-        error={visibleError}
-        operationMessage={operationMessage}
-        onRestoreAll={() => recoverAll(recoveries, "keep")}
-        onDiscardAll={() => recoverAll(recoveries, "discard")}
+        state={recoveryDialogOpen ? recoveryDialogState : "hidden"}
+        items={recoveries}
+        restoredCount={restoredRecoveryCount}
+        onRestore={() => actOnRecoveries("keep")}
+        onIgnore={() => actOnRecoveries("discard")}
+        onAcknowledge={() => setRecoveryDialogState("hidden")}
+        onRequestFocusFallback={() => {
+          const recordingEntry =
+            recoveryFocusFallbackRef.current ??
+            document.querySelector<HTMLElement>("[data-recording-entry]");
+          recordingEntry?.focus();
+        }}
       />
       <TitleErrorDialog
         state={titleDialog}
         onClose={() => setTitleDialog(null)}
-        onRetry={(value) => {
-          setTitleDialog(null);
-          void commitTitle(value);
+        onSubmit={(value) => {
+          void commitTitle(value).then((saved) => {
+            if (saved) setTitleDialog(null);
+          });
         }}
       />
     </>
@@ -796,40 +856,84 @@ function CaptureTitleEditor({
 function TitleErrorDialog({
   state,
   onClose,
-  onRetry,
+  onSubmit,
 }: {
   state:
-    | { kind: "load" | "validation"; message: string }
+    | { kind: "load"; message: string }
+    | { kind: "validation"; message: string; value: string }
     | { kind: "save"; message: string; value: string }
     | null;
   onClose: () => void;
-  onRetry: (value: string) => void;
+  onSubmit: (value: string) => void;
 }) {
   return (
     <Dialog open={state !== null} onOpenChange={(open) => !open && onClose()}>
       <DialogContent showCloseButton={false}>
-        <DialogHeader>
-          <DialogTitle>
-            {state?.kind === "load"
-              ? "无法准备录制名称"
-              : state?.kind === "save"
-                ? "录制名称未保存"
-                : "请检查录制名称"}
-          </DialogTitle>
-          <DialogDescription>{state?.message ?? ""}</DialogDescription>
-        </DialogHeader>
-        <DialogFooter>
-          <Button type="button" variant="outline" onClick={onClose}>
-            {state?.kind === "save" ? "取消" : "关闭"}
-          </Button>
-          {state?.kind === "save" ? (
-            <Button type="button" onClick={() => onRetry(state.value)}>
-              重试
-            </Button>
-          ) : null}
-        </DialogFooter>
+        {state?.kind === "validation" ? (
+          <TitleValidationDialogBody
+            key={state.value}
+            state={state}
+            onClose={onClose}
+            onSubmit={onSubmit}
+          />
+        ) : (
+          <>
+            <DialogHeader>
+              <DialogTitle>
+                {state?.kind === "load" ? "无法准备录制名称" : "录制名称未保存"}
+              </DialogTitle>
+              <DialogDescription>{state?.message ?? ""}</DialogDescription>
+            </DialogHeader>
+            <DialogFooter>
+              <Button type="button" variant="outline" onClick={onClose}>
+                {state?.kind === "save" ? "取消" : "关闭"}
+              </Button>
+              {state?.kind === "save" ? (
+                <Button type="button" onClick={() => onSubmit(state.value)}>
+                  重试
+                </Button>
+              ) : null}
+            </DialogFooter>
+          </>
+        )}
       </DialogContent>
     </Dialog>
+  );
+}
+
+function TitleValidationDialogBody({
+  state,
+  onClose,
+  onSubmit,
+}: {
+  state: { kind: "validation"; message: string; value: string };
+  onClose: () => void;
+  onSubmit: (value: string) => void;
+}) {
+  const [draft, setDraft] = React.useState(state.value);
+  return (
+    <>
+      <DialogHeader>
+        <DialogTitle>请检查录制名称</DialogTitle>
+        <DialogDescription>{state.message}</DialogDescription>
+      </DialogHeader>
+      <Field>
+        <FieldLabel htmlFor="capture-title-correction">录制名称</FieldLabel>
+        <Input
+          id="capture-title-correction"
+          value={draft}
+          onChange={(event) => setDraft(event.currentTarget.value)}
+        />
+      </Field>
+      <DialogFooter>
+        <Button type="button" variant="outline" onClick={onClose}>
+          关闭
+        </Button>
+        <Button type="button" onClick={() => onSubmit(draft)}>
+          保存名称
+        </Button>
+      </DialogFooter>
+    </>
   );
 }
 
@@ -905,6 +1009,7 @@ function CaptureSetup({
   setupOpen,
   preflight,
   busy,
+  recoveryFocusFallbackRef,
   onCheck,
   onStart,
   titleReady,
@@ -915,6 +1020,7 @@ function CaptureSetup({
   setupOpen: boolean;
   preflight: CapturePreflight | null;
   busy: boolean;
+  recoveryFocusFallbackRef: React.RefObject<HTMLButtonElement | null>;
   onCheck: () => void;
   onStart: () => void;
   titleReady: boolean;
@@ -931,7 +1037,14 @@ function CaptureSetup({
         <div className="min-w-0 flex-1">
           <h2 className="font-semibold">音频录制</h2>
         </div>
-        <Button type="button" size="sm" disabled={busy} onClick={onCheck}>
+        <Button
+          ref={recoveryFocusFallbackRef}
+          data-recording-entry="capture-workspace"
+          type="button"
+          size="sm"
+          disabled={busy}
+          onClick={onCheck}
+        >
           检查并设置录制
         </Button>
       </div>
@@ -984,7 +1097,9 @@ function ActiveCapture({
   const finalizedPartial = capture.phase === "partial_capture" && !running;
   return (
     <section aria-label="当前录制" className="space-y-3">
-      {capture.message ? <p className="text-sm">{capture.message}</p> : null}
+      {capture.message && capture.interruptionReason !== "capture_stop_slow" ? (
+        <p className="text-sm">{capture.message}</p>
+      ) : null}
       {capture.phase === "partial_capture" || capture.partialCapture ? (
         <PartialCaptureStatus capture={capture} />
       ) : null}
@@ -1065,55 +1180,6 @@ function PartialCaptureStatus({ capture }: { capture: CaptureView }) {
         时间轴已标记 {capture.gapCount ?? 0} 个时间缺口，现有音频会被保留。
       </p>
     </div>
-  );
-}
-
-function RecoveryDialog({
-  open,
-  itemCount,
-  busy,
-  error,
-  operationMessage,
-  onRestoreAll,
-  onDiscardAll,
-}: {
-  open: boolean;
-  itemCount: number;
-  busy: boolean;
-  error: string | null;
-  operationMessage: string;
-  onRestoreAll: () => void;
-  onDiscardAll: () => void;
-}) {
-  return (
-    <ApplicationBlocker
-      open={open}
-      title="发现可恢复录制"
-      description={`发现 ${itemCount} 段未完成的录音，可一次恢复并保存。`}
-      onDismiss={busy ? undefined : onDiscardAll}
-    >
-      <div className="space-y-2">
-        {busy ? (
-          <p className="border-y bg-muted/40 py-3 text-sm font-medium">
-            {operationMessage}
-          </p>
-        ) : null}
-        {error ? (
-          <p
-            role="alert"
-            className="border-y border-destructive/40 bg-destructive/5 py-3 text-sm"
-          >
-            {error}
-          </p>
-        ) : null}
-      </div>
-      <DialogFooter>
-        <Button type="button" disabled={busy} onClick={onRestoreAll}>
-          <RotateCcw />
-          {busy ? "正在恢复…" : "恢复数据"}
-        </Button>
-      </DialogFooter>
-    </ApplicationBlocker>
   );
 }
 

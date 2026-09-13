@@ -14,6 +14,13 @@ import {
 describe("MacOSCaptureNativePort stop lifecycle", () => {
   it.each([
     [new NativeHelperCommandError("CAPTURE_BUSY", "busy"), "command"],
+    [
+      new NativeHelperCommandError(
+        "CAPTURE_FINALIZATION_FAILED",
+        "finalization failed",
+      ),
+      "finalization",
+    ],
     [new NativeHelperResponseError("response lost"), "transport"],
   ] as const)("classifies %s as %s", async (failure, expectedKind) => {
     const session = sessionFixture();
@@ -34,6 +41,29 @@ describe("MacOSCaptureNativePort stop lifecycle", () => {
     expect((error as CaptureNativeStopError).kind).toBe(
       expectedKind satisfies CaptureNativeStopFailureKind,
     );
+  });
+
+  it("recreates after discard transport loss without replaying the mutation", async () => {
+    const first = sessionFixture();
+    const replacement = sessionFixture();
+    first.captureDiscard.mockRejectedValueOnce(
+      new NativeHelperResponseError("discard response lost"),
+    );
+    const reopen = vi.fn(async () =>
+      Promise.resolve(replacement as unknown as MacOSNativeHelperSession),
+    );
+    const port = new MacOSCaptureNativePort(
+      first as unknown as MacOSNativeHelperSession,
+      reopen,
+    );
+
+    await expect(
+      port.discard("session-discard-port-123456", "discard-port-123456"),
+    ).rejects.toBeInstanceOf(NativeHelperResponseError);
+    expect(first.captureDiscard).toHaveBeenCalledOnce();
+    expect(first.abort).toHaveBeenCalledOnce();
+    expect(reopen).toHaveBeenCalledOnce();
+    expect(replacement.captureDiscard).not.toHaveBeenCalled();
   });
 
   it("aborts the lost session before atomically replacing it", async () => {
@@ -60,12 +90,41 @@ describe("MacOSCaptureNativePort stop lifecycle", () => {
     await port.close();
     expect(replacement.close).toHaveBeenCalledOnce();
   });
+
+  it("joins concurrent native-session recreation requests", async () => {
+    const first = sessionFixture();
+    const replacement = sessionFixture();
+    let resolveReplacement!: (session: MacOSNativeHelperSession) => void;
+    const replacementPending = new Promise<MacOSNativeHelperSession>(
+      (resolve) => {
+        resolveReplacement = resolve;
+      },
+    );
+    const reopen = vi.fn(() => replacementPending);
+    const port = new MacOSCaptureNativePort(
+      first as unknown as MacOSNativeHelperSession,
+      reopen,
+    );
+
+    const firstRequest = port.recreateAfterTransportLoss();
+    const secondRequest = port.recreateAfterTransportLoss();
+    expect(first.abort).toHaveBeenCalledOnce();
+    expect(reopen).toHaveBeenCalledOnce();
+    resolveReplacement(replacement as unknown as MacOSNativeHelperSession);
+
+    await expect(Promise.all([firstRequest, secondRequest])).resolves.toEqual([
+      undefined,
+      undefined,
+    ]);
+    expect(port.currentSession()).toBe(replacement);
+  });
 });
 
 function sessionFixture() {
   return {
     captureControl: vi.fn(),
     captureRecover: vi.fn(),
+    captureDiscard: vi.fn(),
     abort: vi.fn(),
     close: vi.fn(async () => undefined),
   };

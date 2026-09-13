@@ -10,7 +10,7 @@ function application(
   capture: ApplicationSnapshot["capture"],
 ): ApplicationSnapshot {
   return {
-    protocolVersion: 2,
+    protocolVersion: 3,
     revision: 7,
     navigation: { section: "library" },
     profile: { phase: "ready", legacyDatabaseArchived: false },

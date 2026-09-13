@@ -13,7 +13,7 @@ import type {
 import { companionRendererStubs } from "../fixtures/companion";
 
 const application: ApplicationSnapshot = {
-  protocolVersion: 2,
+  protocolVersion: 3,
   revision: 12,
   navigation: { section: "library" },
   profile: { phase: "ready", legacyDatabaseArchived: false },

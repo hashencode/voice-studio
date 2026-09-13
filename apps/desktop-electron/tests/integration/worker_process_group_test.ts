@@ -207,7 +207,7 @@ function intent(resourceIdentity: string, jobId = 1): ExecutionIntent {
 describe.skipIf(process.platform !== "darwin")(
   "owned worker process groups on macOS",
   () => {
-    it("keeps the raw worker health protocol on v1 behind desktop IPC v2", async () => {
+    it("keeps the raw worker health protocol on v1 behind desktop IPC v3", async () => {
       const paths = fixture();
       const catalog = await ResourceCatalog.load(
         resolveResourceRoot({
@@ -221,7 +221,7 @@ describe.skipIf(process.platform !== "darwin")(
       );
 
       await expect(supervisor.check()).resolves.toMatchObject({
-        protocolVersion: 2,
+        protocolVersion: 3,
         protocol: "desktop-sherpa-worker-health/v1",
         runtime: "sherpa-onnx",
       });

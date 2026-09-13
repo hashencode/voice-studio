@@ -19,6 +19,8 @@ import type { AudioProfilePaths } from "../../profile/profile_paths";
 import { sha256File } from "../../security/sha256_file";
 
 export class WorkspaceConflictError extends Error {
+  readonly code = "WORKSPACE_CONFLICT" as const;
+
   constructor(message = "audio workspace changed; reload before editing") {
     super(message);
     this.name = "WorkspaceConflictError";

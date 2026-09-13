@@ -5,6 +5,7 @@ import {
   companionLimits,
   companionTransferManifestSchema,
   companionTransferReceiptSchema,
+  desktopProtocolVersion,
   type CompanionTransferManifest,
   type CompanionTransferReceipt,
 } from "../../../shared/contracts";
@@ -218,7 +219,7 @@ export class TransferRepository {
         command.expectedRevision,
         command.resultRevision,
         JSON.stringify({
-          protocolVersion: 2,
+          protocolVersion: desktopProtocolVersion,
           revision: command.resultRevision,
         }),
         command.nowMs,

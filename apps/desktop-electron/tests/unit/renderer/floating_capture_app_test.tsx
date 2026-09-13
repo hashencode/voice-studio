@@ -20,7 +20,10 @@ const recording: FloatingCaptureSnapshot = {
 function installApi() {
   const api = {
     getSnapshot: vi.fn(async () => recording),
-    control: vi.fn(async () => ({ ...recording, phase: "paused" as const })),
+    control: vi.fn(async (): Promise<FloatingCaptureSnapshot> => ({
+      ...recording,
+      phase: "paused",
+    })),
     windowAction: vi.fn(async () => recording),
     onSnapshot: vi.fn<
       (listener: (snapshot: FloatingCaptureSnapshot) => void) => () => void
@@ -91,15 +94,81 @@ describe("floating capture app", () => {
       publish = listener;
       return () => undefined;
     });
-    api.control.mockRejectedValue(new Error("private native path"));
+    api.control
+      .mockRejectedValueOnce(new Error("private native path"))
+      .mockResolvedValueOnce({
+        ...recording,
+        revision: 2,
+        phase: "paused",
+        allowedActions: ["resume", "stop"],
+      });
     const user = userEvent.setup();
     render(<FloatingCaptureApp />);
     await screen.findByText("正在录制");
     await user.click(screen.getByRole("button", { name: "暂停录制" }));
     expect(await screen.findByText("操作未完成")).toBeVisible();
-    act(() => publish({ ...recording, revision: 2, elapsedMs: 65_500 }));
-    expect(screen.getByText("操作未完成")).toBeVisible();
+    await user.click(screen.getByRole("button", { name: "暂停录制" }));
+    expect(await screen.findByText("录制已暂停")).toBeVisible();
+    expect(screen.queryByText("操作未完成")).not.toBeInTheDocument();
+    act(() => publish({ ...recording, revision: 3, elapsedMs: 65_500 }));
+    expect(screen.getByText("正在录制")).toBeVisible();
     expect(document.body).not.toHaveTextContent("private native path");
+  });
+
+  it("keeps a resume failure inline without mounting a toast host", async () => {
+    const api = installApi();
+    api.getSnapshot.mockResolvedValue({
+      ...recording,
+      phase: "paused",
+      allowedActions: ["resume", "stop"],
+    });
+    api.control.mockRejectedValue(new Error("private native path"));
+    const user = userEvent.setup();
+    render(<FloatingCaptureApp />);
+
+    await user.click(await screen.findByRole("button", { name: "继续录制" }));
+
+    expect(await screen.findByText("操作未完成")).toBeVisible();
+    expect(document.querySelector("[data-sonner-toaster]")).toBeNull();
+  });
+
+  it("submits one stop while Main owns the immediate window handoff", async () => {
+    const api = installApi();
+    let resolveStop: (value: FloatingCaptureSnapshot) => void = () => undefined;
+    api.control.mockImplementation(
+      () =>
+        new Promise((resolve) => {
+          resolveStop = resolve;
+        }),
+    );
+    const user = userEvent.setup();
+    render(<FloatingCaptureApp />);
+    await screen.findByText("正在录制");
+
+    await user.click(screen.getByRole("button", { name: "停止并保存" }));
+    await user.click(screen.getByRole("button", { name: "确认停止" }));
+
+    expect(api.control).toHaveBeenCalledOnce();
+    expect(api.control).toHaveBeenCalledWith(
+      expect.objectContaining({
+        action: "stop",
+        sessionId: recording.sessionId,
+      }),
+    );
+    expect(api.windowAction).not.toHaveBeenCalledWith("open-details");
+    expect(screen.getByRole("button", { name: "确认停止" })).toBeDisabled();
+
+    await act(async () =>
+      resolveStop({
+        ...recording,
+        revision: 2,
+        phase: "finalizing",
+        allowedActions: [],
+      }),
+    );
+    expect(
+      screen.queryByRole("button", { name: "确认停止" }),
+    ).not.toBeInTheDocument();
   });
 
   it("keeps a privacy-safe handoff when the initial snapshot fails", async () => {

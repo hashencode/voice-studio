@@ -1,4 +1,10 @@
-import { mkdtempSync, readFileSync, rmSync } from "node:fs";
+import {
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  rmSync,
+  writeFileSync,
+} from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
@@ -14,6 +20,10 @@ import {
   type QuitDecision,
 } from "../../src/main/domain/capture/capture_quit_coordinator";
 import { finalizeCommittedCaptureTranscript } from "../../src/main/domain/captions/capture_formal_completion";
+import {
+  runFloatingCaptureControl,
+  runStopOnlyCapture,
+} from "../../src/main/application/floating_capture_stop_handoff";
 import type { CaptureNativePort } from "../../src/main/domain/capture/capture_native_port";
 import { CaptureNativeStopError } from "../../src/main/domain/capture/capture_native_port";
 import { MicrophoneTestService } from "../../src/main/domain/capture/microphone_test_service";
@@ -41,6 +51,653 @@ const parity = desktopCaptureParitySchema.parse(
 );
 
 describe("macOS capture parity flow", () => {
+  it("hands floating stop to Main before awaiting one stop and returns the current snapshot", async () => {
+    const stop = deferred<CaptureSnapshot>();
+    const events: string[] = [];
+    const currentSnapshot = {
+      revision: 9,
+      sessionId: "session-floating-stop-123456",
+      phase: "finalizing" as const,
+      elapsedMs: 42_000,
+      allowedActions: [],
+      attention: false,
+    };
+    const controlCapture = vi.fn(async () => {
+      events.push("stop");
+      return await stop.promise;
+    });
+
+    const result = runFloatingCaptureControl(
+      {
+        action: "stop",
+        sessionId: "session-floating-stop-123456",
+        idempotencyKey: "stop-floating-123456",
+      },
+      {
+        handoffToMain: () => events.push("handoff"),
+        controlCapture,
+        currentSnapshot: () => currentSnapshot,
+      },
+    );
+
+    expect(events).toEqual(["handoff", "stop"]);
+    expect(controlCapture).toHaveBeenCalledOnce();
+    stop.resolve(
+      snapshot({
+        sessionId: "session-floating-stop-123456",
+        state: "completed",
+        recordingSha256: "e".repeat(64),
+      }),
+    );
+    await expect(result).resolves.toBe(currentSnapshot);
+  });
+
+  it("continues floating stop when the main window cannot be shown yet", async () => {
+    const currentSnapshot = {
+      revision: 10,
+      sessionId: "session-hidden-main-123456",
+      phase: "finalizing" as const,
+      elapsedMs: 1_000,
+      allowedActions: [],
+      attention: false,
+    };
+    const controlCapture = vi.fn(async () => undefined);
+    const reportHandoffFailure = vi.fn();
+
+    await expect(
+      runFloatingCaptureControl(
+        {
+          action: "stop",
+          sessionId: currentSnapshot.sessionId,
+          idempotencyKey: "stop-hidden-main-123456",
+        },
+        {
+          handoffToMain: () => {
+            throw new Error("main window unavailable");
+          },
+          reportHandoffFailure,
+          controlCapture,
+          currentSnapshot: () => currentSnapshot,
+        },
+      ),
+    ).resolves.toBe(currentSnapshot);
+    expect(reportHandoffFailure).toHaveBeenCalledOnce();
+    expect(controlCapture).toHaveBeenCalledOnce();
+  });
+
+  it("keeps one stop running past the soft threshold without recovery or teardown", async () => {
+    vi.useFakeTimers();
+    const stop = deferred<{
+      snapshot: CaptureSnapshot;
+      capability: "recovered-terminal";
+    }>();
+    const capture = snapshot({
+      sessionId: "session-soft-stop-123456",
+      state: "recording",
+    });
+    const publishCapture = vi.fn();
+    const stopAndReconcile = vi.fn(() => stop.promise);
+    try {
+      const result = runStopOnlyCapture(
+        {
+          sessionId: capture.sessionId,
+          idempotencyKey: "stop-soft-123456",
+        },
+        {
+          currentCapture: () => capture,
+          publishCapture,
+          stopAndReconcile,
+        },
+      );
+
+      expect(stopAndReconcile).toHaveBeenCalledOnce();
+      expect(publishCapture).toHaveBeenCalledWith(
+        expect.objectContaining({
+          state: "finalizing",
+          interruptionReason: null,
+        }),
+      );
+      await vi.advanceTimersByTimeAsync(15_000);
+      expect(stopAndReconcile).toHaveBeenCalledOnce();
+      expect(publishCapture).toHaveBeenLastCalledWith(
+        expect.objectContaining({
+          state: "finalizing",
+          interruptionReason: "capture_stop_slow",
+        }),
+      );
+
+      const completed = snapshot({
+        sessionId: capture.sessionId,
+        state: "completed",
+        recordingSha256: "f".repeat(64),
+      });
+      stop.resolve({ snapshot: completed, capability: "recovered-terminal" });
+      await expect(result).resolves.toBe(completed);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("keeps zero-chunk candidate audio discoverable and discards only a proven-empty workspace", async () => {
+    const captureRoot = mkdtempSync(
+      join(tmpdir(), "voice2text-actionability-"),
+    );
+    const database = openAudioDatabase(":memory:");
+    const repository = new CaptureRepository(database);
+    const emptySessionId = "session-empty-recovery-123456";
+    const partialSessionId = "session-partial-tail-123456";
+    for (const sessionId of [emptySessionId, partialSessionId]) {
+      const workspacePath = join(captureRoot, sessionId);
+      mkdirSync(workspacePath);
+      writeFileSync(join(workspacePath, "journal.json"), "{}");
+      repository.beginSession({
+        sessionId,
+        title: sessionId,
+        workspacePath,
+        nowMs: 1,
+      });
+      repository.saveSnapshot(
+        snapshot({
+          sessionId,
+          state: "recoverable",
+          finalizedChunkCount: 0,
+          journalSha256: "a".repeat(64),
+        }),
+        2,
+      );
+    }
+    writeFileSync(
+      join(captureRoot, partialSessionId, "microphone.partial"),
+      "candidate",
+    );
+    const native = nativeFixture();
+    native.recover.mockResolvedValueOnce([
+      snapshot({
+        sessionId: emptySessionId,
+        state: "recoverable",
+        finalizedChunkCount: 0,
+        journalSha256: "a".repeat(64),
+      }),
+      snapshot({
+        sessionId: partialSessionId,
+        state: "recoverable",
+        finalizedChunkCount: 0,
+        journalSha256: "a".repeat(64),
+      }),
+    ]);
+    const service = new DesktopCaptureService(repository, native, captureRoot);
+    try {
+      await service.recover();
+      await expect(service.listRecoveries()).resolves.toEqual([
+        expect.objectContaining({
+          sessionId: emptySessionId,
+          capability: "discard-only",
+          reason: "no-audio-data",
+        }),
+        expect.objectContaining({
+          sessionId: partialSessionId,
+          capability: "preserve-only",
+          reason: "unfinished-audio-data",
+        }),
+      ]);
+
+      const response = await service.actOnRecoveries({
+        action: "discard",
+        sessionIds: [partialSessionId],
+        idempotencyKey: "discard-preserved-123456",
+      });
+      expect(response.outcomes).toEqual([
+        expect.objectContaining({
+          sessionId: partialSessionId,
+          result: "preserved",
+        }),
+      ]);
+      expect(native.discard).not.toHaveBeenCalled();
+      expect(
+        readFileSync(
+          join(captureRoot, partialSessionId, "microphone.partial"),
+          "utf8",
+        ),
+      ).toBe("candidate");
+    } finally {
+      database.close();
+      rmSync(captureRoot, { recursive: true, force: true });
+    }
+  });
+
+  it("keeps a known workspace discoverable when the native scan cannot return its damaged journal", async () => {
+    const captureRoot = mkdtempSync(
+      join(tmpdir(), "voice2text-damaged-journal-"),
+    );
+    const database = openAudioDatabase(":memory:");
+    const repository = new CaptureRepository(database);
+    const sessionId = "session-damaged-journal-123456";
+    const workspacePath = join(captureRoot, sessionId);
+    mkdirSync(workspacePath);
+    writeFileSync(join(workspacePath, "journal.json"), "{damaged");
+    writeFileSync(join(workspacePath, "orphan.caf"), "candidate");
+    repository.beginSession({
+      sessionId,
+      title: "Damaged journal",
+      workspacePath,
+      nowMs: 1,
+    });
+    repository.saveSnapshot(
+      snapshot({ sessionId, state: "failed", journalSha256: null }),
+      2,
+    );
+    const service = new DesktopCaptureService(
+      repository,
+      nativeFixture(),
+      captureRoot,
+    );
+    try {
+      await service.recover();
+      await expect(service.listRecoveries()).resolves.toEqual([
+        expect.objectContaining({
+          sessionId,
+          capability: "preserve-only",
+          reason: "recovery-metadata-damaged",
+        }),
+      ]);
+    } finally {
+      database.close();
+      rmSync(captureRoot, { recursive: true, force: true });
+    }
+  });
+
+  it("does not publish an orphan returned only by native recovery", async () => {
+    const database = openAudioDatabase(":memory:");
+    const repository = new CaptureRepository(database);
+    const native = nativeFixture();
+    const knownSessionId = "session-known-recovery-123456";
+    repository.beginSession({
+      sessionId: knownSessionId,
+      title: "Known recovery",
+      workspacePath: `/tmp/${knownSessionId}`,
+      nowMs: 1,
+    });
+    native.recover.mockResolvedValueOnce([
+      snapshot({
+        sessionId: "session-orphan-recovery-123456",
+        state: "failed",
+      }),
+      snapshot({ sessionId: knownSessionId, state: "failed" }),
+    ]);
+    const service = new DesktopCaptureService(repository, native, "/tmp");
+    try {
+      await expect(service.recover()).resolves.toEqual([
+        expect.objectContaining({ sessionId: knownSessionId }),
+      ]);
+    } finally {
+      database.close();
+    }
+  });
+
+  it("does not treat a persisted active row as a live native session after recovery", async () => {
+    const database = openAudioDatabase(":memory:");
+    const repository = new CaptureRepository(database);
+    const sessionId = "session-stale-active-123456";
+    repository.beginSession({
+      sessionId,
+      title: "Stale active capture",
+      workspacePath: `/tmp/${sessionId}`,
+      nowMs: 1,
+    });
+    const service = new DesktopCaptureService(
+      repository,
+      nativeFixture(),
+      "/tmp",
+    );
+    try {
+      await service.recover();
+      expect(service.snapshot()).toBeNull();
+      await expect(service.listRecoveries()).resolves.toEqual([
+        expect.objectContaining({
+          sessionId,
+          capability: "preserve-only",
+          reason: "recovery-metadata-damaged",
+        }),
+      ]);
+    } finally {
+      database.close();
+    }
+  });
+
+  it("processes recovery batches in order, continues after an item fails, and never keeps preserve-only data", async () => {
+    const captureRoot = mkdtempSync(
+      join(tmpdir(), "voice2text-recovery-batch-"),
+    );
+    const database = openAudioDatabase(":memory:");
+    const repository = new CaptureRepository(database);
+    const sessionIds = [
+      "session-batch-first-123456",
+      "session-batch-second-123456",
+      "session-batch-third-123456",
+    ];
+    for (const sessionId of sessionIds) {
+      const workspacePath = join(captureRoot, sessionId);
+      mkdirSync(join(workspacePath, "microphone"), { recursive: true });
+      writeFileSync(join(workspacePath, "microphone/chunk-000000.caf"), "data");
+      repository.beginSession({
+        sessionId,
+        title: sessionId,
+        workspacePath,
+        nowMs: 1,
+      });
+      repository.saveSnapshot(
+        snapshot({
+          sessionId,
+          state: "recoverable",
+          finalizedChunkCount: 1,
+          journalSha256: "b".repeat(64),
+        }),
+        2,
+      );
+    }
+    database.exec(`CREATE TRIGGER fail_middle_recovery
+      BEFORE UPDATE OF recovery_disposition ON capture_sessions
+      WHEN OLD.session_id = '${sessionIds[1]}' AND NEW.recovery_disposition = 'kept'
+      BEGIN SELECT RAISE(ABORT, 'injected keep failure'); END`);
+    const native = nativeFixture();
+    native.recover.mockResolvedValueOnce(
+      sessionIds.map((sessionId) =>
+        snapshot({
+          sessionId,
+          state: "recoverable",
+          finalizedChunkCount: 1,
+          journalSha256: "b".repeat(64),
+        }),
+      ),
+    );
+    const service = new DesktopCaptureService(
+      repository,
+      native,
+      captureRoot,
+      Date.now,
+      async (options) => authorityWithChunk(options.sessionId),
+    );
+    try {
+      await service.recover();
+      const response = await service.actOnRecoveries({
+        action: "keep",
+        sessionIds,
+        idempotencyKey: "keep-batch-123456",
+      });
+      expect(
+        response.outcomes.map(({ sessionId, result }) => ({
+          sessionId,
+          result,
+        })),
+      ).toEqual([
+        { sessionId: sessionIds[0], result: "kept" },
+        { sessionId: sessionIds[1], result: "failed" },
+        { sessionId: sessionIds[2], result: "kept" },
+      ]);
+      expect(response.recoveries.map((item) => item.sessionId)).toEqual([
+        sessionIds[1],
+      ]);
+    } finally {
+      database.close();
+      rmSync(captureRoot, { recursive: true, force: true });
+    }
+  });
+
+  it("rechecks the authoritative recovery predicate immediately before keep", async () => {
+    const captureRoot = mkdtempSync(
+      join(tmpdir(), "voice2text-recovery-recheck-"),
+    );
+    const database = openAudioDatabase(":memory:");
+    const repository = new CaptureRepository(database);
+    const sessionId = "session-recheck-before-keep-123456";
+    const workspacePath = join(captureRoot, sessionId);
+    mkdirSync(join(workspacePath, "microphone"), { recursive: true });
+    writeFileSync(join(workspacePath, "microphone/chunk-000000.caf"), "data");
+    repository.beginSession({
+      sessionId,
+      title: "Recheck before keep",
+      workspacePath,
+      nowMs: 1,
+    });
+    const recoverable = snapshot({
+      sessionId,
+      state: "recoverable",
+      finalizedChunkCount: 1,
+      journalSha256: "b".repeat(64),
+    });
+    const native = nativeFixture();
+    native.recover.mockResolvedValueOnce([recoverable]);
+    const service = new DesktopCaptureService(
+      repository,
+      native,
+      captureRoot,
+      Date.now,
+      async (options) => authorityWithChunk(options.sessionId),
+    );
+    try {
+      await service.recover();
+      await expect(service.listRecoveries()).resolves.toEqual([
+        expect.objectContaining({ sessionId, capability: "restorable" }),
+      ]);
+
+      repository.saveSnapshot(
+        {
+          ...recoverable,
+          state: "failed",
+          interruptionReason: "helper_failed",
+        },
+        3,
+      );
+      const response = await service.actOnRecoveries({
+        action: "keep",
+        sessionIds: [sessionId],
+        idempotencyKey: "keep-after-state-change-123456",
+      });
+
+      expect(response.outcomes).toEqual([
+        expect.objectContaining({ sessionId, result: "preserved" }),
+      ]);
+      expect(
+        repository.receipt(sessionId, "keep-after-state-change-123456"),
+      ).toBeNull();
+      expect(response.recoveries).toEqual([
+        expect.objectContaining({ sessionId, capability: "preserve-only" }),
+      ]);
+    } finally {
+      database.close();
+      rmSync(captureRoot, { recursive: true, force: true });
+    }
+  });
+
+  it("preserves recovery when its persisted chunk authority disappears before keep", async () => {
+    const captureRoot = mkdtempSync(
+      join(tmpdir(), "voice2text-recovery-authority-"),
+    );
+    const database = openAudioDatabase(":memory:");
+    const repository = new CaptureRepository(database);
+    const sessionId = "session-missing-authority-123456";
+    const workspacePath = join(captureRoot, sessionId);
+    mkdirSync(join(workspacePath, "microphone"), { recursive: true });
+    writeFileSync(join(workspacePath, "microphone/chunk-000000.caf"), "data");
+    repository.beginSession({
+      sessionId,
+      title: "Missing authority",
+      workspacePath,
+      nowMs: 1,
+    });
+    const native = nativeFixture();
+    native.recover.mockResolvedValueOnce([
+      snapshot({
+        sessionId,
+        state: "recoverable",
+        finalizedChunkCount: 1,
+        journalSha256: "b".repeat(64),
+      }),
+    ]);
+    const service = new DesktopCaptureService(
+      repository,
+      native,
+      captureRoot,
+      Date.now,
+      async (options) => authorityWithChunk(options.sessionId),
+    );
+    try {
+      await service.recover();
+      await expect(service.listRecoveries()).resolves.toEqual([
+        expect.objectContaining({ sessionId, capability: "restorable" }),
+      ]);
+      database
+        .prepare("DELETE FROM capture_chunks WHERE session_id = ?")
+        .run(sessionId);
+
+      const response = await service.actOnRecoveries({
+        action: "keep",
+        sessionIds: [sessionId],
+        idempotencyKey: "keep-missing-authority-123456",
+      });
+
+      expect(response.outcomes).toEqual([
+        expect.objectContaining({ sessionId, result: "preserved" }),
+      ]);
+      expect(
+        repository.receipt(sessionId, "keep-missing-authority-123456"),
+      ).toBeNull();
+    } finally {
+      database.close();
+      rmSync(captureRoot, { recursive: true, force: true });
+    }
+  });
+
+  it("commits discard disposition before best-effort native cleanup and reconciles repeats from the receipt", async () => {
+    const captureRoot = mkdtempSync(
+      join(tmpdir(), "voice2text-discard-receipt-"),
+    );
+    const database = openAudioDatabase(":memory:");
+    const repository = new CaptureRepository(database);
+    const sessionId = "session-discard-receipt-123456";
+    const workspacePath = join(captureRoot, sessionId);
+    mkdirSync(workspacePath);
+    writeFileSync(join(workspacePath, "journal.json"), "{}");
+    repository.beginSession({
+      sessionId,
+      title: "Discard receipt",
+      workspacePath,
+      nowMs: 1,
+    });
+    repository.saveSnapshot(
+      snapshot({
+        sessionId,
+        state: "recoverable",
+        finalizedChunkCount: 0,
+        journalSha256: "c".repeat(64),
+      }),
+      2,
+    );
+    const native = nativeFixture();
+    native.recover.mockResolvedValueOnce([
+      snapshot({
+        sessionId,
+        state: "recoverable",
+        finalizedChunkCount: 0,
+        journalSha256: "c".repeat(64),
+      }),
+    ]);
+    native.discard.mockRejectedValueOnce(new Error("injected cleanup failure"));
+    const service = new DesktopCaptureService(repository, native, captureRoot);
+    try {
+      await service.recover();
+      const command = {
+        action: "discard" as const,
+        sessionIds: [sessionId],
+        idempotencyKey: "discard-receipt-123456",
+      };
+      const first = await service.actOnRecoveries(command);
+      const repeated = await service.actOnRecoveries(command);
+      expect(first.outcomes[0]).toMatchObject({ result: "discarded" });
+      expect(repeated.outcomes[0]).toMatchObject({ result: "discarded" });
+      expect(repository.findRecoveryCandidate(sessionId)).toBeNull();
+      expect(
+        repository.receipt(sessionId, command.idempotencyKey),
+      ).toMatchObject({
+        action: "discard",
+      });
+      expect(native.discard).toHaveBeenCalledOnce();
+    } finally {
+      database.close();
+      rmSync(captureRoot, { recursive: true, force: true });
+    }
+  });
+
+  it("serializes conflicting recovery actions per session while cleanup is pending", async () => {
+    const captureRoot = mkdtempSync(
+      join(tmpdir(), "voice2text-recovery-flight-"),
+    );
+    const database = openAudioDatabase(":memory:");
+    const repository = new CaptureRepository(database);
+    const sessionId = "session-recovery-flight-123456";
+    const workspacePath = join(captureRoot, sessionId);
+    mkdirSync(workspacePath);
+    writeFileSync(join(workspacePath, "journal.json"), "{}");
+    repository.beginSession({
+      sessionId,
+      title: "Recovery flight",
+      workspacePath,
+      nowMs: 1,
+    });
+    repository.saveSnapshot(
+      snapshot({
+        sessionId,
+        state: "recoverable",
+        finalizedChunkCount: 0,
+        journalSha256: "e".repeat(64),
+      }),
+      2,
+    );
+    const native = nativeFixture();
+    native.recover.mockResolvedValueOnce([
+      snapshot({
+        sessionId,
+        state: "recoverable",
+        finalizedChunkCount: 0,
+        journalSha256: "e".repeat(64),
+      }),
+    ]);
+    let finishCleanup!: () => void;
+    native.discard.mockImplementationOnce(
+      async () =>
+        await new Promise<undefined>((resolve) => {
+          finishCleanup = () => resolve(undefined);
+        }),
+    );
+    const service = new DesktopCaptureService(repository, native, captureRoot);
+    try {
+      await service.recover();
+      const discard = service.actOnRecoveries({
+        action: "discard",
+        sessionIds: [sessionId],
+        idempotencyKey: "discard-flight-123456",
+      });
+      await vi.waitFor(() => expect(native.discard).toHaveBeenCalledOnce());
+      const keep = service.actOnRecoveries({
+        action: "keep",
+        sessionIds: [sessionId],
+        idempotencyKey: "keep-flight-123456",
+      });
+      finishCleanup();
+
+      await expect(discard).resolves.toMatchObject({
+        outcomes: [{ result: "discarded" }],
+      });
+      await expect(keep).resolves.toMatchObject({
+        outcomes: [{ result: "conflict" }],
+      });
+      expect(native.discard).toHaveBeenCalledOnce();
+      expect(repository.findRecoveryCandidate(sessionId)).toBeNull();
+    } finally {
+      database.close();
+      rmSync(captureRoot, { recursive: true, force: true });
+    }
+  });
   it("keeps runtime activity out of durable snapshots and command receipts", async () => {
     const database = openAudioDatabase(":memory:");
     const repository = new CaptureRepository(database);
@@ -258,7 +915,7 @@ describe("macOS capture parity flow", () => {
       native,
       "/tmp/voice2text-capture-test-root",
       () => 10_000,
-      async (options) => authorityFixture(options.sessionId),
+      async (options) => authorityWithChunk(options.sessionId),
     );
     try {
       await service.start({
@@ -278,10 +935,14 @@ describe("macOS capture parity flow", () => {
       ]);
 
       await service.recover();
-      expect(service.listRecoveries()[0]?.title).toBe("Recover-客户访谈");
+      expect((await service.listRecoveries())[0]?.title).toBe(
+        "Recover-客户访谈",
+      );
       service.renameSession(sessionId, "客户访谈（已检查）");
       await service.recover();
-      expect(service.listRecoveries()[0]?.title).toBe("客户访谈（已检查）");
+      expect((await service.listRecoveries())[0]?.title).toBe(
+        "客户访谈（已检查）",
+      );
 
       const restarted = new DesktopCaptureService(
         repository,
@@ -565,7 +1226,7 @@ describe("macOS capture parity flow", () => {
         }),
       ]);
       await expect(service.recover()).resolves.toHaveLength(1);
-      expect(service.listRecoveries()[0]).toEqual(
+      expect((await service.listRecoveries())[0]).toEqual(
         expect.objectContaining({ sessionId: result.sessionId }),
       );
       await service.discardRecovered(
@@ -577,7 +1238,7 @@ describe("macOS capture parity flow", () => {
         "discard-partial-123456",
       );
       expect(native.discard).toHaveBeenCalledOnce();
-      expect(service.listRecoveries()).toEqual([]);
+      expect(await service.listRecoveries()).toEqual([]);
     } finally {
       database.close();
     }
@@ -585,6 +1246,7 @@ describe("macOS capture parity flow", () => {
 
   it("keeps validated recovery once and fences the same durable receipt", async () => {
     const database = openAudioDatabase(":memory:");
+    const repository = new CaptureRepository(database);
     const native = nativeFixture();
     native.recover.mockResolvedValueOnce([
       snapshot({
@@ -595,16 +1257,24 @@ describe("macOS capture parity flow", () => {
         journalSha256: "c".repeat(64),
       }),
     ]);
+    repository.beginSession({
+      sessionId: "session-keep-123456789",
+      title: "新录音-123456789",
+      workspacePath: "/tmp/voice2text-capture-test-root/session-keep-123456789",
+      nowMs: 1,
+    });
     const service = new DesktopCaptureService(
-      new CaptureRepository(database),
+      repository,
       native,
       "/tmp/voice2text-capture-test-root",
       () => 3_000,
-      async (options) => authorityFixture(options.sessionId),
+      async (options) => authorityWithChunk(options.sessionId),
     );
     try {
       await service.recover();
-      expect(service.listRecoveries()[0]?.title).toMatch(/^Recover-新录音-/);
+      expect((await service.listRecoveries())[0]?.title).toMatch(
+        /^Recover-新录音-/,
+      );
       const kept = service.keepRecovered(
         "session-keep-123456789",
         "keep-recovery-123456",
@@ -620,14 +1290,106 @@ describe("macOS capture parity flow", () => {
           recordingSha256: "c".repeat(64),
         }),
       );
-      expect(service.listRecoveries()).toEqual([]);
+      expect(await service.listRecoveries()).toEqual([]);
     } finally {
       database.close();
     }
   });
 
+  it.each([
+    [
+      "invalid finalized chunks",
+      { invalidFinalizedChunks: 1 },
+      false,
+      false,
+      "audio-integrity-failed",
+    ],
+    [
+      "quarantined tail chunks",
+      { quarantinedTailChunks: 1 },
+      false,
+      false,
+      "audio-integrity-failed",
+    ],
+    ["a quarantine directory", {}, true, false, "audio-integrity-failed"],
+    ["an unreferenced CAF", {}, false, true, "unfinished-audio-data"],
+  ] as const)(
+    "preserves recovery with %s for both keep and discard",
+    async (_label, snapshotOverrides, addQuarantine, addExtraCaf, reason) => {
+      const captureRoot = mkdtempSync(
+        join(tmpdir(), "voice2text-recovery-integrity-"),
+      );
+      const database = openAudioDatabase(":memory:");
+      const repository = new CaptureRepository(database);
+      const sessionId = "session-integrity-check-123456";
+      const workspacePath = join(captureRoot, sessionId);
+      mkdirSync(join(workspacePath, "microphone"), { recursive: true });
+      writeFileSync(join(workspacePath, "journal.json"), "{}");
+      writeFileSync(join(workspacePath, "microphone/chunk-000000.caf"), "data");
+      if (addQuarantine) {
+        mkdirSync(join(workspacePath, "quarantine"));
+      }
+      if (addExtraCaf) {
+        writeFileSync(join(workspacePath, "orphan.caf"), "extra");
+      }
+      repository.beginSession({
+        sessionId,
+        title: "Integrity check",
+        workspacePath,
+        nowMs: 1,
+      });
+      const native = nativeFixture();
+      native.recover.mockResolvedValueOnce([
+        snapshot({
+          sessionId,
+          state: "recoverable",
+          finalizedChunkCount: 1,
+          journalSha256: "b".repeat(64),
+          ...snapshotOverrides,
+        }),
+      ]);
+      const service = new DesktopCaptureService(
+        repository,
+        native,
+        captureRoot,
+        Date.now,
+        async (options) => authorityWithChunk(options.sessionId),
+      );
+      try {
+        await service.recover();
+        await expect(service.listRecoveries()).resolves.toEqual([
+          expect.objectContaining({
+            sessionId,
+            capability: "preserve-only",
+            reason,
+          }),
+        ]);
+        for (const action of ["keep", "discard"] as const) {
+          await expect(
+            service.actOnRecoveries({
+              action,
+              sessionIds: [sessionId],
+              idempotencyKey: `${action}-integrity-check-123456`,
+            }),
+          ).resolves.toEqual(
+            expect.objectContaining({
+              outcomes: [
+                expect.objectContaining({ sessionId, result: "preserved" }),
+              ],
+            }),
+          );
+        }
+        expect(native.discard).not.toHaveBeenCalled();
+      } finally {
+        database.close();
+        rmSync(captureRoot, { recursive: true, force: true });
+      }
+    },
+  );
+
   it("selects the next recovery after disposing the current one", async () => {
     const database = openAudioDatabase(":memory:");
+    const repository = new CaptureRepository(database);
     const native = nativeFixture();
     const firstSessionId = "session-recovery-a-123456";
     const secondSessionId = "session-recovery-b-123456";
@@ -635,8 +1397,16 @@ describe("macOS capture parity flow", () => {
       snapshot({ sessionId: firstSessionId, state: "recoverable" }),
       snapshot({ sessionId: secondSessionId, state: "recoverable" }),
     ]);
+    for (const sessionId of [firstSessionId, secondSessionId]) {
+      repository.beginSession({
+        sessionId,
+        title: sessionId,
+        workspacePath: `/tmp/voice2text-capture-test-root/${sessionId}`,
+        nowMs: 1,
+      });
+    }
     const service = new DesktopCaptureService(
-      new CaptureRepository(database),
+      repository,
       native,
       "/tmp/voice2text-capture-test-root",
       () => 3_500,
@@ -734,6 +1504,13 @@ describe("macOS capture parity flow", () => {
       }),
     ]);
     const repository = new CaptureRepository(database);
+    repository.beginSession({
+      sessionId: "session-completed-crash-123456",
+      title: "Completed crash",
+      workspacePath:
+        "/tmp/voice2text-capture-test-root/session-completed-crash-123456",
+      nowMs: 1,
+    });
     const service = new DesktopCaptureService(
       repository,
       native,
@@ -754,7 +1531,7 @@ describe("macOS capture parity flow", () => {
           )
           .get()?.count,
       ).toBe(1);
-      expect(service.listRecoveries()).toEqual([]);
+      expect(await service.listRecoveries()).toEqual([]);
     } finally {
       database.close();
     }
@@ -940,7 +1717,7 @@ describe("macOS capture parity flow", () => {
         captionEnabled: false,
       });
 
-      const decisions: QuitDecision[] = ["stop-and-exit", "preserve-and-exit"];
+      const decisions: QuitDecision[] = ["stop-and-exit"];
       const exit = vi.fn();
       const teardown = vi.fn(async () => undefined);
       const ports = {
@@ -950,8 +1727,7 @@ describe("macOS capture parity flow", () => {
         showDecision: vi.fn(async () => decisions.shift()!),
         stopAndReconcile: async (options) =>
           await service.stopAndReconcile({ action: "stop", ...options }),
-        publishCapture: vi.fn(),
-        showSafeReturn: vi.fn(),
+        returnToCapture: vi.fn(),
         suppressCapturePublications: vi.fn(),
         abortCapture: () => service.abortNativeSession(),
         teardown,
@@ -963,6 +1739,7 @@ describe("macOS capture parity flow", () => {
       await expect(coordinator.requestInteractive()).resolves.toBe(
         "recoverable-exit",
       );
+      expect(ports.showDecision).toHaveBeenCalledOnce();
       expect(native.abort).toHaveBeenCalledOnce();
       expect(teardown).toHaveBeenCalledWith("recovery-exit");
       expect(exit).toHaveBeenCalledOnce();
@@ -1000,7 +1777,7 @@ describe("macOS capture parity flow", () => {
         () => 9_000,
       );
       await expect(restarted.recover()).resolves.toHaveLength(1);
-      expect(restarted.listRecoveries()).toEqual([
+      expect(await restarted.listRecoveries()).toEqual([
         expect.objectContaining({ sessionId, state: "recoverable" }),
       ]);
       expect(restarted.snapshot()).toMatchObject({
@@ -1232,4 +2009,33 @@ function authorityFixture(sessionId: string) {
     chunks: [],
     events: [],
   };
+}
+
+function authorityWithChunk(sessionId: string) {
+  return {
+    ...authorityFixture(sessionId),
+    state: "recoverable" as const,
+    chunks: [
+      {
+        track: "microphone" as const,
+        sequence: 0,
+        startMs: 0,
+        endMs: 1_000,
+        relativePath: "microphone/chunk-000000.caf",
+        bytes: 4,
+        sha256: "d".repeat(64),
+        finalized: true as const,
+      },
+    ],
+  };
+}
+
+function deferred<T>() {
+  let resolve!: (value: T) => void;
+  let reject!: (reason?: unknown) => void;
+  const promise = new Promise<T>((resolvePromise, rejectPromise) => {
+    resolve = resolvePromise;
+    reject = rejectPromise;
+  });
+  return { promise, resolve, reject };
 }

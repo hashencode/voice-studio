@@ -36,8 +36,11 @@ describe("CaptureRepository recovery marker repair", () => {
           recordingSha256: null,
           journalSha256,
         });
-        expect(repository.listRecoveries()).toEqual([
-          expect.objectContaining({ sessionId, journalSha256 }),
+        expect(repository.listRecoveryCandidates()).toEqual([
+          expect.objectContaining({
+            snapshot: expect.objectContaining({ sessionId, journalSha256 }),
+            workspacePath: `/tmp/${sessionId}`,
+          }),
         ]);
         expect(repository.recoveryMarkerRepairDiagnostics()).toEqual({
           repaired: 1,
@@ -124,7 +127,7 @@ describe("CaptureRepository recovery marker repair", () => {
       expect(repository.find(unknownSessionId)?.recordingSha256).toBe(
         "d".repeat(64),
       );
-      expect(repository.listRecoveries()).toEqual([]);
+      expect(repository.listRecoveryCandidates()).toEqual([]);
     } finally {
       database.close();
     }

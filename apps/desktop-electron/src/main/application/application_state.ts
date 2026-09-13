@@ -206,5 +206,6 @@ function captureMessage(reason: string): string {
   if (reason === "system_wake_requires_resume")
     return "电脑已唤醒，请确认后手动继续录制。";
   if (reason === "disk_space_low") return "磁盘空间不足，已保存当前可用录音。";
+  if (reason === "capture_stop_slow") return "保存时间比预期长，仍在继续保存…";
   return "录制状态发生变化，请检查轨道状态。";
 }

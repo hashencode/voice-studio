@@ -1,6 +1,8 @@
 import type { LocalModelBundleId } from "../../shared/contracts";
 
 export class ModelBusyError extends Error {
+  readonly code = "MODEL_BUSY" as const;
+
   constructor(readonly reason: string) {
     super(reason);
     this.name = "ModelBusyError";

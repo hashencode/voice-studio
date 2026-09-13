@@ -99,6 +99,7 @@ export class LocalModelService {
   private readonly unsubscribeGate: () => void;
   private closed = false;
   private downloadTask: Promise<void> | null = null;
+  private downloadOperationState: "running" | "paused" | "failed" | null = null;
   private readonly bundleValidationCache = new Map<string, BundleState>();
 
   constructor(
@@ -358,6 +359,7 @@ export class LocalModelService {
           return await this.snapshot();
         case "pause":
           if (this.operation?.bundleId === bundleId) {
+            this.downloadOperationState = "paused";
             this.operation = {
               ...this.operation,
               message: "已暂停",
@@ -522,6 +524,7 @@ export class LocalModelService {
     const extraction = path.join(store.stagingRoot, `${bundleId}-${id}`);
     let lastProgressPublishMs = 0;
     try {
+      this.downloadOperationState = "running";
       this.operation = {
         id,
         kind: "download",
@@ -598,12 +601,17 @@ export class LocalModelService {
         this.activeStore = this.options.store.publishActive(store);
         this.bundleValidationCache.clear();
         unlinkIfPresent(archive);
+        this.downloadOperationState = null;
         this.operation = null;
       } finally {
         releasePublication();
       }
     } catch (error) {
-      if (this.operation?.id === id && this.operation.message !== "已暂停") {
+      if (
+        this.operation?.id === id &&
+        this.downloadOperationState !== "paused"
+      ) {
+        this.downloadOperationState = "failed";
         this.operation = {
           ...this.operation,
           kind: "download",
@@ -653,6 +661,7 @@ export class LocalModelService {
       path.join(store.stagingRoot, "downloads", `${bundleId}.partial`),
       path.join(store.stagingRoot, "downloads", `${bundleId}.json`),
     );
+    this.downloadOperationState = null;
     this.operation = null;
   }
 
@@ -717,9 +726,9 @@ export class LocalModelService {
       return {
         ...base,
         state:
-          this.operation.message === "已暂停"
+          this.downloadOperationState === "paused"
             ? "paused"
-            : this.operation.message === "下载失败"
+            : this.downloadOperationState === "failed"
               ? "failed"
               : this.operation.kind === "install"
                 ? "installing"

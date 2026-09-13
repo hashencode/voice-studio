@@ -2,6 +2,7 @@
 
 import { act, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
+import { toast } from "sonner";
 import { afterEach, expect, it, vi } from "vitest";
 
 import { LocalModelsFeature } from "../../../src/renderer/features/settings/local-models-feature";
@@ -119,6 +120,7 @@ it("keeps raw local-model failures out of the rendered settings", async () => {
 });
 
 it("uses an operation-specific fallback without exposing mutation errors", async () => {
+  const toastError = vi.spyOn(toast, "error");
   const installed = {
     ...localModelSnapshot,
     bundles: localModelSnapshot.bundles.map((bundle, index) =>
@@ -148,8 +150,14 @@ it("uses an operation-specific fallback without exposing mutation errors", async
     .setup()
     .click(await screen.findByRole("button", { name: "删除" }));
 
-  expect(await screen.findByRole("alert")).toHaveTextContent(
-    "本地模型操作未完成，请重试。",
+  await vi.waitFor(() =>
+    expect(toastError).toHaveBeenCalledWith(
+      "本地模型操作未完成，请重试。",
+      expect.objectContaining({
+        id: "local-model:delete:formal-transcription",
+      }),
+    ),
   );
+  expect(screen.queryByRole("alert")).toBeNull();
   expect(screen.queryByText(/private\/models/)).not.toBeInTheDocument();
 });

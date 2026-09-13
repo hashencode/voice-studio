@@ -9,30 +9,11 @@ import {
 } from "./capture_lifecycle_policy";
 
 export type QuitCoordinatorPhase =
-  | "idle"
-  | "confirming"
-  | "stopping"
-  | "live-failure-choice"
-  | "recovered-choice"
-  | "unresolved-choice"
-  | "tearing-down"
-  | "exiting";
+  "idle" | "confirming" | "stopping" | "tearing-down" | "exiting";
 
-export type QuitDecisionKind =
-  | "initial"
-  | "live-failure"
-  | "recovered-failure"
-  | "unknown-failure"
-  | "unresolved";
+export type QuitDecisionKind = "initial";
 
-export type QuitDecision =
-  | "continue-recording"
-  | "stop-and-exit"
-  | "return-to-app"
-  | "return-safe-view"
-  | "retry-stop"
-  | "continue-waiting"
-  | "preserve-and-exit";
+export type QuitDecision = "continue-recording" | "stop-and-exit";
 
 export interface CaptureQuitCoordinatorPorts {
   currentCapture(): CaptureSnapshot | null;
@@ -43,8 +24,7 @@ export interface CaptureQuitCoordinatorPorts {
     sessionId: string;
     idempotencyKey: string;
   }): Promise<CaptureStopReconciliation>;
-  publishCapture(snapshot: CaptureSnapshot | null): void;
-  showSafeReturn(destination: "capture" | "recovery" | "disabled"): void;
+  returnToCapture(): void;
   suppressCapturePublications(): void;
   abortCapture(): void;
   teardown(mode: "normal" | "recovery-exit"): Promise<void>;
@@ -53,29 +33,15 @@ export interface CaptureQuitCoordinatorPorts {
 }
 
 export interface CaptureQuitCoordinatorOptions {
-  stopWatchdogMs?: number;
   recoveryExitDeadlineMs?: number;
-  setTimer?: (
-    callback: () => void,
-    delayMs: number,
-  ) => ReturnType<typeof setTimeout>;
-  clearTimer?: (timer: ReturnType<typeof setTimeout>) => void;
+  setTimer?: typeof setTimeout;
+  clearTimer?: typeof clearTimeout;
 }
 
-type SettledStop =
-  { kind: "result"; value: CaptureStopReconciliation } | { kind: "error" };
-
-const timedOut = Symbol("capture-stop-watchdog");
-
 export class CaptureQuitCoordinator {
-  private readonly stopWatchdogMs: number;
   private readonly recoveryExitDeadlineMs: number;
-  private readonly setTimer: NonNullable<
-    CaptureQuitCoordinatorOptions["setTimer"]
-  >;
-  private readonly clearTimer: NonNullable<
-    CaptureQuitCoordinatorOptions["clearTimer"]
-  >;
+  private readonly setTimer: typeof setTimeout;
+  private readonly clearTimer: typeof clearTimeout;
   private currentPhase: QuitCoordinatorPhase = "idle";
   private generation = 0;
   private activeIntent: Promise<CaptureQuitPreparationOutcome> | null = null;
@@ -85,7 +51,6 @@ export class CaptureQuitCoordinator {
     private readonly ports: CaptureQuitCoordinatorPorts,
     options: CaptureQuitCoordinatorOptions = {},
   ) {
-    this.stopWatchdogMs = options.stopWatchdogMs ?? 15_000;
     this.recoveryExitDeadlineMs = options.recoveryExitDeadlineMs ?? 5_000;
     this.setTimer = options.setTimer ?? setTimeout;
     this.clearTimer = options.clearTimer ?? clearTimeout;
@@ -139,135 +104,39 @@ export class CaptureQuitCoordinator {
       );
       if (!this.isActive(generation)) return "cancelled";
       if (decision !== "stop-and-exit") {
-        return this.cancel(generation, "capture");
+        return this.cancel(generation);
       }
     }
 
-    return await this.stopUntilDecision(generation, capture, interactive);
+    return await this.stopAndExit(generation, capture);
   }
 
-  private async stopUntilDecision(
+  private async stopAndExit(
     generation: number,
     capture: CaptureSnapshot,
-    interactive: boolean,
   ): Promise<CaptureQuitPreparationOutcome> {
-    let attempt = 0;
-    while (this.isActive(generation)) {
-      this.currentPhase = "stopping";
-      const settled: Promise<SettledStop> = this.ports
-        .stopAndReconcile({
-          sessionId: capture.sessionId,
-          idempotencyKey: `stop-quit-${capture.sessionId}-${generation}-${attempt++}`,
-        })
-        .then(
-          (value): SettledStop => ({ kind: "result", value }),
-          (): SettledStop => ({ kind: "error" }),
-        );
-      const first = await this.withWatchdog(settled);
-      if (!this.isActive(generation)) return "cancelled";
-
-      let stop: SettledStop;
-      if (first === timedOut) {
-        if (!interactive) return await this.recoveryExit(generation);
-        this.currentPhase = "unresolved-choice";
-        let decision = this.ports.showDecision(
-          "unresolved",
-          this.ports.dialogParent(),
-        );
-        while (true) {
-          const next = await Promise.race([
-            settled.then((value) => ({ kind: "stop" as const, value })),
-            decision.then((value) => ({ kind: "decision" as const, value })),
-          ]);
-          if (!this.isActive(generation)) return "cancelled";
-          if (next.kind === "decision") {
-            if (next.value === "preserve-and-exit") {
-              return await this.recoveryExit(generation);
-            }
-            // A native MessageBox cannot remain open after its button resolves.
-            // Reopen the same decision sequentially so preserve-and-exit stays
-            // available without issuing another stop request or watchdog.
-            decision = this.ports.showDecision(
-              "unresolved",
-              this.ports.dialogParent(),
-            );
-            continue;
-          }
-
-          stop = next.value;
-          const result =
-            stop.kind === "result" ? stop.value : unknownStopResult();
-          if (result.snapshot && isDurableTerminal(result.snapshot)) break;
-
-          // The outstanding native dialog has no cancellable handle. Wait for
-          // it to close before presenting the result-specific decision.
-          const pendingDecision = await decision;
-          if (!this.isActive(generation)) return "cancelled";
-          if (pendingDecision === "preserve-and-exit") {
-            return await this.recoveryExit(generation);
-          }
-          break;
-        }
-      } else {
-        stop = first;
-      }
-
-      const result = stop.kind === "result" ? stop.value : unknownStopResult();
-      if (result.snapshot) this.ports.publishCapture(result.snapshot);
-      if (result.snapshot && isDurableTerminal(result.snapshot)) {
-        return await this.commitAndExit(generation);
-      }
-      if (!interactive) return await this.recoveryExit(generation);
-
-      if (result.capability === "live-stoppable") {
-        this.currentPhase = "live-failure-choice";
-        const decision = await this.ports.showDecision(
-          "live-failure",
-          this.ports.dialogParent(),
-        );
-        if (!this.isActive(generation)) return "cancelled";
-        if (decision === "retry-stop") continue;
-        if (decision === "preserve-and-exit") {
-          return await this.recoveryExit(generation);
-        }
-        return this.cancel(generation, "capture");
-      }
-
-      this.currentPhase = "recovered-choice";
-      const recovered = result.capability === "recovered-terminal";
-      const decision = await this.ports.showDecision(
-        recovered ? "recovered-failure" : "unknown-failure",
-        this.ports.dialogParent(),
-      );
-      if (!this.isActive(generation)) return "cancelled";
-      if (decision === "preserve-and-exit") {
-        return await this.recoveryExit(generation);
-      }
-      return this.cancel(generation, recovered ? "recovery" : "disabled");
+    this.currentPhase = "stopping";
+    let result: CaptureStopReconciliation;
+    try {
+      result = await this.ports.stopAndReconcile({
+        sessionId: capture.sessionId,
+        idempotencyKey: `stop-quit-${capture.sessionId}-${generation}`,
+      });
+    } catch {
+      result = unknownStopResult();
     }
-    return "cancelled";
+    if (!this.isActive(generation)) return "cancelled";
+    if (result.snapshot && isDurableTerminal(result.snapshot)) {
+      return await this.commitAndExit(generation);
+    }
+    return await this.recoveryExit(generation);
   }
 
-  private async withWatchdog(
-    stop: Promise<SettledStop>,
-  ): Promise<SettledStop | typeof timedOut> {
-    let timer: ReturnType<typeof setTimeout> | undefined;
-    const watchdog = new Promise<typeof timedOut>((resolve) => {
-      timer = this.setTimer(() => resolve(timedOut), this.stopWatchdogMs);
-    });
-    const result = await Promise.race([stop, watchdog]);
-    if (result !== timedOut && timer) this.clearTimer(timer);
-    return result;
-  }
-
-  private cancel(
-    generation: number,
-    destination: "capture" | "recovery" | "disabled",
-  ): CaptureQuitPreparationOutcome {
+  private cancel(generation: number): CaptureQuitPreparationOutcome {
     if (this.isActive(generation)) {
       this.generation += 1;
       this.currentPhase = "idle";
-      this.ports.showSafeReturn(destination);
+      this.ports.returnToCapture();
     }
     return "cancelled";
   }
@@ -299,16 +168,15 @@ export class CaptureQuitCoordinator {
     this.currentPhase = "tearing-down";
     this.ports.suppressCapturePublications();
 
+    try {
+      this.ports.abortCapture();
+    } catch {
+      // Reconciliation has already persisted the safest available state.
+    }
     let timer: ReturnType<typeof setTimeout> | undefined;
     const deadline = new Promise<void>((resolve) => {
       timer = this.setTimer(resolve, this.recoveryExitDeadlineMs);
     });
-    try {
-      this.ports.abortCapture();
-    } catch {
-      // The absolute deadline and final exit remain authoritative even when
-      // the out-of-band helper termination itself reports a synchronous error.
-    }
     let cleanup: Promise<void>;
     try {
       cleanup = Promise.resolve(this.ports.teardown("recovery-exit")).catch(

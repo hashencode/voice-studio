@@ -14,6 +14,8 @@ import {
 } from "./capture_native_port";
 
 export class MacOSCaptureNativePort implements CaptureNativePort {
+  private recreation: Promise<void> | null = null;
+
   constructor(
     private session: MacOSNativeHelperSession,
     private readonly reopenSession?: () => Promise<MacOSNativeHelperSession>,
@@ -40,7 +42,11 @@ export class MacOSCaptureNativePort implements CaptureNativePort {
       return await this.session.captureControl(command);
     } catch (error) {
       throw new CaptureNativeStopError(
-        error instanceof NativeHelperCommandError ? "command" : "transport",
+        error instanceof NativeHelperCommandError
+          ? error.code === "CAPTURE_FINALIZATION_FAILED"
+            ? "finalization"
+            : "command"
+          : "transport",
         { cause: error },
       );
     }
@@ -70,16 +76,32 @@ export class MacOSCaptureNativePort implements CaptureNativePort {
     return this.session.captureRecover();
   }
 
-  discard(sessionId: string, idempotencyKey: string) {
-    return this.session.captureDiscard(sessionId, idempotencyKey);
+  async discard(sessionId: string, idempotencyKey: string) {
+    try {
+      await this.session.captureDiscard(sessionId, idempotencyKey);
+    } catch (error) {
+      if (error instanceof NativeHelperCommandError) throw error;
+      await this.recreateAfterTransportLoss();
+      throw error;
+    }
   }
 
   async recreateAfterTransportLoss(): Promise<void> {
+    if (this.recreation) return await this.recreation;
     if (!this.reopenSession) {
       throw new Error("capture native session cannot be recreated");
     }
-    this.session.abort();
-    this.session = await this.reopenSession();
+    const lostSession = this.session;
+    const recreation = (async () => {
+      lostSession.abort();
+      this.session = await this.reopenSession!();
+    })();
+    this.recreation = recreation;
+    try {
+      await recreation;
+    } finally {
+      if (this.recreation === recreation) this.recreation = null;
+    }
   }
 
   abort(): void {

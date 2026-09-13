@@ -1,5 +1,6 @@
 import * as React from "react";
 import { AlertCircle, LoaderCircle, Trash2 } from "lucide-react";
+import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
 import {
@@ -21,7 +22,10 @@ import {
   SettingsListBlock,
   SettingsListSkeleton,
 } from "@/features/settings/settings-page-section";
-import { userFacingError } from "@/lib/user-facing-error";
+import {
+  desktopFailurePresentation,
+  userFacingError,
+} from "@/lib/user-facing-error";
 
 const STATE_LABELS: Record<LocalModelBundleSnapshot["state"], string> = {
   "not-installed": "未安装",
@@ -59,14 +63,20 @@ export function LocalModelsFeature() {
     void window.voice2text
       .getLocalModelSnapshot()
       .then((next) => {
-        if (active) setSnapshot(next);
+        if (active) {
+          setError(null);
+          setSnapshot(next);
+        }
       })
       .catch((cause: unknown) => {
         if (active)
           setError(userFacingError(cause, "无法读取本地模型，请重试。"));
       });
     const unsubscribe = window.voice2text.onLocalModelSnapshot((next) => {
-      if (active) setSnapshot(next);
+      if (active) {
+        setError(null);
+        setSnapshot(next);
+      }
     });
     return () => {
       active = false;
@@ -77,8 +87,8 @@ export function LocalModelsFeature() {
   const act = React.useCallback(
     async (intent: Omit<LocalModelIntent, "expectedRevision">) => {
       if (!snapshot || pending) return;
+      const toastId = `local-model:${intent.action}${"bundleId" in intent ? `:${intent.bundleId}` : ""}`;
       setPending(true);
-      setError(null);
       try {
         setSnapshot(
           await window.voice2text.sendLocalModelIntent({
@@ -86,8 +96,18 @@ export function LocalModelsFeature() {
             expectedRevision: snapshot.revision,
           } as LocalModelIntent),
         );
+        toast.dismiss(toastId);
       } catch (cause) {
-        setError(userFacingError(cause, "本地模型操作未完成，请重试。"));
+        if (
+          desktopFailurePresentation(cause, {
+            kind: "non-blocking-result",
+          }) === "application-blocker"
+        ) {
+          return;
+        }
+        toast.error(userFacingError(cause, "本地模型操作未完成，请重试。"), {
+          id: toastId,
+        });
       } finally {
         setPending(false);
       }
@@ -115,6 +135,10 @@ export function LocalModelsFeature() {
     operation && operation.totalBytes > 0
       ? Math.round((operation.copiedBytes / operation.totalBytes) * 100)
       : null;
+  const activeBundle = operation?.bundleId
+    ? snapshot.bundles.find((bundle) => bundle.id === operation.bundleId)
+    : null;
+  const operationPaused = activeBundle?.state === "paused";
   return (
     <section aria-label="本地模型设置" className="w-full">
       {error ? (
@@ -159,15 +183,12 @@ export function LocalModelsFeature() {
                         disabled={pending}
                         onClick={() =>
                           void act({
-                            action:
-                              operation.message === "已暂停"
-                                ? "resume"
-                                : "pause",
+                            action: operationPaused ? "resume" : "pause",
                             bundleId: operation.bundleId!,
                           })
                         }
                       >
-                        {operation.message === "已暂停" ? "继续" : "暂停"}
+                        {operationPaused ? "继续" : "暂停"}
                       </Button>
                     ) : null}
                     <Button

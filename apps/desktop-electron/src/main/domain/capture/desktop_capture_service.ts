@@ -1,8 +1,12 @@
 import path from "node:path";
+import { lstatSync, readdirSync, realpathSync } from "node:fs";
 
 import {
   captureControlCommandSchema,
   capturePreflightSchema,
+  captureRecoveryActionRequestSchema,
+  captureRecoveryActionResponseSchema,
+  captureRecoveryItemSchema,
   captureRuntimeSnapshotSchema,
   captureSnapshotSchema,
   captureStartCommandSchema,
@@ -10,6 +14,8 @@ import {
   type CaptureControlCommand,
   type CapturePreflight,
   type CaptureRecoveryItem,
+  type CaptureRecoveryActionResponse,
+  type CaptureRecoveryOutcome,
   type CaptureRuntimeSnapshot,
   type CaptureSnapshot,
   type CaptureStartCommand,
@@ -17,6 +23,7 @@ import {
 } from "../../../shared/contracts";
 import type {
   CaptureRepository,
+  StoredCaptureRecovery,
   StoredCaptureSession,
 } from "../../storage/repositories/capture_repository";
 import {
@@ -31,6 +38,12 @@ import {
 export class DesktopCaptureService {
   private currentSessionId: string | null = null;
   private currentAudioActivity = 0;
+  private recoveryScanComplete = false;
+  private readonly nativeRecoveries = new Map<string, CaptureSnapshot>();
+  private readonly recoveryActions = new Map<
+    string,
+    Promise<CaptureRecoveryOutcome>
+  >();
 
   constructor(
     private readonly repository: CaptureRepository,
@@ -39,6 +52,7 @@ export class DesktopCaptureService {
     private readonly now: () => number = Date.now,
     private readonly authorityValidator: typeof validateCaptureAuthority = validateCaptureAuthority,
     private readonly captureDay: typeof localCaptureDay = localCaptureDay,
+    private readonly inspectWorkspace: typeof inspectCaptureRecoveryWorkspace = inspectCaptureRecoveryWorkspace,
   ) {}
 
   async preflight(command: {
@@ -207,9 +221,10 @@ export class DesktopCaptureService {
   }
 
   snapshot(): CaptureSnapshot | null {
-    return this.currentSessionId
-      ? this.repository.find(this.currentSessionId)
-      : this.repository.active();
+    if (this.currentSessionId) {
+      return this.repository.find(this.currentSessionId);
+    }
+    return this.recoveryScanComplete ? null : this.repository.active();
   }
 
   audioActivity(): number {
@@ -253,8 +268,7 @@ export class DesktopCaptureService {
     }
     this.assertSession(sessionId, result);
     if (
-      (result.state === "completed" || result.state === "partial_capture") &&
-      result.recordingSha256 &&
+      isDurableTerminal(result) &&
       !this.repository.hasActionReceipt(sessionId, "stop")
     ) {
       const authority = await this.validatedAuthority(result);
@@ -270,19 +284,17 @@ export class DesktopCaptureService {
   }
 
   async recover(): Promise<CaptureSnapshot[]> {
+    await this.cleanupDiscardedRecoveries();
     const values = captureSnapshotSchema
       .array()
       .max(256)
       .parse(await this.native.recover());
+    const accepted: CaptureSnapshot[] = [];
+    this.nativeRecoveries.clear();
     for (const value of values) {
-      if (!this.repository.find(value.sessionId)) {
-        this.repository.beginSession({
-          sessionId: value.sessionId,
-          title: `新录音-${value.sessionId.slice(-12)}`,
-          workspacePath: path.join(this.captureRoot, value.sessionId),
-          nowMs: this.now(),
-        });
-      }
+      if (!this.repository.find(value.sessionId)) continue;
+      accepted.push(value);
+      this.nativeRecoveries.set(value.sessionId, value);
       const key = `recover-${value.journalSha256 ?? value.sessionId}`;
       if (value.state === "completed") {
         const completedKey = `recover-completed-${value.journalSha256}`;
@@ -310,12 +322,39 @@ export class DesktopCaptureService {
         );
       }
     }
+    this.recoveryScanComplete = true;
     this.selectCurrentSession();
-    return values;
+    return accepted;
   }
 
-  listRecoveries(): CaptureRecoveryItem[] {
-    return this.repository.listRecoveries();
+  async listRecoveries(): Promise<CaptureRecoveryItem[]> {
+    const recoveries: CaptureRecoveryItem[] = [];
+    for (const candidate of this.repository.listRecoveryCandidates()) {
+      recoveries.push(await this.assessRecovery(candidate));
+    }
+    return recoveries;
+  }
+
+  async actOnRecoveries(raw: {
+    action: "keep" | "discard";
+    sessionIds: string[];
+    idempotencyKey: string;
+  }): Promise<CaptureRecoveryActionResponse> {
+    const request = captureRecoveryActionRequestSchema.parse(raw);
+    const outcomes: CaptureRecoveryOutcome[] = [];
+    for (const sessionId of request.sessionIds) {
+      outcomes.push(
+        await this.runRecoveryAction(
+          sessionId,
+          request.action,
+          request.idempotencyKey,
+        ),
+      );
+    }
+    return captureRecoveryActionResponseSchema.parse({
+      outcomes,
+      recoveries: await this.listRecoveries(),
+    });
   }
 
   async discardRecovered(
@@ -329,12 +368,23 @@ export class DesktopCaptureService {
       this.selectCurrentSession();
       return;
     }
-    await this.native.discard(sessionId, idempotencyKey);
     this.repository.discardRecoveryAndReceipt(
       sessionId,
       idempotencyKey,
       this.now(),
     );
+    try {
+      await this.native.discard(sessionId, idempotencyKey);
+    } catch {
+      console.error(
+        JSON.stringify({
+          event: "capture-recovery-cleanup-deferred",
+          operation: "discard",
+          sessionId,
+          occurredAtMs: this.now(),
+        }),
+      );
+    }
     this.selectCurrentSession();
   }
 
@@ -365,6 +415,173 @@ export class DesktopCaptureService {
     return receipt.result;
   }
 
+  private async runRecoveryAction(
+    sessionId: string,
+    action: "keep" | "discard",
+    idempotencyKey: string,
+  ): Promise<CaptureRecoveryOutcome> {
+    const inFlight = this.recoveryActions.get(sessionId);
+    if (inFlight) {
+      const settled = await inFlight;
+      return settled.action === action
+        ? settled
+        : recoveryOutcome(sessionId, action, "conflict");
+    }
+    const operation = this.executeRecoveryAction(
+      sessionId,
+      action,
+      idempotencyKey,
+    ).finally(() => {
+      if (this.recoveryActions.get(sessionId) === operation) {
+        this.recoveryActions.delete(sessionId);
+      }
+    });
+    this.recoveryActions.set(sessionId, operation);
+    return await operation;
+  }
+
+  private async executeRecoveryAction(
+    sessionId: string,
+    action: "keep" | "discard",
+    idempotencyKey: string,
+  ): Promise<CaptureRecoveryOutcome> {
+    const cached = this.repository.receipt(sessionId, idempotencyKey);
+    if (cached) {
+      if (cached.action !== action) {
+        return recoveryOutcome(sessionId, action, "conflict");
+      }
+      return recoveryOutcome(
+        sessionId,
+        action,
+        action === "keep" ? "kept" : "discarded",
+        cached.result,
+      );
+    }
+    const candidate = this.repository.findRecoveryCandidate(sessionId);
+    if (!candidate) return recoveryOutcome(sessionId, action, "conflict");
+    const assessed = await this.assessRecovery(candidate);
+    if (
+      assessed.capability === "preserve-only" ||
+      (action === "keep" && assessed.capability !== "restorable")
+    ) {
+      return recoveryOutcome(sessionId, action, "preserved");
+    }
+    try {
+      if (action === "discard") {
+        await this.discardRecovered(sessionId, idempotencyKey);
+        return recoveryOutcome(sessionId, action, "discarded");
+      }
+      const kept = this.keepRecovered(sessionId, idempotencyKey);
+      return recoveryOutcome(sessionId, action, "kept", kept);
+    } catch {
+      return recoveryOutcome(sessionId, action, "failed");
+    }
+  }
+
+  private async assessRecovery(
+    candidate: StoredCaptureRecovery,
+  ): Promise<CaptureRecoveryItem> {
+    const snapshot = this.nativeRecoveries.get(candidate.snapshot.sessionId);
+    const base = candidate.snapshot;
+    const item = (
+      capability: CaptureRecoveryItem["capability"],
+      reason: CaptureRecoveryItem["reason"],
+    ) =>
+      captureRecoveryItemSchema.parse({
+        ...base,
+        title: candidate.title,
+        capability,
+        reason,
+      });
+    if (!this.recoveryScanComplete) {
+      return item("preserve-only", "currently-unverifiable");
+    }
+    if (!snapshot) {
+      return item("preserve-only", "recovery-metadata-damaged");
+    }
+    if (
+      ["preparing", "recording", "paused", "finalizing"].includes(base.state)
+    ) {
+      return item("preserve-only", "finalization-in-progress");
+    }
+    const workspace = this.inspectWorkspace({
+      captureRoot: this.captureRoot,
+      sessionId: base.sessionId,
+      workspacePath: candidate.workspacePath,
+    });
+    if (!workspace.complete) {
+      return item("preserve-only", "currently-unverifiable");
+    }
+    if (
+      snapshot.state !== base.state ||
+      snapshot.finalizedChunkCount !== base.finalizedChunkCount ||
+      snapshot.journalSha256 !== base.journalSha256
+    ) {
+      return item("preserve-only", "currently-unverifiable");
+    }
+    if (
+      (snapshot.invalidFinalizedChunks ?? 0) > 0 ||
+      (snapshot.quarantinedTailChunks ?? 0) > 0 ||
+      workspace.hasQuarantine
+    ) {
+      return item("preserve-only", "audio-integrity-failed");
+    }
+    if (snapshot.finalizedChunkCount === 0) {
+      if (!workspace.journalPresent) {
+        return item("preserve-only", "recovery-metadata-damaged");
+      }
+      return workspace.audioFiles.length > 0 || workspace.hasPartial
+        ? item("preserve-only", "unfinished-audio-data")
+        : item("discard-only", "no-audio-data");
+    }
+    if (
+      snapshot.state !== "recoverable" &&
+      snapshot.state !== "partial_capture"
+    ) {
+      return item("preserve-only", "currently-unverifiable");
+    }
+    try {
+      const authority = await this.validatedAuthority(snapshot);
+      const referenced = new Set(
+        authority.chunks.map((chunk) =>
+          normalizeRelativePath(chunk.relativePath),
+        ),
+      );
+      if (
+        authority.sessionId !== snapshot.sessionId ||
+        authority.chunks.length !== snapshot.finalizedChunkCount ||
+        !this.repository.hasRecoveryAuthority(
+          snapshot.sessionId,
+          snapshot.finalizedChunkCount,
+        ) ||
+        workspace.hasPartial ||
+        workspace.audioFiles.some((file) => !referenced.has(file))
+      ) {
+        return item("preserve-only", "unfinished-audio-data");
+      }
+      return item("restorable", null);
+    } catch {
+      return item("preserve-only", "audio-integrity-failed");
+    }
+  }
+
+  private async cleanupDiscardedRecoveries(): Promise<void> {
+    for (const sessionId of this.repository.listDiscardedRecoverySessionIds()) {
+      try {
+        await this.native.discard(sessionId, `cleanup-${sessionId}`);
+      } catch {
+        console.error(
+          JSON.stringify({
+            event: "capture-recovery-cleanup-deferred",
+            operation: "startup-cleanup",
+            sessionId,
+            occurredAtMs: this.now(),
+          }),
+        );
+      }
+    }
+  }
+
   private titleSuggestionAt(nowMs: number): string {
     const day = this.captureDay(nowMs);
     const sequence =
@@ -373,10 +590,16 @@ export class DesktopCaptureService {
   }
 
   private selectCurrentSession(): void {
+    const recoverySessionId = this.repository.firstRecoverySessionId();
+    if (recoverySessionId) {
+      this.currentSessionId = recoverySessionId;
+      return;
+    }
+    const activeSessionId = this.repository.activeSession()?.snapshot.sessionId;
     this.currentSessionId =
-      this.repository.firstRecoverySessionId() ??
-      this.repository.activeSession()?.snapshot.sessionId ??
-      null;
+      activeSessionId && this.nativeRecoveries.has(activeSessionId)
+        ? activeSessionId
+        : null;
   }
 
   private assertSession(expected: string, snapshot: CaptureSnapshot): void {
@@ -525,6 +748,135 @@ function isLiveStoppable(snapshot: CaptureSnapshot): boolean {
     snapshot.state === "paused" ||
     (snapshot.state === "partial_capture" && snapshot.recordingSha256 === null)
   );
+}
+
+interface CaptureRecoveryWorkspaceInspection {
+  complete: boolean;
+  audioFiles: string[];
+  hasPartial: boolean;
+  hasQuarantine: boolean;
+  journalPresent: boolean;
+}
+
+export function inspectCaptureRecoveryWorkspace(options: {
+  captureRoot: string;
+  sessionId: string;
+  workspacePath: string;
+}): CaptureRecoveryWorkspaceInspection {
+  const unavailable = (): CaptureRecoveryWorkspaceInspection => ({
+    complete: false,
+    audioFiles: [],
+    hasPartial: false,
+    hasQuarantine: false,
+    journalPresent: false,
+  });
+  try {
+    const root = realpathSync(path.resolve(options.captureRoot));
+    const expected = path.join(root, options.sessionId);
+    if (
+      path.basename(path.resolve(options.workspacePath)) !== options.sessionId
+    ) {
+      return unavailable();
+    }
+    const workspace = realpathSync(options.workspacePath);
+    if (workspace !== expected) return unavailable();
+    const rootStat = lstatSync(workspace);
+    if (!rootStat.isDirectory() || rootStat.isSymbolicLink())
+      return unavailable();
+    const audioFiles: string[] = [];
+    let hasPartial = false;
+    let hasQuarantine = false;
+    let journalPresent = false;
+    let visited = 0;
+    const walk = (directory: string): boolean => {
+      const entries = readdirSync(directory, { withFileTypes: true });
+      for (const entry of entries) {
+        visited += 1;
+        if (visited > 4_096 || entry.isSymbolicLink()) return false;
+        const absolute = path.join(directory, entry.name);
+        const relative = normalizeRelativePath(
+          path.relative(workspace, absolute),
+        );
+        if (entry.isDirectory()) {
+          if (entry.name === "quarantine") hasQuarantine = true;
+          if (!walk(absolute)) return false;
+        } else if (entry.isFile()) {
+          if (relative === "journal.json") journalPresent = true;
+          if (entry.name.endsWith(".partial")) hasPartial = true;
+          if (entry.name.endsWith(".caf")) audioFiles.push(relative);
+          if (relative.startsWith("quarantine/")) hasQuarantine = true;
+        } else {
+          return false;
+        }
+      }
+      return true;
+    };
+    return walk(workspace)
+      ? {
+          complete: true,
+          audioFiles,
+          hasPartial,
+          hasQuarantine,
+          journalPresent,
+        }
+      : unavailable();
+  } catch {
+    return unavailable();
+  }
+}
+
+function normalizeRelativePath(value: string): string {
+  return value.split(path.sep).join("/");
+}
+
+function recoveryOutcome(
+  sessionId: string,
+  action: "keep" | "discard",
+  result: CaptureRecoveryOutcome["result"],
+  capture: CaptureSnapshot | null = null,
+): CaptureRecoveryOutcome {
+  if (result === "kept") {
+    return {
+      sessionId,
+      action,
+      result,
+      completionCertainty: "completed",
+      audioDurability: "durable",
+      transcriptionHandoff: "pending",
+      capture,
+    };
+  }
+  if (result === "discarded") {
+    return {
+      sessionId,
+      action,
+      result,
+      completionCertainty: "completed",
+      audioDurability: "discarded",
+      transcriptionHandoff: "not-requested",
+      capture: null,
+    };
+  }
+  if (result === "preserved") {
+    return {
+      sessionId,
+      action,
+      result,
+      completionCertainty: "not-completed",
+      audioDurability: "preserved",
+      transcriptionHandoff: "not-requested",
+      capture: null,
+    };
+  }
+  return {
+    sessionId,
+    action,
+    result,
+    completionCertainty: result === "conflict" ? "not-completed" : "unknown",
+    audioDurability: result === "conflict" ? "unchanged" : "unknown",
+    transcriptionHandoff: "not-requested",
+    capture: null,
+  };
 }
 
 export function localCaptureDay(nowMs: number): {

@@ -149,7 +149,7 @@ function testAiProfile() {
 }
 
 const restored: ApplicationSnapshot = {
-  protocolVersion: 2,
+  protocolVersion: 3,
   revision: 8,
   navigation: { section: "companion" },
   profile: { phase: "ready", legacyDatabaseArchived: false },

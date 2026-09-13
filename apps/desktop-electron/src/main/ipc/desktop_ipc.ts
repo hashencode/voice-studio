@@ -11,6 +11,8 @@ import {
   processingTasksRequestSchema,
   importAudioRequestSchema,
   desktopProtocolVersion,
+  desktopFailureSchema,
+  type DesktopFailureData,
   getApplicationSnapshotRequestSchema,
   ipcChannels,
   navigateRequestSchema,
@@ -45,6 +47,7 @@ import {
   microphoneTestControlRequestSchema,
   microphoneSettingsOpenRequestSchema,
   type CapturePreflight,
+  type CaptureRecoveryActionResponse,
   type CaptureSnapshot,
   type CaptureRecoveryItem,
   type RenameCaptureSessionRequest,
@@ -119,6 +122,41 @@ export interface IpcTrustPolicy {
   frameId: number;
   origins: ReadonlySet<string>;
   fileUrls?: ReadonlySet<string>;
+}
+
+export interface DesktopFailureContext {
+  readonly operation: string;
+  readonly mutation: boolean;
+  readonly sessionId?: string;
+  readonly action?: string;
+}
+
+type UnversionedDesktopFailure = DesktopFailureData extends infer Failure
+  ? Failure extends { protocolVersion: number }
+    ? Omit<Failure, "protocolVersion">
+    : never
+  : never;
+
+export interface DesktopFailureAdaptation {
+  readonly errorKind: string;
+  readonly failure: UnversionedDesktopFailure;
+}
+
+export type DesktopFailureAdapter = (
+  error: unknown,
+  context: DesktopFailureContext,
+) => DesktopFailureAdaptation | null;
+
+export type DesktopFailureAdapterRegistry = readonly DesktopFailureAdapter[];
+
+export interface DesktopFailureDiagnostic {
+  readonly operation: string;
+  readonly domain: DesktopFailureData["domain"];
+  readonly code: DesktopFailureData["code"];
+  readonly errorKind: string;
+  readonly sessionId?: string;
+  readonly action?: string;
+  readonly occurredAtMs: number;
 }
 
 export interface DesktopIpcServices {
@@ -212,9 +250,9 @@ export interface DesktopIpcServices {
   listCaptureRecoveries(): Promise<CaptureRecoveryItem[]>;
   actOnCaptureRecovery(options: {
     action: "keep" | "discard";
-    sessionId: string;
+    sessionIds: string[];
     idempotencyKey: string;
-  }): Promise<CaptureSnapshot | null>;
+  }): Promise<CaptureRecoveryActionResponse>;
   startMicrophoneTest(options: {
     ownerId: number;
     microphoneDeviceId?: string;
@@ -331,6 +369,8 @@ export class DesktopIpcHandlers {
     private readonly trust: IpcTrustPolicy | undefined,
     private readonly handlers: ReadonlyMap<string, RegisteredHandler>,
     private readonly maximumPayloadBytes: number,
+    private readonly failureAdapters: DesktopFailureAdapterRegistry,
+    private readonly logFailure: (diagnostic: DesktopFailureDiagnostic) => void,
   ) {}
 
   has(channel: string): boolean {
@@ -371,7 +411,34 @@ export class DesktopIpcHandlers {
         { cause: parsed.error },
       );
     }
-    return await handler.invoke(parsed.data as never, event);
+    const context = failureContext(channel, parsed.data);
+    try {
+      return {
+        ok: true as const,
+        value: await handler.invoke(parsed.data as never, event),
+      };
+    } catch (error) {
+      let adaptation: DesktopFailureAdaptation | null = null;
+      for (const adapter of this.failureAdapters) {
+        adaptation = adapter(error, context);
+        if (adaptation !== null) break;
+      }
+      adaptation ??= unexpectedFailure();
+      const failure = desktopFailureSchema.parse({
+        protocolVersion: desktopProtocolVersion,
+        ...adaptation.failure,
+      });
+      this.logFailure({
+        operation: context.operation,
+        domain: failure.domain,
+        code: failure.code,
+        errorKind: adaptation.errorKind,
+        ...(context.sessionId ? { sessionId: context.sessionId } : {}),
+        ...(context.action ? { action: context.action } : {}),
+        occurredAtMs: Date.now(),
+      });
+      return { ok: false as const, failure };
+    }
   }
 }
 
@@ -379,6 +446,8 @@ export function createDesktopIpcHandlers(options: {
   trust?: IpcTrustPolicy;
   services: DesktopIpcServices;
   maximumPayloadBytes?: number;
+  failureAdapters?: DesktopFailureAdapterRegistry;
+  logFailure?: (diagnostic: DesktopFailureDiagnostic) => void;
 }): DesktopIpcHandlers {
   const handlers = new Map<string, RegisteredHandler>([
     [
@@ -806,7 +875,7 @@ export function createDesktopIpcHandlers(options: {
         schema: captureRecoveryActionRequestSchema,
         invoke: async (payload: {
           action: "keep" | "discard";
-          sessionId: string;
+          sessionIds: string[];
           idempotencyKey: string;
         }) => await options.services.actOnCaptureRecovery(payload),
       } as RegisteredHandler,
@@ -952,6 +1021,73 @@ export function createDesktopIpcHandlers(options: {
     options.trust,
     handlers,
     options.maximumPayloadBytes ?? 64 * 1024,
+    options.failureAdapters ?? [],
+    options.logFailure ?? defaultFailureLogger,
+  );
+}
+
+function unexpectedFailure(): DesktopFailureAdaptation {
+  return {
+    errorKind: "unexpected",
+    failure: {
+      domain: "internal",
+      code: "INTERNAL_ERROR",
+      retryable: false,
+      fallback: "continue",
+    },
+  };
+}
+
+function failureContext(
+  operation: string,
+  payload: unknown,
+): DesktopFailureContext {
+  const record =
+    typeof payload === "object" && payload !== null
+      ? (payload as Record<string, unknown>)
+      : {};
+  return {
+    operation,
+    mutation: mutationChannels.has(operation),
+    ...(typeof record.sessionId === "string"
+      ? { sessionId: record.sessionId }
+      : Array.isArray(record.sessionIds) &&
+          record.sessionIds.length === 1 &&
+          typeof record.sessionIds[0] === "string"
+        ? { sessionId: record.sessionIds[0] }
+        : {}),
+    ...(typeof record.action === "string" ? { action: record.action } : {}),
+  };
+}
+
+const mutationChannels = new Set<string>([
+  ipcChannels.localModelsIntent,
+  ipcChannels.localModelsChangeRoot,
+  ipcChannels.companionOptInSet,
+  ipcChannels.companionPairingInviteCreate,
+  ipcChannels.companionPeerRevoke,
+  ipcChannels.companionTransferCancel,
+  ipcChannels.companionTransferRetry,
+  ipcChannels.aiProviderProfileCreate,
+  ipcChannels.aiProviderProfileUpdate,
+  ipcChannels.aiProviderProfileSelect,
+  ipcChannels.aiProviderProfileDelete,
+  ipcChannels.audioAiGenerate,
+  ipcChannels.audioAiRetry,
+  ipcChannels.captureStart,
+  ipcChannels.captureControl,
+  ipcChannels.captureRecoveryAction,
+  ipcChannels.audioEditSegment,
+  ipcChannels.audioUndo,
+  ipcChannels.audioRedo,
+  ipcChannels.audioRenameSpeaker,
+  ipcChannels.audioMergeSpeakers,
+  ipcChannels.audioAssignSpeaker,
+]);
+
+function defaultFailureLogger(diagnostic: DesktopFailureDiagnostic): void {
+  console.error(
+    JSON.stringify({ event: "desktop-ipc-failure", ...diagnostic }),
   );
 }
 

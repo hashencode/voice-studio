@@ -56,13 +56,13 @@ const api: Voice2TextDesktopApi = {
     throw new Error("retryProcessing is outside the visual fixture");
   },
   async startTranscription(audioId) {
-    return { protocolVersion: 2, jobId: audioId, state: "queued" };
+    return { protocolVersion: 3, jobId: audioId, state: "queued" };
   },
   async listProcessingTasks() {
     return [];
   },
   async importAudio() {
-    return { protocolVersion: 2, state: "canceled" };
+    return { protocolVersion: 3, state: "canceled" };
   },
   onOperationEvent() {
     return () => undefined;
@@ -133,7 +133,10 @@ const api: Voice2TextDesktopApi = {
     return structuredClone(fixture.recoveries);
   },
   async actOnCaptureRecovery() {
-    return null;
+    return {
+      outcomes: [],
+      recoveries: structuredClone(fixture.recoveries),
+    };
   },
   async getCaptionSnapshot() {
     return null;

@@ -699,6 +699,26 @@ final class CaptureControllerTests: XCTestCase {
     XCTAssertTrue(FileManager.default.fileExists(atPath: outside.path))
   }
 
+  func testDiscardDeletesOnlyTheExplicitSessionAndPreservesRejectedTargets() throws {
+    let root = try temporaryRoot()
+    defer { try? FileManager.default.removeItem(at: root) }
+    let target = root.appendingPathComponent("session-discard-target-123456", isDirectory: true)
+    let neighbour = root.appendingPathComponent("session-discard-neighbour-123456", isDirectory: true)
+    let rejected = root.appendingPathComponent("session-discard-file-123456")
+    try FileManager.default.createDirectory(at: target, withIntermediateDirectories: false)
+    try FileManager.default.createDirectory(at: neighbour, withIntermediateDirectories: false)
+    try Data("preserve".utf8).write(to: rejected)
+    let controller = try CaptureController(captureRootPath: root.path)
+
+    try controller.discard(sessionId: target.lastPathComponent)
+    XCTAssertFalse(FileManager.default.fileExists(atPath: target.path))
+    XCTAssertTrue(FileManager.default.fileExists(atPath: neighbour.path))
+
+    XCTAssertThrowsError(try controller.discard(sessionId: rejected.lastPathComponent))
+    XCTAssertTrue(FileManager.default.fileExists(atPath: rejected.path))
+    XCTAssertTrue(FileManager.default.fileExists(atPath: neighbour.path))
+  }
+
   func testSessionCaptionTrackAndQuarantineSymlinksFailClosed() throws {
     let root = try temporaryRoot()
     let outside = try temporaryRoot()

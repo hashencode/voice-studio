@@ -11,7 +11,10 @@ import {
   DialogDescription,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { userFacingError } from "@/lib/user-facing-error";
+import {
+  desktopFailureHasCode,
+  userFacingError,
+} from "@/lib/user-facing-error";
 import type {
   AudioAiConsentPreview,
   AudioAiSnapshot,
@@ -45,6 +48,7 @@ export function AudioAiFeature({
     (next: AudioAiSnapshot) => {
       if (next.audioId !== audioId || next.generationId !== generationId)
         return;
+      setError(null);
       setSnapshot((current) =>
         !current || isNewerSnapshot(current, next) ? next : current,
       );
@@ -348,20 +352,14 @@ function isNewerSnapshot(
 }
 
 function aiErrorMessage(cause: unknown, fallback: string): string {
-  if (
-    cause instanceof Error &&
-    cause.message.includes("AI_PREPARATION_STALE")
-  ) {
+  if (desktopFailureHasCode(cause, "ai-provider", "AI_PREPARATION_STALE")) {
     return "模型设置已变化，请重新确认。";
   }
-  const code =
-    typeof cause === "object" && cause !== null && "code" in cause
-      ? String(cause.code)
-      : "";
-  if (code.includes("SECRET_MISSING")) return "请先到设置输入提供商密钥";
-  if (code.includes("SECRET_DENIED"))
+  if (desktopFailureHasCode(cause, "ai-provider", "AI_SECRET_MISSING"))
+    return "请先到设置输入提供商密钥";
+  if (desktopFailureHasCode(cause, "ai-provider", "AI_SECRET_DENIED"))
     return "无法读取 macOS 钥匙串，请到设置重新输入密钥";
-  if (code.includes("SECRET_CORRUPT"))
+  if (desktopFailureHasCode(cause, "ai-provider", "AI_SECRET_CORRUPT"))
     return "macOS 钥匙串中的密钥无法使用，请到设置重新输入";
   return userFacingError(cause, fallback);
 }

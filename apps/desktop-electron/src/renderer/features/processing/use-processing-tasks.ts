@@ -1,4 +1,5 @@
 import * as React from "react";
+import { toast } from "sonner";
 
 import type {
   ApplicationSnapshot,
@@ -36,9 +37,6 @@ export function useProcessingTasks(
   profileReady: boolean,
 ) {
   const [tasks, setTasks] = React.useState<ProcessingTask[]>([]);
-  const [operationError, setOperationError] = React.useState<string | null>(
-    null,
-  );
   const [importPending, setImportPending] = React.useState(false);
   const [pendingJobActions, setPendingJobActions] = React.useState<
     ReadonlyMap<number, PendingJobAction>
@@ -108,10 +106,13 @@ export function useProcessingTasks(
               latestDeltaRef.current.delete(jobId);
           }
           publishTasks(next);
+          toast.dismiss("processing-task-refresh");
         })
         .catch(() => {
           if (mountedRef.current && generation === mountGenerationRef.current) {
-            setOperationError("无法读取转写任务，请重试。");
+            toast.error("无法读取转写任务，请重试。", {
+              id: "processing-task-refresh",
+            });
           }
         })
         .finally(() => {
@@ -184,7 +185,6 @@ export function useProcessingTasks(
     if (importPendingRef.current) return;
     importPendingRef.current = true;
     if (mountedRef.current) setImportPending(true);
-    setOperationError(null);
     try {
       const result = await window.voice2text.importAudio();
       if (result.state === "imported") {
@@ -200,12 +200,15 @@ export function useProcessingTasks(
   const cancelProcessing = React.useCallback(
     async (jobId: number) => {
       if (!beginPending(jobId, "cancel")) return;
-      setOperationError(null);
       try {
         await window.voice2text.cancelProcessing(jobId);
         await requestReconcile({ queueIfBusy: false });
+        toast.dismiss(`processing-cancel:${jobId}`);
       } catch {
-        if (mountedRef.current) setOperationError("无法取消处理，请重试。");
+        if (mountedRef.current)
+          toast.error("无法取消处理，请重试。", {
+            id: `processing-cancel:${jobId}`,
+          });
       } finally {
         finishPending(jobId);
       }
@@ -216,14 +219,17 @@ export function useProcessingTasks(
   const retryProcessing = React.useCallback(
     async (jobId: number, expectedAttempt: number) => {
       if (!beginPending(jobId, "retry")) return;
-      setOperationError(null);
       try {
         await window.voice2text.retryProcessing(jobId, expectedAttempt);
         await requestReconcile({
           allowTerminalResetJobIds: new Set([jobId]),
         });
+        toast.dismiss(`processing-retry:${jobId}`);
       } catch {
-        if (mountedRef.current) setOperationError("无法重试处理，请重试。");
+        if (mountedRef.current)
+          toast.error("无法重试处理，请重试。", {
+            id: `processing-retry:${jobId}`,
+          });
       } finally {
         finishPending(jobId);
       }
@@ -233,7 +239,6 @@ export function useProcessingTasks(
 
   return {
     tasks,
-    operationError,
     importPending,
     pendingJobActions,
     importAudio,

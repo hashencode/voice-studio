@@ -1,7 +1,10 @@
 import { describe, expect, it, vi } from "vitest";
 
 import { MacOSHelperSecretStore } from "../../src/main/features/secrets/macos_helper_secret_store";
-import type { MacOSNativeHelperSession } from "../../src/main/features/importing/macos_native_helper_client";
+import {
+  NativeHelperCommandError,
+  type MacOSNativeHelperSession,
+} from "../../src/main/features/importing/macos_native_helper_client";
 
 describe("U10 private Keychain helper adapter", () => {
   it("uses only allowlisted private helper commands and never returns a replaced secret", async () => {
@@ -48,7 +51,10 @@ describe("U10 private Keychain helper adapter", () => {
   it("maps denied/corrupt reads to non-secret settings truth", async () => {
     const denied = new MacOSHelperSecretStore({
       invokeRaw: vi.fn(async () => {
-        throw new Error("KEYCHAIN_ACCESS_DENIED: unavailable");
+        throw new NativeHelperCommandError(
+          "KEYCHAIN_ACCESS_DENIED",
+          "unavailable",
+        );
       }),
     } as unknown as MacOSNativeHelperSession);
     const corrupt = new MacOSHelperSecretStore({
@@ -59,6 +65,18 @@ describe("U10 private Keychain helper adapter", () => {
 
     expect(await denied.read("deepseek")).toEqual({ state: "denied" });
     expect(await corrupt.read("deepseek")).toEqual({ state: "corrupt" });
+  });
+
+  it("does not classify helper failures from localized message text", async () => {
+    const store = new MacOSHelperSecretStore({
+      invokeRaw: vi.fn(async () => {
+        throw new Error("KEYCHAIN_ACCESS_DENIED: 本地化文案");
+      }),
+    } as unknown as MacOSNativeHelperSession);
+
+    await expect(store.read("deepseek")).resolves.toEqual({
+      state: "corrupt",
+    });
   });
 
   it("resolves the current helper session for every operation", async () => {

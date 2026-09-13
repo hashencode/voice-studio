@@ -16,13 +16,13 @@ const trustedEvent = {
 
 function handlers() {
   const workerHealth = vi.fn(async () => ({
-    protocolVersion: 2 as const,
+    protocolVersion: 3 as const,
     protocol: "desktop-sherpa-worker-health/v1" as const,
     runtime: "sherpa-onnx" as const,
     workerSha256: "b".repeat(64),
   }));
   const cancelProcessing = vi.fn(async (jobId: number) => ({
-    protocolVersion: 2 as const,
+    protocolVersion: 3 as const,
     jobId,
     state: "canceled" as const,
   }));
@@ -66,13 +66,13 @@ function handlers() {
         workerHealth,
         cancelProcessing,
         retryProcessing: vi.fn(async (jobId: number) => ({
-          protocolVersion: 2 as const,
+          protocolVersion: 3 as const,
           jobId,
           state: "queued" as const,
         })),
         listProcessingTasks: vi.fn(async () => []),
         importAudio: vi.fn(async () => ({
-          protocolVersion: 2 as const,
+          protocolVersion: 3 as const,
           state: "canceled" as const,
         })),
         preflightCapture: vi.fn(),
@@ -149,7 +149,7 @@ describe("Main IPC validation", () => {
     ]) {
       await expect(
         fixture.handlers.invoke(ipcChannels.workerHealth, event, {
-          expectedProtocolVersion: 2,
+          expectedProtocolVersion: 3,
         }),
       ).rejects.toBeInstanceOf(IpcContractError);
     }
@@ -205,12 +205,18 @@ describe("Main IPC validation", () => {
       fixture.handlers.invoke(ipcChannels.cancelProcessing, trustedEvent, {
         jobId: 23,
       }),
-    ).resolves.toEqual({ protocolVersion: 2, jobId: 23, state: "canceled" });
+    ).resolves.toEqual({
+      ok: true,
+      value: { protocolVersion: 3, jobId: 23, state: "canceled" },
+    });
     expect(fixture.cancelProcessing).toHaveBeenCalledOnce();
     expect(fixture.cancelProcessing).toHaveBeenCalledWith(23);
     await expect(
       fixture.handlers.invoke(ipcChannels.importAudio, trustedEvent, {}),
-    ).resolves.toEqual({ protocolVersion: 2, state: "canceled" });
+    ).resolves.toEqual({
+      ok: true,
+      value: { protocolVersion: 3, state: "canceled" },
+    });
     await expect(
       fixture.handlers.invoke(ipcChannels.importAudio, trustedEvent, {
         sourcePath: "/etc/passwd",
@@ -232,9 +238,12 @@ describe("Main IPC validation", () => {
     ).resolves.toEqual([]);
     await expect(
       fixture.handlers.invoke(ipcChannels.processingTasks, trustedEvent, {
-        expectedProtocolVersion: 2,
+        expectedProtocolVersion: 3,
       }),
-    ).resolves.toEqual({ protocolVersion: 2, tasks: [] });
+    ).resolves.toEqual({
+      ok: true,
+      value: { protocolVersion: 3, tasks: [] },
+    });
   });
 
   it("opens the local model root through the validated preload command", async () => {
@@ -261,18 +270,20 @@ describe("Main IPC validation", () => {
     const fixture = handlers();
     await expect(
       fixture.handlers.invoke(ipcChannels.applicationSnapshot, trustedEvent, {
-        expectedProtocolVersion: 2,
+        expectedProtocolVersion: 3,
       }),
-    ).resolves.toEqual(
-      expect.objectContaining({ navigation: { section: "library" } }),
-    );
+    ).resolves.toEqual({
+      ok: true,
+      value: expect.objectContaining({ navigation: { section: "library" } }),
+    });
     await expect(
       fixture.handlers.invoke(ipcChannels.applicationNavigate, trustedEvent, {
         section: "settings",
       }),
-    ).resolves.toEqual(
-      expect.objectContaining({ navigation: { section: "settings" } }),
-    );
+    ).resolves.toEqual({
+      ok: true,
+      value: expect.objectContaining({ navigation: { section: "settings" } }),
+    });
     await expect(
       fixture.handlers.invoke(ipcChannels.applicationNavigate, trustedEvent, {
         section: "raw-filesystem",
@@ -284,14 +295,20 @@ describe("Main IPC validation", () => {
         trustedEvent,
         { activityId: "activity-1" },
       ),
-    ).resolves.toEqual(expect.objectContaining({ revision: 1 }));
+    ).resolves.toEqual({
+      ok: true,
+      value: expect.objectContaining({ revision: 1 }),
+    });
     await expect(
       fixture.handlers.invoke(
         ipcChannels.applicationActivityMarkAllRead,
         trustedEvent,
         {},
       ),
-    ).resolves.toEqual(expect.objectContaining({ revision: 1 }));
+    ).resolves.toEqual({
+      ok: true,
+      value: expect.objectContaining({ revision: 1 }),
+    });
     await expect(
       fixture.handlers.invoke(
         ipcChannels.applicationActivityMarkRead,
@@ -310,7 +327,7 @@ describe("Main IPC validation", () => {
 
   it("allows only the exact packaged renderer file URL", async () => {
     const workerHealth = vi.fn(async () => ({
-      protocolVersion: 2 as const,
+      protocolVersion: 3 as const,
       protocol: "desktop-sherpa-worker-health/v1" as const,
       runtime: "sherpa-onnx" as const,
       workerSha256: "c".repeat(64),
@@ -352,7 +369,7 @@ describe("Main IPC validation", () => {
         retryProcessing: vi.fn(),
         listProcessingTasks: vi.fn(async () => []),
         importAudio: vi.fn(async () => ({
-          protocolVersion: 2 as const,
+          protocolVersion: 3 as const,
           state: "canceled" as const,
         })),
         preflightCapture: vi.fn(),
@@ -377,7 +394,7 @@ describe("Main IPC validation", () => {
         exportAudio: vi.fn(),
       },
     });
-    const payload = { expectedProtocolVersion: 2 };
+    const payload = { expectedProtocolVersion: 3 };
     await expect(
       packaged.invoke(
         ipcChannels.workerHealth,
@@ -388,7 +405,10 @@ describe("Main IPC validation", () => {
         },
         payload,
       ),
-    ).resolves.toEqual(expect.objectContaining({ protocolVersion: 2 }));
+    ).resolves.toEqual({
+      ok: true,
+      value: expect.objectContaining({ protocolVersion: 3 }),
+    });
     await expect(
       packaged.invoke(
         ipcChannels.workerHealth,
@@ -399,7 +419,10 @@ describe("Main IPC validation", () => {
         },
         payload,
       ),
-    ).resolves.toEqual(expect.objectContaining({ protocolVersion: 2 }));
+    ).resolves.toEqual({
+      ok: true,
+      value: expect.objectContaining({ protocolVersion: 3 }),
+    });
     await expect(
       packaged.invoke(
         ipcChannels.workerHealth,
@@ -410,7 +433,10 @@ describe("Main IPC validation", () => {
         },
         payload,
       ),
-    ).resolves.toEqual(expect.objectContaining({ protocolVersion: 2 }));
+    ).resolves.toEqual({
+      ok: true,
+      value: expect.objectContaining({ protocolVersion: 3 }),
+    });
     await expect(
       packaged.invoke(
         ipcChannels.workerHealth,
@@ -421,7 +447,10 @@ describe("Main IPC validation", () => {
         },
         payload,
       ),
-    ).resolves.toEqual(expect.objectContaining({ protocolVersion: 2 }));
+    ).resolves.toEqual({
+      ok: true,
+      value: expect.objectContaining({ protocolVersion: 3 }),
+    });
     await expect(
       packaged.invoke(
         ipcChannels.workerHealth,
@@ -461,7 +490,7 @@ describe("Main IPC validation", () => {
 
 function applicationSnapshot() {
   return {
-    protocolVersion: 2 as const,
+    protocolVersion: 3 as const,
     revision: 1,
     navigation: { section: "library" as const },
     profile: { phase: "ready" as const, legacyDatabaseArchived: false },

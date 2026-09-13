@@ -1,5 +1,6 @@
 import * as React from "react";
 import { LoaderCircle, Pencil, Plus, Trash2 } from "lucide-react";
+import { toast } from "sonner";
 
 import {
   AlertDialog,
@@ -45,7 +46,10 @@ import {
   SettingsPageSection,
   SettingsSelectContent,
 } from "@/features/settings/settings-page-section";
-import { userFacingError } from "@/lib/user-facing-error";
+import {
+  desktopFailureHasCode,
+  userFacingError,
+} from "@/lib/user-facing-error";
 import type {
   AiProviderProfile,
   AiSettingsSnapshot,
@@ -178,7 +182,6 @@ export function AiSettingsFeature({
       mutationPending={mutationPending}
       onPendingChange={setMutationPending}
       onSaved={setSettings}
-      onError={setError}
       onReload={load}
       addActionRef={addActionRef}
     />
@@ -217,7 +220,6 @@ function ProviderProfileList({
   mutationPending,
   onPendingChange,
   onSaved,
-  onError,
   onReload,
   addActionRef,
 }: {
@@ -227,7 +229,6 @@ function ProviderProfileList({
   mutationPending: boolean;
   onPendingChange: (pending: boolean) => void;
   onSaved: (settings: AiSettingsSnapshot) => void;
-  onError: (error: string | null) => void;
   onReload: () => Promise<AiSettingsSnapshot | null>;
   addActionRef: React.RefObject<HTMLButtonElement | null>;
 }) {
@@ -237,19 +238,24 @@ function ProviderProfileList({
   const selectProfile = (profile: AiProviderProfile) => {
     if (mutationPending || !profile.capabilities.selectable) return;
     onPendingChange(true);
-    onError(null);
+    const toastId = "ai-profile-selection";
     void api
       .selectAiProviderProfile({
         profileId: profile.profileId,
         expectedRevision: settings.revision,
       })
-      .then(onSaved)
+      .then((next) => {
+        onSaved(next);
+        toast.dismiss(toastId);
+      })
       .catch(async (cause: unknown) => {
         if (isStaleRevision(cause)) {
           await onReload();
-          onError("设置已更新，请重试");
+          toast.error("设置已更新，请重试。", { id: toastId });
         } else {
-          onError(userFacingError(cause, "无法切换模型"));
+          toast.error(userFacingError(cause, "无法切换模型，请重试。"), {
+            id: toastId,
+          });
         }
       })
       .finally(() => onPendingChange(false));
@@ -793,14 +799,17 @@ function focusAfterProfileDeletion(
 }
 
 function mutationErrorMessage(cause: unknown, fallback: string): string {
-  const message = cause instanceof Error ? cause.message : "";
-  if (message.includes("AI_PROFILE_IN_USE")) {
+  if (desktopFailureHasCode(cause, "ai-provider", "AI_PROFILE_IN_USE")) {
     return "该模型正在被任务使用，无法修改配置。";
   }
   return fallback;
 }
 
 function isStaleRevision(cause: unknown): boolean {
-  const message = cause instanceof Error ? cause.message.toLowerCase() : "";
-  return message.includes("stale") || message.includes("revision is stale");
+  return desktopFailureHasCode(
+    cause,
+    "ai-provider",
+    "AI_PREPARATION_STALE",
+    "AI_ATTEMPT_CONFLICT",
+  );
 }

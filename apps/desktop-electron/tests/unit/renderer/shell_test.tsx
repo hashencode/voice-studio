@@ -35,6 +35,16 @@ function deferred<T>() {
 }
 
 describe("render-backed shell frame", () => {
+  it("installs exactly one root toast host", () => {
+    installApi(readySnapshot);
+
+    render(<App />);
+
+    expect(
+      document.querySelectorAll('section[aria-label^="Notifications"]'),
+    ).toHaveLength(1);
+  });
+
   it("owns source-order slots without feature controllers", () => {
     const { container } = render(
       <AppShellFrame
@@ -409,7 +419,7 @@ describe("render-backed shell frame", () => {
 });
 
 const readySnapshot: ApplicationSnapshot = {
-  protocolVersion: 2,
+  protocolVersion: 3,
   revision: 4,
   navigation: { section: "library" },
   profile: { phase: "ready", legacyDatabaseArchived: false },
@@ -1393,7 +1403,11 @@ describe("application shell", () => {
     ).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: /音频上下文面板/ })).toBeNull();
     expect(audioNavigation).toHaveFocus();
-    expect(document.querySelector("[aria-live]")).toBeNull();
+    expect(document.querySelectorAll("[aria-live]")).toHaveLength(1);
+    expect(document.querySelector("[aria-live]")).toHaveAttribute(
+      "aria-label",
+      expect.stringContaining("Notifications"),
+    );
     expect(writes).not.toHaveBeenCalled();
     expect(
       window.localStorage.getItem("voice2text.shell.context-panes.v1"),
@@ -1484,7 +1498,7 @@ describe("application shell", () => {
       name: "工作站主导航",
     });
     expect(
-      screen.getByRole("complementary", { name: "音频上下文面板" }),
+      await screen.findByRole("complementary", { name: "音频上下文面板" }),
     ).toBeVisible();
     expect(writes).not.toHaveBeenCalled();
 
@@ -2073,6 +2087,8 @@ describe("application shell", () => {
       interruptionReason: null,
       recordingSha256: null,
       title: "Recover-录制中断，需要处理",
+      capability: "restorable" as const,
+      reason: null,
     };
     const otherRecovery = {
       ...targetedRecovery,
@@ -2080,7 +2096,10 @@ describe("application shell", () => {
       title: "Recover-另一段录制",
       captureTimelineMs: 4_000,
     };
-    const actOnCaptureRecovery = vi.fn(async () => null);
+    const actOnCaptureRecovery = vi.fn(async () => ({
+      outcomes: [],
+      recoveries: [],
+    }));
     installApi(
       {
         ...readySnapshot,
@@ -2110,12 +2129,10 @@ describe("application shell", () => {
     render(<App />);
 
     const recoveryDialog = await screen.findByRole("dialog", {
-      name: "发现可恢复录制",
+      name: "发现待处理的录音",
     });
     expect(
-      within(recoveryDialog).getByText(
-        "发现 2 段未完成的录音，可一次恢复并保存。",
-      ),
+      within(recoveryDialog).getByText(/发现 2 段待处理录音：2 段可恢复/),
     ).toBeVisible();
     expect(
       within(recoveryDialog).queryByText("Recover-录制中断，需要处理"),
@@ -2126,21 +2143,11 @@ describe("application shell", () => {
     expect(screen.queryByRole("region", { name: "录制详情" })).toBeNull();
     await userEvent
       .setup()
-      .click(
-        within(recoveryDialog).getByRole("button", { name: "恢复所有录音" }),
-      );
-    await waitFor(() => expect(actOnCaptureRecovery).toHaveBeenCalledTimes(2));
-    expect(actOnCaptureRecovery).toHaveBeenNthCalledWith(
-      1,
+      .click(within(recoveryDialog).getByRole("button", { name: "恢复" }));
+    await waitFor(() => expect(actOnCaptureRecovery).toHaveBeenCalledOnce());
+    expect(actOnCaptureRecovery).toHaveBeenCalledWith(
       expect.objectContaining({
-        sessionId: otherRecovery.sessionId,
-        action: "keep",
-      }),
-    );
-    expect(actOnCaptureRecovery).toHaveBeenNthCalledWith(
-      2,
-      expect.objectContaining({
-        sessionId: targetedRecovery.sessionId,
+        sessionIds: [otherRecovery.sessionId, targetedRecovery.sessionId],
         action: "keep",
       }),
     );

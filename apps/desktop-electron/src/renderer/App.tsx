@@ -1,5 +1,6 @@
 import * as React from "react";
 import { Cloud, HardDrive, Mic, Settings2 } from "lucide-react";
+import { toast } from "sonner";
 
 import { Item, ItemContent, ItemMedia, ItemTitle } from "@/components/ui/item";
 import {
@@ -70,6 +71,7 @@ import {
   ModalCoordinatorProvider,
   useModalCoordinator,
 } from "@/components/ui/modal-coordinator";
+import { Toaster } from "@/components/ui/sonner";
 
 const SETTINGS_SECTIONS = [
   { value: "general", label: "通用", icon: Settings2 },
@@ -83,6 +85,7 @@ export default function AppRoot() {
   return (
     <ModalCoordinatorProvider>
       <App />
+      <Toaster />
     </ModalCoordinatorProvider>
   );
 }
@@ -95,7 +98,6 @@ function App() {
     bootstrapPending,
     bootstrapError,
     loadError,
-    operationError,
     tasks,
     pendingJobActions,
     navigate,
@@ -172,9 +174,6 @@ function App() {
   >(null);
   const [activityError, setActivityError] =
     React.useState<ActivityItemView | null>(null);
-  const [activityOperationError, setActivityOperationError] = React.useState<
-    string | null
-  >(null);
   const [markAllActivityPending, setMarkAllActivityPending] =
     React.useState(false);
   const [activityQuery, setActivityQuery] = React.useState("");
@@ -205,11 +204,12 @@ function App() {
   const markActivityRead = React.useCallback(async (item: ActivityItemView) => {
     if (item.read || exactReadPendingRef.current.has(item.id)) return;
     exactReadPendingRef.current.add(item.id);
-    setActivityOperationError(null);
+    const toastId = `activity-mark-read:${item.id}`;
     try {
       await window.voice2text.markActivityRead(item.id);
+      toast.dismiss(toastId);
     } catch {
-      setActivityOperationError("操作失败，请重试");
+      toast.error("无法标记为已读，请重试。", { id: toastId });
     } finally {
       exactReadPendingRef.current.delete(item.id);
     }
@@ -218,11 +218,12 @@ function App() {
     if (markAllReadPendingRef.current) return;
     markAllReadPendingRef.current = true;
     setMarkAllActivityPending(true);
-    setActivityOperationError(null);
+    const toastId = "activity-mark-all-read";
     try {
       await window.voice2text.markAllActivityRead();
+      toast.dismiss(toastId);
     } catch {
-      setActivityOperationError("操作失败，请重试");
+      toast.error("无法全部标记为已读，请重试。", { id: toastId });
     } finally {
       markAllReadPendingRef.current = false;
       setMarkAllActivityPending(false);
@@ -686,7 +687,6 @@ function App() {
                         }}
                         unreadCount={unreadActivityItems.length}
                         markAllPending={markAllActivityPending}
-                        operationError={activityOperationError}
                         onMarkAllRead={() => void markAllActivityRead()}
                         query={activityQuery}
                         filter={activityFilter}
@@ -733,7 +733,6 @@ function App() {
                 {!captureDetailVisible && presentation.renderContent ? (
                   <ShellContent
                     snapshot={snapshot}
-                    operationError={operationError}
                     audio={audio}
                     companion={companion}
                     onOpenCompanionPane={openPane}
@@ -820,7 +819,6 @@ function hasCaptureDetail(
 
 function ShellContent({
   snapshot,
-  operationError,
   audio,
   companion,
   onOpenCompanionPane,
@@ -830,7 +828,6 @@ function ShellContent({
   settingsSection,
 }: {
   snapshot: ApplicationSnapshot;
-  operationError: string | null;
   audio: AudioRouteController;
   companion: CompanionRouteController;
   onOpenCompanionPane: () => void;
@@ -879,7 +876,6 @@ function ShellContent({
         <div className="flex min-h-full flex-col gap-4">
           <AudioMainWorkspace
             controller={audio}
-            operationError={operationError}
             showRecordingReady={snapshot.capture.phase === "idle"}
           />
         </div>
@@ -909,9 +905,7 @@ function ShellContent({
 }
 
 function processingUnavailableMessage(reason: string | null): string {
-  return reason?.includes("安装")
-    ? "请先安装本地转写模型。"
-    : "请检查本地模型设置后重试。";
+  return reason ?? "请检查本地模型设置后重试。";
 }
 
 function SettingsContextPane({

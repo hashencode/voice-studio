@@ -87,9 +87,35 @@ export const captureSnapshotSchema = z
 export const captureRuntimeSnapshotSchema = captureSnapshotSchema.extend({
   audioActivity: captureAudioActivitySchema,
 });
-export const captureRecoveryItemSchema = captureSnapshotSchema.extend({
-  title: captureTitleSchema,
-});
+export const captureRecoveryCapabilitySchema = z.enum([
+  "restorable",
+  "discard-only",
+  "preserve-only",
+]);
+export const captureRecoveryReasonSchema = z.enum([
+  "no-audio-data",
+  "unfinished-audio-data",
+  "recovery-metadata-damaged",
+  "audio-integrity-failed",
+  "finalization-in-progress",
+  "currently-unverifiable",
+]);
+export const captureRecoveryItemSchema = captureSnapshotSchema
+  .extend({
+    title: captureTitleSchema,
+    capability: captureRecoveryCapabilitySchema,
+    reason: captureRecoveryReasonSchema.nullable(),
+  })
+  .strict()
+  .superRefine((item, context) => {
+    if ((item.capability === "restorable") !== (item.reason === null)) {
+      context.addIssue({
+        code: "custom",
+        message: "recovery capability and reason are inconsistent",
+        path: ["reason"],
+      });
+    }
+  });
 
 export const suggestCaptureTitleRequestSchema = z.object({}).strict();
 export const suggestCaptureTitleResponseSchema = z
@@ -149,8 +175,45 @@ export const captureControlRequestSchema = z
 export const captureRecoveryActionRequestSchema = z
   .object({
     action: z.enum(["keep", "discard"]),
-    sessionId: captureSessionIdSchema,
+    sessionIds: z.array(captureSessionIdSchema).min(1).max(256),
     idempotencyKey: z.string().min(12).max(160),
+  })
+  .strict()
+  .superRefine((request, context) => {
+    if (new Set(request.sessionIds).size !== request.sessionIds.length) {
+      context.addIssue({
+        code: "custom",
+        message: "capture recovery targets must be unique",
+        path: ["sessionIds"],
+      });
+    }
+  });
+export const captureRecoveryOutcomeSchema = z
+  .object({
+    sessionId: captureSessionIdSchema,
+    action: z.enum(["keep", "discard"]),
+    result: z.enum(["kept", "discarded", "preserved", "conflict", "failed"]),
+    completionCertainty: z.enum(["completed", "not-completed", "unknown"]),
+    audioDurability: z.enum([
+      "durable",
+      "discarded",
+      "preserved",
+      "unchanged",
+      "unknown",
+    ]),
+    transcriptionHandoff: z.enum([
+      "not-requested",
+      "pending",
+      "completed",
+      "failed",
+    ]),
+    capture: captureSnapshotSchema.nullable(),
+  })
+  .strict();
+export const captureRecoveryActionResponseSchema = z
+  .object({
+    outcomes: z.array(captureRecoveryOutcomeSchema).max(256),
+    recoveries: z.array(captureRecoveryItemSchema).max(256),
   })
   .strict();
 export const captureRecoveryListRequestSchema = z.object({}).strict();
@@ -290,6 +353,16 @@ export type CaptureRuntimeSnapshot = z.infer<
   typeof captureRuntimeSnapshotSchema
 >;
 export type CaptureRecoveryItem = z.infer<typeof captureRecoveryItemSchema>;
+export type CaptureRecoveryCapability = z.infer<
+  typeof captureRecoveryCapabilitySchema
+>;
+export type CaptureRecoveryReason = z.infer<typeof captureRecoveryReasonSchema>;
+export type CaptureRecoveryOutcome = z.infer<
+  typeof captureRecoveryOutcomeSchema
+>;
+export type CaptureRecoveryActionResponse = z.infer<
+  typeof captureRecoveryActionResponseSchema
+>;
 export type SuggestCaptureTitleResponse = z.infer<
   typeof suggestCaptureTitleResponseSchema
 >;

@@ -12,7 +12,7 @@ import type {
 } from "../../src/shared/contracts";
 
 const application: ApplicationSnapshot = {
-  protocolVersion: 2,
+  protocolVersion: 3,
   revision: 12,
   navigation: { section: "library" },
   profile: { phase: "ready", legacyDatabaseArchived: false },

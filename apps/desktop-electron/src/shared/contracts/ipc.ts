@@ -15,8 +15,10 @@ import type {
   AudioWorkspaceSnapshot,
   PlaybackAction,
 } from "./audio_workspace";
+import { audioAiErrorCodeSchema, type AudioAiErrorCode } from "./audio_ai";
 import type {
   CapturePreflight,
+  CaptureRecoveryActionResponse,
   CaptureRecoveryItem,
   CaptureSnapshot,
   RenameCaptureSessionRequest,
@@ -55,7 +57,7 @@ import type {
 } from "./companion";
 import type { LocalModelIntent, LocalModelSnapshot } from "./local_models";
 
-export const desktopProtocolVersion = 2 as const;
+export const desktopProtocolVersion = 3 as const;
 export const desktopWorkerHealthProtocolVersion = 1 as const;
 export const desktopWorkerHealthProtocol =
   "desktop-sherpa-worker-health/v1" as const;
@@ -228,21 +230,163 @@ export const operationEventSchema = z
   })
   .strict();
 
-export const desktopErrorSchema = z
-  .object({
-    protocolVersion: z.literal(desktopProtocolVersion),
-    code: z.enum([
-      "UNKNOWN_CHANNEL",
-      "UNTRUSTED_SENDER",
-      "INVALID_PAYLOAD",
-      "PAYLOAD_TOO_LARGE",
-      "OPERATION_NOT_AVAILABLE",
-      "INTERNAL_ERROR",
-    ]),
-    message: z.string().min(1).max(512),
-    retryable: z.boolean(),
-  })
+const desktopFailureBaseSchema = z.object({
+  protocolVersion: z.literal(desktopProtocolVersion),
+  retryable: z.boolean(),
+  fallback: z.enum(["try-again", "reload", "continue", "restart-application"]),
+  completionCertainty: z
+    .enum(["completed", "not-completed", "unknown"])
+    .optional(),
+  dataDurability: z
+    .enum(["durable", "unchanged", "at-risk", "unknown"])
+    .optional(),
+});
+
+export const desktopFailureSchema = z.discriminatedUnion("domain", [
+  desktopFailureBaseSchema
+    .extend({
+      domain: z.literal("transport"),
+      code: z.enum([
+        "IPC_DISCONNECTED",
+        "INVALID_RESPONSE",
+        "PROTOCOL_MISMATCH",
+      ]),
+    })
+    .strict(),
+  desktopFailureBaseSchema
+    .extend({
+      domain: z.literal("internal"),
+      code: z.literal("INTERNAL_ERROR"),
+    })
+    .strict(),
+  desktopFailureBaseSchema
+    .extend({
+      domain: z.literal("application"),
+      code: z.literal("APPLICATION_UNAVAILABLE"),
+      applicationAvailability: z.literal("unavailable"),
+    })
+    .strict(),
+  desktopFailureBaseSchema
+    .extend({
+      domain: z.literal("local-model"),
+      code: z.literal("MODEL_BUSY"),
+    })
+    .strict(),
+  desktopFailureBaseSchema
+    .extend({
+      domain: z.literal("audio-workspace"),
+      code: z.literal("WORKSPACE_CONFLICT"),
+    })
+    .strict(),
+  desktopFailureBaseSchema
+    .extend({
+      domain: z.literal("ai-provider"),
+      code: audioAiErrorCodeSchema,
+    })
+    .strict(),
+  desktopFailureBaseSchema
+    .extend({
+      domain: z.literal("companion-transfer"),
+      code: z.enum([
+        "COMPANION_TRANSFER_CONFLICT",
+        "COMPANION_CHUNK_CONFLICT",
+        "COMPANION_CHECKPOINT_EXPIRED",
+        "COMPANION_TRANSFER_NOT_FOUND",
+        "COMPANION_RECEIPT_MISMATCH",
+      ]),
+    })
+    .strict(),
+]);
+
+export const desktopIpcFailureEnvelopeSchema = z
+  .object({ ok: z.literal(false), failure: desktopFailureSchema })
   .strict();
+
+export function desktopIpcSuccessEnvelopeSchema<T extends z.ZodType>(
+  valueSchema: T,
+) {
+  return z.object({ ok: z.literal(true), value: valueSchema }).strict();
+}
+
+export type DesktopFailureData = z.infer<typeof desktopFailureSchema>;
+
+export class DesktopFailure extends Error {
+  readonly data: DesktopFailureData;
+  readonly protocolVersion: typeof desktopProtocolVersion;
+  readonly domain: DesktopFailureData["domain"];
+  readonly code: DesktopFailureData["code"];
+  readonly retryable: boolean;
+  readonly fallback: DesktopFailureData["fallback"];
+  readonly completionCertainty?: DesktopFailureData["completionCertainty"];
+  readonly dataDurability?: DesktopFailureData["dataDurability"];
+  readonly applicationAvailability?: "unavailable";
+
+  constructor(data: DesktopFailureData) {
+    super(`Desktop operation failed (${data.domain}/${data.code})`);
+    this.name = "DesktopFailure";
+    this.data = Object.freeze({ ...data }) as DesktopFailureData;
+    this.protocolVersion = data.protocolVersion;
+    this.domain = data.domain;
+    this.code = data.code;
+    this.retryable = data.retryable;
+    this.fallback = data.fallback;
+    this.completionCertainty = data.completionCertainty;
+    this.dataDurability = data.dataDurability;
+    this.applicationAvailability =
+      data.domain === "application" ? data.applicationAvailability : undefined;
+  }
+}
+
+export function unwrapDesktopIpcEnvelope<T extends z.ZodType>(
+  payload: unknown,
+  valueSchema: T,
+): z.infer<T> {
+  if (
+    typeof payload === "object" &&
+    payload !== null &&
+    "ok" in payload &&
+    payload.ok === false
+  ) {
+    const parsed = desktopIpcFailureEnvelopeSchema.safeParse(payload);
+    if (parsed.success) throw new DesktopFailure(parsed.data.failure);
+    throw desktopTransportFailure("INVALID_RESPONSE");
+  }
+  const parsed =
+    desktopIpcSuccessEnvelopeSchema(valueSchema).safeParse(payload);
+  if (parsed.success) {
+    return (parsed.data as { ok: true; value: z.output<T> }).value;
+  }
+  const versionedValue =
+    typeof payload === "object" &&
+    payload !== null &&
+    "ok" in payload &&
+    payload.ok === true &&
+    "value" in payload
+      ? payload.value
+      : payload;
+  if (
+    typeof versionedValue === "object" &&
+    versionedValue !== null &&
+    "protocolVersion" in versionedValue &&
+    versionedValue.protocolVersion !== desktopProtocolVersion
+  ) {
+    throw desktopTransportFailure("PROTOCOL_MISMATCH");
+  }
+  throw desktopTransportFailure("INVALID_RESPONSE");
+}
+
+export function desktopTransportFailure(
+  code: "IPC_DISCONNECTED" | "INVALID_RESPONSE" | "PROTOCOL_MISMATCH",
+): DesktopFailure {
+  return new DesktopFailure({
+    protocolVersion: desktopProtocolVersion,
+    domain: "transport",
+    code,
+    retryable: true,
+    fallback:
+      code === "PROTOCOL_MISMATCH" ? "restart-application" : "try-again",
+  });
+}
 
 export type WorkerHealthResponse = z.infer<typeof workerHealthResponseSchema>;
 export type CancelProcessingResponse = z.infer<
@@ -257,7 +401,10 @@ export type StartTranscriptionResponse = z.infer<
   typeof startTranscriptionResponseSchema
 >;
 export type ImportAudioResponse = z.infer<typeof importAudioResponseSchema>;
-export type DesktopError = z.infer<typeof desktopErrorSchema>;
+export type DesktopIpcFailureEnvelope = z.infer<
+  typeof desktopIpcFailureEnvelopeSchema
+>;
+export type { AudioAiErrorCode };
 
 export interface Voice2TextDesktopApi {
   getCompanionSnapshot(): Promise<CompanionSnapshot>;
@@ -424,9 +571,9 @@ export interface Voice2TextDesktopApi {
   listCaptureRecoveries(): Promise<CaptureRecoveryItem[]>;
   actOnCaptureRecovery(options: {
     action: "keep" | "discard";
-    sessionId: string;
+    sessionIds: string[];
     idempotencyKey: string;
-  }): Promise<CaptureSnapshot | null>;
+  }): Promise<CaptureRecoveryActionResponse>;
   startMicrophoneTest(options: {
     microphoneDeviceId?: string;
   }): Promise<MicrophoneTestSnapshot>;

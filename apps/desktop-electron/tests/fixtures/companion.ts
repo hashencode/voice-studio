@@ -88,7 +88,7 @@ export function companionCommandStubs() {
     openLocalModelRoot: async () => undefined,
     onLocalModelSnapshot: () => () => undefined,
     startTranscription: async (audioId: number) => ({
-      protocolVersion: 2 as const,
+      protocolVersion: 3 as const,
       jobId: audioId,
       state: "queued" as const,
     }),

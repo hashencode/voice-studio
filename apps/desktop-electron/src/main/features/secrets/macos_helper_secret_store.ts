@@ -1,6 +1,9 @@
 import { z } from "zod";
 
-import type { MacOSNativeHelperSession } from "../importing/macos_native_helper_client";
+import {
+  NativeHelperCommandError,
+  type MacOSNativeHelperSession,
+} from "../importing/macos_native_helper_client";
 import {
   assertProviderSecretInput,
   type DesktopSecretStorePort,
@@ -116,5 +119,5 @@ function mapReadFailure(error: unknown): "denied" | "corrupt" {
 }
 
 function isHelperCode(error: unknown, code: string): boolean {
-  return error instanceof Error && error.message.startsWith(`${code}:`);
+  return error instanceof NativeHelperCommandError && error.code === code;
 }

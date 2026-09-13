@@ -1,4 +1,5 @@
 import * as React from "react";
+import { toast } from "sonner";
 import {
   ChevronDown,
   Download,
@@ -352,8 +353,11 @@ function WorkspaceView({
     try {
       setWorkspace(await action());
       setStatus(success);
+      toast.dismiss("audio-workspace-mutation");
     } catch (cause) {
-      setError(userFacingError(cause, "音频修改未完成，请重新载入"));
+      toast.error(userFacingError(cause, "音频修改未完成，请重新载入。"), {
+        id: "audio-workspace-mutation",
+      });
     } finally {
       operationPendingRef.current = false;
       setPending(false);
@@ -380,8 +384,11 @@ function WorkspaceView({
           : await api.controlAudioPlayback(workspace.summary.audioId, command);
       setPlayback(next);
       setStatus(playbackStatus(next));
+      toast.dismiss("audio-playback-action");
     } catch (cause) {
-      setError(userFacingError(cause, "音频操作未完成"));
+      toast.error(userFacingError(cause, "音频操作未完成，请重试。"), {
+        id: "audio-playback-action",
+      });
     } finally {
       operationPendingRef.current = false;
       setPending(false);
@@ -395,14 +402,19 @@ function WorkspaceView({
     setError(null);
     try {
       const result = await api.exportAudio(workspace.summary.audioId, format);
-      if (result.state === "saved") setStatus(`已导出 ${result.fileName}`);
-      else if (result.state === "canceled") setStatus("已取消导出");
-      else {
-        setError(result.message);
-        setStatus(`音频导出失败：${result.message}`);
+      if (result.state === "saved") {
+        setStatus(`已导出 ${result.fileName}`);
+        toast.dismiss("audio-export");
+      } else if (result.state === "canceled") {
+        setStatus("已取消导出");
+        toast.dismiss("audio-export");
+      } else {
+        toast.error("音频导出失败，请重试。", { id: "audio-export" });
       }
     } catch (cause) {
-      setError(userFacingError(cause, "音频导出未完成"));
+      toast.error(userFacingError(cause, "音频导出未完成，请重试。"), {
+        id: "audio-export",
+      });
     } finally {
       operationPendingRef.current = false;
       setPending(false);

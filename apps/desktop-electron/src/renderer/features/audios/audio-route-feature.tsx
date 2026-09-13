@@ -1,4 +1,5 @@
 import * as React from "react";
+import { toast } from "sonner";
 import {
   AudioLines,
   Ban,
@@ -14,6 +15,15 @@ import {
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { EmptyState } from "@/components/ui/empty-state";
+import {
+  Dialog,
+  DialogClose,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import {
   Item,
   ItemContent,
@@ -32,7 +42,10 @@ import {
   useRecordingPreference,
 } from "@/features/capture/use-recording-preference";
 import type { PendingJobAction } from "@/features/processing/use-processing-tasks";
-import { userFacingError } from "@/lib/user-facing-error";
+import {
+  desktopFailureHasCode,
+  userFacingError,
+} from "@/lib/user-facing-error";
 import type {
   AudioSummary,
   AudioWorkspaceSnapshot,
@@ -108,6 +121,7 @@ export function useAudioRouteController({
     string | null
   >(null);
   const workspaceRef = React.useRef(workspace);
+  const audiosRef = React.useRef(audios);
   const capturePreflightIntentRef = React.useRef(0);
   const listIntentRef = React.useRef(0);
   const listRequestRef = React.useRef<Promise<void> | null>(null);
@@ -211,10 +225,18 @@ export function useAudioRouteController({
         if (intent !== listIntentRef.current) return;
         await clearRemovedSelection(next);
         if (intent !== listIntentRef.current) return;
+        audiosRef.current = next;
         setAudios(next);
+        toast.dismiss("audio-library-refresh");
       } catch (cause) {
         if (intent === listIntentRef.current) {
-          setListError(userFacingError(cause, "无法载入音频列表"));
+          if (audiosRef.current) {
+            toast.error("无法刷新音频列表，仍显示上次内容。", {
+              id: "audio-library-refresh",
+            });
+          } else {
+            setListError(userFacingError(cause, "无法载入音频列表"));
+          }
         }
       } finally {
         if (intent === listIntentRef.current) setListPending(false);
@@ -443,7 +465,7 @@ export function useAudioRouteController({
     try {
       await api.startTranscription(audioId);
     } catch (cause) {
-      if (isProcessingUnavailableError(cause)) {
+      if (desktopFailureHasCode(cause, "local-model", "MODEL_BUSY")) {
         onProcessingUnavailable?.();
       } else {
         setTransitionError(userFacingError(cause, "无法开始本地转写"));
@@ -565,6 +587,7 @@ export function useAudioRouteController({
     selectAudio,
     clearSelection,
     transitionError,
+    dismissTransitionError: () => setTransitionError(null),
     transitionPending,
     importPending,
     importError,
@@ -587,13 +610,6 @@ export function useAudioRouteController({
     onRetry: retryProcessing,
     startTranscription,
   };
-}
-
-function isProcessingUnavailableError(cause: unknown): boolean {
-  return (
-    cause instanceof Error &&
-    /模型|runtime|storage|本地转写不可用/i.test(cause.message)
-  );
 }
 
 export function AudioRouteFeature({
@@ -655,6 +671,7 @@ export function AudioContextPaneHeader({
   return (
     <div role="group" aria-label="录音操作">
       <Button
+        data-recording-entry="audio-context-pane"
         type="button"
         size="icon-sm"
         variant="ghost"
@@ -841,7 +858,10 @@ export function AudioMainWorkspace({
       {controller.libraryPresentation !== "loading" &&
       controller.libraryPresentation !== "error" &&
       controller.transitionError ? (
-        <AudioOperationError message={controller.transitionError} />
+        <AudioTransitionErrorDialog
+          message={controller.transitionError}
+          onDismiss={controller.dismissTransitionError}
+        />
       ) : null}
       {controller.libraryPresentation === "loading" ? (
         <AudioLibraryLoading />
@@ -863,6 +883,7 @@ export function AudioMainWorkspace({
                 </p>
               </div>
               <Button
+                data-recording-entry="audio-first-use"
                 type="button"
                 disabled={controller.transitionPending}
                 onClick={() => void controller.startTranscription()}
@@ -1303,5 +1324,29 @@ function AudioOperationError({ message }: { message: string }) {
     <div role="alert" className="rounded-lg border bg-card px-4 py-3 text-sm">
       操作未完成：{message}
     </div>
+  );
+}
+
+function AudioTransitionErrorDialog({
+  message,
+  onDismiss,
+}: {
+  message: string;
+  onDismiss: () => void;
+}) {
+  return (
+    <Dialog open onOpenChange={(open) => !open && onDismiss()}>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>音频操作未完成</DialogTitle>
+          <DialogDescription>{message}</DialogDescription>
+        </DialogHeader>
+        <DialogFooter>
+          <DialogClose asChild>
+            <Button type="button">知道了</Button>
+          </DialogClose>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   );
 }

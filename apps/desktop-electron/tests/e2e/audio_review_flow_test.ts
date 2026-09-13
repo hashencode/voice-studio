@@ -223,7 +223,7 @@ it("reviews a completed audio through validated Main and Preload contracts witho
 
 function applicationSnapshot(): ApplicationSnapshot {
   return {
-    protocolVersion: 2,
+    protocolVersion: 3,
     revision: 1,
     navigation: { section: "library" },
     profile: { phase: "ready", legacyDatabaseArchived: false },

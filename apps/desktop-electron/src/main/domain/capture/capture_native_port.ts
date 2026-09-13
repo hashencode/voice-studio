@@ -17,7 +17,8 @@ export class MicrophoneTestNativeError extends Error {
   }
 }
 
-export type CaptureNativeStopFailureKind = "command" | "transport";
+export type CaptureNativeStopFailureKind =
+  "command" | "finalization" | "transport";
 
 export class CaptureNativeStopError extends Error {
   constructor(

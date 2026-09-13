@@ -9,7 +9,8 @@ import {
 } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { BoxesIcon } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { toast } from "sonner";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { Checkbox } from "@/components/ui/checkbox";
@@ -87,10 +88,23 @@ import {
   useModalCoordinator,
 } from "@/components/ui/modal-coordinator";
 import componentConfig from "../../../components.json";
+import { Toaster } from "@/components/ui/sonner";
 
 afterEach(() => {
+  toast.dismiss();
   vi.restoreAllMocks();
 });
+
+function LoadingToast({ id }: { id: string }) {
+  useEffect(() => {
+    toast.loading("正在保存", { id });
+    return () => {
+      toast.dismiss(id);
+    };
+  }, [id]);
+
+  return null;
+}
 
 function ControlledSidebar({
   onOpenChange,
@@ -119,6 +133,53 @@ function ControlledSidebar({
 }
 
 describe("current shadcn primitives", () => {
+  it("uses the shadowless local Sonner host without a theme provider", () => {
+    render(<Toaster />);
+    const toaster = document.querySelector('section[aria-live="polite"]');
+
+    expect(toaster).toHaveAttribute(
+      "aria-label",
+      expect.stringContaining("Notifications"),
+    );
+    expect(Toaster.toString()).toContain("shadow-none");
+    expect(Toaster.toString()).toContain("focus-visible:ring-1");
+    expect(Toaster.toString()).not.toContain("focus-visible:ring-2");
+    expect(Toaster.toString()).not.toContain("next-themes");
+  });
+
+  it("updates a stable toast id instead of creating a duplicate", async () => {
+    const user = userEvent.setup();
+    render(
+      <>
+        <Toaster />
+        <LoadingToast id="save-recording" />
+        <button
+          type="button"
+          onClick={() => toast.success("保存完成", { id: "save-recording" })}
+        >
+          完成保存
+        </button>
+      </>,
+    );
+
+    expect(await screen.findByText("正在保存")).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "完成保存" }));
+    expect(await screen.findByText("保存完成")).toBeInTheDocument();
+    expect(screen.queryByText("正在保存")).not.toBeInTheDocument();
+    expect(document.querySelectorAll("[data-sonner-toast]")).toHaveLength(1);
+  });
+
+  it("dismisses a loading toast when its feature owner unmounts", async () => {
+    render(<Toaster />);
+    const loading = render(<LoadingToast id="feature-loading" />);
+
+    expect(await screen.findByText("正在保存")).toBeInTheDocument();
+    loading.unmount();
+    await waitFor(() => {
+      expect(screen.queryByText("正在保存")).not.toBeInTheDocument();
+    });
+  });
+
   it("pins the composite Radix Nova registry style without a separate base", () => {
     expect(componentConfig.style).toBe("radix-nova");
     expect(componentConfig).not.toHaveProperty("base");
@@ -345,6 +406,9 @@ describe("current shadcn primitives", () => {
             open={blocked}
             title="需要先处理本机资料库"
             description="请重新检查资料库状态。"
+            // @ts-expect-error Application blockers intentionally expose no
+            // dismiss callback, even to callers compiled against stale props.
+            onDismiss={() => setBlocked(false)}
           >
             <button type="button">重新检查</button>
           </ApplicationBlocker>

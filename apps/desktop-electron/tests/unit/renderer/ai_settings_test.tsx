@@ -2,6 +2,7 @@
 
 import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
+import { toast } from "sonner";
 import { describe, expect, it, vi } from "vitest";
 
 import { AiSettingsFeature } from "../../../src/renderer/features/settings/ai-settings-feature";
@@ -10,6 +11,7 @@ import type {
   CustomAiProviderProfile,
   Voice2TextDesktopApi,
 } from "../../../src/shared/contracts";
+import { DesktopFailure } from "../../../src/shared/contracts";
 
 const deepseekProfile: CustomAiProviderProfile = {
   profileId: "profile-deepseek",
@@ -77,6 +79,33 @@ function api(overrides: Record<string, unknown> = {}) {
 }
 
 describe("cloud model settings", () => {
+  it("reloads a stale selection by stable code instead of the error message", async () => {
+    const toastError = vi.spyOn(toast, "error");
+    const failure = new DesktopFailure({
+      protocolVersion: 3,
+      domain: "ai-provider",
+      code: "AI_PREPARATION_STALE",
+      retryable: false,
+      fallback: "continue",
+    });
+    failure.message = "设置响应已翻译";
+    const desktop = api({
+      selectAiProviderProfile: vi.fn(async () => Promise.reject(failure)),
+    });
+    render(<AiSettingsFeature api={desktop} settingsPage />);
+
+    await userEvent.setup().click(await screen.findByText("team-chat"));
+
+    await waitFor(() =>
+      expect(toastError).toHaveBeenCalledWith(
+        "设置已更新，请重试。",
+        expect.objectContaining({ id: "ai-profile-selection" }),
+      ),
+    );
+    expect(screen.queryByRole("alert")).toBeNull();
+    expect(desktop.getAiSettings).toHaveBeenCalledTimes(2);
+  });
+
   it("sanitizes an initial settings-load failure", async () => {
     const rawDiagnostic = "EACCES /private/credentials/provider.json";
     render(

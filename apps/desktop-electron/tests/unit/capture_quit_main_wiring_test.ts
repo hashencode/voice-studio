@@ -44,10 +44,20 @@ describe("capture quit Main wiring", () => {
       /suppressCapturePublications: suppressCapturePublications,[\s\S]*abortCapture: \(\) => captureNativePort\?\.abort\(\)/,
     );
     expect(mainSource).toContain("teardownOwnedResources(mode)");
+    expect(mainSource).toContain("await captureRecoveryMutation");
     expect(mainSource).toContain(
       'if (mode === "normal") await captureControlMutation',
     );
     expect(mainSource).toContain("exit: () => app.exit(0)");
+  });
+
+  it("serializes recovery mutations with capture control and fences teardown", () => {
+    expect(mainSource).toMatch(
+      /actOnCaptureRecovery: async \(options\)[\s\S]*Promise\.all\(\[\s*captureControlMutation,\s*captureRecoveryMutation,[\s\S]*captureControlMutation = captureRecoveryMutation/,
+    );
+    expect(mainSource).toContain(
+      'throw new Error("capture recovery is unavailable during teardown")',
+    );
   });
 
   it("shows quit decisions on a visible Main window", () => {
@@ -59,25 +69,21 @@ describe("capture quit Main wiring", () => {
     );
   });
 
-  it("joins an in-flight Renderer control and reuses its terminal result", () => {
+  it("uses the same single-flight stop transaction for Renderer stop and quit", () => {
     expect(mainSource).toMatch(
-      /stopAndReconcile: async \(options\) => \{[\s\S]*await captureControlMutation;[\s\S]*current\?\.sessionId === options\.sessionId[\s\S]*isDurableTerminal\(current\)[\s\S]*capability: "recovered-terminal"[\s\S]*captureService\.stopAndReconcile/,
+      /function runCaptureStopTransaction[\s\S]*captureStopTransaction\?\.sessionId === options\.sessionId[\s\S]*captureStopTransaction\.promise/,
     );
+    expect(
+      mainSource.match(/runCaptureStopTransaction\(options\)/g),
+    ).toHaveLength(2);
   });
 
-  it("disables stale capture controls after unknown recovery", () => {
-    expect(mainSource).toMatch(
-      /destination === "disabled"[\s\S]*captureControlsDisabled = true;[\s\S]*capturePollTimer = null;[\s\S]*publishCapture/,
+  it("offers no post-stop technical retry or recovery decision", () => {
+    expect(mainSource).not.toMatch(
+      /"live-failure"|"recovered-failure"|"unknown-failure"/,
     );
-    expect(mainSource).toContain(
-      'interruptionReason: "capture_native_authority_unavailable"',
-    );
-    expect(mainSource).toMatch(
-      /function requireCaptureControlAuthority[\s\S]*!captureService \|\| captureControlsDisabled/,
-    );
-    expect(mainSource).toMatch(
-      /const recoveries = await captureService\.recover\(\);\s*captureControlsDisabled = false;/,
-    );
+    expect(mainSource).not.toContain("captureControlsDisabled");
+    expect(mainSource).toContain("returnToCapture: () =>");
   });
 
   it("resolves secret operations against the recreated helper session", () => {
