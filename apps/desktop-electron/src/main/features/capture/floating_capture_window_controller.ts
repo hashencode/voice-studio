@@ -19,7 +19,6 @@ export interface FloatingCaptureWindowPort {
 export interface FloatingCaptureControllerPorts<
   RegistrationTarget = FloatingCaptureWindowPort,
 > {
-  appIsReady(): boolean;
   currentSnapshot(): FloatingCaptureSnapshot;
   mainIsProminent(): boolean;
   createWindow(): {
@@ -40,7 +39,6 @@ export interface FloatingCaptureControllerPorts<
   subscribeSnapshot(
     listener: (snapshot: FloatingCaptureSnapshot) => void,
   ): () => void;
-  subscribePresentationEnvironment(listener: () => void): () => void;
   subscribeDisplayChanges(listener: () => void): () => void;
   openCaptureDetails(): void;
   reportLoadFailure(error: unknown): void;
@@ -59,7 +57,6 @@ export class FloatingCaptureWindowController<
   } | null = null;
   private unregisterWindow: (() => void) | null = null;
   private unregisterSnapshot: (() => void) | null = null;
-  private unregisterEnvironment: (() => void) | null = null;
   private unregisterDisplays: (() => void) | null = null;
   private readonly listeners = new Set<
     (snapshot: FloatingCaptureSnapshot) => void
@@ -89,11 +86,6 @@ export class FloatingCaptureWindowController<
     }
     this.unregisterSnapshot = this.ports.subscribeSnapshot((snapshot) =>
       this.acceptSnapshot(snapshot),
-    );
-    this.unregisterEnvironment = this.ports.subscribePresentationEnvironment(
-      () => {
-        if (!this.fenced) this.reconcile(this.ports.currentSnapshot());
-      },
     );
     this.unregisterDisplays = this.ports.subscribeDisplayChanges(() => {
       if (!this.fenced) this.reconcile(this.ports.currentSnapshot(), true);
@@ -159,6 +151,10 @@ export class FloatingCaptureWindowController<
     this.presentedSessionId = null;
   }
 
+  reconcileCurrent(): void {
+    if (!this.fenced) this.reconcile(this.ports.currentSnapshot());
+  }
+
   rebindIpc(): void {
     if (this.fenced) return;
     const window = this.liveWindow();
@@ -175,7 +171,7 @@ export class FloatingCaptureWindowController<
     return this.preferenceMutation;
   }
 
-  disposeAfterCaptureDrain(): Promise<void> {
+  completeTeardown(): Promise<void> {
     this.disposal ??= this.dispose();
     return this.disposal;
   }
@@ -208,7 +204,7 @@ export class FloatingCaptureWindowController<
     snapshot: FloatingCaptureSnapshot,
     forcePosition = false,
   ): void {
-    if (this.fenced || !this.ports.appIsReady()) return;
+    if (this.fenced) return;
     const active = snapshot.phase !== "idle";
     if (
       !this.enabled ||
@@ -321,8 +317,6 @@ export class FloatingCaptureWindowController<
     await this.beginTeardown();
     this.unregisterSnapshot?.();
     this.unregisterSnapshot = null;
-    this.unregisterEnvironment?.();
-    this.unregisterEnvironment = null;
     this.unregisterDisplays?.();
     this.unregisterDisplays = null;
     this.listeners.clear();

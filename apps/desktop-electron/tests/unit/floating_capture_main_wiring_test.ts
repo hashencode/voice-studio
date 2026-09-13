@@ -52,8 +52,10 @@ describe("floating capture Main wiring", () => {
       /window\.on\("focus", \(\) => floatingCaptureController\?\.hideWindow\(\)\)/,
     );
     for (const eventName of ["blur", "minimize", "hide"]) {
-      expect(mainSource).toContain(
-        `window.on("${eventName}", notifyFloatingCapturePresentationEnvironment)`,
+      expect(mainSource).toMatch(
+        new RegExp(
+          `window\\.on\\("${eventName}", \\(\\) => floatingCaptureController\\?\\.reconcileCurrent\\(\\)\\)`,
+        ),
       );
     }
     expect(mainSource).toMatch(
@@ -113,7 +115,7 @@ describe("floating capture Main wiring", () => {
       'if (mode === "normal") await captureControlMutation',
     );
     const dispose = teardown.indexOf(
-      "await floatingCaptureController?.disposeAfterCaptureDrain()",
+      "await floatingCaptureController?.completeTeardown()",
     );
     const unregister = teardown.indexOf("unregisterIpc?.()");
     expect(fence).toBeGreaterThan(-1);

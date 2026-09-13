@@ -306,7 +306,6 @@ const companionListeners = new Set<(snapshot: CompanionSnapshot) => void>();
 const localModelListeners = new Set<
   (snapshot: import("../shared/contracts").LocalModelSnapshot) => void
 >();
-const floatingCapturePresentationEnvironmentListeners = new Set<() => void>();
 
 const captureQuitDecisionConfigurations = {
   initial: {
@@ -372,9 +371,9 @@ function createMainWindow(): BrowserWindow {
   });
   window.once("ready-to-show", () => window.show());
   window.on("focus", () => floatingCaptureController?.hideWindow());
-  window.on("blur", notifyFloatingCapturePresentationEnvironment);
-  window.on("minimize", notifyFloatingCapturePresentationEnvironment);
-  window.on("hide", notifyFloatingCapturePresentationEnvironment);
+  window.on("blur", () => floatingCaptureController?.reconcileCurrent());
+  window.on("minimize", () => floatingCaptureController?.reconcileCurrent());
+  window.on("hide", () => floatingCaptureController?.reconcileCurrent());
   window.on("closed", () => {
     if (mainWindow === window) mainWindow = null;
     if (process.platform !== "darwin" && !teardownComplete) app.quit();
@@ -497,15 +496,8 @@ async function writeFloatingCapturePreference(enabled: boolean): Promise<void> {
   }
 }
 
-function notifyFloatingCapturePresentationEnvironment(): void {
-  for (const listener of floatingCapturePresentationEnvironmentListeners) {
-    listener();
-  }
-}
-
 function createFloatingCaptureController(): FloatingCaptureWindowController<BrowserWindow> {
   return new FloatingCaptureWindowController<BrowserWindow>({
-    appIsReady: () => app.isReady(),
     currentSnapshot: () =>
       deriveFloatingCaptureSnapshot(applicationState.snapshot()),
     mainIsProminent: () =>
@@ -525,11 +517,6 @@ function createFloatingCaptureController(): FloatingCaptureWindowController<Brow
       applicationState.subscribe((snapshot) =>
         listener(deriveFloatingCaptureSnapshot(snapshot)),
       ),
-    subscribePresentationEnvironment: (listener) => {
-      floatingCapturePresentationEnvironmentListeners.add(listener);
-      return () =>
-        floatingCapturePresentationEnvironmentListeners.delete(listener);
-    },
     subscribeDisplayChanges: (listener) => {
       screen.on("display-removed", listener);
       screen.on("display-metrics-changed", listener);
@@ -4283,7 +4270,7 @@ async function teardownOwnedResources(
   await floatingCaptureController?.beginTeardown();
   await captureRecoveryMutation;
   if (mode === "normal") await captureControlMutation;
-  await floatingCaptureController?.disposeAfterCaptureDrain();
+  await floatingCaptureController?.completeTeardown();
   unregisterIpc?.();
   unregisterIpc = null;
   await processCoordinator?.shutdown();

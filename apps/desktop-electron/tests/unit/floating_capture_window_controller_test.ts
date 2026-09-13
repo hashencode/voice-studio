@@ -16,22 +16,11 @@ describe("FloatingCaptureWindowController", () => {
     expect(harness.events.slice(0, 4)).toEqual([
       "read-preference",
       "subscribe-snapshot",
-      "subscribe-environment",
       "subscribe-displays",
+      "create-window",
     ]);
     expect(harness.events).toContain("create-window");
     expect(harness.window.setPosition).toHaveBeenCalledWith(1664, 56, false);
-    expect(harness.window.showInactive).toHaveBeenCalledOnce();
-  });
-
-  it("waits for app readiness without losing the initialized subscriptions", () => {
-    const harness = createHarness({ enabled: true, ready: false });
-    harness.controller.initialize();
-    expect(harness.ports.createWindow).not.toHaveBeenCalled();
-
-    harness.ready = true;
-    harness.emitEnvironment();
-    expect(harness.ports.createWindow).toHaveBeenCalledOnce();
     expect(harness.window.showInactive).toHaveBeenCalledOnce();
   });
 
@@ -256,12 +245,11 @@ describe("FloatingCaptureWindowController", () => {
     expect(harness.window.destroy).not.toHaveBeenCalled();
 
     await Promise.all([
-      harness.controller.disposeAfterCaptureDrain(),
-      harness.controller.disposeAfterCaptureDrain(),
+      harness.controller.completeTeardown(),
+      harness.controller.completeTeardown(),
     ]);
     expect(harness.window.destroy).toHaveBeenCalledOnce();
     expect(harness.unsubscribeSnapshot).toHaveBeenCalledOnce();
-    expect(harness.unsubscribeEnvironment).toHaveBeenCalledOnce();
     expect(harness.unsubscribeDisplays).toHaveBeenCalledOnce();
 
     harness.emitSnapshot();
@@ -272,29 +260,23 @@ describe("FloatingCaptureWindowController", () => {
 
 function createHarness({
   enabled,
-  ready = true,
   loads = [],
 }: {
   enabled: boolean;
-  ready?: boolean;
   loads?: Array<ReturnType<typeof deferred<void>>>;
 }) {
   const events: string[] = [];
   const windows: FakeWindow[] = [];
   let snapshotListener: ((value: FloatingCaptureSnapshot) => void) | undefined;
-  let environmentListener: (() => void) | undefined;
   let displayListener: (() => void) | undefined;
   const unsubscribeSnapshot = vi.fn();
-  const unsubscribeEnvironment = vi.fn();
   const unsubscribeDisplays = vi.fn();
   const state = {
     enabled,
-    ready,
     prominent: false,
     snapshot: snapshot(),
   };
   const ports = {
-    appIsReady: () => state.ready,
     currentSnapshot: () => state.snapshot,
     mainIsProminent: () => state.prominent,
     createWindow: vi.fn(() => {
@@ -322,11 +304,6 @@ function createHarness({
       snapshotListener = listener;
       return unsubscribeSnapshot;
     },
-    subscribePresentationEnvironment: (listener) => {
-      events.push("subscribe-environment");
-      environmentListener = listener;
-      return unsubscribeEnvironment;
-    },
     subscribeDisplayChanges: (listener) => {
       events.push("subscribe-displays");
       displayListener = listener;
@@ -342,19 +319,12 @@ function createHarness({
     ports,
     controller,
     unsubscribeSnapshot,
-    unsubscribeEnvironment,
     unsubscribeDisplays,
     get enabled() {
       return state.enabled;
     },
     set enabled(value: boolean) {
       state.enabled = value;
-    },
-    get ready() {
-      return state.ready;
-    },
-    set ready(value: boolean) {
-      state.ready = value;
     },
     get prominent() {
       return state.prominent;
@@ -375,7 +345,7 @@ function createHarness({
       snapshotListener?.(state.snapshot);
     },
     emitEnvironment() {
-      environmentListener?.();
+      controller.reconcileCurrent();
     },
     emitDisplayChange() {
       displayListener?.();
