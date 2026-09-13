@@ -1632,6 +1632,41 @@ describe("capture workspace", () => {
       );
     });
 
+    it("replays a rejected automatic cleanup once with the same request and warns without success", async () => {
+      const item = recoveryItem({
+        capability: "discard-only",
+        reason: "no-audio-data",
+      });
+      const actOnCaptureRecovery = vi
+        .fn<Voice2TextDesktopApi["actOnCaptureRecovery"]>()
+        .mockRejectedValueOnce(new Error("cleanup response lost"))
+        .mockRejectedValueOnce(new Error("cleanup response still lost"));
+      installCaptureApi({
+        listCaptureRecoveries: vi.fn(async () => [item]),
+        actOnCaptureRecovery,
+      });
+
+      render(<CaptureWorkspace capture={idle} />);
+
+      await waitFor(() =>
+        expect(actOnCaptureRecovery).toHaveBeenCalledTimes(2),
+      );
+      expect(actOnCaptureRecovery.mock.calls[1]?.[0]).toEqual(
+        actOnCaptureRecovery.mock.calls[0]?.[0],
+      );
+      expect(actOnCaptureRecovery.mock.calls[0]?.[0]).toMatchObject({
+        action: "discard",
+        intent: "automatic-discard-only-cleanup",
+        sessionIds: [item.sessionId],
+      });
+      expect(screen.queryByRole("dialog")).toBeNull();
+      expect(toastSpies.success).not.toHaveBeenCalled();
+      expect(toastSpies.warning).toHaveBeenCalledWith(
+        "数据尚未确认删除，下次启动将重新检查。",
+        expect.objectContaining({ id: "capture-recovery-cleanup-unconfirmed" }),
+      );
+    });
+
     it("returns a confirmed conflict to the two-action choice using authoritative recoveries", async () => {
       const item = recoveryItem();
       const actOnCaptureRecovery = vi.fn(async () =>

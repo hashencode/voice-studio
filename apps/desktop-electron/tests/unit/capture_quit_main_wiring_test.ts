@@ -60,6 +60,15 @@ describe("capture quit Main wiring", () => {
     );
   });
 
+  it("waits for recovery cleanup before starting on the native capture session", () => {
+    expect(mainSource).toMatch(
+      /async function startCapture[\s\S]*const operation = Promise\.all\(\[\s*captureControlMutation,\s*captureRecoveryMutation,\s*\]\)\.then\(async \(\) => await performCaptureStart\(options\)\)[\s\S]*captureControlMutation = operation\.then/,
+    );
+    expect(mainSource).toMatch(
+      /async function performCaptureStart[\s\S]*await service\.start\(/,
+    );
+  });
+
   it("shows quit decisions on a visible Main window", () => {
     expect(mainSource).toMatch(
       /activate: \(\) => \{\s*showMainWindow\(\);\s*app\.focus\(\{ steal: true \}\);\s*\}/,

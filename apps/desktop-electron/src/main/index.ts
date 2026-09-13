@@ -1911,6 +1911,24 @@ async function startCapture(options: {
   captionEnabled: boolean;
   idempotencyKey: string;
 }): Promise<CaptureSnapshot> {
+  const operation = Promise.all([
+    captureControlMutation,
+    captureRecoveryMutation,
+  ]).then(async () => await performCaptureStart(options));
+  captureControlMutation = operation.then(
+    () => undefined,
+    () => undefined,
+  );
+  return await operation;
+}
+
+async function performCaptureStart(options: {
+  title: string;
+  refreshSuggestedTitle?: boolean;
+  microphoneDeviceId?: string;
+  captionEnabled: boolean;
+  idempotencyKey: string;
+}): Promise<CaptureSnapshot> {
   const service = requireCaptureControlAuthority();
   await microphoneTestService?.stopBeforeFormalCapture();
   const preflight = await preflightCapture({

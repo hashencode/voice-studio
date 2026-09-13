@@ -749,6 +749,62 @@ describe("application shell", () => {
     ).not.toBeInTheDocument();
   });
 
+  it("restores the load error when a reload fails after an initializing snapshot", async () => {
+    const reload = deferred<ApplicationSnapshot>();
+    let publish: ((snapshot: ApplicationSnapshot) => void) | undefined;
+    installApi(readySnapshot, {
+      getApplicationSnapshot: vi.fn(async () => {
+        throw new Error("initial load failed");
+      }),
+      requestBootstrapAction: vi.fn(() => reload.promise),
+      onApplicationSnapshot: vi.fn((listener) => {
+        publish = listener;
+        return () => undefined;
+      }),
+    });
+    render(<App />);
+
+    fireEvent.click(await screen.findByRole("button", { name: "重新载入" }));
+    act(() =>
+      publish?.({
+        ...readySnapshot,
+        revision: 10,
+        profile: { phase: "initializing" },
+      }),
+    );
+    expect(
+      screen.getByRole("heading", { name: "无法载入工作台" }),
+    ).toBeVisible();
+    expect(screen.getByRole("button", { name: "正在重新载入" })).toBeDisabled();
+    await act(async () => reload.reject(new Error("late reload failure")));
+
+    expect(
+      await screen.findByRole("heading", { name: "无法载入工作台" }),
+    ).toBeVisible();
+    expect(screen.getByText("无法重新载入，请重试。")).toBeVisible();
+    expect(screen.getByRole("button", { name: "重新载入" })).toBeEnabled();
+  });
+
+  it("normalizes a deep link after an equal-revision subscription snapshot", async () => {
+    const initial = deferred<ApplicationSnapshot>();
+    let publish: ((snapshot: ApplicationSnapshot) => void) | undefined;
+    const api = installApi(readySnapshot, {
+      getApplicationSnapshot: vi.fn(() => initial.promise),
+      onApplicationSnapshot: vi.fn((listener) => {
+        publish = listener;
+        return () => undefined;
+      }),
+    });
+    window.history.replaceState(null, "", "/#/settings");
+    render(<App />);
+
+    await waitFor(() => expect(publish).toBeDefined());
+    act(() => publish?.(readySnapshot));
+    await act(async () => initial.resolve(readySnapshot));
+
+    await waitFor(() => expect(api.navigate).toHaveBeenCalledWith("settings"));
+  });
+
   it("does not classify initial deep-link navigation failure as shell load failure", async () => {
     window.history.replaceState(null, "", "/#/settings");
     const api = installApi(readySnapshot, {

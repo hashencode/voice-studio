@@ -63,7 +63,9 @@ export function useApplicationShell() {
         : next;
     snapshotRef.current = accepted;
     setSnapshot(accepted);
-    setLoadError(null);
+    if (next.profile.phase === "ready" || next.profile.phase === "blocked") {
+      setLoadError(null);
+    }
     return true;
   }, []);
   const processing = useProcessingTasks(
@@ -73,22 +75,25 @@ export function useApplicationShell() {
 
   const acceptLoadedSnapshot = React.useCallback(
     async (restored: ApplicationSnapshot) => {
-      if (!accept(restored)) return;
+      const accepted = accept(restored);
+      const normalized = accepted ? restored : snapshotRef.current;
+      if (!accepted && normalized?.revision !== restored.revision) return;
+      if (!normalized) return;
       const deepLink = parseShellDeepLink(window.location.hash);
       if (isLegacyAudioDeepLink(window.location.hash)) {
         window.history.replaceState(null, "", "#/audio");
       }
       const restoredSection = normalizeRendererSection(
-        restored.navigation.section,
+        normalized.navigation.section,
       );
-      if (restored.profile.phase !== "ready") {
+      if (normalized.profile.phase !== "ready") {
         deepLinkApplied.current = true;
         window.history.replaceState(null, "", `#/${restoredSection}`);
         return;
       }
       if (
         ((deepLink && deepLink !== restoredSection) ||
-          restored.navigation.section === "tasks") &&
+          normalized.navigation.section === "tasks") &&
         !deepLinkApplied.current
       ) {
         deepLinkApplied.current = true;
@@ -173,7 +178,14 @@ export function useApplicationShell() {
             accept(restored);
           }
         } catch {
-          if ((snapshotRef.current?.revision ?? null) !== startingRevision) {
+          const latestSnapshot = snapshotRef.current;
+          const acceptedNewerResolvedSnapshot =
+            latestSnapshot !== null &&
+            (startingRevision === null ||
+              latestSnapshot.revision > startingRevision) &&
+            (latestSnapshot.profile.phase === "ready" ||
+              latestSnapshot.profile.phase === "blocked");
+          if (acceptedNewerResolvedSnapshot) {
             return;
           }
           if (surface === "load") {
