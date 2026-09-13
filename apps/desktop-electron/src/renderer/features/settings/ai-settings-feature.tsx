@@ -322,10 +322,16 @@ function ProviderProfileList({
                     <ItemContent>
                       <ItemTitle>{profile.modelSummary}</ItemTitle>
                       <ItemDescription
-                        title={custom ? interfaceSummary(custom) : undefined}
+                        title={
+                          custom?.capabilities.editable
+                            ? interfaceSummary(custom)
+                            : undefined
+                        }
                       >
                         {custom
-                          ? interfaceSummary(custom)
+                          ? custom.capabilities.editable
+                            ? interfaceSummary(custom)
+                            : "正在使用当前模型，无法编辑"
                           : profile.displayName}
                       </ItemDescription>
                     </ItemContent>
@@ -457,7 +463,11 @@ function ProviderProfileDialog({
           type="button"
           variant="ghost"
           size="icon-sm"
-          disabled={disabled || (mode.kind === "edit" && !profile)}
+          disabled={
+            disabled ||
+            (mode.kind === "edit" &&
+              (!profile || !profile.capabilities.editable))
+          }
           aria-label={profile ? `编辑 ${profile.modelId}` : "新增云端模型"}
           data-profile-edit={profile?.profileId}
         >

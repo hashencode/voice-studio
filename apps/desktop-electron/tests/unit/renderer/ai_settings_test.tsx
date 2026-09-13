@@ -167,7 +167,7 @@ describe("cloud model settings", () => {
     expect(screen.queryByText(/钥匙串|FileVault/)).toBeNull();
   });
 
-  it("shows task-locked profiles as read-only with only cancel available", async () => {
+  it("disables editing for task-locked profiles and shows the reason", async () => {
     const lockedProfile = {
       ...deepseekProfile,
       capabilities: {
@@ -184,28 +184,20 @@ describe("cloud model settings", () => {
     });
     const user = userEvent.setup();
     render(<AiSettingsFeature api={desktop} settingsPage />);
-    await user.click(
-      await screen.findByRole("button", { name: "编辑 deepseek-chat" }),
-    );
-    const dialog = screen.getByRole("dialog", { name: "编辑 deepseek-chat" });
+    const edit = await screen.findByRole("button", {
+      name: "编辑 deepseek-chat",
+    });
+    expect(edit).toBeDisabled();
+    expect(screen.getByText("正在使用当前模型，无法编辑")).toBeVisible();
+
+    await user.click(edit);
+    edit.focus();
+    await user.keyboard("{Enter} ");
+
     expect(
-      within(dialog).getByText("该模型正在被任务使用，无法修改配置。"),
-    ).toBeVisible();
-    expect(within(dialog).getByLabelText("接口类型")).toHaveAttribute(
-      "aria-readonly",
-      "true",
-    );
-    for (const label of ["模型 ID", "API 地址", "API 密钥"]) {
-      const field = within(dialog).getByLabelText(label);
-      expect(field).not.toBeDisabled();
-      expect(field).toHaveAttribute("readonly");
-    }
-    expect(within(dialog).queryByRole("button", { name: "保存" })).toBeNull();
-    expect(
-      within(dialog).queryByRole("button", { name: "删除模型" }),
+      screen.queryByRole("dialog", { name: "编辑 deepseek-chat" }),
     ).toBeNull();
-    expect(within(dialog).getAllByRole("button")).toHaveLength(2);
-    expect(within(dialog).getByRole("button", { name: "取消" })).toBeVisible();
+    expect(desktop.selectAiProviderProfile).not.toHaveBeenCalled();
   });
 
   it("forwards controlled selection with the current revision and fences pending mutations", async () => {
