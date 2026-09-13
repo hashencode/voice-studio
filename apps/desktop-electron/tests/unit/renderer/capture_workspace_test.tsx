@@ -38,6 +38,7 @@ import {
 import type {
   ApplicationSnapshot,
   CapturePreflight,
+  CaptureRecoveryActionRequest,
   CaptureRecoveryActionResponse,
   CaptureRecoveryItem,
   CaptureSnapshot,
@@ -1604,7 +1605,12 @@ describe("capture workspace", () => {
         ],
         recoveries: [item],
       });
-      const actOnCaptureRecovery = vi.fn(async () => unknown);
+      const actOnCaptureRecovery = vi.fn(
+        async (request: CaptureRecoveryActionRequest) => {
+          void request;
+          return unknown;
+        },
+      );
       installCaptureApi({
         listCaptureRecoveries: vi.fn(async () => [item]),
         actOnCaptureRecovery,
@@ -1673,7 +1679,9 @@ describe("capture workspace", () => {
       await waitFor(() => expect(toastSpies.warning).toHaveBeenCalledTimes(1));
       expect(screen.queryByRole("dialog")).toBeNull();
       expect(api.actOnCaptureRecovery).not.toHaveBeenCalled();
-      view.rerender(<CaptureWorkspace capture={idle} autoOpenRecoveries />);
+      view.rerender(
+        <CaptureWorkspace capture={idle} focusSessionId={item.sessionId} />,
+      );
       await waitFor(() =>
         expect(api.listCaptureRecoveries).toHaveBeenCalledTimes(2),
       );
@@ -1979,7 +1987,6 @@ describe("capture workspace", () => {
       <CaptureWorkspace
         capture={idle}
         detailOpen={false}
-        autoOpenRecoveries
         onDetailOpenChange={onDetailOpenChange}
       />,
     );

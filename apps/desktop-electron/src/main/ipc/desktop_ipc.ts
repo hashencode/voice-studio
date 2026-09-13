@@ -872,11 +872,8 @@ export function createDesktopIpcHandlers(options: {
       ipcChannels.captureRecoveryAction,
       {
         schema: captureRecoveryActionRequestSchema,
-        invoke: async (payload: {
-          action: "keep" | "discard";
-          sessionIds: string[];
-          idempotencyKey: string;
-        }) => await options.services.actOnCaptureRecovery(payload),
+        invoke: async (payload: CaptureRecoveryActionRequest) =>
+          await options.services.actOnCaptureRecovery(payload),
       } as RegisteredHandler,
     ],
     [

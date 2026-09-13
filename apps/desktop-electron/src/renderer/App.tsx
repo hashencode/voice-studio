@@ -604,7 +604,6 @@ function App() {
       recordRequest={recordRequest}
       detailOpen={captureDetailVisible}
       focusSessionId={routedCaptureSessionId ?? captureDetailSessionId}
-      autoOpenRecoveries={current === "audio"}
       onPreflightResolved={audio.acceptCapturePreflight}
       onDetailOpenChange={(open) => {
         if (!open && routedCaptureSessionId) {

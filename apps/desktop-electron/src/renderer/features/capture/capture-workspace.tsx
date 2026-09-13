@@ -34,6 +34,7 @@ import type {
   CaptureRecoveryActionRequest,
   CaptureRecoveryActionResponse,
   CaptureRecoveryItem,
+  CaptureRecoveryOutcome,
   CaptureSnapshot,
   Voice2TextDesktopApi,
 } from "@shared/contracts";
@@ -56,6 +57,18 @@ let commandSequence = 0;
 const STOP_CAPTURE_FAILURE_MESSAGE =
   "停止录制未完成，请重试；如需退出，可保留录音数据并在下次启动时恢复。";
 
+function isCompletedRecoveryOutcome(
+  action: "keep" | "discard",
+  outcome: CaptureRecoveryOutcome,
+): boolean {
+  return action === "keep"
+    ? outcome.result === "kept" &&
+        outcome.completionCertainty === "completed" &&
+        outcome.audioDurability === "durable"
+    : outcome.result === "discarded" &&
+        outcome.completionCertainty === "completed";
+}
+
 type CaptureWorkspaceProps = {
   capture: ApplicationSnapshot["capture"];
   /** @deprecated Capture state is authoritative in Main and arrives via snapshots. */
@@ -63,7 +76,6 @@ type CaptureWorkspaceProps = {
   recordRequest?: number;
   detailOpen?: boolean;
   focusSessionId?: string | null;
-  autoOpenRecoveries?: boolean;
   onPreflightResolved?: (preflight: CapturePreflight) => void;
   onDetailOpenChange?: (open: boolean) => void;
   onOpenLocalModels?: () => void;
@@ -96,7 +108,6 @@ export function CaptureWorkspaceController({
   recordRequest,
   detailOpen = true,
   focusSessionId = null,
-  autoOpenRecoveries = false,
   onPreflightResolved,
   onDetailOpenChange,
   onOpenLocalModels,
@@ -164,9 +175,13 @@ export function CaptureWorkspaceController({
   const prioritizedRecoverySessionId = focusSessionId ?? recoverySessionId;
   const recordingPreference = useRecordingPreference();
 
-  React.useEffect(() => {
-    recoveryDialogStateRef.current = recoveryDialogState;
-  }, [recoveryDialogState]);
+  const transitionRecoveryDialog = React.useCallback(
+    (next: RecoveryDialogState) => {
+      recoveryDialogStateRef.current = next;
+      setRecoveryDialogState(next);
+    },
+    [],
+  );
 
   const notifyPreservedRecoveries = React.useCallback(
     (items: CaptureRecoveryItem[], additionalSessionIds: string[] = []) => {
@@ -207,11 +222,10 @@ export function CaptureWorkspaceController({
         return [...byId.values()];
       });
       if (!recoveryDialogStateRef.current.startsWith("pending-")) {
-        recoveryDialogStateRef.current = "choice";
-        setRecoveryDialogState("choice");
+        transitionRecoveryDialog("choice");
       }
     },
-    [],
+    [transitionRecoveryDialog],
   );
 
   const runAutomaticCleanup = React.useCallback(
@@ -237,15 +251,16 @@ export function CaptureWorkspaceController({
         } catch {
           response = null;
         }
+        if (!response) continue;
+        const currentResponse = response;
         const unknown =
-          response === null ||
           request.sessionIds.some(
             (sessionId) =>
-              !response.outcomes.some(
+              !currentResponse.outcomes.some(
                 (outcome) => outcome.sessionId === sessionId,
               ),
           ) ||
-          response.outcomes.some(
+          currentResponse.outcomes.some(
             (outcome) =>
               request.sessionIds.includes(outcome.sessionId) &&
               (outcome.completionCertainty === "unknown" ||
@@ -337,14 +352,14 @@ export function CaptureWorkspaceController({
         );
         void runAutomaticCleanup(nextRecoveries);
         if (!recoveryDialogStateRef.current.startsWith("pending-")) {
-          setRecoveryDialogState(restorable.length > 0 ? "choice" : "hidden");
+          transitionRecoveryDialog(restorable.length > 0 ? "choice" : "hidden");
         }
         setLoadedRecoveryTarget(loadTarget);
       })
       .catch((reason: unknown) => {
         if (active && generation === recoveryListGenerationRef.current) {
           setLoadedRecoveryTarget(loadTarget);
-          setRecoveryDialogState("hidden");
+          transitionRecoveryDialog("hidden");
           setError(userFacingError(reason, "无法检查可恢复录制"));
         }
       });
@@ -352,10 +367,10 @@ export function CaptureWorkspaceController({
       active = false;
     };
   }, [
-    autoOpenRecoveries,
     notifyPreservedRecoveries,
     prioritizedRecoverySessionId,
     runAutomaticCleanup,
+    transitionRecoveryDialog,
   ]);
 
   const captureCandidate =
@@ -721,8 +736,7 @@ export function CaptureWorkspaceController({
       if (!retrying || !frozen || frozen.request.action !== action) {
         const sessionIds = recoveries.map((item) => item.sessionId);
         if (sessionIds.length === 0) {
-          recoveryDialogStateRef.current = "hidden";
-          setRecoveryDialogState("hidden");
+          transitionRecoveryDialog("hidden");
           return;
         }
         frozen = {
@@ -742,8 +756,7 @@ export function CaptureWorkspaceController({
       const retryState: RecoveryDialogState =
         action === "keep" ? "retry-restore" : "retry-delete";
       recoveryListGenerationRef.current += 1;
-      recoveryDialogStateRef.current = pendingState;
-      setRecoveryDialogState(pendingState);
+      transitionRecoveryDialog(pendingState);
 
       const execute = async (): Promise<void> => {
         const activeRequest = frozenRecoveryRequestRef.current;
@@ -759,8 +772,7 @@ export function CaptureWorkspaceController({
             await execute();
             return;
           }
-          recoveryDialogStateRef.current = retryState;
-          setRecoveryDialogState(retryState);
+          transitionRecoveryDialog(retryState);
           return;
         }
 
@@ -774,14 +786,9 @@ export function CaptureWorkspaceController({
         const unknownIds = new Set<string>();
         for (const sessionId of activeRequest.request.sessionIds) {
           const outcome = outcomesById.get(sessionId);
-          const terminal =
-            outcome &&
-            (action === "keep"
-              ? outcome.result === "kept" &&
-                outcome.completionCertainty === "completed" &&
-                outcome.audioDurability === "durable"
-              : outcome.result === "discarded" &&
-                outcome.completionCertainty === "completed");
+          const terminal = outcome
+            ? isCompletedRecoveryOutcome(action, outcome)
+            : false;
           const deliberatelyNotCompleted =
             outcome?.result === "preserved" ||
             (outcome?.result === "conflict" &&
@@ -798,14 +805,7 @@ export function CaptureWorkspaceController({
 
         const completedIds = new Set(
           relevantOutcomes
-            .filter((outcome) =>
-              action === "keep"
-                ? outcome.result === "kept" &&
-                  outcome.completionCertainty === "completed" &&
-                  outcome.audioDurability === "durable"
-                : outcome.result === "discarded" &&
-                  outcome.completionCertainty === "completed",
-            )
+            .filter((outcome) => isCompletedRecoveryOutcome(action, outcome))
             .map((outcome) => outcome.sessionId),
         );
         const authoritative = new Map(
@@ -871,19 +871,17 @@ export function CaptureWorkspaceController({
         setRecoveries(remaining);
 
         if (unknownIds.size > 0) {
-          recoveryDialogStateRef.current = retryState;
-          setRecoveryDialogState(retryState);
+          transitionRecoveryDialog(retryState);
           return;
         }
         frozenRecoveryRequestRef.current = null;
         const nextState: RecoveryDialogState =
           remaining.length > 0 ? "choice" : "hidden";
-        recoveryDialogStateRef.current = nextState;
-        setRecoveryDialogState(nextState);
+        transitionRecoveryDialog(nextState);
       };
       void execute();
     },
-    [notifyPreservedRecoveries, recoveries],
+    [notifyPreservedRecoveries, recoveries, transitionRecoveryDialog],
   );
 
   const busy = pendingAction !== null;

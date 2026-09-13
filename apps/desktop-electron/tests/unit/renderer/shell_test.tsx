@@ -675,9 +675,7 @@ describe("application shell", () => {
 
     expect(api.requestBootstrapAction).toHaveBeenCalledTimes(1);
     expect(api.requestBootstrapAction).toHaveBeenCalledWith("recheck");
-    expect(
-      screen.getByRole("button", { name: "正在重新载入" }),
-    ).toBeDisabled();
+    expect(screen.getByRole("button", { name: "正在重新载入" })).toBeDisabled();
 
     await act(async () => firstReload.reject(new Error("reload failed")));
     expect(screen.getByText("无法重新载入，请重试。")).toBeVisible();
@@ -714,9 +712,7 @@ describe("application shell", () => {
     });
     render(<App />);
 
-    fireEvent.click(
-      await screen.findByRole("button", { name: "重新载入" }),
-    );
+    fireEvent.click(await screen.findByRole("button", { name: "重新载入" }));
 
     expect(
       await screen.findByRole("dialog", { name: "本机资料库暂不可用" }),
@@ -741,9 +737,7 @@ describe("application shell", () => {
     });
     render(<App />);
 
-    fireEvent.click(
-      await screen.findByRole("button", { name: "重新载入" }),
-    );
+    fireEvent.click(await screen.findByRole("button", { name: "重新载入" }));
     act(() => publish?.({ ...readySnapshot, revision: 10 }));
     await act(async () => reload.reject(new Error("late reload failure")));
 
@@ -2222,7 +2216,15 @@ describe("application shell", () => {
       captureTimelineMs: 4_000,
     };
     const actOnCaptureRecovery = vi.fn(async () => ({
-      outcomes: [],
+      outcomes: [otherRecovery, targetedRecovery].map((item) => ({
+        sessionId: item.sessionId,
+        action: "keep" as const,
+        result: "kept" as const,
+        completionCertainty: "completed" as const,
+        audioDurability: "durable" as const,
+        transcriptionHandoff: "completed" as const,
+        capture: item,
+      })),
       recoveries: [],
     }));
     installApi(
@@ -2254,10 +2256,10 @@ describe("application shell", () => {
     render(<App />);
 
     const recoveryDialog = await screen.findByRole("dialog", {
-      name: "发现待处理的录音",
+      name: "发现可恢复的录音",
     });
     expect(
-      within(recoveryDialog).getByText(/发现 2 段待处理录音：2 段可恢复/),
+      within(recoveryDialog).getByText(/发现 2 段可恢复录音/),
     ).toBeVisible();
     expect(
       within(recoveryDialog).queryByText("Recover-录制中断，需要处理"),
@@ -2268,12 +2270,13 @@ describe("application shell", () => {
     expect(screen.queryByRole("region", { name: "录制详情" })).toBeNull();
     await userEvent
       .setup()
-      .click(within(recoveryDialog).getByRole("button", { name: "恢复" }));
+      .click(within(recoveryDialog).getByRole("button", { name: "立即恢复" }));
     await waitFor(() => expect(actOnCaptureRecovery).toHaveBeenCalledOnce());
     expect(actOnCaptureRecovery).toHaveBeenCalledWith(
       expect.objectContaining({
         sessionIds: [otherRecovery.sessionId, targetedRecovery.sessionId],
         action: "keep",
+        intent: "user-decision",
       }),
     );
   });

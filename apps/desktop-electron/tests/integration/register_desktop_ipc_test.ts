@@ -163,6 +163,7 @@ describe("desktop IPC window registry", () => {
     });
     const recoveryCommand = {
       action: "discard" as const,
+      intent: "user-decision" as const,
       sessionIds: ["session-recovery-123456"],
       idempotencyKey: "discard-recovery-123456",
     };

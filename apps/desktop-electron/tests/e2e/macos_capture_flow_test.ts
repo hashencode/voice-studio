@@ -295,9 +295,9 @@ describe("macOS capture parity flow", () => {
       journalSha256: "b".repeat(64),
     });
     const native = nativeFixture();
-    native.recover.mockResolvedValueOnce([empty]).mockResolvedValueOnce([
-      restorable,
-    ]);
+    native.recover
+      .mockResolvedValueOnce([empty])
+      .mockResolvedValueOnce([restorable]);
     const service = new DesktopCaptureService(
       repository,
       native,

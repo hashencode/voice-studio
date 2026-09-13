@@ -251,9 +251,7 @@ export class DesktopCaptureService {
 
   renameSession(sessionId: string, title: string): StoredCaptureSession {
     const currentSessionId =
-      this.currentSessionId ??
-      this.recoveryProjectionSessionId ??
-      null;
+      this.currentSessionId ?? this.recoveryProjectionSessionId ?? null;
     if (sessionId !== currentSessionId) {
       throw new Error("rename must target the current capture session");
     }
@@ -368,11 +366,21 @@ export class DesktopCaptureService {
     sessionId: string,
     idempotencyKey: string,
   ): Promise<void> {
+    await this.discardRecoveredWithoutProjectionRefresh(
+      sessionId,
+      idempotencyKey,
+    );
+    await this.refreshRecoveryProjection();
+  }
+
+  private async discardRecoveredWithoutProjectionRefresh(
+    sessionId: string,
+    idempotencyKey: string,
+  ): Promise<void> {
     const cached = this.repository.receipt(sessionId, idempotencyKey);
     if (cached) {
       if (cached.action !== "discard")
         throw new Error("capture idempotency conflict");
-      await this.refreshRecoveryProjection();
       return;
     }
     this.repository.discardRecoveryAndReceipt(
@@ -392,7 +400,6 @@ export class DesktopCaptureService {
         }),
       );
     }
-    await this.refreshRecoveryProjection();
   }
 
   keepRecovered(sessionId: string, idempotencyKey: string): CaptureSnapshot {
@@ -484,7 +491,10 @@ export class DesktopCaptureService {
     }
     try {
       if (action === "discard") {
-        await this.discardRecovered(sessionId, idempotencyKey);
+        await this.discardRecoveredWithoutProjectionRefresh(
+          sessionId,
+          idempotencyKey,
+        );
         return recoveryOutcome(sessionId, action, "discarded");
       }
       const kept = this.keepRecovered(sessionId, idempotencyKey);

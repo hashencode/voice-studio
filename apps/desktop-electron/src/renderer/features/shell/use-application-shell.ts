@@ -95,9 +95,7 @@ export function useApplicationShell() {
         const destination = deepLink ?? restoredSection;
         try {
           accept(
-            await window.voice2text.navigate(
-              toApplicationSection(destination),
-            ),
+            await window.voice2text.navigate(toApplicationSection(destination)),
           );
         } catch {
           // The accepted snapshot can render even when optional deep-link navigation fails.
