@@ -223,6 +223,25 @@ describe("FloatingCaptureWindowController", () => {
     expect(cleanups[1]).toHaveBeenCalledOnce();
   });
 
+  it("does not create a window when a pending enable settles after teardown begins", async () => {
+    const write = deferred<void>();
+    const harness = createHarness({ enabled: false });
+    harness.ports.writePreference.mockReturnValue(write.promise);
+    harness.controller.initialize();
+    const accepted = harness.controller.setPreference(true);
+
+    const fenced = harness.controller.beginTeardown();
+    write.resolve();
+    await accepted;
+    await fenced;
+
+    expect(harness.controller.getPreference()).toEqual({ enabled: true });
+    expect(harness.ports.createWindow).not.toHaveBeenCalled();
+
+    await harness.controller.completeTeardown();
+    expect(harness.ports.createWindow).not.toHaveBeenCalled();
+  });
+
   it("fences actions before draining preference work and disposes once later", async () => {
     const write = deferred<void>();
     const harness = createHarness({ enabled: true });
