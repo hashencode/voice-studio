@@ -265,6 +265,63 @@ describe("desktop IPC window registry", () => {
     );
   });
 
+  it("keeps an in-flight floating action alive while a replacement registry takes ownership", async () => {
+    const ipc = new FakeIpcMain();
+    const pendingAction = deferred<FloatingCaptureSnapshot>();
+    const firstServices = createServices();
+    const firstAction = vi.fn(() => pendingAction.promise);
+    firstServices.value.floatingCaptureWindowAction = firstAction;
+    const firstRegistry = createDesktopIpcRegistry(firstServices.value, ipc);
+    const floating = createWindow(49, 17, "http://localhost:5174");
+    firstRegistry.registerWindow(floating.window, {
+      capability: "floating-capture",
+      origins: new Set(["http://localhost:5174"]),
+    });
+
+    const inFlight = ipc.invoke(
+      ipcChannels.floatingCaptureWindowAction,
+      floating.event,
+      { action: "open-details" },
+    );
+    expect(firstAction).toHaveBeenCalledWith("open-details");
+
+    firstRegistry.dispose();
+    const replacementServices = createServices();
+    const replacementRegistry = createDesktopIpcRegistry(
+      replacementServices.value,
+      ipc,
+    );
+    replacementRegistry.registerWindow(floating.window, {
+      capability: "floating-capture",
+      origins: new Set(["http://localhost:5174"]),
+    });
+
+    await expect(
+      ipc.invoke(ipcChannels.floatingCaptureWindowAction, floating.event, {
+        action: "hide",
+      }),
+    ).resolves.toEqual({
+      ok: true,
+      value: expect.objectContaining({ sessionId: "opaque-1" }),
+    });
+    expect(
+      replacementServices.floatingCaptureWindowAction,
+    ).toHaveBeenCalledWith("hide");
+    await expect(
+      ipc.invoke(ipcChannels.workerHealth, floating.event, {
+        expectedProtocolVersion: 3,
+      }),
+    ).rejects.toMatchObject({ code: "UNTRUSTED_SENDER" });
+
+    pendingAction.resolve({ ...floatingSnapshot(), revision: 7 });
+    await expect(inFlight).resolves.toEqual({
+      ok: true,
+      value: expect.objectContaining({ revision: 7 }),
+    });
+
+    replacementRegistry.dispose();
+  });
+
   it("fans events out by capability and removes only a destroyed window", () => {
     const ipc = new FakeIpcMain();
     const services = createServices();
@@ -538,4 +595,14 @@ function applicationSnapshot(revision: number) {
     reconciliation: [],
     capture: { phase: "idle" as const },
   };
+}
+
+function deferred<T>() {
+  let resolve!: (value: T | PromiseLike<T>) => void;
+  let reject!: (reason?: unknown) => void;
+  const promise = new Promise<T>((resolvePromise, rejectPromise) => {
+    resolve = resolvePromise;
+    reject = rejectPromise;
+  });
+  return { promise, resolve, reject };
 }
