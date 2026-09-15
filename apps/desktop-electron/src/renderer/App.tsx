@@ -8,7 +8,6 @@ import {
   ActivityContextPaneFilters,
   ActivityContextPaneHead,
   ActivityContextPaneSearch,
-  ActivityErrorDialog,
   ActivityMainWorkspace,
   type ActivityItemView,
   type ActivityFilter,
@@ -182,8 +181,6 @@ function App() {
   const [selectedActivityId, setSelectedActivityId] = React.useState<
     string | null
   >(null);
-  const [activityError, setActivityError] =
-    React.useState<ActivityItemView | null>(null);
   const [markAllActivityPending, setMarkAllActivityPending] =
     React.useState(false);
   const [activityQuery, setActivityQuery] = React.useState("");
@@ -207,12 +204,12 @@ function App() {
       hasCaptureDetail(snapshot?.capture, snapshot?.libraryProjection) &&
       automaticCaptureDetailSessionId !== dismissedCaptureDetailSessionId);
   const activityItems = snapshot?.activity ?? EMPTY_ACTIVITY_ITEMS;
-  const unreadActivityItems = React.useMemo(
-    () => activityItems.filter((item) => !item.read),
-    [activityItems],
+  const unreadActivityCount = activityItems.reduce(
+    (count, item) => count + Number(item.unread),
+    0,
   );
   const markActivityRead = React.useCallback(async (item: ActivityItemView) => {
-    if (item.read || exactReadPendingRef.current.has(item.id)) return;
+    if (!item.unread || exactReadPendingRef.current.has(item.id)) return;
     exactReadPendingRef.current.add(item.id);
     const toastId = `activity-mark-read:${item.id}`;
     try {
@@ -312,27 +309,27 @@ function App() {
     },
     [applicationBlocked],
   );
-  const openActivityDetails = React.useCallback(
-    (item: ActivityItemView) => {
+  const openSettingsTarget = React.useCallback(
+    (settingsTarget: SettingsSection) => {
       if (applicationBlocked) return;
-      void markActivityRead(item);
-      setActivityError(null);
-      const navigateToDetails = () => {
-        void navigateSection(
-          "messages",
-          `/messages/${encodeURIComponent(item.id)}/capture/${encodeURIComponent(item.captureSessionId)}`,
-        );
-        window.requestAnimationFrame(() => contentTitleRef.current?.focus());
+      const navigateToSettings = () => {
+        pendingSettingsTargetRef.current = settingsTarget;
+        setMessagesOpen(false);
+        void navigateSection("settings", `/settings/${settingsTarget}`);
+        void navigateAuthorizedRef.current("settings");
       };
-      if (modalOpen) requestNavigationAfterModals(navigateToDetails);
-      else navigateToDetails();
+      if (modalOpen) requestNavigationAfterModals(navigateToSettings);
+      else navigateToSettings();
     },
-    [
-      applicationBlocked,
-      markActivityRead,
-      modalOpen,
-      requestNavigationAfterModals,
-    ],
+    [applicationBlocked, modalOpen, requestNavigationAfterModals],
+  );
+  const openFailureSettings = React.useCallback(
+    (item: ActivityItemView) => {
+      if (applicationBlocked || !item.settingsTarget) return;
+      void markActivityRead(item);
+      openSettingsTarget(item.settingsTarget);
+    },
+    [applicationBlocked, markActivityRead, openSettingsTarget],
   );
   const lastAutoReadActivityIdRef = React.useRef<string | null>(null);
   React.useEffect(() => {
@@ -562,23 +559,14 @@ function App() {
     [applicationBlocked, modalOpen],
   );
   const openLocalModels = React.useCallback(() => {
-    if (applicationBlocked) return;
-    const navigateToLocalModels = () => {
-      pendingSettingsTargetRef.current = "local-models";
-      setMessagesOpen(false);
-      void navigateSection("settings", "/settings/local-models");
-      void navigateAuthorizedRef.current("settings");
-    };
-    if (modalOpen) requestNavigationAfterModals(navigateToLocalModels);
-    else navigateToLocalModels();
-  }, [applicationBlocked, modalOpen, requestNavigationAfterModals]);
+    openSettingsTarget("local-models");
+  }, [openSettingsTarget]);
   React.useEffect(() => {
     if (!applicationBlocked) return;
     let active = true;
     queueMicrotask(() => {
       if (!active) return;
       pendingSettingsTargetRef.current = null;
-      setActivityError(null);
       setProcessingUnavailableReason(null);
       setCaptureDetailOpen(false);
       setCaptureDetailSessionId(null);
@@ -705,7 +693,7 @@ function App() {
         <AppShellFrame
           section={current}
           onNavigate={navigatePrimary}
-          unreadActivityCount={unreadActivityItems.length}
+          unreadActivityCount={unreadActivityCount}
           contextPaneWidth={contextPaneWidth.effectiveWidth}
           contextPaneResize={{
             minimum: contextPaneWidth.limits.minimum,
@@ -734,7 +722,7 @@ function App() {
                       <AudioContextPaneHeader controller={audio} />
                     ) : pane.paneSection === "messages" ? (
                       <ActivityContextPaneHead
-                        unreadCount={unreadActivityItems.length}
+                        unreadCount={unreadActivityCount}
                         markAllPending={markAllActivityPending}
                         onMarkAllRead={() => void markAllActivityRead()}
                       />
@@ -770,11 +758,8 @@ function App() {
                             "messages",
                             `/messages/${encodeURIComponent(item.id)}`,
                           );
-                          if (item.kind === "capture_failed") {
-                            setActivityError(item);
-                          }
                         }}
-                        unreadCount={unreadActivityItems.length}
+                        unreadCount={unreadActivityCount}
                         markAllPending={markAllActivityPending}
                         onMarkAllRead={() => void markAllActivityRead()}
                         query={activityQuery}
@@ -831,7 +816,7 @@ function App() {
                     onOpenCompanionPane={openPane}
                     current={current}
                     selectedActivity={selectedActivity}
-                    onOpenActivityDetails={openActivityDetails}
+                    onOpenFailureSettings={openFailureSettings}
                     settingsSection={settingsSection}
                   />
                 ) : null}
@@ -841,14 +826,6 @@ function App() {
           >
             <SectionRouterProvider section={current} />
           </SectionContentProvider>
-          <ActivityErrorDialog
-            item={activityError}
-            open={activityError !== null}
-            onOpenChange={(open) => {
-              if (!open) setActivityError(null);
-            }}
-            onOpenDetails={openActivityDetails}
-          />
           <CapabilityUnavailableDialog
             reason={processingUnavailableReason ?? ""}
             open={processingUnavailableReason !== null}
@@ -920,7 +897,7 @@ function ShellContent({
   onOpenCompanionPane,
   current,
   selectedActivity,
-  onOpenActivityDetails,
+  onOpenFailureSettings,
   settingsSection,
 }: {
   snapshot: ApplicationSnapshot;
@@ -929,7 +906,7 @@ function ShellContent({
   onOpenCompanionPane: () => void;
   current: RendererShellSection;
   selectedActivity: ActivityItemView | null;
-  onOpenActivityDetails: (item: ActivityItemView) => void;
+  onOpenFailureSettings: (item: ActivityItemView) => void;
   settingsSection: SettingsSection;
 }) {
   if (snapshot.profile.phase === "initializing") {
@@ -992,7 +969,7 @@ function ShellContent({
       section = (
         <ActivityMainWorkspace
           item={selectedActivity}
-          onOpenDetails={onOpenActivityDetails}
+          onOpenSettingsTarget={onOpenFailureSettings}
         />
       );
       break;
@@ -1183,7 +1160,7 @@ function routeTitle(
       "音频"
     );
   }
-  if (route.kind === "message") return activity?.title ?? "消息";
+  if (route.kind === "message") return activity?.safeSummary ?? "消息";
   if (route.kind === "companion-pairing") return "配对设备";
   if (route.kind === "companion-history") return "传输历史";
   if (route.kind === "companion-device") {
@@ -1246,7 +1223,7 @@ function deriveContentPresentation({
   }
   if (current === "messages") {
     return {
-      title: selectedActivity?.title ?? null,
+      title: selectedActivity?.safeSummary ?? null,
       contentMode: "padded",
       renderContent: true,
     };

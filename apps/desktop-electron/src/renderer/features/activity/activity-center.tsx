@@ -1,16 +1,8 @@
 import * as React from "react";
-import { CheckCircle2, MailOpen, TriangleAlert } from "lucide-react";
+import { MailOpen, TriangleAlert } from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import {
-  Dialog,
-  DialogClose,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
 import { EmptyState, FullScreenEmptyState } from "@/components/ui/empty-state";
 import {
   Item,
@@ -36,14 +28,14 @@ export type ActivityItemView = Pick<
   ActivityItem,
   | "id"
   | "kind"
-  | "title"
-  | "severity"
-  | "read"
-  | "captureSessionId"
-  | "createdAt"
+  | "safeSummary"
+  | "occurrenceCount"
+  | "unread"
+  | "settingsTarget"
+  | "lastOccurredAt"
 >;
 
-export type ActivityFilter = "all" | "unread" | "attention";
+export type ActivityFilter = "all" | "unread";
 
 const formatter = new Intl.DateTimeFormat("zh-CN", {
   month: "numeric",
@@ -122,15 +114,18 @@ export function ActivityContextPane({
                   onClick={() => onSelect(item)}
                 >
                   <ItemMedia variant="icon">
-                    <ActivityIcon severity={item.severity} />
+                    <ActivityIcon />
                   </ItemMedia>
                   <ItemContent>
-                    <ItemTitle>{item.title}</ItemTitle>
+                    <ItemTitle>{item.safeSummary}</ItemTitle>
                     <ItemDescription>
-                      {formatter.format(item.createdAt)}
+                      {item.occurrenceCount > 1
+                        ? `发生 ${item.occurrenceCount} 次 · `
+                        : ""}
+                      {formatter.format(item.lastOccurredAt)}
                     </ItemDescription>
                   </ItemContent>
-                  {!item.read ? (
+                  {item.unread ? (
                     <ItemActions>
                       <Badge variant="dot" aria-label="未读" />
                     </ItemActions>
@@ -205,12 +200,10 @@ export function ActivityContextPaneFilters({
   const filters: readonly { value: ActivityFilter; label: string }[] = [
     { value: "all", label: "全部" },
     { value: "unread", label: "未读" },
-    { value: "attention", label: "需处理" },
   ];
   const counts: Record<ActivityFilter, number> = {
     all: items.length,
-    unread: items.filter((item) => !item.read).length,
-    attention: items.filter((item) => item.severity === "warning").length,
+    unread: items.filter((item) => item.unread).length,
   };
   return (
     <div
@@ -240,106 +233,65 @@ function filterActivityItems(
   return items.filter((item) => {
     const matchesQuery =
       !normalizedQuery ||
-      item.title.toLocaleLowerCase("zh-CN").includes(normalizedQuery);
-    const matchesFilter =
-      filter === "all" ||
-      (filter === "unread" ? !item.read : item.severity === "warning");
+      item.safeSummary.toLocaleLowerCase("zh-CN").includes(normalizedQuery);
+    const matchesFilter = filter === "all" || item.unread;
     return matchesQuery && matchesFilter;
   });
 }
 
 export function ActivityMainWorkspace({
   item,
-  onOpenDetails,
+  onOpenSettingsTarget,
 }: {
   item: ActivityItemView | null;
-  onOpenDetails: (item: ActivityItemView) => void;
+  onOpenSettingsTarget: (item: ActivityItemView) => void;
 }) {
   if (!item) {
     return (
       <FullScreenEmptyState
         title="还没有消息"
-        description="当有录音完成或需要处理时，相关消息会显示在这里。"
+        description="这里只显示需要跨页面关注的应用错误。"
       />
     );
   }
   return (
     <section aria-label="消息详情" className="mx-auto max-w-2xl py-8">
-      <ActivityIcon severity={item.severity} large />
+      <ActivityIcon large />
       <dl className="mt-4 grid grid-cols-[auto_1fr] gap-x-4 gap-y-3 border-y py-4 text-sm">
-        <dt className="text-muted-foreground">时间</dt>
-        <dd>{formatter.format(item.createdAt)}</dd>
+        <dt className="text-muted-foreground">最近发生</dt>
+        <dd>{formatter.format(item.lastOccurredAt)}</dd>
+        <dt className="text-muted-foreground">发生次数</dt>
+        <dd>{item.occurrenceCount}</dd>
         <dt className="text-muted-foreground">状态</dt>
-        <dd>{item.severity === "warning" ? "需要处理" : "已完成"}</dd>
+        <dd>需要处理</dd>
       </dl>
-      <Button
-        type="button"
-        className="mt-6"
-        onClick={() => onOpenDetails(item)}
-      >
-        打开录制详情
-      </Button>
+      {item.settingsTarget ? (
+        <Button
+          type="button"
+          className="mt-6"
+          onClick={() => onOpenSettingsTarget(item)}
+        >
+          {settingsTargetLabel(item.settingsTarget)}
+        </Button>
+      ) : null}
     </section>
   );
 }
 
-export function ActivityErrorDialog({
-  item,
-  open,
-  onOpenChange,
-  onOpenDetails,
-}: {
-  item: ActivityItemView | null;
-  open: boolean;
-  onOpenChange: (open: boolean) => void;
-  onOpenDetails: (item: ActivityItemView) => void;
-}) {
-  if (!item) return null;
+function ActivityIcon({ large = false }: { large?: boolean }) {
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent aria-label="错误信息">
-        <DialogHeader>
-          <DialogTitle>{item.title}</DialogTitle>
-          <DialogDescription>{activityDescription(item)}</DialogDescription>
-        </DialogHeader>
-        <div className="flex justify-end gap-2 pt-2">
-          <DialogClose asChild>
-            <Button type="button" variant="outline">
-              稍后处理
-            </Button>
-          </DialogClose>
-          <Button type="button" onClick={() => onOpenDetails(item)}>
-            打开录制详情
-          </Button>
-        </div>
-      </DialogContent>
-    </Dialog>
-  );
-}
-
-function ActivityIcon({
-  severity,
-  large = false,
-}: {
-  severity: ActivityItemView["severity"];
-  large?: boolean;
-}) {
-  const Icon = severity === "warning" ? TriangleAlert : CheckCircle2;
-  return (
-    <Icon
-      className={`${large ? "size-7" : "mt-0.5 size-4 shrink-0"} ${severity === "warning" ? "text-amber-700" : "text-emerald-700"}`}
+    <TriangleAlert
+      className={`${large ? "size-7" : "mt-0.5 size-4 shrink-0"} text-amber-700`}
       aria-hidden="true"
     />
   );
 }
 
-function activityDescription(item: ActivityItemView): string {
-  switch (item.kind) {
-    case "capture_failed":
-      return "这次录制未完成。请打开详情选择恢复方式。";
-    case "capture_partial":
-      return "只保存了部分音频。请打开详情检查。";
-    case "capture_completed":
-      return "录制已保存。";
-  }
+function settingsTargetLabel(
+  target: NonNullable<ActivityItemView["settingsTarget"]>,
+): string {
+  if (target === "local-models") return "前往本地模型设置";
+  if (target === "cloud-models") return "前往云端模型设置";
+  if (target === "recording") return "前往录制设置";
+  return "前往通用设置";
 }

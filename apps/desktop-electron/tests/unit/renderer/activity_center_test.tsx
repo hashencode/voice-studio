@@ -8,7 +8,6 @@ import {
   ActivityContextPane,
   ActivityContextPaneFilters,
   ActivityContextPaneSearch,
-  ActivityErrorDialog,
   ActivityMainWorkspace,
   type ActivityItemView,
 } from "../../../src/renderer/features/activity/activity-center";
@@ -16,12 +15,12 @@ import { useState } from "react";
 
 const failed: ActivityItemView = {
   id: "failed",
-  kind: "capture_failed",
-  title: "录制需要处理",
-  severity: "warning",
-  read: false,
-  captureSessionId: "capture-failed",
-  createdAt: Date.UTC(2026, 7, 19, 3, 20),
+  kind: "processing_runtime_unavailable",
+  safeSummary: "本地处理组件暂不可用。",
+  occurrenceCount: 2,
+  unread: true,
+  settingsTarget: "local-models",
+  lastOccurredAt: Date.UTC(2026, 7, 19, 3, 20),
 };
 
 describe("activity pages", () => {
@@ -38,14 +37,14 @@ describe("activity pages", () => {
   });
 
   it("uses an empty state when no message is selected", () => {
-    render(<ActivityMainWorkspace item={null} onOpenDetails={vi.fn()} />);
+    render(
+      <ActivityMainWorkspace item={null} onOpenSettingsTarget={vi.fn()} />,
+    );
     const empty = screen
       .getByRole("heading", { name: "还没有消息" })
       .closest<HTMLElement>('[data-slot="full-screen-empty-state"]')!;
     expect(empty).toBeVisible();
-    expect(empty).toHaveTextContent(
-      "当有录音完成或需要处理时，相关消息会显示在这里。",
-    );
+    expect(empty).toHaveTextContent("这里只显示需要跨页面关注的应用错误。");
     expect(
       empty.querySelector('[data-slot="full-screen-empty-state-illustration"]'),
     ).not.toBeNull();
@@ -71,11 +70,16 @@ describe("activity pages", () => {
           selectedId="failed"
           onSelect={select}
         />
-        <ActivityMainWorkspace item={failed} onOpenDetails={openDetails} />
+        <ActivityMainWorkspace
+          item={failed}
+          onOpenSettingsTarget={openDetails}
+        />
       </>,
     );
     const user = userEvent.setup();
-    const messageRow = screen.getByRole("button", { name: /录制需要处理/ });
+    const messageRow = screen.getByRole("button", {
+      name: /本地处理组件暂不可用/,
+    });
     expect(messageRow).toHaveAttribute("data-slot", "item");
     expect(messageRow).toHaveAttribute("data-variant", "context");
     expect(messageRow).toHaveAttribute("aria-current", "true");
@@ -84,10 +88,9 @@ describe("activity pages", () => {
     expect(select).toHaveBeenCalledWith(failed);
     expect(select).toHaveBeenCalledOnce();
     const detail = screen.getByRole("region", { name: "消息详情" });
-    expect(detail).not.toHaveTextContent("录制需要处理");
-    expect(detail).not.toHaveTextContent("这次录制未能正常完成");
+    expect(detail).toHaveTextContent("发生次数2");
     expect(detail).toHaveTextContent("需要处理");
-    await user.click(screen.getByRole("button", { name: "打开录制详情" }));
+    await user.click(screen.getByRole("button", { name: "前往本地模型设置" }));
     expect(openDetails).toHaveBeenCalledWith(failed);
   });
 
@@ -95,9 +98,10 @@ describe("activity pages", () => {
     const complete: ActivityItemView = {
       ...failed,
       id: "complete",
-      kind: "capture_completed",
-      title: "Project Alpha",
-      severity: "info",
+      kind: "startup_reconciliation_failed",
+      safeSummary: "Project Alpha",
+      occurrenceCount: 1,
+      settingsTarget: null,
     };
     const select = vi.fn();
     const markAll = vi.fn();
@@ -115,7 +119,9 @@ describe("activity pages", () => {
       screen.getByRole("searchbox", { name: "搜索消息" }),
       "ALPHA",
     );
-    expect(screen.queryByText("录制需要处理")).not.toBeInTheDocument();
+    expect(
+      screen.queryByText("本地处理组件暂不可用。"),
+    ).not.toBeInTheDocument();
     expect(screen.getByText("Project Alpha")).toBeVisible();
     expect(select).not.toHaveBeenCalled();
     await user.clear(screen.getByRole("searchbox", { name: "搜索消息" }));
@@ -127,16 +133,15 @@ describe("activity pages", () => {
     const complete: ActivityItemView = {
       ...failed,
       id: "complete",
-      kind: "capture_completed",
-      title: "Project Alpha",
-      severity: "info",
-      read: true,
+      kind: "startup_reconciliation_failed",
+      safeSummary: "Project Alpha",
+      occurrenceCount: 1,
+      unread: false,
+      settingsTarget: null,
     };
     function Harness() {
       const [query, setQuery] = useState("");
-      const [filter, setFilter] = useState<"all" | "unread" | "attention">(
-        "all",
-      );
+      const [filter, setFilter] = useState<"all" | "unread">("all");
       return (
         <>
           <ActivityContextPaneSearch value={query} onValueChange={setQuery} />
@@ -170,14 +175,13 @@ describe("activity pages", () => {
       "context-search",
     );
     expect(screen.getByRole("button", { name: "未读 1" })).toBeVisible();
-    expect(screen.getByRole("button", { name: "需处理 1" })).toBeVisible();
     await user.click(screen.getByRole("button", { name: "未读 1" }));
     expect(allFilter).toHaveAttribute("aria-pressed", "false");
     expect(screen.getByRole("button", { name: "未读 1" })).toHaveAttribute(
       "aria-pressed",
       "true",
     );
-    expect(screen.getByText("录制需要处理")).toBeVisible();
+    expect(screen.getByText("本地处理组件暂不可用。")).toBeVisible();
     expect(screen.queryByText("Project Alpha")).not.toBeInTheDocument();
     await user.type(
       screen.getByRole("searchbox", { name: "搜索消息" }),
@@ -189,7 +193,7 @@ describe("activity pages", () => {
   it("keeps the all-read action disabled without unread items and exposes failures", () => {
     render(
       <ActivityContextPane
-        items={[{ ...failed, read: true }]}
+        items={[{ ...failed, unread: false }]}
         selectedId="failed"
         onSelect={vi.fn()}
         unreadCount={0}
@@ -202,40 +206,13 @@ describe("activity pages", () => {
     expect(screen.getByRole("alert")).toHaveTextContent("操作失败，请重试");
   });
 
-  it("shows failed capture information in a modal", async () => {
-    const openDetails = vi.fn();
+  it("does not expose file context in application error details", () => {
     render(
-      <ActivityErrorDialog
-        item={failed}
-        open
-        onOpenChange={vi.fn()}
-        onOpenDetails={openDetails}
-      />,
+      <ActivityMainWorkspace item={failed} onOpenSettingsTarget={vi.fn()} />,
     );
-    expect(screen.getByRole("dialog", { name: "录制需要处理" })).toBeVisible();
-    expect(screen.getByLabelText("错误信息")).toHaveTextContent(
-      "这次录制未完成",
-    );
-    await userEvent
-      .setup()
-      .click(screen.getByRole("button", { name: "打开录制详情" }));
-    expect(openDetails).toHaveBeenCalledWith(failed);
-  });
-
-  it("closes a failed-capture modal for later handling", async () => {
-    const onOpenChange = vi.fn();
-    render(
-      <ActivityErrorDialog
-        item={failed}
-        open
-        onOpenChange={onOpenChange}
-        onOpenDetails={vi.fn()}
-      />,
-    );
-
-    await userEvent
-      .setup()
-      .click(screen.getByRole("button", { name: "稍后处理" }));
-    expect(onOpenChange).toHaveBeenCalledWith(false);
+    const detail = screen.getByRole("region", { name: "消息详情" });
+    expect(detail).not.toHaveTextContent("录制详情");
+    expect(detail).not.toHaveTextContent("capture-failed");
+    expect(detail).not.toHaveTextContent("/Users/private/recording.wav");
   });
 });

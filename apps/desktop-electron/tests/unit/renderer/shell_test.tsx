@@ -2270,6 +2270,9 @@ describe("application shell", () => {
     await user.click(await screen.findByRole("button", { name: "消息" }));
     expect(screen.getByRole("heading", { name: "还没有消息" })).toBeVisible();
     expect(
+      screen.getByText("这里只显示需要跨页面关注的应用错误。"),
+    ).toBeVisible();
+    expect(
       document.querySelector('[data-shell-slot="content-head"]'),
     ).toBeNull();
     expect(
@@ -2287,14 +2290,12 @@ describe("application shell", () => {
         activity: [
           {
             id: "capture:completed:message-restored",
-            kind: "capture_completed",
-            captureSessionId: "message-restored",
-            createdAt: 100,
-            title: "录音已完成",
-            severity: "info",
-            read: true,
-            resolved: true,
-            detailTarget: "capture-details",
+            kind: "startup_reconciliation_failed",
+            safeSummary: "启动恢复暂未完成。",
+            occurrenceCount: 1,
+            unread: false,
+            settingsTarget: null,
+            lastOccurredAt: 100,
           },
         ],
       }),
@@ -2783,19 +2784,7 @@ describe("application shell", () => {
       {
         ...readySnapshot,
         capture: { phase: "idle" },
-        activity: [
-          {
-            id: "capture:failed:target",
-            kind: "capture_failed",
-            captureSessionId: targetedRecovery.sessionId,
-            createdAt: 100,
-            title: "录制中断，需要处理",
-            severity: "warning",
-            read: false,
-            resolved: false,
-            detailTarget: "capture-details",
-          },
-        ],
+        activity: [],
       },
       {
         listCaptureRecoveries: vi.fn(async () => [

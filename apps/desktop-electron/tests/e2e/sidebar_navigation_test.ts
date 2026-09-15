@@ -422,14 +422,12 @@ describe("sidebar navigation e2e", () => {
       activity: [
         {
           id: "resize-shared-width",
-          kind: "capture_completed",
-          captureSessionId: "capture-resize-shared-width",
-          createdAt: 2,
-          title: "共享宽度验证",
-          severity: "info",
-          read: true,
-          resolved: true,
-          detailTarget: "capture-details",
+          kind: "startup_reconciliation_failed",
+          safeSummary: "启动恢复暂未完成。",
+          occurrenceCount: 1,
+          unread: false,
+          settingsTarget: null,
+          lastOccurredAt: 2,
         },
       ],
       capture: { phase: "idle" },
@@ -527,25 +525,21 @@ describe("sidebar navigation e2e", () => {
         activity: [
           {
             id: "complete",
-            kind: "capture_completed",
-            captureSessionId: "capture-complete",
-            createdAt: 2,
-            title: "录制已保存",
-            severity: "info",
-            read: false,
-            resolved: true,
-            detailTarget: "capture-details",
+            kind: "startup_reconciliation_failed",
+            safeSummary: "启动恢复暂未完成。",
+            occurrenceCount: 1,
+            unread: true,
+            settingsTarget: null,
+            lastOccurredAt: 2,
           },
           {
             id: "failed",
-            kind: "capture_failed",
-            captureSessionId: "capture-failed",
-            createdAt: 1,
-            title: "录制失败",
-            severity: "warning",
-            read: false,
-            resolved: false,
-            detailTarget: "capture-details",
+            kind: "capture_runtime_unavailable",
+            safeSummary: "录制组件暂不可用。",
+            occurrenceCount: 2,
+            unread: true,
+            settingsTarget: "recording",
+            lastOccurredAt: 1,
           },
         ],
       },
@@ -558,21 +552,21 @@ describe("sidebar navigation e2e", () => {
       await screen.findByRole("button", { name: "消息，2 条未读" }),
     );
     expect(markActivityRead).toHaveBeenCalledWith("complete");
-    await user.click(screen.getByRole("button", { name: /录制已保存/ }));
+    await user.click(screen.getByRole("button", { name: /启动恢复暂未完成/ }));
     expect(
       screen.getByRole("complementary", { name: "消息上下文面板" }),
     ).toBeVisible();
     const messageDetails = screen.getByRole("region", { name: "消息详情" });
-    expect(messageDetails).toHaveTextContent("已完成");
-    expect(
-      within(messageDetails).getByRole("button", { name: "打开录制详情" }),
-    ).toBeVisible();
+    expect(messageDetails).toHaveTextContent("需要处理");
+    expect(within(messageDetails).queryByRole("button")).toBeNull();
 
-    await user.click(screen.getByRole("button", { name: /录制失败/ }));
+    await user.click(screen.getByRole("button", { name: /录制组件暂不可用/ }));
     expect(
       document.querySelector('[aria-label="消息上下文面板"]'),
     ).not.toBeNull();
-    expect(screen.getByRole("dialog", { name: "录制失败" })).toBeVisible();
+    expect(
+      within(messageDetails).getByRole("button", { name: "前往录制设置" }),
+    ).toBeVisible();
     expect(markActivityRead).toHaveBeenCalledWith("failed");
   });
 

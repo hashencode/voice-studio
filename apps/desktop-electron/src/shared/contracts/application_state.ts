@@ -133,17 +133,29 @@ export const captureLibraryProjectionStateSchema = z.discriminatedUnion(
   ],
 );
 
+export const applicationFailureKindSchema = z.enum([
+  "processing_runtime_unavailable",
+  "capture_runtime_unavailable",
+  "startup_reconciliation_failed",
+]);
+
+export const settingsSectionSchema = z.enum([
+  "general",
+  "recording",
+  "local-models",
+  "cloud-models",
+]);
+export const applicationFailureSettingsTargetSchema = settingsSectionSchema;
+
 export const activityItemSchema = z
   .object({
     id: z.string().min(1).max(260),
-    kind: z.enum(["capture_completed", "capture_partial", "capture_failed"]),
-    captureSessionId: z.string().min(1).max(128),
-    createdAt: z.number().int().nonnegative(),
-    title: z.string().min(1).max(80),
-    severity: z.enum(["info", "warning"]),
-    read: z.boolean(),
-    resolved: z.boolean(),
-    detailTarget: z.literal("capture-details"),
+    kind: applicationFailureKindSchema,
+    safeSummary: z.string().trim().min(1).max(160),
+    occurrenceCount: z.number().int().positive(),
+    unread: z.boolean(),
+    settingsTarget: applicationFailureSettingsTargetSchema.nullable(),
+    lastOccurredAt: z.number().int().nonnegative(),
   })
   .strict();
 
@@ -197,6 +209,13 @@ export type ShellSection = z.infer<typeof shellSectionSchema>;
 export type BootstrapAction = z.infer<typeof bootstrapActionSchema>;
 export type ApplicationSnapshot = z.output<typeof applicationSnapshotSchema>;
 export type ActivityItem = z.infer<typeof activityItemSchema>;
+export type ApplicationFailureKind = z.infer<
+  typeof applicationFailureKindSchema
+>;
+export type ApplicationFailureSettingsTarget = z.infer<
+  typeof applicationFailureSettingsTargetSchema
+>;
+export type SettingsSection = z.infer<typeof settingsSectionSchema>;
 export type CaptureLibraryProjectionFailureCode = z.infer<
   typeof captureLibraryProjectionFailureCodeSchema
 >;

@@ -1,3 +1,5 @@
+import { randomUUID } from "node:crypto";
+
 import {
   applicationSnapshotSchema,
   desktopProtocolVersion,
@@ -114,7 +116,6 @@ export class DesktopApplicationState {
   ): ApplicationSnapshot {
     if (!capture) return this.update({ capture: { phase: "idle" } });
     const phase = capture.state === "recoverable" ? "recovery" : capture.state;
-    const activity = nextActivity(this.current, capture, phase);
     return this.update({
       capture: {
         phase,
@@ -132,7 +133,49 @@ export class DesktopApplicationState {
           ? captureMessage(capture.interruptionReason)
           : undefined,
       },
-      activity,
+    });
+  }
+
+  recordApplicationFailure(
+    command: Pick<ActivityItem, "kind" | "safeSummary" | "settingsTarget">,
+  ): ApplicationSnapshot {
+    const safeSummary = command.safeSummary.trim();
+    const activity = this.current.activity ?? [];
+    const matchingIndex = activity.findIndex(
+      (item) =>
+        item.kind === command.kind &&
+        item.safeSummary === safeSummary &&
+        item.settingsTarget === command.settingsTarget,
+    );
+    const lastOccurredAt = Date.now();
+    if (matchingIndex >= 0) {
+      const matching = activity[matchingIndex]!;
+      const updated: ActivityItem = {
+        ...matching,
+        occurrenceCount: matching.occurrenceCount + 1,
+        unread: true,
+        lastOccurredAt,
+      };
+      return this.update({
+        activity: [
+          updated,
+          ...activity.slice(0, matchingIndex),
+          ...activity.slice(matchingIndex + 1),
+        ].slice(0, 20),
+      });
+    }
+    return this.update({
+      activity: [
+        {
+          id: randomUUID(),
+          ...command,
+          safeSummary,
+          occurrenceCount: 1,
+          unread: true,
+          lastOccurredAt,
+        },
+        ...activity,
+      ].slice(0, 20),
     });
   }
 
@@ -179,7 +222,7 @@ export class DesktopApplicationState {
   markActivityRead(activityId: string): ApplicationSnapshot {
     const currentActivity = this.current.activity ?? [];
     const activity = currentActivity.map((item) =>
-      item.id === activityId && !item.read ? { ...item, read: true } : item,
+      item.id === activityId && item.unread ? { ...item, unread: false } : item,
     );
     if (activity.every((item, index) => item === currentActivity[index])) {
       return this.snapshot();
@@ -190,7 +233,7 @@ export class DesktopApplicationState {
   markAllActivityRead(): ApplicationSnapshot {
     const currentActivity = this.current.activity ?? [];
     const activity = currentActivity.map((item) =>
-      item.read ? item : { ...item, read: true },
+      item.unread ? { ...item, unread: false } : item,
     );
     if (activity.every((item, index) => item === currentActivity[index])) {
       return this.snapshot();
@@ -248,46 +291,6 @@ export function canRetryCaptureLibraryProjection(
     (snapshot.capture.phase === "completed" ||
       snapshot.capture.phase === "partial_capture")
   );
-}
-
-function nextActivity(
-  current: ApplicationSnapshot,
-  capture: CaptureSnapshot,
-  phase: Exclude<ApplicationSnapshot["capture"], { phase: "idle" }>["phase"],
-): ActivityItem[] {
-  const currentActivity = current.activity ?? [];
-  const terminal =
-    phase === "completed" ||
-    phase === "failed" ||
-    (phase === "partial_capture" && capture.recordingSha256 !== null);
-  if (!terminal) return currentActivity;
-
-  const kind: ActivityItem["kind"] =
-    phase === "completed"
-      ? "capture_completed"
-      : phase === "partial_capture"
-        ? "capture_partial"
-        : "capture_failed";
-  const id = `${capture.sessionId}:${kind}`;
-  if (currentActivity.some((item) => item.id === id)) return currentActivity;
-  const warning = kind !== "capture_completed";
-  const item: ActivityItem = {
-    id,
-    kind,
-    captureSessionId: capture.sessionId,
-    createdAt: Date.now(),
-    title:
-      kind === "capture_completed"
-        ? "录制已保存"
-        : kind === "capture_partial"
-          ? "部分录制已保存，请检查"
-          : "录制需要处理",
-    severity: warning ? "warning" : "info",
-    read: false,
-    resolved: kind === "capture_completed",
-    detailTarget: "capture-details",
-  };
-  return [item, ...currentActivity].slice(0, 20);
 }
 
 function captureMessage(reason: string): string {

@@ -3078,6 +3078,11 @@ async function initializeApplication(): Promise<void> {
     traceCaptureSmoke("capture-ready");
   } catch (error) {
     console.error("macOS capture initialization failed", error);
+    applicationState.recordApplicationFailure({
+      kind: "capture_runtime_unavailable",
+      safeSummary: "录制组件暂不可用。",
+      settingsTarget: "recording",
+    });
     await microphoneTestService?.stopBeforeFormalCapture();
     microphoneTestService = null;
     await captureNativePort?.close().catch(() => undefined);
@@ -3334,6 +3339,11 @@ async function initializeApplication(): Promise<void> {
     }
     traceCaptureSmoke("catalog-ready");
   } catch (error) {
+    applicationState.recordApplicationFailure({
+      kind: "processing_runtime_unavailable",
+      safeSummary: "本地处理组件暂不可用。",
+      settingsTarget: "local-models",
+    });
     await initializeLocalModels(false);
     applicationState.setProcessingCapability(
       "本地处理暂不可用，请检查本地模型设置。",
@@ -3385,6 +3395,11 @@ async function initializeApplication(): Promise<void> {
       })
       .catch((error) => {
         console.error("capture library startup reconciliation failed", error);
+        applicationState.recordApplicationFailure({
+          kind: "startup_reconciliation_failed",
+          safeSummary: "启动恢复暂未完成。",
+          settingsTarget: null,
+        });
       });
   }
 }

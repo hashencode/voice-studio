@@ -23,7 +23,7 @@ function completedCapture(index: number): CaptureSnapshot {
   };
 }
 
-describe("application capture activity", () => {
+describe("application activity", () => {
   it("publishes a fenced live library projection lifecycle", () => {
     const state = new DesktopApplicationState();
     const sessionId = "session-projection-123456";
@@ -180,97 +180,110 @@ describe("application capture activity", () => {
     expect(state.snapshot().navigation.section).toBe("library");
   });
 
-  it("adds one privacy-safe item for the first durable terminal transition", () => {
+  it("keeps completed, partial, and failed capture transitions out of messages", () => {
     const state = new DesktopApplicationState();
     const completed = completedCapture(1);
 
     state.setCapture(completed, "private meeting title");
-    state.setCapture(completed, "private meeting title");
-
-    expect(state.snapshot().activity).toEqual([
-      expect.objectContaining({
-        id: `${completed.sessionId}:capture_completed`,
-        captureSessionId: completed.sessionId,
-        title: "录制已保存",
-        read: false,
-      }),
-    ]);
-    expect(JSON.stringify(state.snapshot().activity)).not.toContain(
-      "private meeting title",
-    );
-  });
-
-  it("retains the newest 20 items and marks exactly one item read", () => {
-    const state = new DesktopApplicationState();
-    for (let index = 0; index < 22; index += 1) {
-      state.setCapture(completedCapture(index));
-    }
-
-    const activity = state.snapshot().activity!;
-    expect(activity).toHaveLength(20);
-    expect(activity[0]!.captureSessionId).toBe("session-activity-0021");
-    expect(activity.at(-1)!.captureSessionId).toBe("session-activity-0002");
-
-    const revision = state.snapshot().revision;
-    state.markActivityRead(activity[1]!.id);
-    expect(
-      state
-        .snapshot()
-        .activity!.map((item) => item.read)
-        .slice(0, 3),
-    ).toEqual([false, true, false]);
-    expect(state.snapshot().revision).toBe(revision + 1);
-    state.markActivityRead(activity[1]!.id);
-    state.markActivityRead("unknown-activity");
-    expect(state.snapshot().revision).toBe(revision + 1);
-  });
-
-  it("marks all activity read idempotently without changing order", () => {
-    const state = new DesktopApplicationState();
-    for (let index = 0; index < 3; index += 1) {
-      state.setCapture(completedCapture(index));
-    }
-    const before = state.snapshot().activity!.map((item) => item.id);
-    const revision = state.snapshot().revision;
-
-    state.markAllActivityRead();
-    expect(state.snapshot().activity!.every((item) => item.read)).toBe(true);
-    expect(state.snapshot().activity!.map((item) => item.id)).toEqual(before);
-    expect(state.snapshot().revision).toBe(revision + 1);
-    state.markAllActivityRead();
-    expect(state.snapshot().revision).toBe(revision + 1);
-  });
-
-  it("publishes durable partial and failed capture activity only once", () => {
-    const state = new DesktopApplicationState();
     const partial = {
       ...completedCapture(30),
       state: "partial_capture" as const,
-      recordingSha256: null,
+      recordingSha256: "b".repeat(64),
       partialCapture: true,
       systemAudioHealthy: false,
       microphoneHealthy: false,
     };
     state.setCapture(partial);
-    expect(state.snapshot().activity).toEqual([]);
-
-    state.setCapture({ ...partial, recordingSha256: "b".repeat(64) });
-    state.setCapture({ ...partial, recordingSha256: "b".repeat(64) });
-    expect(state.snapshot().activity).toEqual([
-      expect.objectContaining({
-        kind: "capture_partial",
-        severity: "warning",
-        resolved: false,
-      }),
-    ]);
-
     state.setCapture({
       ...completedCapture(31),
       state: "failed",
       recordingSha256: null,
     });
-    expect(state.snapshot().activity?.[0]).toEqual(
-      expect.objectContaining({ kind: "capture_failed", resolved: false }),
+
+    expect(state.snapshot().activity).toEqual([]);
+    expect(JSON.stringify(state.snapshot().activity)).not.toContain(
+      "private meeting title",
     );
+  });
+
+  it("deduplicates admitted application failures and keeps safe fields only", () => {
+    const state = new DesktopApplicationState();
+    state.recordApplicationFailure({
+      kind: "processing_runtime_unavailable",
+      safeSummary: "本地处理组件暂不可用。",
+      settingsTarget: "local-models",
+    });
+    const id = state.snapshot().activity![0]!.id;
+    state.markActivityRead(id);
+    state.recordApplicationFailure({
+      kind: "processing_runtime_unavailable",
+      safeSummary: "本地处理组件暂不可用。",
+      settingsTarget: "local-models",
+    });
+
+    expect(state.snapshot().activity).toEqual([
+      expect.objectContaining({
+        id,
+        kind: "processing_runtime_unavailable",
+        safeSummary: "本地处理组件暂不可用。",
+        occurrenceCount: 2,
+        unread: true,
+        settingsTarget: "local-models",
+      }),
+    ]);
+    const serialized = JSON.stringify(state.snapshot().activity);
+    expect(serialized).not.toContain("/Users/private/recording.wav");
+    expect(serialized).not.toContain("private meeting title");
+    expect(serialized).not.toContain("a".repeat(64));
+  });
+
+  it("keeps failures with different settings targets distinct", () => {
+    const state = new DesktopApplicationState();
+    for (const settingsTarget of ["local-models", "general"] as const) {
+      state.recordApplicationFailure({
+        kind: "processing_runtime_unavailable",
+        safeSummary: "应用组件暂不可用。",
+        settingsTarget,
+      });
+    }
+
+    expect(state.snapshot().activity).toHaveLength(2);
+    expect(
+      state.snapshot().activity!.map((item) => item.settingsTarget),
+    ).toEqual(["general", "local-models"]);
+  });
+
+  it("keeps distinct failures newest-first, caps at 20, and reads idempotently", () => {
+    const state = new DesktopApplicationState();
+    for (let index = 0; index < 22; index += 1) {
+      state.recordApplicationFailure({
+        kind: "startup_reconciliation_failed",
+        safeSummary: `启动恢复暂未完成 ${index}`,
+        settingsTarget: null,
+      });
+    }
+
+    const activity = state.snapshot().activity!;
+    expect(activity).toHaveLength(20);
+    expect(activity[0]!.safeSummary).toBe("启动恢复暂未完成 21");
+    expect(activity.at(-1)!.safeSummary).toBe("启动恢复暂未完成 2");
+    const beforeIds = activity.map((item) => item.id);
+    const revision = state.snapshot().revision;
+
+    state.markActivityRead(activity[1]!.id);
+    expect(state.snapshot().activity![1]!.unread).toBe(false);
+    expect(state.snapshot().revision).toBe(revision + 1);
+    state.markActivityRead(activity[1]!.id);
+    state.markActivityRead("unknown-activity");
+    expect(state.snapshot().revision).toBe(revision + 1);
+
+    state.markAllActivityRead();
+    expect(state.snapshot().activity!.every((item) => !item.unread)).toBe(true);
+    expect(state.snapshot().activity!.map((item) => item.id)).toEqual(
+      beforeIds,
+    );
+    const allReadRevision = state.snapshot().revision;
+    state.markAllActivityRead();
+    expect(state.snapshot().revision).toBe(allReadRevision);
   });
 });
