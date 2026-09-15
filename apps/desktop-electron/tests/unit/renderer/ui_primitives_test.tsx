@@ -66,7 +66,20 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
-import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
+import {
+  AlertDialog,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { ApplicationBlocker } from "@/components/application-blocker";
 import {
   Field,
@@ -376,6 +389,57 @@ describe("current shadcn primitives", () => {
       screen.getByRole("button", { name: "关闭第二层", hidden: true }),
     );
     expect(navigated).toHaveBeenCalledOnce();
+  });
+
+  it("keeps Dialog and AlertDialog visual hierarchy aligned without merging their controls", () => {
+    const ordinary = render(
+      <Dialog open>
+        <DialogContent>
+          <DialogTitle>普通消息</DialogTitle>
+          <DialogDescription>普通消息正文</DialogDescription>
+          <DialogFooter>普通操作</DialogFooter>
+        </DialogContent>
+      </Dialog>,
+    );
+    const dialog = screen.getByRole("dialog", { name: "普通消息" });
+    const dialogOverlayClass = document.querySelector(
+      '[data-slot="dialog-overlay"]',
+    )?.className;
+    const dialogContentClass = dialog.className;
+    const dialogFooterClass = dialog.querySelector(
+      '[data-slot="dialog-footer"]',
+    )?.className;
+    expect(
+      within(dialog).getByRole("button", { name: "关闭", hidden: true }),
+    ).toBeInTheDocument();
+    ordinary.unmount();
+
+    render(
+      <AlertDialog open>
+        <AlertDialogContent>
+          <AlertDialogTitle>确认消息</AlertDialogTitle>
+          <AlertDialogDescription>确认消息正文</AlertDialogDescription>
+          <AlertDialogFooter>确认操作</AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>,
+    );
+    const alertDialog = screen.getByRole("alertdialog", {
+      name: "确认消息",
+    });
+    expect(
+      document.querySelector('[data-slot="alert-dialog-overlay"]')?.className,
+    ).toBe(dialogOverlayClass);
+    expect(alertDialog.className).toBe(dialogContentClass);
+    expect(
+      alertDialog.querySelector('[data-slot="alert-dialog-footer"]')
+        ?.className,
+    ).toBe(dialogFooterClass);
+    expect(
+      within(alertDialog).queryByRole("button", {
+        name: "关闭",
+        hidden: true,
+      }),
+    ).not.toBeInTheDocument();
   });
 
   it("keeps application blockers open and discards pending modal navigation", async () => {

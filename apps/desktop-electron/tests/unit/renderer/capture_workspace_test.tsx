@@ -1468,23 +1468,38 @@ describe("capture workspace", () => {
     const stop = await screen.findByRole("button", { name: "停止并保存" });
     fireEvent.click(stop);
     const dialog = screen.getByRole("alertdialog", { name: "提示" });
+    expect(
+      within(dialog).getByRole("heading", { name: "提示" }),
+    ).toBeVisible();
     expect(dialog).toHaveTextContent("停止录制后，当前内容将自动保存。");
+    expect(within(dialog).getAllByRole("button")).toHaveLength(2);
     expect(
       dialog.querySelector('[data-slot="alert-dialog-footer"]'),
     ).toHaveClass("border-t", "bg-muted/50");
-    fireEvent.click(within(dialog).getByRole("button", { name: "取消" }));
+    const cancel = within(dialog).getByRole("button", { name: "取消" });
+    const firstConfirm = within(dialog).getByRole("button", { name: "确定" });
+    expect(firstConfirm).toHaveAttribute("data-variant", "default");
+    expect(firstConfirm.querySelector("svg")).toBeNull();
+    await waitFor(() => expect(cancel).toHaveFocus());
+    const overlay = document.querySelector(
+      '[data-slot="alert-dialog-overlay"]',
+    );
+    fireEvent.pointerDown(overlay!);
+    fireEvent.click(overlay!);
+    expect(screen.getByRole("alertdialog", { name: "提示" })).toBeVisible();
+    fireEvent.click(cancel);
     expect(controlCapture).not.toHaveBeenCalled();
     expect(screen.queryByRole("alertdialog")).not.toBeInTheDocument();
 
     fireEvent.click(stop);
-    const confirm = screen.getByRole("button", { name: "确认停止并保存" });
+    const confirm = screen.getByRole("button", { name: "确定" });
     fireEvent.click(confirm);
     fireEvent.click(confirm);
     expect(controlCapture).toHaveBeenCalledTimes(1);
     expect(confirm).toBeDisabled();
     expect(screen.getByRole("alertdialog")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "取消" })).toBeDisabled();
-    expect(screen.getByText("正在停止并保存")).toBeVisible();
+    expect(screen.getByRole("button", { name: "正在保存…" })).toBeDisabled();
 
     resolveStop(completed);
     await waitFor(() =>
@@ -1546,7 +1561,7 @@ describe("capture workspace", () => {
     );
 
     fireEvent.click(await screen.findByRole("button", { name: "停止并保存" }));
-    const confirm = screen.getByRole("button", { name: "确认停止并保存" });
+    const confirm = screen.getByRole("button", { name: "确定" });
     fireEvent.click(confirm);
 
     const errorDialog = await screen.findByRole("dialog", {
@@ -1563,7 +1578,7 @@ describe("capture workspace", () => {
       within(errorDialog).getByRole("button", { name: "知道了" }),
     );
     fireEvent.click(screen.getByRole("button", { name: "停止并保存" }));
-    fireEvent.click(screen.getByRole("button", { name: "确认停止并保存" }));
+    fireEvent.click(screen.getByRole("button", { name: "确定" }));
     expect(controlCapture).toHaveBeenCalledTimes(2);
   });
 
@@ -1590,7 +1605,7 @@ describe("capture workspace", () => {
       fireEvent.click(
         await screen.findByRole("button", { name: "停止并保存" }),
       );
-      fireEvent.click(screen.getByRole("button", { name: "确认停止并保存" }));
+      fireEvent.click(screen.getByRole("button", { name: "确定" }));
       expect(
         await screen.findByRole("dialog", { name: "录制遇到问题" }),
       ).toHaveTextContent("停止录制未完成");

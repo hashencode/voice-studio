@@ -108,12 +108,10 @@ export function CaptureFooter({
                   </AlertDialogCancel>
                   <Button
                     type="button"
-                    variant="destructive"
                     disabled={busy}
                     onClick={onConfirmStop}
                   >
-                    <Square aria-hidden="true" />
-                    {busy ? "正在保存…" : "确认停止并保存"}
+                    {busy ? "正在保存…" : "确定"}
                   </Button>
                 </AlertDialogFooter>
               </AlertDialogContent>
