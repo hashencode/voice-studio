@@ -47,6 +47,7 @@ import {
   canRetryCaptureLibraryProjection,
 } from "./application/application_state";
 import {
+  publishStartupCaptureReconciliation,
   publishReadyLibrary,
   runBootstrapTransaction,
 } from "./application/bootstrap_transaction";
@@ -3387,11 +3388,18 @@ async function initializeApplication(): Promise<void> {
         repository: new CaptureRepository(profile.database),
       })
       .then((result) => {
-        if (result.projected > 0) {
-          applicationState.setLibraryCount(
-            startupDesktopRepository.countAudios(),
-          );
-        }
+        publishStartupCaptureReconciliation({
+          result,
+          countAudios: () => startupDesktopRepository.countAudios(),
+          setLibraryCount: (audioCount) =>
+            applicationState.setLibraryCount(audioCount),
+          recordFailure: () =>
+            applicationState.recordApplicationFailure({
+              kind: "startup_reconciliation_failed",
+              safeSummary: "启动恢复暂未完成。",
+              settingsTarget: null,
+            }),
+        });
       })
       .catch((error) => {
         console.error("capture library startup reconciliation failed", error);

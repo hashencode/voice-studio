@@ -21,3 +21,15 @@ export function publishReadyLibrary(options: {
   options.completeBootstrap();
   options.setLibraryCount(audioCount);
 }
+
+export function publishStartupCaptureReconciliation(options: {
+  result: { projected: number; failed: number };
+  countAudios: () => number;
+  setLibraryCount: (audioCount: number) => void;
+  recordFailure: () => void;
+}): void {
+  if (options.result.projected > 0) {
+    options.setLibraryCount(options.countAudios());
+  }
+  if (options.result.failed > 0) options.recordFailure();
+}

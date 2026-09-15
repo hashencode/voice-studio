@@ -449,8 +449,14 @@ export function useAudioRouteController({
         return;
       }
       if (result === "canceled") {
-        protectedWorkspaceAudioIdRef.current = null;
-        setAutoOpenState({ phase: "idle" });
+        if (observedLiveIntentRef.current === intentId) {
+          protectedWorkspaceAudioIdRef.current = null;
+          setAutoOpenState((current) =>
+            current.phase !== "idle" && current.intentId === intentId
+              ? { phase: "idle" }
+              : current,
+          );
+        }
         return;
       }
       setAutoOpenState((current) =>
@@ -484,8 +490,8 @@ export function useAudioRouteController({
   React.useEffect(() => {
     if (!liveRegisteredAudio) return;
     if (observedLiveIntentRef.current === liveRegisteredAudio.intentId) return;
-    observedLiveIntentRef.current = liveRegisteredAudio.intentId;
     if (!enabled || !active) return;
+    observedLiveIntentRef.current = liveRegisteredAudio.intentId;
     const { intentId, audioId } = liveRegisteredAudio;
     void Promise.resolve().then(() => {
       if (observedLiveIntentRef.current !== intentId || !activeRef.current) {

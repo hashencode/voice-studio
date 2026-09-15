@@ -60,6 +60,35 @@ it("opens a live registered recording by id without waiting for the audio list",
   expect(listAudios).toHaveBeenCalledTimes(1);
 });
 
+it("waits to consume a live registered recording until the audio route activates", async () => {
+  const recorded = summary(9, "刚保存的录音.wav");
+  const openAudio = vi.fn(async () => workspace(recorded));
+  const props = {
+    api: api({ listAudios: vi.fn(async () => []), openAudio }),
+    tasks: [],
+    pendingJobActions: new Map<number, never>(),
+    writable: true,
+    paneOpen: true,
+    liveRegisteredAudio: { intentId: "live-9", audioId: 9 },
+    onRecord: vi.fn(),
+    onImport: vi.fn(),
+    onCancel: vi.fn(),
+    onRetry: vi.fn(),
+  };
+  const view = render(<AudioRouteFeature {...props} active={false} />);
+
+  await act(async () => undefined);
+  expect(openAudio).not.toHaveBeenCalled();
+
+  view.rerender(<AudioRouteFeature {...props} active />);
+
+  expect(
+    await screen.findByRole("region", { name: "刚保存的录音.wav 工作区" }),
+  ).toBeVisible();
+  expect(openAudio).toHaveBeenCalledTimes(1);
+  expect(openAudio).toHaveBeenCalledWith(9);
+});
+
 it("retries only direct open and consumes the same live intent once", async () => {
   const list = deferred<AudioSummary[]>();
   const recorded = summary(9, "刚保存的录音.wav");
@@ -125,6 +154,56 @@ it("does not finish a live auto-open after navigation leaves the audio route", a
   expect(
     screen.queryByRole("region", { name: "刚保存的录音.wav 工作区" }),
   ).not.toBeInTheDocument();
+});
+
+it("keeps a replacement auto-open protected from stale cancellation and list data", async () => {
+  const list = deferred<AudioSummary[]>();
+  const firstOpen = deferred<AudioWorkspaceSnapshot | null>();
+  const replacementOpen = deferred<AudioWorkspaceSnapshot | null>();
+  const first = summary(9, "第一段录音.wav");
+  const replacement = summary(10, "替换录音.wav");
+  const openAudio = vi.fn((audioId: number) =>
+    audioId === first.audioId ? firstOpen.promise : replacementOpen.promise,
+  );
+  const props = {
+    api: api({ listAudios: vi.fn(() => list.promise), openAudio }),
+    tasks: [],
+    pendingJobActions: new Map<number, never>(),
+    writable: true,
+    paneOpen: true,
+    onRecord: vi.fn(),
+    onImport: vi.fn(),
+    onCancel: vi.fn(),
+    onRetry: vi.fn(),
+  };
+  const view = render(
+    <AudioRouteFeature
+      {...props}
+      liveRegisteredAudio={{ intentId: "live-9", audioId: first.audioId }}
+    />,
+  );
+  await waitFor(() => expect(openAudio).toHaveBeenCalledWith(first.audioId));
+
+  view.rerender(
+    <AudioRouteFeature
+      {...props}
+      liveRegisteredAudio={{
+        intentId: "live-10",
+        audioId: replacement.audioId,
+      }}
+    />,
+  );
+  await waitFor(() =>
+    expect(openAudio).toHaveBeenCalledWith(replacement.audioId),
+  );
+
+  await act(async () => firstOpen.resolve(workspace(first)));
+  await act(async () => replacementOpen.resolve(workspace(replacement)));
+  await act(async () => list.resolve([]));
+
+  expect(
+    screen.getByRole("region", { name: "替换录音.wav 工作区" }),
+  ).toBeVisible();
 });
 
 it("clears a failed open when the matching live projection is replaced", async () => {

@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from "vitest";
 
 import {
   publishReadyLibrary,
+  publishStartupCaptureReconciliation,
   runBootstrapTransaction,
 } from "../../src/main/application/bootstrap_transaction";
 
@@ -45,5 +46,20 @@ describe("application bootstrap transaction", () => {
     await expect(run()).resolves.toBeUndefined();
     expect(initialize).toHaveBeenCalledTimes(2);
     expect(ready).toBe(true);
+  });
+
+  it("publishes projected audio count and reports partial startup failures", () => {
+    const setLibraryCount = vi.fn();
+    const recordFailure = vi.fn();
+
+    publishStartupCaptureReconciliation({
+      result: { projected: 2, failed: 1 },
+      countAudios: () => 3,
+      setLibraryCount,
+      recordFailure,
+    });
+
+    expect(setLibraryCount).toHaveBeenCalledWith(3);
+    expect(recordFailure).toHaveBeenCalledOnce();
   });
 });
