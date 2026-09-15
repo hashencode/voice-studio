@@ -163,6 +163,12 @@ function App() {
   const restoreFocusFrameRef = React.useRef<number | null>(null);
   const [recordRequest, setRecordRequest] = React.useState(0);
   const [captureStartPending, setCaptureStartPending] = React.useState(false);
+  const recordingShellMode = isCaptureInProgress(snapshot?.capture)
+    ? "recordingFocus"
+    : captureStartPending
+      ? "startPending"
+      : "browsing";
+  const shellNavigationBlocked = recordingShellMode !== "browsing";
   const [processingUnavailableReason, setProcessingUnavailableReason] =
     React.useState<string | null>(null);
   const [captureDetailOpen, setCaptureDetailOpen] = React.useState(false);
@@ -244,7 +250,7 @@ function App() {
     null;
   const navigatePrimary = React.useCallback(
     (section: RendererShellSection) => {
-      if (applicationBlocked || modalOpen) return;
+      if (applicationBlocked || modalOpen || shellNavigationBlocked) return;
       captureInvokerRef.current = null;
       setCaptureDetailOpen(false);
       setCaptureDetailSessionId(null);
@@ -265,7 +271,15 @@ function App() {
       modalOpen,
       navigate,
       selectedActivity,
+      shellNavigationBlocked,
     ],
+  );
+  const navigateShellHistory = React.useCallback(
+    (delta: -1 | 1) => {
+      if (shellNavigationBlocked) return;
+      void navigateSectionDelta(current, delta);
+    },
+    [current, shellNavigationBlocked],
   );
   const changeCaptureDetail = React.useCallback(
     (open: boolean, sessionId: string | null = null) => {
@@ -610,9 +624,10 @@ function App() {
       onStartPendingChange={setCaptureStartPending}
       onDetailOpenChange={(open) => {
         if (open && current !== "audio") return;
+        if (!open && shellNavigationBlocked) return;
         if (!open && routedCaptureSessionId) {
           if (activeRoute.canGoBack) {
-            void navigateSectionDelta(current, -1);
+            navigateShellHistory(-1);
           } else {
             void navigateSection(current, captureOwnerPath(routeDestination), {
               replace: true,
@@ -719,11 +734,15 @@ function App() {
             captureDetailVisible ? captureWorkspace.customTitle : undefined
           }
           showHeader={!fullScreenEmptyPresentation}
+          visibility={{
+            navigation: recordingShellMode !== "recordingFocus",
+            history: recordingShellMode !== "recordingFocus",
+          }}
           history={{
             canGoBack: activeRoute.canGoBack,
             canGoForward: activeRoute.canGoForward,
-            onBack: () => void navigateSectionDelta(current, -1),
-            onForward: () => void navigateSectionDelta(current, 1),
+            onBack: () => navigateShellHistory(-1),
+            onForward: () => navigateShellHistory(1),
           }}
           actions={
             audioWorkspacePresentation ? (

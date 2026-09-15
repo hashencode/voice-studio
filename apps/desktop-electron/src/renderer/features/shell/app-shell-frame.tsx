@@ -39,6 +39,10 @@ type AppShellFrameProps = React.PropsWithChildren<{
   titleRef?: React.Ref<HTMLHeadingElement>;
   customTitle?: React.ReactNode;
   showHeader?: boolean;
+  visibility?: {
+    navigation: boolean;
+    history: boolean;
+  };
   history: {
     canGoBack: boolean;
     canGoForward: boolean;
@@ -68,6 +72,7 @@ export function AppShellFrame({
   titleRef,
   customTitle,
   showHeader = true,
+  visibility,
   history,
   actions,
   notice,
@@ -79,6 +84,8 @@ export function AppShellFrame({
 }: AppShellFrameProps) {
   const [contextPaneResizing, setContextPaneResizing] = React.useState(false);
   const open = contextPane?.open ?? false;
+  const navigationVisible = visibility?.navigation ?? true;
+  const historyVisible = visibility?.history ?? true;
   const paneLabel = `${open ? "收起" : "打开"}${SHELL_SECTION_LABELS[contextPane?.section ?? section]}上下文面板`;
   const resizeLabel = `调整${SHELL_SECTION_LABELS[contextPane?.section ?? section]}上下文面板宽度`;
 
@@ -96,15 +103,19 @@ export function AppShellFrame({
         } as React.CSSProperties
       }
     >
-      <AppSidebar
-        current={section}
-        onNavigate={onNavigate}
-        presentation={open && contextPane ? contextPane.presentation : "closed"}
-        unreadActivityCount={unreadActivityCount}
-      >
-        {contextPane ? <ContextPaneShell {...contextPane} /> : null}
-      </AppSidebar>
-      {contextPane && open && contextPaneResize ? (
+      {navigationVisible ? (
+        <AppSidebar
+          current={section}
+          onNavigate={onNavigate}
+          presentation={
+            open && contextPane ? contextPane.presentation : "closed"
+          }
+          unreadActivityCount={unreadActivityCount}
+        >
+          {contextPane ? <ContextPaneShell {...contextPane} /> : null}
+        </AppSidebar>
+      ) : null}
+      {navigationVisible && contextPane && open && contextPaneResize ? (
         <PaneResizeHandle
           aria-label={resizeLabel}
           value={contextPaneWidth}
@@ -117,7 +128,7 @@ export function AppShellFrame({
           style={{ left: "var(--sidebar-width)" }}
         />
       ) : null}
-      {contextPane ? (
+      {navigationVisible && contextPane ? (
         <SidebarRail
           ref={paneTriggerRef}
           variant="handle"
@@ -139,21 +150,25 @@ export function AppShellFrame({
             data-shell-slot="content-head"
             className="flex h-[50px] shrink-0 items-center gap-1.5 border-b bg-background px-4"
           >
-            <Button
-              type="button"
-              variant="ghost"
-              size="icon-sm"
-              className="size-7"
-              aria-label="后退"
-              disabled={!history.canGoBack}
-              onClick={history.onBack}
-            >
-              <ArrowLeft aria-hidden="true" />
-            </Button>
-            <Separator
-              orientation="vertical"
-              className="mx-2 data-[orientation=vertical]:h-5"
-            />
+            {historyVisible ? (
+              <>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon-sm"
+                  className="size-7"
+                  aria-label="后退"
+                  disabled={!history.canGoBack}
+                  onClick={history.onBack}
+                >
+                  <ArrowLeft aria-hidden="true" />
+                </Button>
+                <Separator
+                  orientation="vertical"
+                  className="mx-2 data-[orientation=vertical]:h-5"
+                />
+              </>
+            ) : null}
             {customTitle !== undefined ? (
               <div data-shell-slot="custom-title" className="min-w-0 flex-1">
                 {customTitle}

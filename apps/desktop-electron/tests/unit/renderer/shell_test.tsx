@@ -238,6 +238,65 @@ describe("render-backed shell frame", () => {
     ).toHaveLength(1);
   });
 
+  it("removes navigation chrome without coupling the frame to recording state", () => {
+    const frame = (navigation: boolean, history: boolean) => (
+      <AppShellFrame
+        section="audio"
+        onNavigate={vi.fn()}
+        unreadActivityCount={0}
+        contextPane={{
+          open: true,
+          section: "audio",
+          presentation: "docked",
+          onRequestClose: vi.fn(),
+          children: <span>面板内容</span>,
+        }}
+        contextPaneWidth={300}
+        contextPaneResize={{
+          minimum: 240,
+          maximum: 480,
+          onChange: vi.fn(),
+        }}
+        onTogglePane={vi.fn()}
+        title="专注内容"
+        visibility={{ navigation, history }}
+        history={{
+          canGoBack: true,
+          canGoForward: false,
+          onBack: vi.fn(),
+          onForward: vi.fn(),
+        }}
+      >
+        <p>正文</p>
+      </AppShellFrame>
+    );
+    const view = render(frame(false, false));
+
+    expect(
+      Array.from(
+        view.container.querySelector('[data-slot="sidebar-wrapper"]')!.children,
+      ).map((child) => child.getAttribute("data-slot")),
+    ).toEqual(["sidebar-inset"]);
+    expect(screen.queryByRole("navigation")).not.toBeInTheDocument();
+    expect(screen.queryByRole("complementary")).not.toBeInTheDocument();
+    expect(screen.queryByRole("separator")).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "后退" })).toBeNull();
+    expect(screen.getByRole("heading", { name: "专注内容" })).toBeVisible();
+    expect(screen.getByText("正文")).toBeVisible();
+
+    view.rerender(frame(true, true));
+    expect(
+      screen.getByRole("navigation", { name: "工作站主导航" }),
+    ).toBeVisible();
+    expect(
+      screen.getByRole("complementary", { name: "音频上下文面板" }),
+    ).toBeVisible();
+    expect(
+      screen.getByRole("separator", { name: "调整音频上下文面板宽度" }),
+    ).toBeVisible();
+    expect(screen.getByRole("button", { name: "后退" })).toBeVisible();
+  });
+
   it("suppresses pane transitions only while the primary section changes", () => {
     const transitionsAtLayout: string[][] = [];
     const layoutRead = vi
@@ -1362,9 +1421,8 @@ describe("application shell", () => {
     ).not.toBeInTheDocument();
   });
 
-  it("restores recording in the content area without global header controls", async () => {
-    const api = installApi(recordingSnapshot);
-    const user = userEvent.setup();
+  it("keeps an active recording in a shell focus state", async () => {
+    installApi(recordingSnapshot);
     render(<App />);
 
     expect(
@@ -1385,20 +1443,20 @@ describe("application shell", () => {
     );
     expect(screen.queryByText(/旧版资料库/)).not.toBeInTheDocument();
 
-    const navigation = screen.getByRole("navigation", { name: "工作站主导航" });
-    const audio = within(navigation).getByRole("button", { name: "音频" });
-    expect(audio).toHaveAttribute("aria-current", "page");
-    expect(audio.querySelector("svg.lucide-audio-lines")).not.toBeNull();
-    expect(within(navigation).getAllByRole("button")).toHaveLength(4);
-    const message = within(navigation).getByRole("button", { name: "消息" });
-    const settings = within(navigation).getByRole("button", { name: "设置" });
     expect(
-      message.compareDocumentPosition(settings) &
-        Node.DOCUMENT_POSITION_FOLLOWING,
-    ).toBeTruthy();
-    expect(
-      within(navigation).queryByRole("button", { name: "转写任务" }),
+      screen.queryByRole("navigation", { name: "工作站主导航" }),
     ).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "后退" })).toBeNull();
+    expect(
+      document.querySelector(
+        '[data-shell-slot="content-head"] [data-slot="separator"]',
+      ),
+    ).toBeNull();
+    expect(
+      Array.from(
+        document.querySelector('[data-slot="sidebar-wrapper"]')!.children,
+      ).map((child) => child.getAttribute("data-slot")),
+    ).toEqual(["sidebar-inset"]);
     expect(
       screen.queryByRole("complementary", { name: "音频上下文面板" }),
     ).not.toBeInTheDocument();
@@ -1421,11 +1479,105 @@ describe("application shell", () => {
     expect(
       screen.queryByRole("region", { name: "录制准备" }),
     ).not.toBeInTheDocument();
-    await user.click(within(navigation).getByRole("button", { name: "设置" }));
-    await waitFor(() => expect(api.navigate).toHaveBeenCalledWith("settings"));
+  });
+
+  it.each([
+    ["preparing", {}],
+    ["paused", {}],
+    ["active partial capture", { systemAudioHealthy: true }],
+    ["finalizing", {}],
+  ] as const)("keeps %s in recording focus", async (label, health) => {
+    const phase =
+      label === "active partial capture" ? "partial_capture" : label;
+    installApi({
+      ...readySnapshot,
+      capture: {
+        phase,
+        sessionId: `capture-${phase}`,
+        title: `状态 ${phase}`,
+        elapsedMs: 5_000,
+        ...health,
+      },
+    });
+
+    render(<App />);
+
     expect(
-      screen.queryByRole("complementary", { name: "录制控制" }),
+      await screen.findByRole("region", { name: "录制详情" }),
+    ).toBeVisible();
+    expect(
+      screen.queryByRole("navigation", { name: "工作站主导航" }),
     ).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "后退" })).toBeNull();
+    expect(
+      document.querySelector(
+        '[data-shell-slot="content-head"] [data-slot="separator"]',
+      ),
+    ).toBeNull();
+  });
+
+  it.each([
+    ["completed", {}],
+    ["failed", {}],
+    ["recovery", {}],
+    [
+      "inactive partial capture",
+      { systemAudioHealthy: false, microphoneHealthy: false },
+    ],
+  ] as const)("restores shell navigation for %s", async (label, health) => {
+    const phase =
+      label === "inactive partial capture" ? "partial_capture" : label;
+    installApi({
+      ...readySnapshot,
+      capture: {
+        phase,
+        sessionId: `capture-${phase}`,
+        title: `状态 ${phase}`,
+        elapsedMs: 5_000,
+        ...health,
+      },
+    });
+
+    render(<App />);
+
+    expect(
+      await screen.findByRole("navigation", { name: "工作站主导航" }),
+    ).toBeVisible();
+    expect(screen.getByRole("button", { name: "后退" })).toBeVisible();
+    expect(
+      document.querySelector(
+        '[data-shell-slot="content-head"] [data-slot="separator"]',
+      ),
+    ).toBeVisible();
+  });
+
+  it("restores normal shell navigation for a historical capture route", async () => {
+    window.history.replaceState(
+      null,
+      "",
+      "/#/audio/1/capture/session-history-1234",
+    );
+    installApi({
+      ...readySnapshot,
+      capture: {
+        phase: "completed",
+        sessionId: "session-history-1234",
+        title: "历史录音",
+        elapsedMs: 5_000,
+      },
+    });
+
+    render(<App />);
+
+    expect(
+      await screen.findByRole("navigation", { name: "工作站主导航" }),
+    ).toBeVisible();
+    expect(screen.getByRole("button", { name: "后退" })).toBeVisible();
+    expect(
+      document.querySelector(
+        '[data-shell-slot="content-head"] [data-slot="separator"]',
+      ),
+    ).toBeVisible();
   });
 
   it("suppresses the audio pane and top bar for true-empty without changing the saved preference", async () => {
@@ -1600,8 +1752,9 @@ describe("application shell", () => {
     expect(screen.getByRole("button", { name: "后退" })).toBeVisible();
   });
 
-  it("keeps the audio workspace visible while recording starts", async () => {
+  it("keeps pending capture navigation locked until delayed start becomes visible", async () => {
     const start = deferred<CaptureSnapshot>();
+    let publish: ((snapshot: ApplicationSnapshot) => void) | undefined;
     const summary = {
       audioId: 12,
       displayName: "已有录音.wav",
@@ -1643,6 +1796,12 @@ describe("application shell", () => {
           blockingReasons: [],
         })),
         startCapture: vi.fn(() => start.promise),
+        onApplicationSnapshot: vi.fn((listener) => {
+          publish = listener;
+          return () => {
+            publish = undefined;
+          };
+        }),
       },
     );
     const user = userEvent.setup();
@@ -1668,6 +1827,139 @@ describe("application shell", () => {
     expect(
       screen.getByRole("button", { name: "打开 已有录音.wav" }),
     ).toBeVisible();
+    const wrapper = document.querySelector<HTMLElement>(
+      '[data-slot="sidebar-wrapper"]',
+    )!;
+    const resizeHandle = screen.getByRole("separator", {
+      name: "调整音频上下文面板宽度",
+    });
+    fireEvent.keyDown(resizeHandle, { key: "ArrowRight" });
+    await waitFor(() =>
+      expect(wrapper.style.getPropertyValue("--sidebar-width")).toBe("360px"),
+    );
+
+    api.navigate.mockClear();
+    await user.click(screen.getByRole("button", { name: "后退" }));
+    expect(
+      screen.getByRole("heading", { name: "已有录音.wav", level: 1 }),
+    ).toBeVisible();
+    await user.click(screen.getByRole("button", { name: "设置" }));
+    expect(api.navigate).not.toHaveBeenCalled();
+    expect(
+      screen.getByRole("heading", { name: "已有录音.wav", level: 1 }),
+    ).toBeVisible();
+
+    await act(async () => {
+      start.resolve({
+        sessionId: "session-shell-start-1234",
+        state: "recording",
+        captureMode: "dual_track",
+        captureTimelineMs: 0,
+        systemAudioHealthy: true,
+        microphoneHealthy: true,
+        partialCapture: false,
+        finalizedChunkCount: 0,
+        eventCount: 0,
+        gapCount: 0,
+        interruptionReason: null,
+        recordingSha256: null,
+      });
+    });
+    act(() =>
+      publish?.({
+        ...readySnapshot,
+        revision: readySnapshot.revision + 1,
+        library: { phase: "ready", audioCount: 1 },
+        capture: {
+          phase: "recording",
+          sessionId: "session-shell-start-1234",
+          title: "延迟开始的录音",
+          elapsedMs: 0,
+        },
+      }),
+    );
+
+    expect(
+      await screen.findByRole("region", { name: "录制详情" }),
+    ).toBeVisible();
+    expect(
+      screen.queryByRole("navigation", { name: "工作站主导航" }),
+    ).not.toBeInTheDocument();
+    expect(screen.queryByRole("complementary")).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("separator", { name: /上下文面板宽度/ }),
+    ).not.toBeInTheDocument();
+    expect(
+      document.querySelector("[data-context-pane-midpoint-rail]"),
+    ).toBeNull();
+    expect(screen.queryByRole("button", { name: "后退" })).toBeNull();
+    expect(wrapper.style.getPropertyValue("--sidebar-width")).toBe("360px");
+
+    act(() =>
+      publish?.({
+        ...readySnapshot,
+        revision: readySnapshot.revision + 2,
+        library: { phase: "ready", audioCount: 1 },
+        capture: {
+          phase: "completed",
+          sessionId: "session-shell-start-1234",
+          title: "延迟开始的录音",
+          elapsedMs: 1_000,
+        },
+      }),
+    );
+
+    expect(
+      await screen.findByRole("navigation", { name: "工作站主导航" }),
+    ).toBeVisible();
+    expect(
+      screen.getByRole("complementary", { name: "音频上下文面板" }),
+    ).toBeVisible();
+    expect(
+      screen.getByRole("separator", { name: "调整音频上下文面板宽度" }),
+    ).toBeVisible();
+    expect(screen.getByRole("button", { name: "后退" })).toBeVisible();
+    expect(wrapper.style.getPropertyValue("--sidebar-width")).toBe("360px");
+  });
+
+  it("restores primary navigation after capture start fails", async () => {
+    const start = deferred<CaptureSnapshot>();
+    const api = installApi(
+      {
+        ...readySnapshot,
+        library: { phase: "ready", audioCount: 1 },
+        capture: { phase: "idle" },
+      },
+      {
+        openAudio: vi.fn(async () => shellWorkspace(shellAudio)),
+        startCapture: vi.fn(() => start.promise),
+      },
+    );
+    const user = userEvent.setup();
+    render(<App />);
+
+    await user.click(
+      await screen.findByRole("button", { name: "打开 音频 A.wav" }),
+    );
+    const newRecording = await screen.findByRole("button", {
+      name: "新录音",
+    });
+    await waitFor(() => expect(newRecording).toBeEnabled());
+    await user.click(newRecording);
+    await waitFor(() => expect(api.startCapture).toHaveBeenCalledOnce());
+
+    api.navigate.mockClear();
+    await user.click(screen.getByRole("button", { name: "设置" }));
+    expect(api.navigate).not.toHaveBeenCalled();
+
+    await act(async () => {
+      start.reject(new Error("capture start failed"));
+    });
+    expect(await screen.findByText("无法开始录制")).toBeVisible();
+    await user.click(screen.getByRole("button", { name: "知道了" }));
+
+    await user.click(screen.getByRole("button", { name: "设置" }));
+    await waitFor(() => expect(api.navigate).toHaveBeenCalledWith("settings"));
   });
 
   it("keeps independent first-use pane preferences including settings", async () => {
