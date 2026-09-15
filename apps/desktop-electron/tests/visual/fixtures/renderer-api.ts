@@ -96,6 +96,7 @@ export function buildVisualFixture(
             interruptionReason: null,
           }
         : { phase: "idle" },
+      libraryProjection: { phase: "idle" },
     },
     audios,
     audioWorkspaces: audios.map(audioWorkspace),

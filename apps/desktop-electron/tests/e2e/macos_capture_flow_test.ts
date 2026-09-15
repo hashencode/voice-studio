@@ -51,6 +51,37 @@ const parity = desktopCaptureParitySchema.parse(
 );
 
 describe("macOS capture parity flow", () => {
+  it("publishes durable capture before the live library projection lifecycle", () => {
+    const mainSource = readFileSync(
+      join(import.meta.dirname, "../../src/main/index.ts"),
+      "utf8",
+    );
+    const controlStart = mainSource.indexOf(
+      "async function performCaptureControl",
+    );
+    const controlEnd = mainSource.indexOf(
+      "async function projectCaptureLibraryForLiveIntent",
+      controlStart,
+    );
+    const controlSource = mainSource.slice(controlStart, controlEnd);
+
+    expect(controlSource.indexOf("publishCapture(result);")).toBeGreaterThan(
+      controlSource.indexOf("recordCaptureSmokeQuitCommit"),
+    );
+    expect(
+      controlSource.indexOf("projectCaptureLibraryForLiveIntent"),
+    ).toBeGreaterThan(controlSource.indexOf("publishCapture(result);"));
+
+    const reconciliationStart = mainSource.indexOf("void startupProjector");
+    const reconciliationEnd = mainSource.indexOf(
+      "async function initializeLocalModels",
+      reconciliationStart,
+    );
+    expect(
+      mainSource.slice(reconciliationStart, reconciliationEnd),
+    ).not.toContain("projectCaptureLibraryForLiveIntent");
+  });
+
   it("hands floating stop to Main before awaiting one stop and returns the current snapshot", async () => {
     const stop = deferred<CaptureSnapshot>();
     const events: string[] = [];

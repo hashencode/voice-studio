@@ -4,6 +4,7 @@ import {
   applicationSnapshotSchema,
   markActivityReadRequestSchema,
   markAllActivityReadRequestSchema,
+  captureLibraryProjectionRetryRequestSchema,
   bootstrapActionSchema,
   cancelProcessingResponseSchema,
   retryProcessingResponseSchema,
@@ -122,6 +123,7 @@ const ipcResponseSchemas: Readonly<Record<string, z.ZodType>> = Object.freeze({
   [ipcChannels.applicationBootstrapAction]: applicationSnapshotSchema,
   [ipcChannels.applicationActivityMarkRead]: applicationSnapshotSchema,
   [ipcChannels.applicationActivityMarkAllRead]: applicationSnapshotSchema,
+  [ipcChannels.captureLibraryProjectionRetry]: applicationSnapshotSchema,
   [ipcChannels.floatingCapturePreferenceGet]: floatingCapturePreferenceSchema,
   [ipcChannels.floatingCapturePreferenceSet]: floatingCapturePreferenceSchema,
   [ipcChannels.workerHealth]: workerHealthResponseSchema,
@@ -417,6 +419,17 @@ export function createDesktopApi(
       const response = await bridge.invoke(
         ipcChannels.applicationActivityMarkAllRead,
         markAllActivityReadRequestSchema.parse({}),
+      );
+      return applicationSnapshotSchema.parse(response);
+    },
+    async retryCaptureLibraryProjection(
+      options: Parameters<
+        NonNullable<Voice2TextDesktopApi["retryCaptureLibraryProjection"]>
+      >[0],
+    ) {
+      const response = await bridge.invoke(
+        ipcChannels.captureLibraryProjectionRetry,
+        captureLibraryProjectionRetryRequestSchema.parse(options),
       );
       return applicationSnapshotSchema.parse(response);
     },

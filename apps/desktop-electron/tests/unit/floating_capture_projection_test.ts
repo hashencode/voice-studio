@@ -19,6 +19,7 @@ function application(
     library: { phase: "empty" },
     reconciliation: [],
     capture,
+    libraryProjection: { phase: "idle" },
   };
 }
 

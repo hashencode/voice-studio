@@ -232,5 +232,6 @@ function applicationSnapshot(): ApplicationSnapshot {
     library: { phase: "ready", audioCount: 1 },
     reconciliation: [],
     capture: { phase: "idle" },
+    libraryProjection: { phase: "idle" },
   };
 }

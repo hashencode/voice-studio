@@ -39,8 +39,13 @@ import {
   type CaptionSnapshot,
   type AudioAiSnapshot,
   type CompanionSnapshot,
+  type CaptureLibraryProjectionFailureCode,
+  type CaptureLibraryProjectionRetryRequest,
 } from "../shared/contracts";
-import { DesktopApplicationState } from "./application/application_state";
+import {
+  DesktopApplicationState,
+  canRetryCaptureLibraryProjection,
+} from "./application/application_state";
 import {
   publishReadyLibrary,
   runBootstrapTransaction,
@@ -142,7 +147,10 @@ import { CaptionWorkerSupervisor } from "./processes/caption_worker_supervisor";
 import { FormalTranscriptHandoffService } from "./domain/captions/formal_transcript_handoff_service";
 import { prepareFormalCaptureMedia } from "./domain/captions/formal_capture_media";
 import { finalizeCommittedCaptureTranscript } from "./domain/captions/capture_formal_completion";
-import { CaptureLibraryProjectionService } from "./domain/capture/capture_library_projection_service";
+import {
+  CaptureLibraryProjectionError,
+  CaptureLibraryProjectionService,
+} from "./domain/capture/capture_library_projection_service";
 import { AudioAiService } from "./domain/audio-intelligence/audio_ai_service";
 import { parseRemoteAiEndpoint } from "./domain/audio-intelligence/provider_security";
 import { AiJobRepository } from "./storage/repositories/ai_job_repository";
@@ -258,6 +266,10 @@ let captureRecoveryMutation: Promise<void> = Promise.resolve();
 let captureStopTransaction: {
   sessionId: string;
   promise: Promise<CaptureSnapshot>;
+} | null = null;
+let lastCaptureProjectionRetry: {
+  key: string;
+  promise: Promise<ReturnType<DesktopApplicationState["snapshot"]>>;
 } | null = null;
 let workerSupervisor: WorkerHealthSupervisor | null = null;
 let processCoordinator: DurableProcessCoordinator | null = null;
@@ -1953,6 +1965,8 @@ async function performCaptureStart(options: {
     },
     { refreshSuggestedTitle: options.refreshSuggestedTitle === true },
   );
+  lastCaptureProjectionRetry = null;
+  applicationState.resetCaptureLibraryProjection();
   if (options.captionEnabled && preflight.captionModelAvailable) {
     const identity = resourceCatalog?.processingIdentity("live-caption");
     if (!identity || !liveCaptionService || !profilePaths) {
@@ -2040,18 +2054,79 @@ async function performCaptureControl(options: {
     // before the separately retryable formal projection is attempted.
     await recordCaptureSmokeQuitCommit(result.sessionId);
     publishCapture(result);
-    await finalizeCommittedCaptureTranscript({
-      handoff: formalTranscriptHandoff,
-      sessionId: options.sessionId,
-      displayName: service.sessionTitle(options.sessionId),
-      processing: null,
-      publish: publishCaption,
-      reportFailure: () =>
-        console.error("Voice2Text formal transcript handoff failed"),
-    });
+    const existingProjection = applicationState.snapshot().libraryProjection;
+    if (
+      !existingProjection ||
+      existingProjection.phase === "idle" ||
+      existingProjection.sessionId !== options.sessionId
+    ) {
+      await projectCaptureLibraryForLiveIntent({
+        sessionId: options.sessionId,
+        displayName: service.sessionTitle(options.sessionId),
+        intentId: randomUUID(),
+      });
+    }
   }
   publishCapture(result);
   return result;
+}
+
+async function projectCaptureLibraryForLiveIntent(command: {
+  sessionId: string;
+  displayName: string;
+  intentId: string;
+}): Promise<ReturnType<DesktopApplicationState["snapshot"]>> {
+  applicationState.beginCaptureLibraryProjection(command);
+  if (!captureLibraryProjection) {
+    return applicationState.failCaptureLibraryProjection({
+      ...command,
+      code: "projection_unavailable",
+    });
+  }
+  try {
+    const receipt = await captureLibraryProjection.project(command);
+    if (desktopRepository) {
+      applicationState.setLibraryCount(desktopRepository.countAudios());
+    }
+    return applicationState.completeCaptureLibraryProjection({
+      ...command,
+      audioId: receipt.audioId,
+    });
+  } catch (error) {
+    console.error("Voice2Text capture library projection failed", error);
+    return applicationState.failCaptureLibraryProjection({
+      ...command,
+      code: captureProjectionFailureCode(error),
+    });
+  }
+}
+
+function captureProjectionFailureCode(
+  error: unknown,
+): CaptureLibraryProjectionFailureCode {
+  return error instanceof CaptureLibraryProjectionError
+    ? error.code
+    : "commit_failed";
+}
+
+async function retryCaptureLibraryProjection(
+  request: CaptureLibraryProjectionRetryRequest,
+): Promise<ReturnType<DesktopApplicationState["snapshot"]>> {
+  const retryKey = `${request.sessionId}:${request.intentId}`;
+  if (lastCaptureProjectionRetry?.key === retryKey) {
+    return await lastCaptureProjectionRetry.promise;
+  }
+  const snapshot = applicationState.snapshot();
+  if (!canRetryCaptureLibraryProjection(snapshot, request) || !captureService) {
+    throw new Error("capture library projection retry is unavailable");
+  }
+  const operation = projectCaptureLibraryForLiveIntent({
+    sessionId: request.sessionId,
+    displayName: captureService.sessionTitle(request.sessionId),
+    intentId: randomUUID(),
+  });
+  lastCaptureProjectionRetry = { key: retryKey, promise: operation };
+  return await operation;
 }
 
 function publishCapture(
@@ -2425,6 +2500,8 @@ function bindDesktopIpc(window: BrowserWindow): void {
     markActivityRead: (activityId) =>
       applicationState.markActivityRead(activityId),
     markAllActivityRead: () => applicationState.markAllActivityRead(),
+    retryCaptureLibraryProjection: async (options) =>
+      await retryCaptureLibraryProjection(options),
     onApplicationSnapshot: (listener) => applicationState.subscribe(listener),
     onOperationEvent: (listener) => {
       operationListeners.add(listener);
@@ -2918,6 +2995,7 @@ async function resetPartialApplicationInitialization(): Promise<void> {
   captureService = null;
   formalTranscriptHandoff = null;
   captureLibraryProjection = null;
+  lastCaptureProjectionRetry = null;
   try {
     profileDatabase?.close();
   } catch {
@@ -4340,6 +4418,7 @@ async function teardownOwnedResources(
   captureService = null;
   formalTranscriptHandoff = null;
   captureLibraryProjection = null;
+  lastCaptureProjectionRetry = null;
   captureTray?.destroy();
   captureTray = null;
   profileDatabase?.close();

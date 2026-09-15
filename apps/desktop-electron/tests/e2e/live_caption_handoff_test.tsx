@@ -27,6 +27,7 @@ const application: ApplicationSnapshot = {
     elapsedMs: 14_000,
     captureMode: "dual_track",
   },
+  libraryProjection: { phase: "idle" },
 };
 
 const captions: CaptionSnapshot = {

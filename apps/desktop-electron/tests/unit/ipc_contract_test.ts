@@ -18,6 +18,7 @@ import {
   captureRecoveryItemSchema,
   captureRuntimeSnapshotSchema,
   captureSnapshotSchema,
+  captureLibraryProjectionRetryRequestSchema,
   applicationSnapshotSchema,
   createAiProviderProfileRequestSchema,
   deleteAiProviderProfileRequestSchema,
@@ -40,6 +41,49 @@ import {
 import { createDesktopApi } from "../../src/preload/api";
 
 describe("shared IPC contracts", () => {
+  it("validates capture library projection retry through preload", async () => {
+    const snapshot = applicationSnapshotSchema.parse({
+      protocolVersion: desktopProtocolVersion,
+      revision: 3,
+      navigation: { section: "library" },
+      profile: { phase: "initializing" },
+      connectivity: "online",
+      capability: { processing: "available" },
+      library: { phase: "empty" },
+      reconciliation: [],
+      capture: { phase: "idle" },
+      libraryProjection: {
+        phase: "registered",
+        sessionId: "session-retry-123456",
+        intentId: "intent-retry-next-123456",
+        audioId: 4,
+      },
+      activity: [],
+    });
+    const invoke = vi.fn(async () => ({ ok: true, value: snapshot }));
+    const api = createDesktopApi({ invoke, on: vi.fn(), off: vi.fn() });
+
+    await expect(
+      api.retryCaptureLibraryProjection!({
+        sessionId: "session-retry-123456",
+        intentId: "intent-retry-failed-123456",
+      }),
+    ).resolves.toEqual(snapshot);
+    expect(invoke).toHaveBeenCalledWith(
+      ipcChannels.captureLibraryProjectionRetry,
+      {
+        sessionId: "session-retry-123456",
+        intentId: "intent-retry-failed-123456",
+      },
+    );
+    expect(() =>
+      captureLibraryProjectionRetryRequestSchema.parse({
+        sessionId: "session-retry-123456",
+        intentId: " ",
+      }),
+    ).toThrow();
+  });
+
   it("carries authoritative recovery capabilities and ordered batch outcomes through preload", async () => {
     const sessionId = "session-contract-recovery-123456";
     const recovery = captureRecoveryItemSchema.parse({

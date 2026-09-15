@@ -21,6 +21,7 @@ const application: ApplicationSnapshot = {
   library: { phase: "empty" },
   reconciliation: [],
   capture: { phase: "idle" },
+  libraryProjection: { phase: "idle" },
 };
 
 const disabledSnapshot: CompanionSnapshot = {

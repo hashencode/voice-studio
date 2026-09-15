@@ -158,6 +158,7 @@ const restored: ApplicationSnapshot = {
   library: { phase: "empty" },
   reconciliation: [],
   capture: { phase: "idle" },
+  libraryProjection: { phase: "idle" },
 };
 
 describe("sidebar navigation e2e", () => {

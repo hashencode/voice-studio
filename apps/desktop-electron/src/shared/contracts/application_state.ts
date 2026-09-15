@@ -96,6 +96,43 @@ const captureStateSchema = z.discriminatedUnion("phase", [
     .strict(),
 ]);
 
+export const captureLibraryProjectionFailureCodeSchema = z.enum([
+  "invalid_authority",
+  "commit_failed",
+  "projection_unavailable",
+]);
+
+export const captureLibraryProjectionStateSchema = z.discriminatedUnion(
+  "phase",
+  [
+    z.object({ phase: z.literal("idle") }).strict(),
+    z
+      .object({
+        phase: z.literal("registering"),
+        sessionId: z.string().trim().min(1).max(128),
+        intentId: z.string().trim().min(1).max(128),
+      })
+      .strict(),
+    z
+      .object({
+        phase: z.literal("registered"),
+        sessionId: z.string().trim().min(1).max(128),
+        intentId: z.string().trim().min(1).max(128),
+        audioId: z.number().int().positive(),
+      })
+      .strict(),
+    z
+      .object({
+        phase: z.literal("failed"),
+        sessionId: z.string().trim().min(1).max(128),
+        intentId: z.string().trim().min(1).max(128),
+        code: captureLibraryProjectionFailureCodeSchema,
+        message: z.string().min(1).max(160),
+      })
+      .strict(),
+  ],
+);
+
 export const activityItemSchema = z
   .object({
     id: z.string().min(1).max(260),
@@ -129,6 +166,9 @@ export const applicationSnapshotSchema = z
     library: libraryStateSchema,
     reconciliation: z.array(reconciliationItemSchema).max(256),
     capture: captureStateSchema,
+    libraryProjection: captureLibraryProjectionStateSchema.default({
+      phase: "idle",
+    }),
     activity: z.array(activityItemSchema).max(20).optional(),
   })
   .strict();
@@ -146,8 +186,20 @@ export const markActivityReadRequestSchema = z
   .object({ activityId: z.string().min(1).max(260) })
   .strict();
 export const markAllActivityReadRequestSchema = z.object({}).strict();
+export const captureLibraryProjectionRetryRequestSchema = z
+  .object({
+    sessionId: z.string().trim().min(1).max(128),
+    intentId: z.string().trim().min(1).max(128),
+  })
+  .strict();
 
 export type ShellSection = z.infer<typeof shellSectionSchema>;
 export type BootstrapAction = z.infer<typeof bootstrapActionSchema>;
-export type ApplicationSnapshot = z.infer<typeof applicationSnapshotSchema>;
+export type ApplicationSnapshot = z.output<typeof applicationSnapshotSchema>;
 export type ActivityItem = z.infer<typeof activityItemSchema>;
+export type CaptureLibraryProjectionFailureCode = z.infer<
+  typeof captureLibraryProjectionFailureCodeSchema
+>;
+export type CaptureLibraryProjectionRetryRequest = z.infer<
+  typeof captureLibraryProjectionRetryRequestSchema
+>;

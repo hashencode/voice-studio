@@ -46,6 +46,7 @@ export const desktopIpcInvokeChannels = [
   ipcChannels.applicationBootstrapAction,
   ipcChannels.applicationActivityMarkRead,
   ipcChannels.applicationActivityMarkAllRead,
+  ipcChannels.captureLibraryProjectionRetry,
   ipcChannels.workerHealth,
   ipcChannels.cancelProcessing,
   ipcChannels.retryProcessing,

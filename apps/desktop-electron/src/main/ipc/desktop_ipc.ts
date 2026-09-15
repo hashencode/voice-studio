@@ -5,6 +5,7 @@ import {
   bootstrapActionRequestSchema,
   markActivityReadRequestSchema,
   markAllActivityReadRequestSchema,
+  captureLibraryProjectionRetryRequestSchema,
   cancelProcessingRequestSchema,
   retryProcessingRequestSchema,
   startTranscriptionRequestSchema,
@@ -19,6 +20,7 @@ import {
   workerHealthRequestSchema,
   type ApplicationSnapshot,
   type BootstrapAction,
+  type CaptureLibraryProjectionRetryRequest,
   type CancelProcessingResponse,
   type RetryProcessingResponse,
   type ImportAudioResponse,
@@ -216,6 +218,9 @@ export interface DesktopIpcServices {
   requestBootstrapAction(action: BootstrapAction): Promise<ApplicationSnapshot>;
   markActivityRead(activityId: string): ApplicationSnapshot;
   markAllActivityRead(): ApplicationSnapshot;
+  retryCaptureLibraryProjection?(
+    options: CaptureLibraryProjectionRetryRequest,
+  ): Promise<ApplicationSnapshot>;
   onApplicationSnapshot?(
     listener: (snapshot: ApplicationSnapshot) => void,
   ): () => void;
@@ -639,6 +644,18 @@ export function createDesktopIpcHandlers(options: {
       {
         schema: markAllActivityReadRequestSchema,
         invoke: async () => options.services.markAllActivityRead(),
+      } as RegisteredHandler,
+    ],
+    [
+      ipcChannels.captureLibraryProjectionRetry,
+      {
+        schema: captureLibraryProjectionRetryRequestSchema,
+        invoke: async (payload: CaptureLibraryProjectionRetryRequest) => {
+          if (!options.services.retryCaptureLibraryProjection) {
+            throw new Error("capture library projection retry is unavailable");
+          }
+          return await options.services.retryCaptureLibraryProjection(payload);
+        },
       } as RegisteredHandler,
     ],
     [
@@ -1072,6 +1089,7 @@ const mutationChannels = new Set<string>([
   ipcChannels.audioAiRetry,
   ipcChannels.captureStart,
   ipcChannels.captureControl,
+  ipcChannels.captureLibraryProjectionRetry,
   ipcChannels.captureRecoveryAction,
   ipcChannels.audioEditSegment,
   ipcChannels.audioUndo,

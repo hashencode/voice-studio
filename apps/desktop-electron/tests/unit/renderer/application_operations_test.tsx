@@ -25,6 +25,7 @@ const tasksSnapshot: ApplicationSnapshot = {
   library: { phase: "empty" },
   reconciliation: [],
   capture: { phase: "idle" },
+  libraryProjection: { phase: "idle" },
 };
 
 const librarySnapshot: ApplicationSnapshot = {

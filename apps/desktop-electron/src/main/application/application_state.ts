@@ -3,6 +3,7 @@ import {
   desktopProtocolVersion,
   type ApplicationSnapshot,
   type ActivityItem,
+  type CaptureLibraryProjectionFailureCode,
   type CaptureSnapshot,
   type ShellSection,
 } from "../../shared/contracts";
@@ -21,6 +22,7 @@ export class DesktopApplicationState {
     library: { phase: "loading" },
     reconciliation: [],
     capture: { phase: "idle" },
+    libraryProjection: { phase: "idle" },
     activity: [],
   });
   private readonly listeners = new Set<SnapshotListener>();
@@ -125,6 +127,46 @@ export class DesktopApplicationState {
     });
   }
 
+  beginCaptureLibraryProjection(command: {
+    sessionId: string;
+    intentId: string;
+  }): ApplicationSnapshot {
+    return this.update({
+      libraryProjection: { phase: "registering", ...command },
+    });
+  }
+
+  resetCaptureLibraryProjection(): ApplicationSnapshot {
+    if (this.current.libraryProjection.phase === "idle") return this.snapshot();
+    return this.update({ libraryProjection: { phase: "idle" } });
+  }
+
+  completeCaptureLibraryProjection(command: {
+    sessionId: string;
+    intentId: string;
+    audioId: number;
+  }): ApplicationSnapshot {
+    if (!this.isCurrentProjection(command)) return this.snapshot();
+    return this.update({
+      libraryProjection: { phase: "registered", ...command },
+    });
+  }
+
+  failCaptureLibraryProjection(command: {
+    sessionId: string;
+    intentId: string;
+    code: CaptureLibraryProjectionFailureCode;
+  }): ApplicationSnapshot {
+    if (!this.isCurrentProjection(command)) return this.snapshot();
+    return this.update({
+      libraryProjection: {
+        phase: "failed",
+        ...command,
+        message: projectionFailureMessage(command.code),
+      },
+    });
+  }
+
   markActivityRead(activityId: string): ApplicationSnapshot {
     const currentActivity = this.current.activity ?? [];
     const activity = currentActivity.map((item) =>
@@ -159,6 +201,44 @@ export class DesktopApplicationState {
     for (const listener of this.listeners) listener(snapshot);
     return snapshot;
   }
+
+  private isCurrentProjection(command: {
+    sessionId: string;
+    intentId: string;
+  }): boolean {
+    const current = this.current.libraryProjection;
+    return (
+      current?.phase === "registering" &&
+      current.sessionId === command.sessionId &&
+      current.intentId === command.intentId
+    );
+  }
+}
+
+function projectionFailureMessage(
+  code: CaptureLibraryProjectionFailureCode,
+): string {
+  return code === "invalid_authority"
+    ? "录音已保存，但无法验证音频资料。请重试。"
+    : code === "projection_unavailable"
+      ? "录音已保存，音频资料库暂不可用。请稍后重试。"
+      : "录音已保存，但暂时无法加入音频资料库。请重试。";
+}
+
+export function canRetryCaptureLibraryProjection(
+  snapshot: ApplicationSnapshot,
+  request: { sessionId: string; intentId: string },
+): boolean {
+  const projection = snapshot.libraryProjection;
+  return (
+    projection?.phase === "failed" &&
+    projection.sessionId === request.sessionId &&
+    projection.intentId === request.intentId &&
+    snapshot.capture.phase !== "idle" &&
+    snapshot.capture.sessionId === request.sessionId &&
+    (snapshot.capture.phase === "completed" ||
+      snapshot.capture.phase === "partial_capture")
+  );
 }
 
 function nextActivity(

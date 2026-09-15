@@ -70,6 +70,7 @@ export const ipcChannels = {
   applicationActivityMarkRead: "desktop.application.activity.mark-read.v1",
   applicationActivityMarkAllRead:
     "desktop.application.activity.mark-all-read.v1",
+  captureLibraryProjectionRetry: "desktop.capture.library-projection.retry.v1",
   applicationSnapshotEvent: "desktop.application.snapshot-event.v1",
   captureDetailsRequestedEvent: "desktop.capture.details-requested-event.v1",
   workerHealth: "desktop.worker.health.v1",
@@ -473,6 +474,9 @@ export interface Voice2TextDesktopApi {
   markAllActivityRead(): Promise<
     import("./application_state").ApplicationSnapshot
   >;
+  retryCaptureLibraryProjection?(
+    options: import("./application_state").CaptureLibraryProjectionRetryRequest,
+  ): Promise<import("./application_state").ApplicationSnapshot>;
   onApplicationSnapshot(
     listener: (
       snapshot: import("./application_state").ApplicationSnapshot,

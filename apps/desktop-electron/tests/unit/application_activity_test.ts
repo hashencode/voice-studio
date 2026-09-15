@@ -1,6 +1,9 @@
 import { describe, expect, it } from "vitest";
 
-import { DesktopApplicationState } from "../../src/main/application/application_state";
+import {
+  DesktopApplicationState,
+  canRetryCaptureLibraryProjection,
+} from "../../src/main/application/application_state";
 import type { CaptureSnapshot } from "../../src/shared/contracts";
 
 function completedCapture(index: number): CaptureSnapshot {
@@ -21,6 +24,127 @@ function completedCapture(index: number): CaptureSnapshot {
 }
 
 describe("application capture activity", () => {
+  it("publishes a fenced live library projection lifecycle", () => {
+    const state = new DesktopApplicationState();
+    const sessionId = "session-projection-123456";
+    const intentId = "intent-projection-123456";
+    const phases: string[] = [];
+    state.subscribe((snapshot) => {
+      if (snapshot.libraryProjection) {
+        phases.push(snapshot.libraryProjection.phase);
+      }
+    });
+
+    state.setCapture(completedCapture(1));
+    state.beginCaptureLibraryProjection({ sessionId, intentId });
+    expect(state.snapshot().libraryProjection).toEqual({
+      phase: "registering",
+      sessionId,
+      intentId,
+    });
+
+    state.completeCaptureLibraryProjection({
+      sessionId,
+      intentId,
+      audioId: 7,
+    });
+    expect(state.snapshot().libraryProjection).toEqual({
+      phase: "registered",
+      sessionId,
+      intentId,
+      audioId: 7,
+    });
+    expect(phases.slice(-2)).toEqual(["registering", "registered"]);
+
+    const registered = state.snapshot();
+    state.completeCaptureLibraryProjection({
+      sessionId,
+      intentId,
+      audioId: 7,
+    });
+    state.failCaptureLibraryProjection({
+      sessionId,
+      intentId: "stale-intent-123456",
+      code: "commit_failed",
+    });
+    expect(state.snapshot()).toEqual(registered);
+  });
+
+  it("does not create a live projection intent while library count changes", () => {
+    const state = new DesktopApplicationState();
+
+    state.setLibraryCount(2);
+
+    expect(state.snapshot().libraryProjection).toEqual({ phase: "idle" });
+  });
+
+  it("keeps projection failures safe and rejects invalid registered audio IDs", () => {
+    const state = new DesktopApplicationState();
+    const command = {
+      sessionId: "session-projection-failed-123456",
+      intentId: "intent-projection-failed-123456",
+    };
+
+    state.beginCaptureLibraryProjection(command);
+    state.failCaptureLibraryProjection({ ...command, code: "commit_failed" });
+    expect(state.snapshot().libraryProjection).toEqual({
+      phase: "failed",
+      ...command,
+      code: "commit_failed",
+      message: "录音已保存，但暂时无法加入音频资料库。请重试。",
+    });
+    expect(JSON.stringify(state.snapshot().libraryProjection)).not.toContain(
+      "/Users/private/recording.wav",
+    );
+
+    state.beginCaptureLibraryProjection(command);
+    expect(() =>
+      state.completeCaptureLibraryProjection({ ...command, audioId: 0 }),
+    ).toThrow();
+  });
+
+  it("admits retry only for the matching failed intent and terminal capture", () => {
+    const state = new DesktopApplicationState();
+    const capture = completedCapture(4);
+    const request = {
+      sessionId: capture.sessionId,
+      intentId: "intent-retry-123456",
+    };
+    state.setCapture(capture);
+    state.beginCaptureLibraryProjection(request);
+    state.failCaptureLibraryProjection({ ...request, code: "commit_failed" });
+    const failed = state.snapshot();
+
+    expect(canRetryCaptureLibraryProjection(failed, request)).toBe(true);
+    expect(
+      canRetryCaptureLibraryProjection(failed, {
+        ...request,
+        intentId: "stale-intent-123456",
+      }),
+    ).toBe(false);
+    expect(
+      canRetryCaptureLibraryProjection(
+        { ...failed, capture: { phase: "idle" } },
+        request,
+      ),
+    ).toBe(false);
+    expect(state.snapshot()).toEqual(failed);
+  });
+
+  it("resets the previous projection when a new capture lifecycle begins", () => {
+    const state = new DesktopApplicationState();
+    const command = {
+      sessionId: "session-projection-reset-123456",
+      intentId: "intent-projection-reset-123456",
+    };
+    state.beginCaptureLibraryProjection(command);
+    state.completeCaptureLibraryProjection({ ...command, audioId: 42 });
+
+    state.resetCaptureLibraryProjection();
+
+    expect(state.snapshot().libraryProjection).toEqual({ phase: "idle" });
+  });
+
   it("projects the soft stop threshold as a continuing save", () => {
     const state = new DesktopApplicationState();
     state.setCapture({

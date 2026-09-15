@@ -28,6 +28,7 @@ const initial: ApplicationSnapshot = {
     elapsedMs: 12_000,
     captureMode: "dual_track",
   },
+  libraryProjection: { phase: "idle" },
 };
 
 afterEach(() => {

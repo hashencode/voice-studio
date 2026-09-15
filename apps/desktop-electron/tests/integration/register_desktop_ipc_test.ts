@@ -595,6 +595,7 @@ function applicationSnapshot(revision: number) {
     library: { phase: "empty" as const },
     reconciliation: [],
     capture: { phase: "idle" as const },
+    libraryProjection: { phase: "idle" as const },
   };
 }
 
