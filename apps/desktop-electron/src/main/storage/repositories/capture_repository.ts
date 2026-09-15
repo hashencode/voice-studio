@@ -7,6 +7,7 @@ import {
   type CaptureSnapshot,
 } from "../../../shared/contracts";
 import { withTransaction } from "../audio_database";
+import { CAPTURE_LIBRARY_RECEIPT_PREFIX } from "../capture_library_projection_receipt";
 import type { CaptureAuthority } from "../../domain/capture/capture_authority";
 
 interface CaptureSessionRow {
@@ -40,6 +41,17 @@ export interface StoredCaptureRecovery extends StoredCaptureSession {
 export interface CaptureRecoveryMarkerDiagnostics {
   repaired: number;
   unchanged: number;
+}
+
+export interface CaptureLibraryProjectionCursor {
+  updatedAtMs: number;
+  sessionId: string;
+}
+
+export interface CaptureLibraryProjectionCandidate {
+  sessionId: string;
+  displayName: string;
+  cursor: CaptureLibraryProjectionCursor;
 }
 
 export class CaptureRepository {
@@ -412,6 +424,76 @@ export class CaptureRepository {
       .prepare("SELECT title FROM capture_sessions WHERE session_id = ?")
       .get(sessionId) as Pick<CaptureSessionRow, "title"> | undefined;
     return row ? captureTitleSchema.parse(row.title) : null;
+  }
+
+  listLibraryProjectionCandidates(
+    cursor: CaptureLibraryProjectionCursor | null,
+    limit: number,
+  ): CaptureLibraryProjectionCandidate[] {
+    if (!Number.isSafeInteger(limit) || limit <= 0 || limit > 100) {
+      throw new Error("capture library projection limit is invalid");
+    }
+    if (
+      cursor &&
+      (!Number.isSafeInteger(cursor.updatedAtMs) || cursor.updatedAtMs < 0)
+    ) {
+      throw new Error("capture library projection cursor is invalid");
+    }
+    const afterUpdatedAtMs = cursor?.updatedAtMs ?? -1;
+    const afterSessionId = cursor?.sessionId ?? "";
+    return this.database
+      .prepare(
+        `SELECT cs.session_id, cs.title, cs.updated_at_ms
+         FROM capture_sessions cs
+         WHERE cs.state IN ('completed', 'partial_capture')
+           AND cs.recording_sha256 IS NOT NULL
+           AND cs.journal_sha256 IS NOT NULL
+           AND length(cs.recording_sha256) = 64
+           AND cs.recording_sha256 NOT GLOB '*[^0-9a-f]*'
+           AND length(cs.journal_sha256) = 64
+           AND cs.journal_sha256 NOT GLOB '*[^0-9a-f]*'
+           AND (
+             cs.recovery_disposition = 'kept'
+             OR (
+               cs.recovery_disposition IS NULL
+               AND EXISTS (
+                 SELECT 1 FROM capture_command_receipts cr
+                 WHERE cr.session_id = cs.session_id
+                   AND cr.action = 'stop'
+                   AND json_extract(cr.result_json, '$.sessionId') = cs.session_id
+                   AND json_extract(cr.result_json, '$.state') IN ('completed', 'partial_capture')
+                   AND json_extract(cr.result_json, '$.recordingSha256') = cs.recording_sha256
+               )
+             )
+           )
+           AND NOT EXISTS (
+             SELECT 1 FROM durable_receipts dr
+             WHERE dr.idempotency_key = ? || cs.session_id
+           )
+           AND (
+             cs.updated_at_ms > ?
+             OR (cs.updated_at_ms = ? AND cs.session_id > ?)
+           )
+         ORDER BY cs.updated_at_ms, cs.session_id
+         LIMIT ?`,
+      )
+      .all(
+        CAPTURE_LIBRARY_RECEIPT_PREFIX,
+        afterUpdatedAtMs,
+        afterUpdatedAtMs,
+        afterSessionId,
+        limit,
+      )
+      .map((row) => {
+        return {
+          sessionId: String(row.session_id),
+          displayName: captureTitleSchema.parse(row.title),
+          cursor: {
+            updatedAtMs: Number(row.updated_at_ms),
+            sessionId: String(row.session_id),
+          },
+        };
+      });
   }
 
   firstRecoverySessionId(): string | null {

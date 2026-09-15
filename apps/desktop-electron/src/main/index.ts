@@ -3284,6 +3284,24 @@ async function initializeApplication(): Promise<void> {
     setLibraryCount: (audioCount) =>
       applicationState.setLibraryCount(audioCount),
   });
+  const startupProjector = captureLibraryProjection;
+  const startupDesktopRepository = desktopRepository;
+  if (startupProjector && startupDesktopRepository) {
+    void startupProjector
+      .reconcileStartup({
+        repository: new CaptureRepository(profile.database),
+      })
+      .then((result) => {
+        if (result.projected > 0) {
+          applicationState.setLibraryCount(
+            startupDesktopRepository.countAudios(),
+          );
+        }
+      })
+      .catch((error) => {
+        console.error("capture library startup reconciliation failed", error);
+      });
+  }
 }
 
 async function initializeLocalModels(runtimeReady: boolean): Promise<void> {

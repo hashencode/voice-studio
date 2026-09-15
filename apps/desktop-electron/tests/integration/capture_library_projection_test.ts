@@ -3,13 +3,15 @@ import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { CaptureLibraryProjectionService } from "../../src/main/domain/capture/capture_library_projection_service";
 import { DesktopDomainService } from "../../src/main/domain/desktop_domain_service";
 import { profilePathsForRoot } from "../../src/main/profile/profile_paths";
 import { openAudioDatabase } from "../../src/main/storage/audio_database";
 import { DesktopRepository } from "../../src/main/storage/desktop_repository";
+import { CaptureRepository } from "../../src/main/storage/repositories/capture_repository";
+import { captureSnapshotSchema } from "../../src/shared/contracts/capture";
 
 const roots: string[] = [];
 
@@ -125,6 +127,126 @@ describe("capture library projection", () => {
     expect(fixture.count("media_authorities")).toBe(0);
     expect(fixture.count("durable_receipts")).toBe(0);
   });
+
+  it("reconciles authorized terminal captures and excludes unsettled partial captures", async () => {
+    const fixture = await createFixture();
+    fixture.authorizeStop(fixture.firstSessionId);
+    fixture.keepPartial(fixture.secondSessionId);
+    const unsettledSessionId = "session-library-unsettled-123456";
+    fixture.addCapture(unsettledSessionId, {
+      state: "partial_capture",
+      updatedAtMs: 2_000,
+    });
+    const projected: string[] = [];
+
+    const result = await fixture.service().reconcileStartup({
+      repository: fixture.captureRepository,
+      onProjected: (receipt) => projected.push(receipt.sessionId),
+    });
+
+    expect(result).toEqual({ attempted: 2, projected: 2, failed: 0 });
+    expect(projected).toEqual([
+      fixture.firstSessionId,
+      fixture.secondSessionId,
+    ]);
+    expect(fixture.count("audio_items")).toBe(1);
+    expect(fixture.count("durable_receipts")).toBe(2);
+    expect(
+      fixture.database
+        .prepare("SELECT 1 FROM durable_receipts WHERE idempotency_key = ?")
+        .get(`capture-library:${unsettledSessionId}`),
+    ).toBeUndefined();
+  });
+
+  it("advances a stable cursor past more invalid candidates than one slice", async () => {
+    const fixture = await createFixture();
+    const sessionIds = Array.from(
+      { length: 5 },
+      (_, index) => `session-library-slice-${index}-123456`,
+    );
+    sessionIds.forEach((sessionId, index) => {
+      fixture.addCapture(sessionId, { updatedAtMs: 10_000 + index });
+      fixture.authorizeStop(sessionId);
+    });
+    const yieldControl = vi.fn(async () => undefined);
+    const service = fixture.service(async (sessionId) => {
+      if (sessionId !== sessionIds.at(-1)) {
+        throw new Error("invalid historic spool");
+      }
+      return fixture.media;
+    });
+
+    await expect(
+      service.reconcileStartup({
+        repository: fixture.captureRepository,
+        maxCandidatesPerSlice: 2,
+        yieldControl,
+      }),
+    ).resolves.toEqual({ attempted: 5, projected: 1, failed: 4 });
+    expect(yieldControl).toHaveBeenCalledTimes(2);
+    expect(
+      fixture.database
+        .prepare("SELECT 1 FROM durable_receipts WHERE idempotency_key = ?")
+        .get(`capture-library:${sessionIds.at(-1)}`),
+    ).toBeDefined();
+  });
+
+  it("yields on elapsed budget, preserves captures, and repeated startup is a no-op", async () => {
+    const fixture = await createFixture();
+    fixture.authorizeStop(fixture.firstSessionId);
+    fixture.authorizeStop(fixture.secondSessionId);
+    const before = fixture.captureRows();
+    let clock = 0;
+    const yieldControl = vi.fn(async () => undefined);
+    const service = fixture.service();
+
+    const first = await service.reconcileStartup({
+      repository: fixture.captureRepository,
+      maxCandidatesPerSlice: 10,
+      maxSliceMs: 5,
+      now: () => (clock += 10),
+      yieldControl,
+    });
+    const replay = await service.reconcileStartup({
+      repository: fixture.captureRepository,
+      yieldControl,
+    });
+
+    expect(first).toEqual({ attempted: 2, projected: 2, failed: 0 });
+    expect(replay).toEqual({ attempted: 0, projected: 0, failed: 0 });
+    expect(yieldControl).toHaveBeenCalled();
+    expect(fixture.captureRows()).toEqual(before);
+    expect(fixture.count("audio_items")).toBe(1);
+    expect(fixture.count("durable_receipts")).toBe(2);
+  });
+
+  it("serializes a live projection with startup reconciliation for one session", async () => {
+    const fixture = await createFixture();
+    fixture.authorizeStop(fixture.firstSessionId);
+    const prepared = deferred<typeof fixture.media>();
+    const service = fixture.service(async () => await prepared.promise);
+
+    const live = service.project({
+      sessionId: fixture.firstSessionId,
+      displayName: "Live capture",
+    });
+    const recovery = service.reconcileStartup({
+      repository: fixture.captureRepository,
+    });
+    prepared.resolve(fixture.media);
+
+    await expect(live).resolves.toMatchObject({
+      sessionId: fixture.firstSessionId,
+      inserted: true,
+    });
+    await expect(recovery).resolves.toEqual({
+      attempted: 1,
+      projected: 1,
+      failed: 0,
+    });
+    expect(fixture.count("audio_items")).toBe(1);
+    expect(fixture.count("durable_receipts")).toBe(1);
+  });
 });
 
 async function createFixture() {
@@ -168,8 +290,10 @@ async function createFixture() {
   );
   return {
     database,
+    media,
     firstSessionId,
     secondSessionId,
+    captureRepository: new CaptureRepository(database),
     service: (
       prepareMedia: (sessionId: string) => Promise<typeof media> = async () =>
         media,
@@ -189,5 +313,83 @@ async function createFixture() {
           .prepare("SELECT state FROM capture_sessions WHERE session_id = ?")
           .get(firstSessionId)?.state,
       ),
+    addCapture: (
+      sessionId: string,
+      options: {
+        state?: "completed" | "partial_capture";
+        updatedAtMs?: number;
+      } = {},
+    ) => {
+      database
+        .prepare(
+          `INSERT INTO capture_sessions (
+            session_id, title, workspace_path, state, capture_mode,
+            recording_sha256, journal_sha256, created_at_ms, updated_at_ms
+          ) VALUES (?, ?, ?, ?, 'dual_track', ?, ?, ?, ?)`,
+        )
+        .run(
+          sessionId,
+          sessionId,
+          path.join(profile.captureDirectory, sessionId),
+          options.state ?? "completed",
+          "d".repeat(64),
+          "d".repeat(64),
+          options.updatedAtMs ?? 1_000,
+          options.updatedAtMs ?? 1_000,
+        );
+    },
+    authorizeStop: (sessionId: string) => {
+      const row = database
+        .prepare("SELECT * FROM capture_sessions WHERE session_id = ?")
+        .get(sessionId)!;
+      const result = captureSnapshotSchema.parse({
+        sessionId,
+        state: row.state,
+        captureMode: row.capture_mode,
+        captureTimelineMs: Number(row.capture_timeline_ms),
+        systemAudioHealthy: Boolean(row.system_audio_healthy),
+        microphoneHealthy: Boolean(row.microphone_healthy),
+        partialCapture: Boolean(row.partial_capture),
+        finalizedChunkCount: Number(row.finalized_chunk_count),
+        eventCount: Number(row.event_count),
+        gapCount: Number(row.gap_count),
+        interruptionReason: row.interruption_reason,
+        recordingSha256: row.recording_sha256,
+        journalSha256: row.journal_sha256,
+      });
+      database
+        .prepare(
+          `INSERT INTO capture_command_receipts (
+            session_id, idempotency_key, action, result_json, created_at_ms
+          ) VALUES (?, ?, 'stop', ?, ?)`,
+        )
+        .run(sessionId, `stop:${sessionId}`, JSON.stringify(result), 2_000);
+    },
+    keepPartial: (sessionId: string) => {
+      database
+        .prepare(
+          `UPDATE capture_sessions
+           SET state = 'partial_capture', partial_capture = 1,
+             recovery_disposition = 'kept'
+           WHERE session_id = ?`,
+        )
+        .run(sessionId);
+    },
+    captureRows: () =>
+      database
+        .prepare(
+          `SELECT session_id, state, recording_sha256, journal_sha256,
+             recovery_disposition, updated_at_ms
+           FROM capture_sessions ORDER BY session_id`,
+        )
+        .all(),
   };
+}
+
+function deferred<T>() {
+  let resolve!: (value: T) => void;
+  const promise = new Promise<T>((settle) => {
+    resolve = settle;
+  });
+  return { promise, resolve };
 }

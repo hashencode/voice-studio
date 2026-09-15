@@ -16,6 +16,10 @@ import {
 } from "../profile/profile_paths";
 import { withTransaction } from "./audio_database";
 import { AudioWorkspaceRepository } from "./repositories/audio_workspace_repository";
+import {
+  CAPTURE_LIBRARY_RECEIPT_KIND,
+  captureLibraryReceiptKey,
+} from "./capture_library_projection_receipt";
 
 export class IdempotencyConflictError extends Error {
   constructor(entity: string) {
@@ -722,7 +726,7 @@ export class DesktopRepository {
     assertProfileOwnedPath(this.profile, command.normalizedPath);
     return withTransaction(this.database, () => {
       const projectionKey = command.captureSessionId
-        ? `capture-library:${command.captureSessionId}`
+        ? captureLibraryReceiptKey(command.captureSessionId)
         : null;
       if (projectionKey) {
         const capture = this.database
@@ -750,22 +754,22 @@ export class DesktopRepository {
           ) as Record<string, unknown>;
           const audioId = Number(existingReceipt.audio_id);
           if (
-            String(existingReceipt.kind) !== "capture-library" ||
+            String(existingReceipt.kind) !== CAPTURE_LIBRARY_RECEIPT_KIND ||
             payload.sessionId !== command.captureSessionId ||
             payload.audioId !== audioId
           ) {
             throw new Error("capture library receipt is invalid");
           }
-          const audio = this.requireAudio(audioId);
-          const authority = this.database
-            .prepare("SELECT media_authority_id FROM audio_items WHERE id = ?")
+          const audioRow = this.database
+            .prepare("SELECT * FROM audio_items WHERE id = ?")
             .get(audioId);
-          if (authority?.media_authority_id == null) {
+          if (!audioRow) throw new Error(`Audio ${audioId} was not found`);
+          if (audioRow.media_authority_id == null) {
             throw new Error("capture library audio lacks media authority");
           }
           return {
-            audio,
-            mediaAuthorityId: Number(authority.media_authority_id),
+            audio: mapAudio(audioRow),
+            mediaAuthorityId: Number(audioRow.media_authority_id),
             inserted: false,
           };
         }
@@ -850,11 +854,12 @@ export class DesktopRepository {
   ): void {
     this.database
       .prepare(
-        "INSERT INTO durable_receipts (audio_id, idempotency_key, kind, payload_json, created_at_ms) VALUES (?, ?, 'capture-library', ?, ?)",
+        "INSERT INTO durable_receipts (audio_id, idempotency_key, kind, payload_json, created_at_ms) VALUES (?, ?, ?, ?, ?)",
       )
       .run(
         audioId,
         idempotencyKey,
+        CAPTURE_LIBRARY_RECEIPT_KIND,
         JSON.stringify({ sessionId, audioId }),
         nowMs,
       );
