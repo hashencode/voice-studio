@@ -3,6 +3,7 @@ import type {
   FormalProcessingIdentity,
   FormalTranscriptHandoffService,
 } from "./formal_transcript_handoff_service";
+import type { CaptureLibraryProjectionReceipt } from "../capture/capture_library_projection_service";
 
 /**
  * Capture commit is the primary durability boundary. Formal processing is a
@@ -16,22 +17,23 @@ export async function finalizeCommittedCaptureTranscript(options: {
   processing: FormalProcessingIdentity | null;
   publish(snapshot: CaptionSnapshot): void;
   reportFailure(): void;
-}): Promise<CaptionSnapshot | null> {
+}): Promise<CaptionSnapshot | CaptureLibraryProjectionReceipt | null> {
   if (!options.handoff) return null;
   try {
-    const snapshot = options.processing
-      ? await options.handoff.finalize({
-          sessionId: options.sessionId,
-          displayName: options.displayName,
-          processing: options.processing,
-        })
-      : await options.handoff.finalize({
-          sessionId: options.sessionId,
-          displayName: options.displayName,
-          processing: null,
-        });
-    if (snapshot) options.publish(snapshot);
-    return snapshot;
+    if (options.processing) {
+      const snapshot = await options.handoff.finalize({
+        sessionId: options.sessionId,
+        displayName: options.displayName,
+        processing: options.processing,
+      });
+      options.publish(snapshot);
+      return snapshot;
+    }
+    return await options.handoff.finalize({
+      sessionId: options.sessionId,
+      displayName: options.displayName,
+      processing: null,
+    });
   } catch {
     options.reportFailure();
     return null;

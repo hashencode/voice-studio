@@ -83,6 +83,7 @@ export class DesktopDomainService {
   }
 
   commitValidatedImport(command: {
+    captureSessionId?: string;
     displayName: string;
     normalizedPath: string;
     normalizedSha256: string;
@@ -91,6 +92,9 @@ export class DesktopDomainService {
     durationMs: number;
     receipt: Record<string, unknown>;
   }) {
+    if (command.captureSessionId !== undefined) {
+      requireCaptureSessionId(command.captureSessionId);
+    }
     requireText(command.displayName, "audio display name");
     requireText(command.normalizedPath, "normalized media path");
     for (const [value, label] of [
@@ -298,6 +302,12 @@ export class DesktopDomainService {
 
   listProcessingTasks(): ProcessingTask[] {
     return this.repository.listProcessingTasks();
+  }
+}
+
+function requireCaptureSessionId(value: string): void {
+  if (!/^session-[a-zA-Z0-9-]{12,120}$/.test(value)) {
+    throw new DomainValidationError("Capture session id is invalid");
   }
 }
 

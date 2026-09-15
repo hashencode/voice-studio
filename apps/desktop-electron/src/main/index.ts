@@ -142,6 +142,7 @@ import { CaptionWorkerSupervisor } from "./processes/caption_worker_supervisor";
 import { FormalTranscriptHandoffService } from "./domain/captions/formal_transcript_handoff_service";
 import { prepareFormalCaptureMedia } from "./domain/captions/formal_capture_media";
 import { finalizeCommittedCaptureTranscript } from "./domain/captions/capture_formal_completion";
+import { CaptureLibraryProjectionService } from "./domain/capture/capture_library_projection_service";
 import { AudioAiService } from "./domain/audio-intelligence/audio_ai_service";
 import { parseRemoteAiEndpoint } from "./domain/audio-intelligence/provider_security";
 import { AiJobRepository } from "./storage/repositories/ai_job_repository";
@@ -267,6 +268,7 @@ let desktopRepository: DesktopRepository | null = null;
 let transcriptRepository: TranscriptRepository | null = null;
 let liveCaptionService: LiveCaptionService | null = null;
 let formalTranscriptHandoff: FormalTranscriptHandoffService | null = null;
+let captureLibraryProjection: CaptureLibraryProjectionService | null = null;
 let audioWorkspaceService: AudioWorkspaceService | null = null;
 let audioExportService: AudioExportService | null = null;
 let audioPlaybackService: AudioPlaybackService | null = null;
@@ -2915,6 +2917,7 @@ async function resetPartialApplicationInitialization(): Promise<void> {
   captureNativeSession = null;
   captureService = null;
   formalTranscriptHandoff = null;
+  captureLibraryProjection = null;
   try {
     profileDatabase?.close();
   } catch {
@@ -2997,6 +3000,65 @@ async function initializeApplication(): Promise<void> {
     captureNativeSession = null;
     captureService = null;
   }
+  const prepareCaptureMedia = async (sessionId: string) => {
+    const snapshot = captureService?.snapshot();
+    const durableCapture = profile.database
+      .prepare(
+        `SELECT state, recording_sha256, journal_sha256
+         FROM capture_sessions WHERE session_id = ?`,
+      )
+      .get(sessionId);
+    const smokeAuthority =
+      captionFormalSmokeAuthority?.sessionId === sessionId
+        ? captionFormalSmokeAuthority
+        : null;
+    if (
+      (!snapshot ||
+        snapshot.sessionId !== sessionId ||
+        !snapshot.recordingSha256 ||
+        !snapshot.journalSha256) &&
+      (!durableCapture ||
+        !["completed", "partial_capture"].includes(
+          String(durableCapture.state),
+        ) ||
+        !durableCapture.recording_sha256 ||
+        !durableCapture.journal_sha256) &&
+      !smokeAuthority
+    ) {
+      throw new Error("finalized capture authority is unavailable");
+    }
+    return await prepareFormalCaptureMedia({
+      profile: profile.profile,
+      sessionId,
+      recordingSha256:
+        smokeAuthority?.recordingSha256 ??
+        (snapshot?.sessionId === sessionId
+          ? snapshot.recordingSha256!
+          : String(durableCapture!.recording_sha256)),
+      journalSha256:
+        smokeAuthority?.journalSha256 ??
+        (snapshot?.sessionId === sessionId
+          ? snapshot.journalSha256!
+          : String(durableCapture!.journal_sha256)),
+    });
+  };
+  captureLibraryProjection = new CaptureLibraryProjectionService({
+    profile: profile.profile,
+    domain: domainService,
+    prepareMedia: prepareCaptureMedia,
+  });
+  formalTranscriptHandoff = new FormalTranscriptHandoffService({
+    repository: transcriptRepository,
+    profile: profile.profile,
+    flushDraft: async (sessionId) => await liveCaptionService?.flush(sessionId),
+    prepareMedia: prepareCaptureMedia,
+    projectLibrary: async (command) => {
+      const result = await captureLibraryProjection!.projectWithMedia(command);
+      applicationState.setLibraryCount(desktopRepository!.countAudios());
+      return result;
+    },
+    scheduleProcessing: () => scheduleProcessing(),
+  });
   const secretStore = captureNativeSession
     ? new MacOSHelperSecretStore(() => {
         const session =
@@ -3170,69 +3232,6 @@ async function initializeApplication(): Promise<void> {
         publishCaption,
       );
       liveCaptionService.reconcileStartup();
-    }
-    if (transcriptRepository) {
-      formalTranscriptHandoff = new FormalTranscriptHandoffService({
-        repository: transcriptRepository,
-        profile: profile.profile,
-        flushDraft: async (sessionId) =>
-          await liveCaptionService?.flush(sessionId),
-        prepareMedia: async (sessionId) => {
-          const snapshot = captureService?.snapshot();
-          const durableCapture = profile.database
-            .prepare(
-              `SELECT state, recording_sha256, journal_sha256
-               FROM capture_sessions WHERE session_id = ?`,
-            )
-            .get(sessionId);
-          const smokeAuthority =
-            captionFormalSmokeAuthority?.sessionId === sessionId
-              ? captionFormalSmokeAuthority
-              : null;
-          if (
-            (!snapshot ||
-              snapshot.sessionId !== sessionId ||
-              !snapshot.recordingSha256 ||
-              !snapshot.journalSha256) &&
-            (!durableCapture ||
-              !["completed", "partial_capture"].includes(
-                String(durableCapture.state),
-              ) ||
-              !durableCapture.recording_sha256 ||
-              !durableCapture.journal_sha256) &&
-            !smokeAuthority
-          ) {
-            throw new Error("finalized capture authority is unavailable");
-          }
-          return await prepareFormalCaptureMedia({
-            profile: profile.profile,
-            sessionId,
-            recordingSha256:
-              smokeAuthority?.recordingSha256 ??
-              (snapshot?.sessionId === sessionId
-                ? snapshot.recordingSha256!
-                : String(durableCapture!.recording_sha256)),
-            journalSha256:
-              smokeAuthority?.journalSha256 ??
-              (snapshot?.sessionId === sessionId
-                ? snapshot.journalSha256!
-                : String(durableCapture!.journal_sha256)),
-          });
-        },
-        commitMedia: (media) => {
-          domainService!.commitValidatedImport({
-            displayName: media.displayName,
-            normalizedPath: media.normalizedPath,
-            normalizedSha256: media.normalizedSha256,
-            sourceSha256: media.sourceSha256,
-            normalizedSizeBytes: media.normalizedSizeBytes,
-            durationMs: media.durationMs,
-            receipt: media.receipt,
-          });
-          applicationState.setLibraryCount(desktopRepository!.countAudios());
-        },
-        scheduleProcessing: () => scheduleProcessing(),
-      });
     }
     workerSupervisor = new WorkerHealthSupervisor(
       resourceCatalog.command("worker-health"),
@@ -4322,6 +4321,7 @@ async function teardownOwnedResources(
   captureNativeSession = null;
   captureService = null;
   formalTranscriptHandoff = null;
+  captureLibraryProjection = null;
   captureTray?.destroy();
   captureTray = null;
   profileDatabase?.close();

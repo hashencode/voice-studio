@@ -704,6 +704,7 @@ export class DesktopRepository {
 
   commitValidatedImport(
     command: {
+      captureSessionId?: string;
       displayName: string;
       normalizedPath: string;
       normalizedSha256: string;
@@ -720,6 +721,55 @@ export class DesktopRepository {
   } {
     assertProfileOwnedPath(this.profile, command.normalizedPath);
     return withTransaction(this.database, () => {
+      const projectionKey = command.captureSessionId
+        ? `capture-library:${command.captureSessionId}`
+        : null;
+      if (projectionKey) {
+        const capture = this.database
+          .prepare(
+            "SELECT state, recording_sha256 FROM capture_sessions WHERE session_id = ?",
+          )
+          .get(command.captureSessionId!);
+        if (
+          !capture ||
+          !["completed", "partial_capture"].includes(String(capture.state)) ||
+          String(capture.recording_sha256) !== command.sourceSha256
+        ) {
+          throw new Error(
+            "capture library commit lacks finalized capture authority",
+          );
+        }
+        const existingReceipt = this.database
+          .prepare(
+            "SELECT audio_id, kind, payload_json FROM durable_receipts WHERE idempotency_key = ?",
+          )
+          .get(projectionKey);
+        if (existingReceipt) {
+          const payload = JSON.parse(
+            String(existingReceipt.payload_json),
+          ) as Record<string, unknown>;
+          const audioId = Number(existingReceipt.audio_id);
+          if (
+            String(existingReceipt.kind) !== "capture-library" ||
+            payload.sessionId !== command.captureSessionId ||
+            payload.audioId !== audioId
+          ) {
+            throw new Error("capture library receipt is invalid");
+          }
+          const audio = this.requireAudio(audioId);
+          const authority = this.database
+            .prepare("SELECT media_authority_id FROM audio_items WHERE id = ?")
+            .get(audioId);
+          if (authority?.media_authority_id == null) {
+            throw new Error("capture library audio lacks media authority");
+          }
+          return {
+            audio,
+            mediaAuthorityId: Number(authority.media_authority_id),
+            inserted: false,
+          };
+        }
+      }
       const existingAsset = this.database
         .prepare("SELECT * FROM media_authorities WHERE content_sha256 = ?")
         .get(command.normalizedSha256);
@@ -728,8 +778,17 @@ export class DesktopRepository {
           .prepare("SELECT * FROM audio_items WHERE media_authority_id = ?")
           .get(Number(existingAsset.id));
         if (!audioRow) throw new Error("media authority is missing its audio");
+        const audio = mapAudio(audioRow);
+        if (projectionKey) {
+          this.insertCaptureLibraryReceipt(
+            projectionKey,
+            command.captureSessionId!,
+            audio.id,
+            nowMs,
+          );
+        }
         return {
-          audio: mapAudio(audioRow),
+          audio,
           mediaAuthorityId: Number(existingAsset.id),
           inserted: false,
         };
@@ -767,12 +826,38 @@ export class DesktopRepository {
           nowMs,
         );
       const audioId = Number(audio.lastInsertRowid);
+      if (projectionKey) {
+        this.insertCaptureLibraryReceipt(
+          projectionKey,
+          command.captureSessionId!,
+          audioId,
+          nowMs,
+        );
+      }
       return {
         audio: this.requireAudio(audioId),
         mediaAuthorityId: mediaId,
         inserted: true,
       };
     });
+  }
+
+  private insertCaptureLibraryReceipt(
+    idempotencyKey: string,
+    sessionId: string,
+    audioId: number,
+    nowMs: number,
+  ): void {
+    this.database
+      .prepare(
+        "INSERT INTO durable_receipts (audio_id, idempotency_key, kind, payload_json, created_at_ms) VALUES (?, ?, 'capture-library', ?, ?)",
+      )
+      .run(
+        audioId,
+        idempotencyKey,
+        JSON.stringify({ sessionId, audioId }),
+        nowMs,
+      );
   }
 
   private findAudioByIdempotencyKey(key: string): AudioRecord | null {

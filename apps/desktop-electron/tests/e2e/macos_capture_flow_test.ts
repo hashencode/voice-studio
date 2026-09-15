@@ -1478,6 +1478,75 @@ describe("macOS capture parity flow", () => {
     }
   });
 
+  it("keeps a model-unavailable capture completed when library projection fails", async () => {
+    const database = openAudioDatabase(":memory:");
+    const repository = new CaptureRepository(database);
+    const native = nativeFixture();
+    const sessionId = "session-model-unavailable-123456";
+    native.stop.mockResolvedValueOnce(
+      runtimeSnapshot({
+        sessionId,
+        state: "completed",
+        finalizedChunkCount: 2,
+        recordingSha256: "a".repeat(64),
+        journalSha256: "b".repeat(64),
+      }),
+    );
+    const service = new DesktopCaptureService(
+      repository,
+      native,
+      "/tmp/voice2text-capture-test-root",
+      () => 1_000,
+      async (options) => authorityFixture(options.sessionId),
+    );
+    const reportFailure = vi.fn();
+    try {
+      await expect(
+        service.preflight({
+          minimumFreeBytes: 1,
+          captionModelAvailable: false,
+          requestPermissions: false,
+        }),
+      ).resolves.toMatchObject({
+        captionModelAvailable: false,
+        canStart: true,
+      });
+      await service.start({
+        sessionId,
+        title: "Durable without model",
+        idempotencyKey: "start-model-unavailable-123456",
+        minimumFreeBytes: 1,
+        captionEnabled: false,
+      });
+      const stopped = await service.control({
+        action: "stop",
+        sessionId,
+        idempotencyKey: "stop-model-unavailable-123456",
+      });
+
+      await expect(
+        finalizeCommittedCaptureTranscript({
+          handoff: {
+            finalize: vi.fn(async () => {
+              throw new Error("injected projection failure");
+            }),
+          } as never,
+          sessionId,
+          displayName: service.sessionTitle(sessionId),
+          processing: null,
+          publish: vi.fn(),
+          reportFailure,
+        }),
+      ).resolves.toBeNull();
+
+      expect(stopped.state).toBe("completed");
+      expect(repository.find(sessionId)?.state).toBe("completed");
+      expect(reportFailure).toHaveBeenCalledOnce();
+    } finally {
+      database.close();
+    }
+  });
+
   it("preserves one healthy track, visible gaps, and recoverable authority", async () => {
     const database = openAudioDatabase(":memory:");
     const native = nativeFixture();

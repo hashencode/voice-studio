@@ -9,7 +9,15 @@ import {
   validateCaptureAuthority,
 } from "../capture/capture_authority";
 import type { AudioProfilePaths } from "../../profile/profile_paths";
-import type { FormalCaptureMedia } from "./formal_transcript_handoff_service";
+
+export interface FormalCaptureMedia {
+  normalizedPath: string;
+  normalizedSha256: string;
+  sourceSha256: string;
+  normalizedSizeBytes: number;
+  durationMs: number;
+  receipt: Record<string, unknown>;
+}
 
 const MAXIMUM_SPOOL_BYTES = 4 * 60 * 60 * 16_000 * 2;
 const PCM_FRAME_BYTES = 3_200;

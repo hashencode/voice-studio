@@ -6,6 +6,7 @@ import path from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { FormalTranscriptHandoffService } from "../../src/main/domain/captions/formal_transcript_handoff_service";
+import { CaptureLibraryProjectionService } from "../../src/main/domain/capture/capture_library_projection_service";
 import { DesktopDomainService } from "../../src/main/domain/desktop_domain_service";
 import { openAudioDatabase } from "../../src/main/storage/audio_database";
 import { DesktopRepository } from "../../src/main/storage/desktop_repository";
@@ -37,11 +38,18 @@ describe("capture to formal transcript handoff", () => {
       throw new Error("caption worker crashed during flush");
     });
     const prepareMedia = vi.fn(async () => fixture.media);
+    const projector = new CaptureLibraryProjectionService({
+      profile: fixture.profile,
+      domain: new DesktopDomainService(fixture.desktop, () => 5_000),
+      prepareMedia,
+    });
     const service = new FormalTranscriptHandoffService({
       repository: fixture.transcripts,
       profile: fixture.profile,
       flushDraft,
       prepareMedia,
+      projectLibrary: async (command) =>
+        await projector.projectWithMedia(command),
       scheduleProcessing: fixture.schedule,
     });
 
@@ -59,6 +67,13 @@ describe("capture to formal transcript handoff", () => {
     ).toBe(1);
     expect(
       database
+        .prepare(
+          "SELECT audio_id FROM durable_receipts WHERE idempotency_key = ?",
+        )
+        .get(`capture-library:${sessionId}`)?.audio_id,
+    ).toBe(database.prepare("SELECT id FROM audio_items").get()?.id);
+    expect(
+      database
         .prepare("SELECT state, recording_sha256 FROM capture_sessions")
         .get(),
     ).toEqual(
@@ -67,6 +82,45 @@ describe("capture to formal transcript handoff", () => {
         recording_sha256: "d".repeat(64),
       }),
     );
+  });
+
+  it("projects durable capture media without a processing identity and returns its authoritative audio ID", async () => {
+    const prepareMedia = vi.fn(async () => fixture.media);
+    const projector = new CaptureLibraryProjectionService({
+      profile: fixture.profile,
+      domain: new DesktopDomainService(fixture.desktop, () => 5_000),
+      prepareMedia,
+    });
+    const service = new FormalTranscriptHandoffService({
+      repository: fixture.transcripts,
+      profile: fixture.profile,
+      flushDraft: vi.fn(async () => undefined),
+      prepareMedia,
+      projectLibrary: async (command) =>
+        await projector.projectWithMedia(command),
+      scheduleProcessing: fixture.schedule,
+    });
+
+    const receipt = await service.finalize({
+      sessionId,
+      displayName: "Model-independent capture",
+      processing: null,
+    });
+    const storedAudioId = Number(
+      database.prepare("SELECT id FROM audio_items").get()?.id,
+    );
+
+    expect(receipt).toEqual({
+      sessionId,
+      audioId: storedAudioId,
+      inserted: true,
+    });
+    expect(prepareMedia).toHaveBeenCalledOnce();
+    expect(fixture.schedule).not.toHaveBeenCalled();
+    expect(
+      database.prepare("SELECT COUNT(*) AS count FROM processing_jobs").get()
+        ?.count,
+    ).toBe(0);
   });
 
   it("records enqueue failure without touching capture and retries by expected-attempt CAS", async () => {

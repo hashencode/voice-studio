@@ -4,16 +4,11 @@ import type {
 } from "../../../shared/contracts";
 import type { TranscriptRepository } from "../../storage/repositories/transcript_repository";
 import type { AudioProfilePaths } from "../../profile/profile_paths";
-import { validateFormalMediaAuthority } from "./formal_capture_media";
-
-export interface FormalCaptureMedia {
-  normalizedPath: string;
-  normalizedSha256: string;
-  sourceSha256: string;
-  normalizedSizeBytes: number;
-  durationMs: number;
-  receipt: Record<string, unknown>;
-}
+import {
+  validateFormalMediaAuthority,
+  type FormalCaptureMedia,
+} from "./formal_capture_media";
+import type { CaptureLibraryProjectionReceipt } from "../capture/capture_library_projection_service";
 
 export interface FormalProcessingIdentity {
   operationId: "asr";
@@ -30,7 +25,13 @@ export class FormalTranscriptHandoffService {
       profile: AudioProfilePaths;
       flushDraft(sessionId: string): Promise<unknown>;
       prepareMedia(sessionId: string): Promise<FormalCaptureMedia>;
-      commitMedia?(command: FormalCaptureMedia & { displayName: string }): void;
+      projectLibrary?(command: {
+        sessionId: string;
+        displayName: string;
+      }): Promise<{
+        receipt: CaptureLibraryProjectionReceipt;
+        media: FormalCaptureMedia;
+      }>;
       scheduleProcessing(jobId: number): void;
       now?: () => number;
     },
@@ -45,12 +46,12 @@ export class FormalTranscriptHandoffService {
     sessionId: string;
     displayName: string;
     processing: null;
-  }): Promise<CaptionSnapshot | null>;
+  }): Promise<CaptureLibraryProjectionReceipt>;
   async finalize(command: {
     sessionId: string;
     displayName: string;
     processing: FormalProcessingIdentity | null;
-  }): Promise<CaptionSnapshot | null> {
+  }): Promise<CaptionSnapshot | CaptureLibraryProjectionReceipt> {
     // A caption flush failure degrades only the disposable draft. The durable
     // capture remains authoritative and must still receive one formal attempt.
     await this.options.flushDraft(command.sessionId).catch(() => undefined);
@@ -59,13 +60,10 @@ export class FormalTranscriptHandoffService {
       return existing;
     const nowMs = this.now();
     if (!command.processing) {
-      const media = await this.options.prepareMedia(command.sessionId);
-      await validateFormalMediaAuthority(this.options.profile, media);
-      if (!this.options.commitMedia) {
-        throw new Error("capture media registration is unavailable");
+      if (!this.options.projectLibrary) {
+        throw new Error("capture library projection is unavailable");
       }
-      this.options.commitMedia({ ...media, displayName: command.displayName });
-      return existing;
+      return (await this.options.projectLibrary(command)).receipt;
     }
     this.options.repository.beginFormalPreparation({
       sessionId: command.sessionId,
@@ -75,8 +73,12 @@ export class FormalTranscriptHandoffService {
     });
     let media = this.options.repository.formalHandoffMedia(command.sessionId);
     try {
-      media ??= await this.options.prepareMedia(command.sessionId);
-      await validateFormalMediaAuthority(this.options.profile, media);
+      if (!media && this.options.projectLibrary) {
+        media = (await this.options.projectLibrary(command)).media;
+      } else {
+        media ??= await this.options.prepareMedia(command.sessionId);
+        await validateFormalMediaAuthority(this.options.profile, media);
+      }
       this.options.repository.saveFormalHandoff({
         sessionId: command.sessionId,
         displayName: command.displayName,
@@ -154,8 +156,18 @@ export class FormalTranscriptHandoffService {
         throw new Error("formal preparation attempt fence rejected");
       }
       try {
-        const media = await this.options.prepareMedia(command.sessionId);
-        await validateFormalMediaAuthority(this.options.profile, media);
+        let media: FormalCaptureMedia;
+        if (this.options.projectLibrary) {
+          media = (
+            await this.options.projectLibrary({
+              sessionId: command.sessionId,
+              displayName: preparation.displayName,
+            })
+          ).media;
+        } else {
+          media = await this.options.prepareMedia(command.sessionId);
+          await validateFormalMediaAuthority(this.options.profile, media);
+        }
         this.options.repository.saveFormalHandoff({
           sessionId: command.sessionId,
           displayName: preparation.displayName,
