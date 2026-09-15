@@ -92,10 +92,19 @@ export class DesktopApplicationState {
   }
 
   setLibraryCount(audioCount: number): ApplicationSnapshot {
-    return this.update({
-      library:
-        audioCount === 0 ? { phase: "empty" } : { phase: "ready", audioCount },
-    });
+    const library =
+      audioCount === 0
+        ? ({ phase: "empty" } as const)
+        : ({ phase: "ready", audioCount } as const);
+    if (
+      this.current.library.phase === library.phase &&
+      (library.phase === "empty" ||
+        (this.current.library.phase === "ready" &&
+          this.current.library.audioCount === library.audioCount))
+    ) {
+      return this.snapshot();
+    }
+    return this.update({ library });
   }
 
   setCapture(

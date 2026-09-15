@@ -33,6 +33,168 @@ afterEach(() => {
   vi.restoreAllMocks();
 });
 
+it("opens a live registered recording by id without waiting for the audio list", async () => {
+  const list = deferred<AudioSummary[]>();
+  const recorded = summary(9, "刚保存的录音.wav");
+  const openAudio = vi.fn(async () => workspace(recorded));
+  const listAudios = vi.fn(() => list.promise);
+  render(
+    <AudioRouteFeature
+      api={api({ listAudios, openAudio })}
+      tasks={[]}
+      pendingJobActions={new Map()}
+      writable
+      paneOpen
+      liveRegisteredAudio={{ intentId: "live-9", audioId: 9 }}
+      onRecord={vi.fn()}
+      onImport={vi.fn()}
+      onCancel={vi.fn()}
+      onRetry={vi.fn()}
+    />,
+  );
+
+  expect(
+    await screen.findByRole("region", { name: "刚保存的录音.wav 工作区" }),
+  ).toBeVisible();
+  expect(openAudio).toHaveBeenCalledWith(9);
+  expect(listAudios).toHaveBeenCalledTimes(1);
+});
+
+it("retries only direct open and consumes the same live intent once", async () => {
+  const list = deferred<AudioSummary[]>();
+  const recorded = summary(9, "刚保存的录音.wav");
+  const openAudio = vi
+    .fn()
+    .mockRejectedValueOnce(new Error("open failed"))
+    .mockResolvedValueOnce(workspace(recorded));
+  const props = {
+    api: api({ listAudios: vi.fn(() => list.promise), openAudio }),
+    tasks: [],
+    pendingJobActions: new Map<number, never>(),
+    writable: true,
+    paneOpen: true,
+    liveRegisteredAudio: { intentId: "live-9", audioId: 9 },
+    onRecord: vi.fn(),
+    onImport: vi.fn(),
+    onCancel: vi.fn(),
+    onRetry: vi.fn(),
+  };
+  const view = render(<AudioRouteFeature {...props} />);
+
+  await userEvent
+    .setup()
+    .click(await screen.findByRole("button", { name: "重试打开音频" }));
+  expect(
+    await screen.findByRole("region", { name: "刚保存的录音.wav 工作区" }),
+  ).toBeVisible();
+  expect(openAudio).toHaveBeenCalledTimes(2);
+
+  view.rerender(<AudioRouteFeature {...props} />);
+  await act(async () => undefined);
+  expect(openAudio).toHaveBeenCalledTimes(2);
+});
+
+it("does not finish a live auto-open after navigation leaves the audio route", async () => {
+  const pendingOpen = deferred<AudioWorkspaceSnapshot | null>();
+  const recorded = summary(9, "刚保存的录音.wav");
+  const onAudioSelected = vi.fn();
+  const openAudio = vi.fn(() => pendingOpen.promise);
+  const props = {
+    api: api({
+      listAudios: vi.fn(async () => []),
+      openAudio,
+    }),
+    tasks: [],
+    pendingJobActions: new Map<number, never>(),
+    writable: true,
+    paneOpen: true,
+    liveRegisteredAudio: { intentId: "live-9", audioId: 9 },
+    onAudioSelected,
+    onRecord: vi.fn(),
+    onImport: vi.fn(),
+    onCancel: vi.fn(),
+    onRetry: vi.fn(),
+  };
+  const view = render(<AudioRouteFeature {...props} active />);
+  await waitFor(() => expect(openAudio).toHaveBeenCalledWith(9));
+
+  view.rerender(<AudioRouteFeature {...props} active={false} />);
+  await act(async () => pendingOpen.resolve(workspace(recorded)));
+
+  expect(onAudioSelected).not.toHaveBeenCalled();
+  expect(
+    screen.queryByRole("region", { name: "刚保存的录音.wav 工作区" }),
+  ).not.toBeInTheDocument();
+});
+
+it("clears a failed open when the matching live projection is replaced", async () => {
+  const list = deferred<AudioSummary[]>();
+  const props = {
+    api: api({
+      listAudios: vi.fn(() => list.promise),
+      openAudio: vi.fn().mockRejectedValue(new Error("open failed")),
+    }),
+    tasks: [],
+    pendingJobActions: new Map<number, never>(),
+    writable: true,
+    paneOpen: true,
+    onRecord: vi.fn(),
+    onImport: vi.fn(),
+    onCancel: vi.fn(),
+    onRetry: vi.fn(),
+  };
+  const view = render(
+    <AudioRouteFeature
+      {...props}
+      liveRegisteredAudio={{ intentId: "live-old", audioId: 9 }}
+    />,
+  );
+  expect(
+    await screen.findByRole("button", { name: "重试打开音频" }),
+  ).toBeVisible();
+
+  view.rerender(<AudioRouteFeature {...props} liveRegisteredAudio={null} />);
+
+  await waitFor(() =>
+    expect(
+      screen.queryByRole("button", { name: "重试打开音频" }),
+    ).not.toBeInTheDocument(),
+  );
+});
+
+it("keeps an opened recording visible when the independent list refresh fails", async () => {
+  const list = deferred<AudioSummary[]>();
+  const recorded = summary(9, "刚保存的录音.wav");
+  render(
+    <AudioRouteFeature
+      api={api({
+        listAudios: vi.fn(() => list.promise),
+        openAudio: vi.fn(async () => workspace(recorded)),
+      })}
+      tasks={[]}
+      pendingJobActions={new Map()}
+      writable
+      paneOpen
+      liveRegisteredAudio={{ intentId: "live-9", audioId: 9 }}
+      onRecord={vi.fn()}
+      onImport={vi.fn()}
+      onCancel={vi.fn()}
+      onRetry={vi.fn()}
+    />,
+  );
+
+  expect(
+    await screen.findByRole("region", { name: "刚保存的录音.wav 工作区" }),
+  ).toBeVisible();
+  list.reject(new Error("list failed"));
+  expect(
+    await screen.findByRole("button", { name: "重新载入音频列表" }),
+  ).toBeVisible();
+  expect(
+    screen.getByRole("region", { name: "刚保存的录音.wav 工作区" }),
+  ).toBeVisible();
+});
+
 it("renders the authoritative first-use state only after an empty list succeeds", async () => {
   const onImport = vi.fn(async () => ({
     protocolVersion: 3 as const,

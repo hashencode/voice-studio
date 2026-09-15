@@ -106,6 +106,8 @@ function applicationApi(
     markAllActivityRead: vi.fn(async () => snapshot),
     onApplicationSnapshot: vi.fn(() => () => undefined),
     ...overrides,
+    retryCaptureLibraryProjection:
+      overrides.retryCaptureLibraryProjection ?? vi.fn(async () => snapshot),
   };
   Object.defineProperty(window, "voice2text", {
     configurable: true,

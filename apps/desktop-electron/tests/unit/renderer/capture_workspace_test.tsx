@@ -152,9 +152,15 @@ function installCaptureApi(overrides: Partial<Voice2TextDesktopApi> = {}) {
   return api;
 }
 
-function renderCaptureProjection(capture: ApplicationSnapshot["capture"]) {
+function renderCaptureProjection(
+  capture: ApplicationSnapshot["capture"],
+  options: Omit<
+    React.ComponentProps<typeof CaptureWorkspaceController>,
+    "capture" | "children"
+  > = {},
+) {
   return render(
-    <CaptureWorkspaceController capture={capture}>
+    <CaptureWorkspaceController capture={capture} {...options}>
       {({ customTitle, content, footer }) => (
         <>
           <header>{customTitle}</header>
@@ -167,6 +173,86 @@ function renderCaptureProjection(capture: ApplicationSnapshot["capture"]) {
 }
 
 describe("capture workspace", () => {
+  it("keeps completed capture context visible while library projection registers or fails", async () => {
+    installCaptureApi();
+    const completed: ApplicationSnapshot["capture"] = {
+      phase: "completed",
+      sessionId: recording.sessionId,
+      title: "已保存的访谈",
+      elapsedMs: 5_000,
+    };
+    const retryProjection = vi.fn(async () => undefined);
+    const view = renderCaptureProjection(completed, {
+      libraryProjection: {
+        phase: "registering",
+        sessionId: recording.sessionId,
+        intentId: "projection-1",
+      },
+      onRetryLibraryProjection: retryProjection,
+    });
+
+    expect(
+      screen.getByRole("heading", { name: "正在加入音频资料库" }),
+    ).toBeVisible();
+    expect(screen.getByText("录音已经保存，完成后会自动打开。")).toBeVisible();
+
+    view.rerender(
+      <CaptureWorkspaceController
+        capture={completed}
+        libraryProjection={{
+          phase: "failed",
+          sessionId: recording.sessionId,
+          intentId: "projection-1",
+          code: "commit_failed",
+          message: "音频资料库暂时无法更新。",
+        }}
+        onRetryLibraryProjection={retryProjection}
+      >
+        {({ content }) => <main>{content}</main>}
+      </CaptureWorkspaceController>,
+    );
+    await userEvent
+      .setup()
+      .click(screen.getByRole("button", { name: "重试加入音频资料库" }));
+    await waitFor(() => expect(retryProjection).toHaveBeenCalledOnce());
+  });
+
+  it("keeps direct-open retry separate from projection retry", async () => {
+    installCaptureApi();
+    const retryProjection = vi.fn(async () => undefined);
+    const retryOpen = vi.fn();
+    renderCaptureProjection(
+      {
+        phase: "completed",
+        sessionId: recording.sessionId,
+        title: "已保存的访谈",
+        elapsedMs: 5_000,
+      },
+      {
+        libraryProjection: {
+          phase: "registered",
+          sessionId: recording.sessionId,
+          intentId: "projection-1",
+          audioId: 9,
+        },
+        libraryOpenState: {
+          phase: "open_failed",
+          intentId: "projection-1",
+          audioId: 9,
+          message: "录音已加入音频资料库，但暂时无法打开。",
+        },
+        onRetryLibraryProjection: retryProjection,
+        onRetryLibraryOpen: retryOpen,
+      },
+    );
+
+    await userEvent
+      .setup()
+      .click(screen.getByRole("button", { name: "重试打开音频" }));
+    expect(retryOpen).toHaveBeenCalledOnce();
+    expect(retryProjection).not.toHaveBeenCalled();
+  });
+
   it.each([
     ["preparing", "正在开始录制", "暂停录制", true, "停止并保存", true],
     ["recording", "正在录制", "暂停录制", false, "停止并保存", false],
@@ -1468,9 +1554,7 @@ describe("capture workspace", () => {
     const stop = await screen.findByRole("button", { name: "停止并保存" });
     fireEvent.click(stop);
     const dialog = screen.getByRole("alertdialog", { name: "提示" });
-    expect(
-      within(dialog).getByRole("heading", { name: "提示" }),
-    ).toBeVisible();
+    expect(within(dialog).getByRole("heading", { name: "提示" })).toBeVisible();
     expect(dialog).toHaveTextContent("停止录制后，当前内容将自动保存。");
     expect(within(dialog).getAllByRole("button")).toHaveLength(2);
     expect(

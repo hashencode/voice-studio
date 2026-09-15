@@ -74,8 +74,11 @@ describe("application capture activity", () => {
     const state = new DesktopApplicationState();
 
     state.setLibraryCount(2);
+    const revision = state.snapshot().revision;
+    state.setLibraryCount(2);
 
     expect(state.snapshot().libraryProjection).toEqual({ phase: "idle" });
+    expect(state.snapshot().revision).toBe(revision);
   });
 
   it("keeps projection failures safe and rejects invalid registered audio IDs", () => {

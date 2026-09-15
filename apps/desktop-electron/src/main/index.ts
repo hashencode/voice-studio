@@ -2125,8 +2125,15 @@ async function retryCaptureLibraryProjection(
     displayName: captureService.sessionTitle(request.sessionId),
     intentId: randomUUID(),
   });
-  lastCaptureProjectionRetry = { key: retryKey, promise: operation };
-  return await operation;
+  const transaction = { key: retryKey, promise: operation };
+  lastCaptureProjectionRetry = transaction;
+  try {
+    return await operation;
+  } finally {
+    if (lastCaptureProjectionRetry === transaction) {
+      lastCaptureProjectionRetry = null;
+    }
+  }
 }
 
 function publishCapture(

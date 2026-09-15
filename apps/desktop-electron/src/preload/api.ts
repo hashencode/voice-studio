@@ -424,7 +424,7 @@ export function createDesktopApi(
     },
     async retryCaptureLibraryProjection(
       options: Parameters<
-        NonNullable<Voice2TextDesktopApi["retryCaptureLibraryProjection"]>
+        Voice2TextDesktopApi["retryCaptureLibraryProjection"]
       >[0],
     ) {
       const response = await bridge.invoke(

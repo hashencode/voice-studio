@@ -41,6 +41,7 @@ import {
   resolveRecordingMicrophone,
   useRecordingPreference,
 } from "@/features/capture/use-recording-preference";
+import type { CaptureLibraryOpenState } from "@/features/capture/capture-library-open-state";
 import type { PendingJobAction } from "@/features/processing/use-processing-tasks";
 import {
   desktopFailureHasCode,
@@ -66,9 +67,13 @@ type AudioRouteOptions = {
   newRecordingBlocked?: boolean;
   libraryRefreshToken?: string;
   recordingCompletionToken?: string | null;
+  liveRegisteredAudio?: {
+    intentId: string;
+    audioId: number;
+  } | null;
   active?: boolean;
   enabled?: boolean;
-  onAudioSelected?: (audioId: number) => void;
+  onAudioSelected?: (audioId: number, source: "user" | "auto") => void;
   onRecord: () => void;
   onImport: () => Promise<ImportAudioResponse | undefined>;
   onProcessingUnavailable?: (reason?: string) => void;
@@ -93,6 +98,7 @@ export function useAudioRouteController({
   newRecordingBlocked = false,
   libraryRefreshToken,
   recordingCompletionToken = null,
+  liveRegisteredAudio = null,
   active = true,
   enabled = true,
   onAudioSelected,
@@ -113,6 +119,8 @@ export function useAudioRouteController({
     null,
   );
   const [transitionPending, setTransitionPending] = React.useState(false);
+  const [autoOpenState, setAutoOpenState] =
+    React.useState<CaptureLibraryOpenState>({ phase: "idle" });
   const [importPending, setImportPending] = React.useState(false);
   const [importError, setImportError] = React.useState<string | null>(null);
   const [capturePreflight, setCapturePreflight] =
@@ -135,6 +143,8 @@ export function useAudioRouteController({
     promise: Promise<void>;
   } | null>(null);
   const activeRef = React.useRef(active);
+  const observedLiveIntentRef = React.useRef<string | null>(null);
+  const protectedWorkspaceAudioIdRef = React.useRef<number | null>(null);
   const taskStructureToken = React.useMemo(
     () =>
       tasks
@@ -197,6 +207,7 @@ export function useAudioRouteController({
       const current = workspaceRef.current;
       if (
         !current ||
+        protectedWorkspaceAudioIdRef.current === current.summary.audioId ||
         nextAudios.some((item) => item.audioId === current.summary.audioId)
       ) {
         return;
@@ -229,15 +240,22 @@ export function useAudioRouteController({
         if (intent !== listIntentRef.current) return;
         audiosRef.current = next;
         setAudios(next);
+        if (
+          protectedWorkspaceAudioIdRef.current !== null &&
+          next.some(
+            (item) => item.audioId === protectedWorkspaceAudioIdRef.current,
+          )
+        ) {
+          protectedWorkspaceAudioIdRef.current = null;
+        }
         toast.dismiss("audio-library-refresh");
       } catch (cause) {
         if (intent === listIntentRef.current) {
+          setListError(userFacingError(cause, "无法载入音频列表"));
           if (audiosRef.current) {
             toast.error("无法刷新音频列表，仍显示上次内容。", {
               id: "audio-library-refresh",
             });
-          } else {
-            setListError(userFacingError(cause, "无法载入音频列表"));
           }
         }
       } finally {
@@ -343,25 +361,31 @@ export function useAudioRouteController({
     const wasActive = activeRef.current;
     activeRef.current = active;
     const current = workspaceRef.current;
-    if (wasActive && !active && current) {
+    if (wasActive && !active) {
       selectionIntentRef.current += 1;
-      void requestPlaybackClose(current.summary.audioId).catch((cause) => {
-        setTransitionError(
-          userFacingError(cause, "离开音频工作区时无法关闭播放"),
-        );
-      });
+      if (current) {
+        void requestPlaybackClose(current.summary.audioId).catch((cause) => {
+          setTransitionError(
+            userFacingError(cause, "离开音频工作区时无法关闭播放"),
+          );
+        });
+      }
     } else if (!wasActive && active) {
       closeRef.current = null;
     }
   }, [active, requestPlaybackClose]);
 
   const selectAudio = React.useCallback(
-    async (audioId: number, options?: { fromRoute?: boolean }) => {
+    async (
+      audioId: number,
+      options?: { fromRoute?: boolean; source?: "user" | "auto" },
+    ): Promise<"opened" | "failed" | "canceled"> => {
       const current = workspaceRef.current;
       if (current?.summary.audioId === audioId) {
         setTransitionError(null);
-        if (!options?.fromRoute) onAudioSelected?.(audioId);
-        return;
+        if (!options?.fromRoute)
+          onAudioSelected?.(audioId, options?.source ?? "user");
+        return "opened";
       }
       const intent = ++selectionIntentRef.current;
       transitionCountRef.current += 1;
@@ -377,21 +401,24 @@ export function useAudioRouteController({
                 userFacingError(cause, "无法切换音频，请重试"),
               );
             }
-            return;
+            return "failed";
           }
         }
-        if (intent !== selectionIntentRef.current) return;
+        if (intent !== selectionIntentRef.current) return "canceled";
         const next = await api.openAudio(audioId);
-        if (intent !== selectionIntentRef.current) return;
+        if (intent !== selectionIntentRef.current) return "canceled";
         if (!next) throw new Error("音频不存在或已被移除");
         workspaceRef.current = next;
         setWorkspaceState(next);
         closeRef.current = null;
-        if (!options?.fromRoute) onAudioSelected?.(audioId);
+        if (!options?.fromRoute)
+          onAudioSelected?.(audioId, options?.source ?? "user");
+        return "opened";
       } catch (cause) {
         if (intent === selectionIntentRef.current) {
           setTransitionError(userFacingError(cause, "无法打开音频"));
         }
+        return "failed";
       } finally {
         transitionCountRef.current = Math.max(
           0,
@@ -407,6 +434,72 @@ export function useAudioRouteController({
     },
     [api, onAudioSelected, requestPlaybackClose],
   );
+
+  const openRegisteredAudio = React.useCallback(
+    async (intentId: string, audioId: number) => {
+      protectedWorkspaceAudioIdRef.current = audioId;
+      setAutoOpenState({ phase: "opening", intentId, audioId });
+      const result = await selectAudio(audioId, { source: "auto" });
+      if (result === "opened") {
+        setAutoOpenState((current) =>
+          current.phase !== "idle" && current.intentId === intentId
+            ? { phase: "idle" }
+            : current,
+        );
+        return;
+      }
+      if (result === "canceled") {
+        protectedWorkspaceAudioIdRef.current = null;
+        setAutoOpenState({ phase: "idle" });
+        return;
+      }
+      setAutoOpenState((current) =>
+        current.phase !== "idle" && current.intentId === intentId
+          ? {
+              phase: "open_failed",
+              intentId,
+              audioId,
+              message: "录音已加入音频资料库，但暂时无法打开。",
+            }
+          : current,
+      );
+    },
+    [selectAudio],
+  );
+
+  React.useEffect(() => {
+    setAutoOpenState((current) => {
+      if (
+        current.phase === "idle" ||
+        (liveRegisteredAudio?.intentId === current.intentId &&
+          liveRegisteredAudio.audioId === current.audioId)
+      ) {
+        return current;
+      }
+      protectedWorkspaceAudioIdRef.current = null;
+      return { phase: "idle" };
+    });
+  }, [liveRegisteredAudio?.audioId, liveRegisteredAudio?.intentId]);
+
+  React.useEffect(() => {
+    if (!liveRegisteredAudio) return;
+    if (observedLiveIntentRef.current === liveRegisteredAudio.intentId) return;
+    observedLiveIntentRef.current = liveRegisteredAudio.intentId;
+    if (!enabled || !active) return;
+    const { intentId, audioId } = liveRegisteredAudio;
+    void Promise.resolve().then(() => {
+      if (observedLiveIntentRef.current !== intentId || !activeRef.current) {
+        return;
+      }
+      void openRegisteredAudio(intentId, audioId);
+      void loadAudios();
+    });
+  }, [active, enabled, liveRegisteredAudio, openRegisteredAudio, loadAudios]);
+
+  const retryAutoOpen = React.useCallback(() => {
+    if (autoOpenState.phase !== "open_failed") return;
+    void openRegisteredAudio(autoOpenState.intentId, autoOpenState.audioId);
+  }, [autoOpenState, openRegisteredAudio]);
 
   const clearSelection = React.useCallback(async () => {
     const current = workspaceRef.current;
@@ -591,6 +684,8 @@ export function useAudioRouteController({
     transitionError,
     dismissTransitionError: () => setTransitionError(null),
     transitionPending,
+    autoOpenState,
+    retryAutoOpen,
     importPending,
     importError,
     importAudio,
@@ -710,7 +805,40 @@ export function AudioContextPane({
 }: {
   controller: AudioRouteController;
 }) {
-  if (controller.libraryPresentation !== "populated") return null;
+  if (controller.libraryPresentation !== "populated") {
+    if (!controller.workspace) return null;
+    return (
+      <SidebarGroup className="h-full p-0">
+        <SidebarGroupContent className="flex h-full flex-col">
+          {controller.libraryPresentation === "error" ? (
+            <div role="alert" className="space-y-2 border-b p-3 text-sm">
+              <p>{controller.listError}</p>
+              <Button
+                type="button"
+                size="sm"
+                variant="outline"
+                onClick={() => void controller.reload()}
+              >
+                <RotateCcw aria-hidden="true" />
+                重新载入音频列表
+              </Button>
+            </div>
+          ) : (
+            <p
+              role="status"
+              className="flex items-center gap-2 border-b px-3 py-2 text-xs text-muted-foreground"
+            >
+              <LoaderCircle
+                className="size-3.5 animate-spin"
+                aria-hidden="true"
+              />
+              正在同步音频列表…
+            </p>
+          )}
+        </SidebarGroupContent>
+      </SidebarGroup>
+    );
+  }
   return (
     <SidebarGroup className="h-full p-0">
       <SidebarGroupContent className="flex h-full flex-col">
@@ -877,16 +1005,7 @@ export function AudioMainWorkspace({
           onDismiss={controller.dismissTransitionError}
         />
       ) : null}
-      {controller.libraryPresentation === "loading" ? (
-        <AudioLibraryLoading />
-      ) : controller.libraryPresentation === "error" ? (
-        <AudioLibraryError controller={controller} />
-      ) : controller.libraryPresentation === "true-empty" &&
-        showRecordingReady ? (
-        <RecordingReadyState controller={controller} />
-      ) : controller.libraryPresentation === "populated" && !workspace ? (
-        <AudioSelectionPrompt />
-      ) : workspace ? (
+      {workspace ? (
         <div key={workspace.summary.audioId} className="space-y-4">
           {!task && workspace.segments.length === 0 ? (
             <div className="flex flex-wrap items-center justify-between gap-3 border-y py-3">
@@ -922,6 +1041,51 @@ export function AudioMainWorkspace({
             onWorkspaceChange={controller.setWorkspace}
           />
         </div>
+      ) : controller.autoOpenState.phase === "opening" ? (
+        <div
+          role="status"
+          className="flex min-h-72 flex-1 flex-col items-center justify-center gap-1 text-center"
+        >
+          <p className="text-sm font-medium">正在打开新音频</p>
+          <p className="text-sm text-muted-foreground">
+            音频已加入资料库，正在打开详情。
+          </p>
+        </div>
+      ) : controller.autoOpenState.phase === "open_failed" ? (
+        <div
+          role="alert"
+          className="flex min-h-72 flex-1 flex-col items-center justify-center gap-3 text-center"
+        >
+          <p className="text-sm font-medium">新音频暂时无法打开</p>
+          <p className="text-sm text-muted-foreground">
+            {controller.autoOpenState.message}
+          </p>
+          <Button
+            type="button"
+            size="sm"
+            variant="outline"
+            onClick={controller.retryAutoOpen}
+          >
+            重试打开音频
+          </Button>
+        </div>
+      ) : controller.libraryPresentation === "loading" ? (
+        <AudioLibraryLoading />
+      ) : controller.libraryPresentation === "error" ? (
+        <AudioLibraryError controller={controller} />
+      ) : controller.libraryPresentation === "true-empty" &&
+        showRecordingReady ? (
+        <RecordingReadyState controller={controller} />
+      ) : controller.libraryPresentation === "true-empty" ? (
+        <div
+          role="status"
+          className="flex min-h-72 flex-1 flex-col items-center justify-center gap-1 text-center"
+        >
+          <p className="text-sm font-medium">录音已保存</p>
+          <p className="text-sm text-muted-foreground">正在同步音频资料库。</p>
+        </div>
+      ) : controller.libraryPresentation === "populated" && !workspace ? (
+        <AudioSelectionPrompt />
       ) : null}
     </div>
   );

@@ -160,6 +160,8 @@ function App() {
   const mainContentRef = React.useRef<HTMLDivElement>(null);
   const pendingSettingsTargetRef = React.useRef<SettingsSection | null>(null);
   const captureInvokerRef = React.useRef<HTMLElement | null>(null);
+  const autoOpenFocusRequestedRef = React.useRef(false);
+  const suppressNextRouteAudioFocusRef = React.useRef(false);
   const restoreFocusFrameRef = React.useRef<number | null>(null);
   const [recordRequest, setRecordRequest] = React.useState(0);
   const [captureStartPending, setCaptureStartPending] = React.useState(false);
@@ -202,7 +204,7 @@ function App() {
     routedCaptureSessionId !== null ||
     captureDetailOpen ||
     (current === "audio" &&
-      hasCaptureDetail(snapshot?.capture) &&
+      hasCaptureDetail(snapshot?.capture, snapshot?.libraryProjection) &&
       automaticCaptureDetailSessionId !== dismissedCaptureDetailSessionId);
   const activityItems = snapshot?.activity ?? EMPTY_ACTIVITY_ITEMS;
   const unreadActivityItems = React.useMemo(
@@ -358,11 +360,23 @@ function App() {
     [],
   );
   const closeUnblockedCaptureDetailForAudioSelection = React.useCallback(
-    (audioId: number) => {
+    (audioId: number, source: "user" | "auto") => {
       if (!isNewRecordingBlocked(snapshot?.capture)) {
         setCaptureDetailOpen(false);
         setCaptureDetailSessionId(null);
         setDismissedCaptureDetailSessionId(automaticCaptureDetailSessionId);
+      }
+      if (source === "auto") {
+        const activeElement = document.activeElement;
+        const captureRegion = document.querySelector<HTMLElement>(
+          '[role="region"][aria-label="录制详情"]',
+        );
+        autoOpenFocusRequestedRef.current = Boolean(
+          activeElement instanceof HTMLElement &&
+          captureRegion?.contains(activeElement),
+        );
+        suppressNextRouteAudioFocusRef.current =
+          !autoOpenFocusRequestedRef.current;
       }
       void navigateSection("audio", `/audio/${audioId}`);
     },
@@ -386,6 +400,13 @@ function App() {
     recordingCompletionToken:
       snapshot?.capture.phase === "completed"
         ? snapshot.capture.sessionId
+        : null,
+    liveRegisteredAudio:
+      snapshot?.libraryProjection.phase === "registered"
+        ? {
+            intentId: snapshot.libraryProjection.intentId,
+            audioId: snapshot.libraryProjection.audioId,
+          }
         : null,
     active: current === "audio",
     enabled: snapshot?.profile.phase === "ready",
@@ -425,6 +446,7 @@ function App() {
     listError: routeAudioListError,
     listPending: routeAudioListPending,
     selectAudio: selectRouteAudio,
+    workspace: routeAudioWorkspace,
   } = audio;
   const {
     applyRouteView: applyCompanionRouteView,
@@ -440,8 +462,13 @@ function App() {
         routeDestination.kind === "audio-capture"
       ) {
         const audioId = routeDestination.audioId;
-        if (routeAudios === null) return;
-        if (!routeAudios.some((item) => item.audioId === audioId)) {
+        const workspaceMatches =
+          routeAudioWorkspace?.summary.audioId === audioId;
+        if (routeAudios === null && !workspaceMatches) return;
+        if (
+          !workspaceMatches &&
+          !routeAudios?.some((item) => item.audioId === audioId)
+        ) {
           if (!routeAudioListPending && !routeAudioListError) {
             void navigateSection("audio", "/audio", { replace: true });
           }
@@ -449,7 +476,16 @@ function App() {
         }
         void selectRouteAudio(audioId, { fromRoute: true }).then(() => {
           if (generation !== routeSyncGenerationRef.current) return;
-          window.requestAnimationFrame(() => contentTitleRef.current?.focus());
+          const suppressFocus = suppressNextRouteAudioFocusRef.current;
+          const focusForAutoOpen = autoOpenFocusRequestedRef.current;
+          suppressNextRouteAudioFocusRef.current = false;
+          autoOpenFocusRequestedRef.current = false;
+          if (suppressFocus) return;
+          if (focusForAutoOpen || !workspaceMatches) {
+            window.requestAnimationFrame(() =>
+              contentTitleRef.current?.focus({ preventScroll: true }),
+            );
+          }
         });
       } else if (routeDestination.kind === "audio-index") {
         void clearRouteAudioSelection();
@@ -500,6 +536,7 @@ function App() {
     routeAudioListError,
     routeAudioListPending,
     routeAudios,
+    routeAudioWorkspace,
     routeDestination,
     selectRouteAudio,
   ]);
@@ -594,7 +631,9 @@ function App() {
   );
   const paneStructurallyAvailable =
     !captureDetailVisible &&
-    (current !== "audio" || audio.libraryPresentation === "populated") &&
+    (current !== "audio" ||
+      audio.libraryPresentation === "populated" ||
+      audio.workspace !== null) &&
     (current !== "messages" || activityItems.length > 0);
   const audioWorkspacePresentation =
     current === "audio" && !captureDetailVisible;
@@ -614,14 +653,38 @@ function App() {
     else if (audioWorkspacePresentation) contentPadding = "compact";
     else contentPadding = "page";
   }
+  const failedLibraryProjection =
+    snapshot.libraryProjection.phase === "failed"
+      ? snapshot.libraryProjection
+      : null;
+  const captureLibraryOpenState =
+    snapshot.libraryProjection.phase === "registered" &&
+    audio.autoOpenState.phase !== "idle" &&
+    audio.autoOpenState.intentId === snapshot.libraryProjection.intentId &&
+    audio.autoOpenState.audioId === snapshot.libraryProjection.audioId
+      ? audio.autoOpenState
+      : ({ phase: "idle" } as const);
   return (
     <CaptureWorkspaceController
       capture={snapshot.capture}
+      libraryProjection={snapshot.libraryProjection}
+      libraryOpenState={captureLibraryOpenState}
       recordRequest={recordRequest}
       detailOpen={captureDetailVisible}
       focusSessionId={routedCaptureSessionId ?? captureDetailSessionId}
       onPreflightResolved={audio.acceptCapturePreflight}
       onStartPendingChange={setCaptureStartPending}
+      onRetryLibraryProjection={
+        failedLibraryProjection
+          ? async () => {
+              await window.voice2text.retryCaptureLibraryProjection({
+                sessionId: failedLibraryProjection.sessionId,
+                intentId: failedLibraryProjection.intentId,
+              });
+            }
+          : undefined
+      }
+      onRetryLibraryOpen={audio.retryAutoOpen}
       onDetailOpenChange={(open) => {
         if (open && current !== "audio") return;
         if (!open && shellNavigationBlocked) return;
@@ -841,10 +904,13 @@ function isNewRecordingBlocked(
 
 function hasCaptureDetail(
   capture: ApplicationSnapshot["capture"] | undefined,
+  projection: ApplicationSnapshot["libraryProjection"] | undefined,
 ): boolean {
-  return Boolean(
-    capture && !["idle", "completed", "recovery"].includes(capture.phase),
-  );
+  if (!capture || capture.phase === "idle" || capture.phase === "recovery") {
+    return false;
+  }
+  if (capture.phase !== "completed") return true;
+  return projection?.phase !== "idle";
 }
 
 function ShellContent({
@@ -1164,9 +1230,9 @@ function deriveContentPresentation({
   if (current === "audio") {
     const populated = audio.libraryPresentation === "populated";
     return {
-      title: populated
-        ? (audio.workspace?.summary.displayName ?? "请选择音频")
-        : null,
+      title:
+        audio.workspace?.summary.displayName ??
+        (populated ? "请选择音频" : null),
       contentMode: "padded",
       renderContent: true,
     };

@@ -474,7 +474,7 @@ export interface Voice2TextDesktopApi {
   markAllActivityRead(): Promise<
     import("./application_state").ApplicationSnapshot
   >;
-  retryCaptureLibraryProjection?(
+  retryCaptureLibraryProjection(
     options: import("./application_state").CaptureLibraryProjectionRetryRequest,
   ): Promise<import("./application_state").ApplicationSnapshot>;
   onApplicationSnapshot(

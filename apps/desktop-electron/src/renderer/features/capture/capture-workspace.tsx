@@ -39,6 +39,7 @@ import {
   type CaptureView,
 } from "./capture-presentation";
 import { CaptureFooter } from "./capture-footer";
+import type { CaptureLibraryOpenState } from "./capture-library-open-state";
 import { RecoveryDialog, type RecoveryDialogState } from "./recovery-dialog";
 import {
   resolveRecordingMicrophone,
@@ -66,6 +67,8 @@ function isCompletedRecoveryOutcome(
 
 type CaptureWorkspaceProps = {
   capture: ApplicationSnapshot["capture"];
+  libraryProjection?: ApplicationSnapshot["libraryProjection"];
+  libraryOpenState?: CaptureLibraryOpenState;
   /** @deprecated Capture state is authoritative in Main and arrives via snapshots. */
   applicationRevision?: number;
   recordRequest?: number;
@@ -74,6 +77,8 @@ type CaptureWorkspaceProps = {
   onPreflightResolved?: (preflight: CapturePreflight) => void;
   onDetailOpenChange?: (open: boolean) => void;
   onStartPendingChange?: (pending: boolean) => void;
+  onRetryLibraryProjection?: () => Promise<void>;
+  onRetryLibraryOpen?: () => void;
 };
 
 export type CaptureWorkspaceProjection = {
@@ -100,12 +105,16 @@ export function CaptureWorkspace(props: CaptureWorkspaceProps) {
 
 export function CaptureWorkspaceController({
   capture,
+  libraryProjection = { phase: "idle" },
+  libraryOpenState = { phase: "idle" },
   recordRequest,
   detailOpen = true,
   focusSessionId = null,
   onPreflightResolved,
   onDetailOpenChange,
   onStartPendingChange,
+  onRetryLibraryProjection,
+  onRetryLibraryOpen,
   children,
 }: CaptureWorkspaceProps & {
   children: (projection: CaptureWorkspaceProjection) => React.ReactNode;
@@ -933,6 +942,21 @@ export function CaptureWorkspaceController({
         aria-busy={busy}
         className="mx-auto w-full max-w-3xl space-y-5"
       >
+        <CaptureLibraryProjectionStatus
+          projection={libraryProjection}
+          openState={libraryOpenState}
+          busy={busy}
+          onRetryProjection={() => {
+            if (!onRetryLibraryProjection) return;
+            void runExclusive(
+              `library-projection-${libraryProjection.phase === "failed" ? libraryProjection.intentId : "retry"}`,
+              "正在重试加入音频资料库",
+              onRetryLibraryProjection,
+              "无法重试加入音频资料库",
+            );
+          }}
+          onRetryOpen={onRetryLibraryOpen}
+        />
         {busy && !focusedActiveCapture ? (
           <p className="mb-3 border-b bg-muted/40 pb-3 text-sm font-medium">
             {operationMessage}
@@ -1043,6 +1067,82 @@ export function CaptureWorkspaceController({
     ),
     footer,
   });
+}
+
+function CaptureLibraryProjectionStatus({
+  projection,
+  openState,
+  busy,
+  onRetryProjection,
+  onRetryOpen,
+}: {
+  projection: ApplicationSnapshot["libraryProjection"];
+  openState: CaptureLibraryOpenState;
+  busy: boolean;
+  onRetryProjection: () => void;
+  onRetryOpen?: () => void;
+}) {
+  if (openState.phase === "opening") {
+    return (
+      <section role="status" className="border-y py-4">
+        <h2 className="text-sm font-semibold">正在打开新音频</h2>
+        <p className="mt-1 text-sm text-muted-foreground">
+          音频已加入资料库，正在打开详情。
+        </p>
+      </section>
+    );
+  }
+  if (openState.phase === "open_failed") {
+    return (
+      <section role="alert" className="border-y py-4">
+        <h2 className="text-sm font-semibold">新音频暂时无法打开</h2>
+        <p className="mt-1 text-sm text-muted-foreground">
+          {openState.message}
+        </p>
+        <Button
+          type="button"
+          size="sm"
+          variant="outline"
+          className="mt-3"
+          disabled={busy}
+          onClick={onRetryOpen}
+        >
+          重试打开音频
+        </Button>
+      </section>
+    );
+  }
+  if (projection.phase === "registering") {
+    return (
+      <section role="status" className="border-y py-4">
+        <h2 className="text-sm font-semibold">正在加入音频资料库</h2>
+        <p className="mt-1 text-sm text-muted-foreground">
+          录音已经保存，完成后会自动打开。
+        </p>
+      </section>
+    );
+  }
+  if (projection.phase === "failed") {
+    return (
+      <section role="alert" className="border-y py-4">
+        <h2 className="text-sm font-semibold">音频资料库未更新</h2>
+        <p className="mt-1 text-sm text-muted-foreground">
+          {projection.message}
+        </p>
+        <Button
+          type="button"
+          size="sm"
+          variant="outline"
+          className="mt-3"
+          disabled={busy}
+          onClick={onRetryProjection}
+        >
+          重试加入音频资料库
+        </Button>
+      </section>
+    );
+  }
+  return null;
 }
 
 function CaptureTitleEditor({

@@ -43,6 +43,9 @@ const api: Voice2TextDesktopApi = {
   async markAllActivityRead() {
     return structuredClone(application);
   },
+  async retryCaptureLibraryProjection() {
+    return structuredClone(application);
+  },
   onApplicationSnapshot() {
     return () => undefined;
   },

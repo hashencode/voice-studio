@@ -549,10 +549,19 @@ function installApi(
   overrides: Partial<Voice2TextDesktopApi> = {},
 ) {
   let current = snapshot;
+  const navigateMock = vi.fn(async (section) => {
+    current = {
+      ...current,
+      revision: current.revision + 1,
+      navigation: { section },
+    };
+    return current;
+  });
   const api: Voice2TextDesktopApi = {
     ...companionRendererStubs(),
     markActivityRead: vi.fn(async () => current),
     markAllActivityRead: vi.fn(async () => current),
+    retryCaptureLibraryProjection: vi.fn(async () => current),
     getAiSettings: vi.fn(async () => testAiSettings()),
     createAiProviderProfile: vi.fn(async () => testAiSettings()),
     updateAiProviderProfile: vi.fn(async () => testAiSettings()),
@@ -593,14 +602,7 @@ function installApi(
     onCaptionSnapshot: vi.fn(() => () => undefined),
     onOperationEvent: vi.fn(() => () => undefined),
     getApplicationSnapshot: vi.fn(async () => current),
-    navigate: vi.fn(async (section) => {
-      current = {
-        ...current,
-        revision: current.revision + 1,
-        navigation: { section },
-      };
-      return current;
-    }),
+    navigate: navigateMock,
     requestBootstrapAction: vi.fn(async () => snapshot),
     onApplicationSnapshot: vi.fn(() => () => undefined),
     ...overrides,
@@ -609,7 +611,7 @@ function installApi(
     configurable: true,
     value: api,
   });
-  return api;
+  return { ...api, navigateMock };
 }
 
 function testAiSettings() {
@@ -1839,13 +1841,13 @@ describe("application shell", () => {
       expect(wrapper.style.getPropertyValue("--sidebar-width")).toBe("360px"),
     );
 
-    api.navigate.mockClear();
+    api.navigateMock.mockClear();
     await user.click(screen.getByRole("button", { name: "后退" }));
     expect(
       screen.getByRole("heading", { name: "已有录音.wav", level: 1 }),
     ).toBeVisible();
     await user.click(screen.getByRole("button", { name: "设置" }));
-    expect(api.navigate).not.toHaveBeenCalled();
+    expect(api.navigateMock).not.toHaveBeenCalled();
     expect(
       screen.getByRole("heading", { name: "已有录音.wav", level: 1 }),
     ).toBeVisible();
@@ -1923,6 +1925,198 @@ describe("application shell", () => {
     expect(wrapper.style.getPropertyValue("--sidebar-width")).toBe("360px");
   });
 
+  it("opens the first saved recording before its list refresh resolves", async () => {
+    const list = deferred<(typeof shellAudio)[]>();
+    const savedAudio = {
+      ...shellAudio,
+      audioId: 9,
+      displayName: "刚保存的录音.wav",
+    };
+    let publish: ((snapshot: ApplicationSnapshot) => void) | undefined;
+    const openAudio = vi.fn(async () => shellWorkspace(savedAudio));
+    installApi(
+      {
+        ...readySnapshot,
+        capture: {
+          phase: "completed",
+          sessionId: "saved-session-9",
+          title: "刚保存的录音",
+          elapsedMs: 1_000,
+        },
+        libraryProjection: {
+          phase: "registering",
+          sessionId: "saved-session-9",
+          intentId: "live-intent-9",
+        },
+      },
+      {
+        listAudios: vi.fn(() => list.promise),
+        openAudio,
+        onApplicationSnapshot: vi.fn((listener) => {
+          publish = listener;
+          return () => {
+            publish = undefined;
+          };
+        }),
+      },
+    );
+    render(<App />);
+
+    expect(
+      await screen.findByRole("heading", {
+        name: "正在加入音频资料库",
+      }),
+    ).toBeVisible();
+    const captureAction = screen.getByRole("button", {
+      name: "录制另一个音频",
+    });
+    captureAction.focus();
+
+    act(() =>
+      publish?.({
+        ...readySnapshot,
+        revision: readySnapshot.revision + 1,
+        capture: {
+          phase: "completed",
+          sessionId: "saved-session-9",
+          title: "刚保存的录音",
+          elapsedMs: 1_000,
+        },
+        libraryProjection: {
+          phase: "registered",
+          sessionId: "saved-session-9",
+          intentId: "live-intent-9",
+          audioId: 9,
+        },
+      }),
+    );
+
+    expect(
+      await screen.findByRole("region", {
+        name: "刚保存的录音.wav 工作区",
+      }),
+    ).toBeVisible();
+    await waitFor(() =>
+      expect(
+        screen.getByRole("heading", {
+          level: 1,
+          name: "刚保存的录音.wav",
+        }),
+      ).toHaveFocus(),
+    );
+    expect(openAudio).toHaveBeenCalledTimes(1);
+
+    act(() =>
+      publish?.({
+        ...readySnapshot,
+        revision: readySnapshot.revision + 2,
+        capture: {
+          phase: "completed",
+          sessionId: "saved-session-9",
+          title: "刚保存的录音",
+          elapsedMs: 1_000,
+        },
+        libraryProjection: {
+          phase: "registered",
+          sessionId: "saved-session-9",
+          intentId: "live-intent-9",
+          audioId: 9,
+        },
+      }),
+    );
+    await act(async () => undefined);
+    expect(openAudio).toHaveBeenCalledTimes(1);
+  });
+
+  it("renders a saved state instead of a blank main region for a true-empty library", async () => {
+    installApi(
+      {
+        ...readySnapshot,
+        capture: {
+          phase: "completed",
+          sessionId: "saved-session-empty",
+          title: "第一段录音",
+          elapsedMs: 1_000,
+        },
+      },
+      { listAudios: vi.fn(async () => []) },
+    );
+    render(<App />);
+
+    const savedState = await screen.findByText("录音已保存", {
+      selector: "p",
+    });
+    expect(savedState).toBeVisible();
+    const main = savedState.closest("main");
+    expect(main).toHaveTextContent("正在同步音频资料库。");
+  });
+
+  it("preserves focus after the user leaves the disappearing capture workspace", async () => {
+    const list = deferred<(typeof shellAudio)[]>();
+    const pendingOpen = deferred<ReturnType<typeof shellWorkspace>>();
+    const savedAudio = {
+      ...shellAudio,
+      audioId: 9,
+      displayName: "刚保存的录音.wav",
+    };
+    let publish: ((snapshot: ApplicationSnapshot) => void) | undefined;
+    const openAudio = vi.fn(() => pendingOpen.promise);
+    installApi(
+      {
+        ...readySnapshot,
+        capture: {
+          phase: "completed",
+          sessionId: "saved-session-9",
+          title: "刚保存的录音",
+          elapsedMs: 1_000,
+        },
+        libraryProjection: {
+          phase: "registering",
+          sessionId: "saved-session-9",
+          intentId: "live-intent-9",
+        },
+      },
+      {
+        listAudios: vi.fn(() => list.promise),
+        openAudio,
+        onApplicationSnapshot: vi.fn((listener) => {
+          publish = listener;
+          return () => undefined;
+        }),
+      },
+    );
+    render(<App />);
+    await screen.findByRole("heading", { name: "正在加入音频资料库" });
+    screen.getByRole("button", { name: "录制另一个音频" }).focus();
+
+    act(() =>
+      publish?.({
+        ...readySnapshot,
+        revision: readySnapshot.revision + 1,
+        capture: {
+          phase: "completed",
+          sessionId: "saved-session-9",
+          title: "刚保存的录音",
+          elapsedMs: 1_000,
+        },
+        libraryProjection: {
+          phase: "registered",
+          sessionId: "saved-session-9",
+          intentId: "live-intent-9",
+          audioId: 9,
+        },
+      }),
+    );
+
+    await waitFor(() => expect(openAudio).toHaveBeenCalledWith(9));
+    const audioNavigation = screen.getByRole("button", { name: "音频" });
+    audioNavigation.focus();
+    await act(async () => pendingOpen.resolve(shellWorkspace(savedAudio)));
+
+    await screen.findByRole("region", { name: "刚保存的录音.wav 工作区" });
+    expect(audioNavigation).toHaveFocus();
+  });
+
   it("restores primary navigation after capture start fails", async () => {
     const start = deferred<CaptureSnapshot>();
     const api = installApi(
@@ -1949,9 +2143,9 @@ describe("application shell", () => {
     await user.click(newRecording);
     await waitFor(() => expect(api.startCapture).toHaveBeenCalledOnce());
 
-    api.navigate.mockClear();
+    api.navigateMock.mockClear();
     await user.click(screen.getByRole("button", { name: "设置" }));
-    expect(api.navigate).not.toHaveBeenCalled();
+    expect(api.navigateMock).not.toHaveBeenCalled();
 
     await act(async () => {
       start.reject(new Error("capture start failed"));
@@ -1960,7 +2154,9 @@ describe("application shell", () => {
     await user.click(screen.getByRole("button", { name: "知道了" }));
 
     await user.click(screen.getByRole("button", { name: "设置" }));
-    await waitFor(() => expect(api.navigate).toHaveBeenCalledWith("settings"));
+    await waitFor(() =>
+      expect(api.navigateMock).toHaveBeenCalledWith("settings"),
+    );
   });
 
   it("keeps independent first-use pane preferences including settings", async () => {

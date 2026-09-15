@@ -135,6 +135,9 @@ function installOperationsApi(overrides: Partial<Voice2TextDesktopApi> = {}) {
     requestBootstrapAction: vi.fn(async () => tasksSnapshot),
     onApplicationSnapshot: vi.fn(() => () => undefined),
     ...overrides,
+    retryCaptureLibraryProjection:
+      overrides.retryCaptureLibraryProjection ??
+      vi.fn(async () => tasksSnapshot),
   };
   Object.defineProperty(window, "voice2text", {
     configurable: true,
