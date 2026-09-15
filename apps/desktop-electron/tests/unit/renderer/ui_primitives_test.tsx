@@ -431,8 +431,7 @@ describe("current shadcn primitives", () => {
     ).toBe(dialogOverlayClass);
     expect(alertDialog.className).toBe(dialogContentClass);
     expect(
-      alertDialog.querySelector('[data-slot="alert-dialog-footer"]')
-        ?.className,
+      alertDialog.querySelector('[data-slot="alert-dialog-footer"]')?.className,
     ).toBe(dialogFooterClass);
     expect(
       within(alertDialog).queryByRole("button", {

@@ -106,11 +106,7 @@ export function CaptureFooter({
                       取消
                     </Button>
                   </AlertDialogCancel>
-                  <Button
-                    type="button"
-                    disabled={busy}
-                    onClick={onConfirmStop}
-                  >
+                  <Button type="button" disabled={busy} onClick={onConfirmStop}>
                     {busy ? "正在保存…" : "确定"}
                   </Button>
                 </AlertDialogFooter>
