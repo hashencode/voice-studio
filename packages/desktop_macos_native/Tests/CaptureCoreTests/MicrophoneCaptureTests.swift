@@ -171,6 +171,37 @@ final class MicrophoneCaptureTests: XCTestCase {
     XCTAssertEqual(harness.capture.meterSnapshot().observedFrames, 2)
   }
 
+  func testResumeReusesPreparedInputWithoutReselectingTheDevice() throws {
+    let harness = RecoveryHarness(selectedDeviceUniqueID: "bluetooth")
+    try harness.capture.start()
+
+    harness.capture.pause()
+    try harness.capture.start()
+    harness.capture.pause()
+    try harness.capture.start()
+
+    XCTAssertEqual(harness.deviceQueryCount, 1)
+    XCTAssertEqual(harness.engine.selectedDeviceIDs, [42])
+    XCTAssertEqual(harness.engine.activeFormatCount, 1)
+    XCTAssertEqual(harness.engine.maximumActiveTapCount, 1)
+    XCTAssertEqual(harness.engine.startCount, 3)
+  }
+
+  func testFailedResumeStillAllowsCaptureTeardown() throws {
+    let harness = RecoveryHarness(selectedDeviceUniqueID: "bluetooth")
+    try harness.capture.start()
+    harness.capture.pause()
+    harness.engine.startResults = [.failure(.failed)]
+
+    XCTAssertThrowsError(try harness.capture.start())
+    harness.capture.teardown()
+
+    XCTAssertEqual(harness.deviceQueryCount, 1)
+    XCTAssertEqual(harness.engine.selectedDeviceIDs, [42])
+    XCTAssertEqual(harness.engine.removeTapCount, 1)
+    XCTAssertEqual(harness.engine.activeTapCount, 0)
+  }
+
   func testConfigurationChangeRestartsOnceWithRenegotiatedFormat() throws {
     let harness = RecoveryHarness(selectedDeviceUniqueID: "bluetooth")
     harness.engine.onStart = { [weak harness] in

@@ -1,4 +1,3 @@
-import * as React from "react";
 import { CirclePause, Play, Square } from "lucide-react";
 
 import {
@@ -14,25 +13,6 @@ import {
 import { Button } from "@/components/ui/button";
 import type { CaptureCompactAction, CaptureView } from "./capture-presentation";
 import { formatCaptureElapsed } from "./capture-presentation";
-
-const FIXED_WAVEFORM = [
-  { height: 28, delay: -0.54, duration: 0.82 },
-  { height: 52, delay: -0.22, duration: 0.96 },
-  { height: 78, delay: -0.67, duration: 1.08 },
-  { height: 44, delay: -0.35, duration: 0.88 },
-  { height: 92, delay: -0.74, duration: 1.12 },
-  { height: 64, delay: -0.18, duration: 0.94 },
-  { height: 36, delay: -0.49, duration: 0.84 },
-  { height: 72, delay: -0.63, duration: 1.04 },
-  { height: 48, delay: -0.28, duration: 0.9 },
-  { height: 86, delay: -0.71, duration: 1.1 },
-  { height: 58, delay: -0.4, duration: 0.98 },
-  { height: 32, delay: -0.12, duration: 0.8 },
-  { height: 68, delay: -0.57, duration: 1.02 },
-  { height: 42, delay: -0.32, duration: 0.86 },
-  { height: 82, delay: -0.69, duration: 1.06 },
-  { height: 54, delay: -0.24, duration: 0.92 },
-] as const;
 
 type CaptureFooterProps = {
   capture: CaptureView;
@@ -58,11 +38,6 @@ export function CaptureFooter({
   const presentation = footerPresentation(capture);
   const controlsDisabled =
     busy || stopSubmitted || presentation.controlsDisabled;
-  const acceptsActivity =
-    capture.phase === "recording" ||
-    (capture.phase === "partial_capture" &&
-      Boolean(capture.systemAudioHealthy || capture.microphoneHealthy));
-  const inputActive = acceptsActivity && (capture.audioActivity ?? 0) > 0;
 
   return (
     <div
@@ -76,7 +51,6 @@ export function CaptureFooter({
         <p className="shrink-0 text-sm tabular-nums text-muted-foreground">
           {formatCaptureElapsed(capture.elapsedMs)}
         </p>
-        <CaptureActivity inputActive={inputActive} />
       </div>
       {presentation.action ? (
         <div className="ml-auto flex shrink-0 flex-nowrap items-center gap-2">
@@ -121,9 +95,9 @@ export function CaptureFooter({
               </AlertDialogTrigger>
               <AlertDialogContent>
                 <AlertDialogHeader>
-                  <AlertDialogTitle>确认停止并保存</AlertDialogTitle>
-                  <AlertDialogDescription className="sr-only">
-                    确认停止录制
+                  <AlertDialogTitle>提示</AlertDialogTitle>
+                  <AlertDialogDescription>
+                    停止录制后，当前内容将自动保存。
                   </AlertDialogDescription>
                 </AlertDialogHeader>
                 <AlertDialogFooter>
@@ -150,37 +124,6 @@ export function CaptureFooter({
     </div>
   );
 }
-
-const CaptureActivity = React.memo(function CaptureActivity({
-  inputActive,
-}: {
-  inputActive: boolean;
-}) {
-  return (
-    <div
-      role="img"
-      aria-label="录音活动"
-      data-input-active={String(inputActive)}
-      className="flex h-6 w-32 shrink-0 items-center gap-0.5 overflow-hidden"
-    >
-      {FIXED_WAVEFORM.map(({ height, delay, duration }, index) => (
-        <span
-          key={index}
-          aria-hidden="true"
-          data-testid="capture-activity-sample"
-          className="capture-activity-bar min-h-0.5 flex-1 rounded-full bg-primary/70"
-          style={
-            {
-              "--capture-bar-height": `${height}%`,
-              "--capture-bar-delay": `${delay}s`,
-              "--capture-bar-duration": `${duration}s`,
-            } as React.CSSProperties
-          }
-        />
-      ))}
-    </div>
-  );
-});
 
 function footerPresentation(capture: CaptureView): {
   status: string;

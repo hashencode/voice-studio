@@ -121,33 +121,6 @@
   }
 }
 
-@keyframes capture-input-wave {
-  0%,
-  100% {
-    transform: scaleY(0.3);
-  }
-
-  50% {
-    transform: scaleY(1);
-  }
-}
-
-.capture-activity-bar {
-  height: var(--capture-bar-height);
-  opacity: 0.35;
-  transform: scaleY(0.3);
-  transform-origin: center;
-}
-
-[data-input-active="true"] > .capture-activity-bar {
-  animation-delay: var(--capture-bar-delay);
-  animation-duration: var(--capture-bar-duration);
-  animation-iteration-count: infinite;
-  animation-name: capture-input-wave;
-  animation-timing-function: ease-in-out;
-  opacity: 0.7;
-}
-
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,

@@ -62,6 +62,7 @@ type AudioRouteOptions = {
   writable: boolean;
   processingAvailable?: boolean;
   recordingActive?: boolean;
+  captureStartPending?: boolean;
   newRecordingBlocked?: boolean;
   libraryRefreshToken?: string;
   recordingCompletionToken?: string | null;
@@ -88,6 +89,7 @@ export function useAudioRouteController({
   writable,
   processingAvailable = true,
   recordingActive = false,
+  captureStartPending = false,
   newRecordingBlocked = false,
   libraryRefreshToken,
   recordingCompletionToken = null,
@@ -597,6 +599,7 @@ export function useAudioRouteController({
     newRecordingBlocked,
     capturePreflight,
     capturePreflightPending,
+    captureStartPending,
     capturePreflightError,
     refreshCapturePreflight,
     acceptCapturePreflight,
@@ -676,16 +679,27 @@ export function AudioContextPaneHeader({
         size="icon-sm"
         variant="ghost"
         className="size-7"
-        aria-label={controller.recordingActive ? "正在录音" : "新录音"}
+        aria-label={
+          controller.recordingActive
+            ? "正在录音"
+            : controller.captureStartPending
+              ? "正在开始录制"
+              : "新录音"
+        }
         disabled={
           !controller.captureReadyWithMicrophone ||
           controller.recordingActive ||
           controller.newRecordingBlocked ||
-          controller.capturePreflightPending
+          controller.capturePreflightPending ||
+          controller.captureStartPending
         }
         onClick={() => controller.record()}
       >
-        <Mic aria-hidden="true" />
+        {controller.captureStartPending ? (
+          <LoaderCircle className="size-4 animate-spin" aria-hidden="true" />
+        ) : (
+          <Mic aria-hidden="true" />
+        )}
       </Button>
     </div>
   );
@@ -1042,7 +1056,9 @@ function RecordingReadyState({
       data-audio-first-use="frame"
       aria-label="首次使用音频"
       aria-busy={
-        controller.capturePreflightPending || controller.transitionPending
+        controller.capturePreflightPending ||
+        controller.captureStartPending ||
+        controller.transitionPending
       }
       className="relative mx-auto flex min-h-0 w-full flex-1 items-center justify-center overflow-hidden"
     >
@@ -1077,6 +1093,7 @@ function RecordingReadyState({
                 type="button"
                 disabled={
                   controller.capturePreflightPending ||
+                  controller.captureStartPending ||
                   !controller.captureReadyWithMicrophone ||
                   !microphone ||
                   controller.recordingActive ||
@@ -1084,7 +1101,8 @@ function RecordingReadyState({
                 }
                 onClick={() => controller.record()}
               >
-                {controller.capturePreflightPending ? (
+                {controller.capturePreflightPending ||
+                controller.captureStartPending ? (
                   <LoaderCircle
                     className="size-4 animate-spin"
                     aria-hidden="true"
@@ -1092,9 +1110,11 @@ function RecordingReadyState({
                 ) : (
                   <Mic aria-hidden="true" />
                 )}
-                {controller.capturePreflightPending
-                  ? "正在检查麦克风…"
-                  : "开始录制"}
+                {controller.captureStartPending
+                  ? "正在开始录制…"
+                  : controller.capturePreflightPending
+                    ? "正在检查麦克风…"
+                    : "开始录制"}
               </Button>
               <AudioImportButton
                 controller={controller}

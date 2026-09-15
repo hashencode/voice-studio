@@ -1,10 +1,11 @@
 import * as React from "react";
-import { Mic, Pencil } from "lucide-react";
+import { Mic } from "lucide-react";
 import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
+  DialogClose,
   DialogContent,
   DialogDescription,
   DialogFooter,
@@ -20,12 +21,6 @@ import {
 } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipProvider,
-  TooltipTrigger,
-} from "@/components/ui/tooltip";
 import { CaptionWorkspace } from "@/features/captions/caption-workspace";
 import { userFacingError } from "@/lib/user-facing-error";
 import type {
@@ -78,7 +73,7 @@ type CaptureWorkspaceProps = {
   focusSessionId?: string | null;
   onPreflightResolved?: (preflight: CapturePreflight) => void;
   onDetailOpenChange?: (open: boolean) => void;
-  onOpenLocalModels?: () => void;
+  onStartPendingChange?: (pending: boolean) => void;
 };
 
 export type CaptureWorkspaceProjection = {
@@ -110,27 +105,20 @@ export function CaptureWorkspaceController({
   focusSessionId = null,
   onPreflightResolved,
   onDetailOpenChange,
-  onOpenLocalModels,
+  onStartPendingChange,
   children,
 }: CaptureWorkspaceProps & {
   children: (projection: CaptureWorkspaceProjection) => React.ReactNode;
 }) {
-  const [preflight, setPreflight] = React.useState<CapturePreflight | null>(
-    null,
-  );
-  const [setupOpen, setSetupOpen] = React.useState(false);
+  const [startAttempted, setStartAttempted] = React.useState(false);
   const [title, setTitle] = React.useState("");
-  const [titleLoading, setTitleLoading] = React.useState(false);
   const [titleEditing, setTitleEditing] = React.useState(false);
   const [confirmedActiveTitle, setConfirmedActiveTitle] = React.useState("");
   const [titleDialog, setTitleDialog] = React.useState<
-    | { kind: "load"; message: string }
     | { kind: "validation"; message: string; value: string }
     | { kind: "save"; message: string; value: string }
     | null
   >(null);
-  const [captionEnabled, setCaptionEnabled] = React.useState(true);
-  const [microphoneDeviceId, setMicrophoneDeviceId] = React.useState("");
   const [recoveries, setRecoveries] = React.useState<CaptureRecoveryItem[]>([]);
   const [recoveryDialogState, setRecoveryDialogState] =
     React.useState<RecoveryDialogState>("assessing");
@@ -163,13 +151,27 @@ export function CaptureWorkspaceController({
   const titleInputRef = React.useRef<HTMLInputElement>(null);
   const titleDirtyRef = React.useRef(false);
   const titleGenerationRef = React.useRef(0);
-  const suggestionGenerationRef = React.useRef(0);
+  const startAttemptGenerationRef = React.useRef(0);
+  const startEligibleRef = React.useRef(false);
+  const mountedRef = React.useRef(true);
   const titleSaveRef = React.useRef<Promise<boolean> | null>(null);
   const titleSaveGenerationRef = React.useRef<number | null>(null);
   const onDetailOpenChangeRef = React.useRef(onDetailOpenChange);
+  const onStartPendingChangeRef = React.useRef(onStartPendingChange);
   React.useEffect(() => {
     onDetailOpenChangeRef.current = onDetailOpenChange;
   }, [onDetailOpenChange]);
+  React.useEffect(() => {
+    onStartPendingChangeRef.current = onStartPendingChange;
+  }, [onStartPendingChange]);
+  React.useEffect(() => {
+    mountedRef.current = true;
+    return () => {
+      mountedRef.current = false;
+      startAttemptGenerationRef.current += 1;
+      onStartPendingChangeRef.current?.(false);
+    };
+  }, []);
   const recoverySessionId =
     capture.phase === "recovery" ? capture.sessionId : null;
   const prioritizedRecoverySessionId = focusSessionId ?? recoverySessionId;
@@ -410,30 +412,6 @@ export function CaptureWorkspaceController({
     titleInputRef.current?.select();
   }, [titleEditing]);
 
-  const loadSuggestedTitle = React.useCallback(async () => {
-    const generation = ++suggestionGenerationRef.current;
-    titleDirtyRef.current = false;
-    setTitle("");
-    setTitleLoading(true);
-    try {
-      const result = await window.voice2text.suggestCaptureTitle();
-      if (generation !== suggestionGenerationRef.current) return false;
-      if (!titleDirtyRef.current) setTitle(result.title);
-      setTitleLoading(false);
-      return true;
-    } catch (reason: unknown) {
-      if (generation !== suggestionGenerationRef.current) return false;
-      setTitleLoading(false);
-      setSetupOpen(false);
-      onDetailOpenChangeRef.current?.(false);
-      setTitleDialog({
-        kind: "load",
-        message: userFacingError(reason, "无法生成录制名称"),
-      });
-      return false;
-    }
-  }, []);
-
   const validateTitle = React.useCallback((value: string) => {
     const trimmed = value.trim();
     const contentLength = trimmed.startsWith("Recover-")
@@ -560,6 +538,7 @@ export function CaptureWorkspaceController({
       label: string,
       operation: () => Promise<void>,
       failureMessage = "录制操作未完成",
+      onFailure?: (reason: unknown) => boolean | void,
     ) => {
       if (pendingRef.current.has(identity)) return;
       pendingRef.current.add(identity);
@@ -569,43 +548,104 @@ export function CaptureWorkspaceController({
       try {
         await operation();
       } catch (reason: unknown) {
+        if (!mountedRef.current || onFailure?.(reason) === false) return;
         setError(userFacingError(reason, failureMessage));
       } finally {
         pendingRef.current.delete(identity);
-        setPendingAction((current) => (current === identity ? null : current));
+        if (mountedRef.current) {
+          setPendingAction((current) =>
+            current === identity ? null : current,
+          );
+        }
       }
     },
     [],
   );
 
-  const checkPreflight = React.useCallback(() => {
-    void runExclusive("preflight", "正在检查录制条件", async () => {
-      const result = await window.voice2text.preflightCapture({
-        requestPermissions: true,
-        captionEnabled,
+  const startEligible =
+    capture.phase !== "recovery" &&
+    (!activeCapture || canBeginAnotherCapture(activeCapture)) &&
+    recoveries.length === 0 &&
+    !focusSessionId;
+  React.useLayoutEffect(() => {
+    startEligibleRef.current = startEligible;
+    if (!startEligible) {
+      startAttemptGenerationRef.current += 1;
+      void Promise.resolve().then(() => {
+        if (!startEligibleRef.current) setStartAttempted(false);
       });
-      setPreflight(result);
-      onPreflightResolved?.(result);
-      if (!result.captionModelAvailable) setCaptionEnabled(false);
-      const defaultMicrophone = resolveRecordingMicrophone(
-        result.microphones,
-        recordingPreference.microphoneDeviceId,
-      );
-      setMicrophoneDeviceId(defaultMicrophone?.id ?? "");
-      if (!result.canStart || !defaultMicrophone) {
-        setSetupOpen(false);
-        setOperationMessage("录制条件已变化");
-        return;
+    }
+  }, [startEligible]);
+
+  const beginCapture = React.useCallback(() => {
+    if (!startEligibleRef.current || pendingRef.current.has("start")) return;
+    const generation = ++startAttemptGenerationRef.current;
+    const startIsCurrent = () =>
+      generation === startAttemptGenerationRef.current &&
+      startEligibleRef.current;
+    const cancelStaleStart = () => {
+      if (generation === startAttemptGenerationRef.current) {
+        setStartAttempted(false);
       }
-      setSetupOpen(true);
-      onDetailOpenChangeRef.current?.(true);
-      setOperationMessage("录制设置已打开");
-      await loadSuggestedTitle();
-    });
+    };
+    onStartPendingChangeRef.current?.(true);
+    void runExclusive(
+      "start",
+      "正在开始录制",
+      async () => {
+        setStartAttempted(true);
+        const result = await window.voice2text.preflightCapture({
+          requestPermissions: true,
+          captionEnabled: true,
+        });
+        if (!startIsCurrent()) {
+          cancelStaleStart();
+          return;
+        }
+        onPreflightResolved?.(result);
+        const defaultMicrophone = resolveRecordingMicrophone(
+          result.microphones,
+          recordingPreference.microphoneDeviceId,
+        );
+        if (!result.canStart || !defaultMicrophone) {
+          throw new Error(
+            "当前录制条件不可用，请检查麦克风权限和磁盘空间后重试。",
+          );
+        }
+        titleDirtyRef.current = false;
+        const suggestedTitle = (await window.voice2text.suggestCaptureTitle())
+          .title;
+        if (!startIsCurrent()) {
+          cancelStaleStart();
+          return;
+        }
+        await window.voice2text.startCapture({
+          title: suggestedTitle.trim(),
+          refreshSuggestedTitle: true,
+          microphoneDeviceId: defaultMicrophone.id,
+          captionEnabled: result.captionModelAvailable,
+          idempotencyKey: commandKey("start"),
+        });
+        if (!startIsCurrent()) {
+          cancelStaleStart();
+          return;
+        }
+        setDismissedSessionId(null);
+        setStartAttempted(false);
+        setOperationMessage("录制已经开始");
+      },
+      "无法开始录制",
+      () => {
+        if (!startIsCurrent()) {
+          cancelStaleStart();
+          return false;
+        }
+        onDetailOpenChangeRef.current?.(true);
+        return true;
+      },
+    ).finally(() => onStartPendingChangeRef.current?.(false));
   }, [
-    captionEnabled,
     onPreflightResolved,
-    loadSuggestedTitle,
     recordingPreference.microphoneDeviceId,
     runExclusive,
   ]);
@@ -621,34 +661,10 @@ export function CaptureWorkspaceController({
     if (!activeCapture || canBeginAnotherCapture(activeCapture)) {
       void Promise.resolve().then(() => {
         if (activeCapture) setDismissedSessionId(activeCapture.sessionId);
-        setPreflight(null);
-        setSetupOpen(false);
-        setError(null);
-        checkPreflight();
+        beginCapture();
       });
     }
-  }, [activeCapture, checkPreflight, recordRequest]);
-
-  const start = React.useCallback(() => {
-    if (
-      !preflight?.canStart ||
-      (captionEnabled && !preflight.captionModelAvailable) ||
-      !title.trim()
-    )
-      return;
-    void runExclusive("start", "正在开始录制", async () => {
-      await window.voice2text.startCapture({
-        title: title.trim(),
-        refreshSuggestedTitle: !titleDirtyRef.current,
-        microphoneDeviceId: microphoneDeviceId || undefined,
-        captionEnabled,
-        idempotencyKey: commandKey("start"),
-      });
-      setDismissedSessionId(null);
-      setSetupOpen(false);
-      setOperationMessage("录制已经开始");
-    });
-  }, [captionEnabled, microphoneDeviceId, preflight, runExclusive, title]);
+  }, [activeCapture, beginCapture, recordRequest]);
 
   const control = React.useCallback(
     (action: CaptureControlAction) => {
@@ -686,6 +702,11 @@ export function CaptureWorkspaceController({
           }
         },
         action === "stop" ? STOP_CAPTURE_FAILURE_MESSAGE : undefined,
+        action === "stop"
+          ? () => {
+              setStopConfirmationSessionId(null);
+            }
+          : undefined,
       );
     },
     [activeCapture, runExclusive, successfulTerminalStopSessionId],
@@ -888,11 +909,8 @@ export function CaptureWorkspaceController({
   const beginAnotherCapture = React.useCallback(() => {
     if (!activeCapture) return;
     setDismissedSessionId(activeCapture.sessionId);
-    setPreflight(null);
-    setSetupOpen(false);
-    setError(null);
-    checkPreflight();
-  }, [activeCapture, checkPreflight]);
+    beginCapture();
+  }, [activeCapture, beginCapture]);
 
   const focusedRecoveries = focusSessionId
     ? recoveries.filter((item) => item.sessionId === focusSessionId)
@@ -909,7 +927,7 @@ export function CaptureWorkspaceController({
   const workspaceHidden =
     recordRequest !== undefined &&
     !activeCapture &&
-    !setupOpen &&
+    !startAttempted &&
     recoveries.length === 0 &&
     !focusSessionId;
   const recoveryDialogOpen =
@@ -928,15 +946,6 @@ export function CaptureWorkspaceController({
             {operationMessage}
           </p>
         ) : null}
-        {visibleError ? (
-          <div
-            role="alert"
-            className="mb-3 border-y border-destructive/40 bg-destructive/5 py-3 text-sm"
-          >
-            {visibleError}
-          </div>
-        ) : null}
-
         {focusedCaptureUnavailable ? (
           <section role="status" className="border-y py-6 text-sm">
             <p className="font-medium">这条录制已不在待恢复列表中</p>
@@ -952,17 +961,11 @@ export function CaptureWorkspaceController({
             onBeginAnother={beginAnotherCapture}
           />
         ) : !focusSessionId ? (
-          <CaptureSetup
-            setupOpen={setupOpen}
-            preflight={preflight}
+          <CaptureStart
+            startAttempted={startAttempted}
             busy={busy}
             recoveryFocusFallbackRef={recoveryFocusFallbackRef}
-            onCheck={checkPreflight}
-            onStart={start}
-            titleReady={!titleLoading && Boolean(title)}
-            captionAvailable={preflight?.captionModelAvailable ?? true}
-            captionEnabled={captionEnabled}
-            onOpenLocalModels={onOpenLocalModels}
+            onStart={beginCapture}
           />
         ) : null}
       </section>
@@ -970,9 +973,9 @@ export function CaptureWorkspaceController({
 
   const titleEditable = selectedActiveCapture
     ? isCaptureTitleEditable(selectedActiveCapture)
-    : setupOpen;
+    : false;
   const customTitle =
-    detailOpen && (title || titleEditing) && !titleLoading ? (
+    detailOpen && selectedActiveCapture && (title || titleEditing) ? (
       <CaptureTitleEditor
         value={title}
         editing={titleEditing}
@@ -1009,6 +1012,10 @@ export function CaptureWorkspaceController({
             if (saved) setTitleDialog(null);
           });
         }}
+      />
+      <CaptureErrorDialog
+        message={visibleError}
+        onClose={() => setError(null)}
       />
     </>
   );
@@ -1073,6 +1080,11 @@ function CaptureTitleEditor({
           value={value}
           maxLength={value.startsWith("Recover-") ? 58 : 50}
           onChange={(event) => onChange(event.currentTarget.value)}
+          onKeyDown={(event) => {
+            if (event.key === "Enter" && !event.nativeEvent.isComposing) {
+              event.currentTarget.blur();
+            }
+          }}
           onBlur={onBlur}
         />
       </div>
@@ -1086,32 +1098,16 @@ function CaptureTitleEditor({
     );
   }
   return (
-    <TooltipProvider>
-      <div className="flex min-w-0 items-center gap-1">
-        <button
-          type="button"
-          className="min-w-0 truncate text-left text-sm leading-snug font-semibold"
-          onClick={onEdit}
-        >
-          {value}
-        </button>
-        <Tooltip>
-          <TooltipTrigger asChild>
-            <Button
-              type="button"
-              variant="ghost"
-              size="icon-sm"
-              className="size-7 shrink-0"
-              aria-label="编辑录制名称"
-              onClick={onEdit}
-            >
-              <Pencil aria-hidden="true" />
-            </Button>
-          </TooltipTrigger>
-          <TooltipContent>编辑录制名称</TooltipContent>
-        </Tooltip>
-      </div>
-    </TooltipProvider>
+    <Button
+      type="button"
+      variant="ghost"
+      size="sm"
+      className="-mx-1.5 min-w-0 cursor-text justify-start truncate px-1.5 font-semibold"
+      title="点击编辑录制名称"
+      onClick={onEdit}
+    >
+      {value}
+    </Button>
   );
 }
 
@@ -1121,7 +1117,6 @@ function TitleErrorDialog({
   onSubmit,
 }: {
   state:
-    | { kind: "load"; message: string }
     | { kind: "validation"; message: string; value: string }
     | { kind: "save"; message: string; value: string }
     | null;
@@ -1141,16 +1136,14 @@ function TitleErrorDialog({
         ) : (
           <>
             <DialogHeader>
-              <DialogTitle>
-                {state?.kind === "load" ? "无法准备录制名称" : "录制名称未保存"}
-              </DialogTitle>
+              <DialogTitle>录制名称未保存</DialogTitle>
               <DialogDescription>{state?.message ?? ""}</DialogDescription>
             </DialogHeader>
             <DialogFooter>
               <Button type="button" variant="outline" onClick={onClose}>
-                {state?.kind === "save" ? "取消" : "关闭"}
+                取消
               </Button>
-              {state?.kind === "save" ? (
+              {state ? (
                 <Button type="button" onClick={() => onSubmit(state.value)}>
                   重试
                 </Button>
@@ -1158,6 +1151,30 @@ function TitleErrorDialog({
             </DialogFooter>
           </>
         )}
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+function CaptureErrorDialog({
+  message,
+  onClose,
+}: {
+  message: string | null;
+  onClose: () => void;
+}) {
+  return (
+    <Dialog open={message !== null} onOpenChange={(open) => !open && onClose()}>
+      <DialogContent showCloseButton={false}>
+        <DialogHeader>
+          <DialogTitle>录制遇到问题</DialogTitle>
+          <DialogDescription>{message ?? ""}</DialogDescription>
+        </DialogHeader>
+        <DialogFooter>
+          <DialogClose asChild>
+            <Button type="button">知道了</Button>
+          </DialogClose>
+        </DialogFooter>
       </DialogContent>
     </Dialog>
   );
@@ -1267,30 +1284,18 @@ export function FloatingCapturePreferenceSetting({
   );
 }
 
-function CaptureSetup({
-  setupOpen,
-  preflight,
+function CaptureStart({
+  startAttempted,
   busy,
   recoveryFocusFallbackRef,
-  onCheck,
   onStart,
-  titleReady,
-  captionAvailable,
-  captionEnabled,
-  onOpenLocalModels,
 }: {
-  setupOpen: boolean;
-  preflight: CapturePreflight | null;
+  startAttempted: boolean;
   busy: boolean;
   recoveryFocusFallbackRef: React.RefObject<HTMLButtonElement | null>;
-  onCheck: () => void;
   onStart: () => void;
-  titleReady: boolean;
-  captionAvailable: boolean;
-  captionEnabled: boolean;
-  onOpenLocalModels?: () => void;
 }) {
-  if (!setupOpen) {
+  if (!startAttempted) {
     return (
       <div className="flex items-center gap-3">
         <span className="flex size-9 shrink-0 items-center justify-center rounded-full bg-primary/10 text-primary">
@@ -1305,41 +1310,23 @@ function CaptureSetup({
           type="button"
           size="sm"
           disabled={busy}
-          onClick={onCheck}
+          onClick={onStart}
         >
-          检查并设置录制
+          开始录制
         </Button>
       </div>
     );
   }
 
-  const readyToStart = Boolean(preflight?.canStart);
+  if (busy) return null;
+
   return (
-    <section aria-labelledby="capture-setup-heading" className="space-y-3">
-      <h2 id="capture-setup-heading" className="font-semibold">
-        设置音频录制
-      </h2>
-      <div className="flex flex-wrap items-center justify-between gap-2">
-        <p role="status" className="text-sm text-muted-foreground">
-          {captionEnabled && captionAvailable
-            ? "实时字幕已启用。"
-            : "实时字幕模型未安装，本次仍可正常录音。"}
-        </p>
-        {!captionAvailable && onOpenLocalModels ? (
-          <Button type="button" variant="outline" onClick={onOpenLocalModels}>
-            前往本地模型
-          </Button>
-        ) : null}
-      </div>
-      <div className="flex flex-wrap justify-end gap-2">
-        {readyToStart && titleReady ? (
-          <Button type="button" disabled={busy} onClick={onStart}>
-            <Mic aria-hidden="true" />
-            {busy ? "正在开始…" : "开始录制"}
-          </Button>
-        ) : null}
-      </div>
-    </section>
+    <div className="flex justify-end">
+      <Button type="button" onClick={onStart}>
+        <Mic aria-hidden="true" />
+        重试开始录制
+      </Button>
+    </div>
   );
 }
 

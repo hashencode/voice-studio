@@ -162,6 +162,7 @@ function App() {
   const captureInvokerRef = React.useRef<HTMLElement | null>(null);
   const restoreFocusFrameRef = React.useRef<number | null>(null);
   const [recordRequest, setRecordRequest] = React.useState(0);
+  const [captureStartPending, setCaptureStartPending] = React.useState(false);
   const [processingUnavailableReason, setProcessingUnavailableReason] =
     React.useState<string | null>(null);
   const [captureDetailOpen, setCaptureDetailOpen] = React.useState(false);
@@ -360,6 +361,7 @@ function App() {
     writable: snapshot?.profile.phase === "ready",
     processingAvailable: snapshot?.capability.processing === "available",
     recordingActive: isCaptureInProgress(snapshot?.capture),
+    captureStartPending,
     newRecordingBlocked: isNewRecordingBlocked(snapshot?.capture),
     libraryRefreshToken: snapshot
       ? [
@@ -605,7 +607,9 @@ function App() {
       detailOpen={captureDetailVisible}
       focusSessionId={routedCaptureSessionId ?? captureDetailSessionId}
       onPreflightResolved={audio.acceptCapturePreflight}
+      onStartPendingChange={setCaptureStartPending}
       onDetailOpenChange={(open) => {
+        if (open && current !== "audio") return;
         if (!open && routedCaptureSessionId) {
           if (activeRoute.canGoBack) {
             void navigateSectionDelta(current, -1);
@@ -618,7 +622,6 @@ function App() {
         }
         changeCaptureDetail(open);
       }}
-      onOpenLocalModels={openLocalModels}
     >
       {(captureWorkspace) => (
         <AppShellFrame

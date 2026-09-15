@@ -306,6 +306,7 @@ final class MicrophoneCapture: @unchecked Sendable {
   private var recovering = false
   private var recoveryNotificationActive = false
   private var captureActive = false
+  private var preparedForResume = false
   private var tornDown = false
 
   init(
@@ -420,6 +421,17 @@ final class MicrophoneCapture: @unchecked Sendable {
     guard permissionGranted() else {
       throw DesktopMicrophoneCaptureError.permissionDenied
     }
+    if preparedForResume {
+      captureActive = true
+      engine.prepare()
+      do {
+        try engine.start()
+      } catch {
+        captureActive = false
+        throw DesktopMicrophoneCaptureError.engineStart(error)
+      }
+      return
+    }
     try selectInputDeviceIfNeeded()
     let format = engine.activeInputFormat()
     guard Self.isSupported(format) else {
@@ -432,6 +444,7 @@ final class MicrophoneCapture: @unchecked Sendable {
     engine.prepare()
     do {
       try engine.start()
+      preparedForResume = true
     } catch {
       captureActive = false
       throw DesktopMicrophoneCaptureError.engineStart(error)
@@ -858,6 +871,7 @@ final class MicrophoneCapture: @unchecked Sendable {
     tornDown = true
     recovering = false
     captureActive = false
+    preparedForResume = false
     recoveryStartedAt = nil
     setRecoveryNotificationActive(false)
     if let configurationObserver {

@@ -18,6 +18,7 @@ import { ContextPaneShell } from "../../../src/renderer/features/shell/context-p
 import { AppShellFrame } from "../../../src/renderer/features/shell/app-shell-frame";
 import type {
   ApplicationSnapshot,
+  CaptureSnapshot,
   ProcessingTask,
   Voice2TextDesktopApi,
 } from "../../../src/shared/contracts";
@@ -1599,7 +1600,8 @@ describe("application shell", () => {
     expect(screen.getByRole("button", { name: "后退" })).toBeVisible();
   });
 
-  it("keeps recording setup fullscreen after the back action is removed", async () => {
+  it("keeps the audio workspace visible while recording starts", async () => {
+    const start = deferred<CaptureSnapshot>();
     const summary = {
       audioId: 12,
       displayName: "已有录音.wav",
@@ -1610,7 +1612,7 @@ describe("application shell", () => {
       generationKind: null,
       segmentCount: 0,
     };
-    installApi(
+    const api = installApi(
       {
         ...readySnapshot,
         capture: { phase: "idle" },
@@ -1640,6 +1642,7 @@ describe("application shell", () => {
           canStart: true,
           blockingReasons: [],
         })),
+        startCapture: vi.fn(() => start.promise),
       },
     );
     const user = userEvent.setup();
@@ -1651,16 +1654,20 @@ describe("application shell", () => {
     const newRecording = await screen.findByRole("button", { name: "新录音" });
     await waitFor(() => expect(newRecording).toBeEnabled());
     await user.click(newRecording);
+    await waitFor(() => expect(api.startCapture).toHaveBeenCalledOnce());
+    expect(screen.getByRole("button", { name: "正在开始录制" })).toBeDisabled();
     expect(
-      await screen.findByRole("button", { name: "新录音2026090501" }),
+      screen.queryByRole("button", { name: "新录音2026090501" }),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("heading", { name: "设置音频录制" }),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.getByRole("complementary", { name: "音频上下文面板" }),
     ).toBeVisible();
-    expect(screen.getByRole("heading", { name: "设置音频录制" })).toBeVisible();
     expect(
-      screen.queryByRole("complementary", { name: "音频上下文面板" }),
-    ).not.toBeInTheDocument();
-    expect(
-      screen.queryByRole("button", { name: "打开 已有录音.wav" }),
-    ).not.toBeInTheDocument();
+      screen.getByRole("button", { name: "打开 已有录音.wav" }),
+    ).toBeVisible();
   });
 
   it("keeps independent first-use pane preferences including settings", async () => {
