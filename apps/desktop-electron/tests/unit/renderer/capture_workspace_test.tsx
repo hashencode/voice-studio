@@ -381,10 +381,14 @@ describe("capture workspace", () => {
     expect(screen.queryByRole("textbox", { name: "录制名称" })).toBeNull();
   });
 
-  it("edits an active title from its hoverable label and persists its trimmed Enter value", async () => {
-    const renameCaptureSession = vi.fn(async () => ({
-      capture: { ...idle },
-    })) as unknown as Voice2TextDesktopApi["renameCaptureSession"];
+  it("edits a surface-free active title and saves a non-composing Enter once", async () => {
+    let resolveRename!: (value: unknown) => void;
+    const renameCaptureSession = vi.fn(
+      () =>
+        new Promise((resolve) => {
+          resolveRename = resolve;
+        }),
+    ) as unknown as Voice2TextDesktopApi["renameCaptureSession"];
     installCaptureApi({ renameCaptureSession });
     const user = userEvent.setup();
     render(
@@ -407,8 +411,9 @@ describe("capture workspace", () => {
     );
 
     const titleButton = await screen.findByRole("button", { name: "客户访谈" });
-    expect(titleButton).toHaveAttribute("data-variant", "ghost");
-    expect(titleButton).toHaveClass("hover:bg-accent");
+    expect(titleButton).toHaveAttribute("data-variant", "text");
+    expect(titleButton).toHaveClass("cursor-text");
+    expect(titleButton.className).not.toContain("hover:");
     expect(titleButton.querySelector("svg")).toBeNull();
     expect(
       screen.queryByRole("button", { name: "编辑录制名称" }),
@@ -424,14 +429,44 @@ describe("capture workspace", () => {
     expect(input).toHaveFocus();
     expect(renameCaptureSession).not.toHaveBeenCalled();
     await user.keyboard("{Enter}");
-    await waitFor(() =>
-      expect(renameCaptureSession).toHaveBeenCalledWith({
-        sessionId: recording.sessionId,
-        title: "产品回访",
-      }),
-    );
+    expect(renameCaptureSession).toHaveBeenCalledOnce();
+    expect(renameCaptureSession).toHaveBeenCalledWith({
+      sessionId: recording.sessionId,
+      title: "产品回访",
+    });
+    fireEvent.blur(input);
+    expect(renameCaptureSession).toHaveBeenCalledOnce();
+    resolveRename({ capture: { ...idle } });
+    await waitFor(() => expect(input).not.toBeInTheDocument());
     expect(screen.queryByText("跨页面持续运行，由本机安全保存。")).toBeNull();
     expect(screen.queryByLabelText("录制名称")).toBeNull();
+  });
+
+  it("saves an active title on blur only once", async () => {
+    const renameCaptureSession = vi.fn(async () => ({
+      capture: { ...idle },
+    })) as unknown as Voice2TextDesktopApi["renameCaptureSession"];
+    installCaptureApi({ renameCaptureSession });
+    const user = userEvent.setup();
+    renderCaptureProjection({
+      phase: "recording",
+      sessionId: recording.sessionId,
+      title: "客户访谈",
+      elapsedMs: 5_000,
+    });
+
+    await user.click(await screen.findByRole("button", { name: "客户访谈" }));
+    const input = screen.getByRole("textbox", { name: "录制名称" });
+    await user.clear(input);
+    await user.type(input, "复盘访谈");
+    fireEvent.blur(input);
+    fireEvent.blur(input);
+
+    await waitFor(() => expect(renameCaptureSession).toHaveBeenCalledOnce());
+    expect(renameCaptureSession).toHaveBeenCalledWith({
+      sessionId: recording.sessionId,
+      title: "复盘访谈",
+    });
   });
 
   it("keeps invalid capture-title correction in one prefilled input dialog", async () => {
@@ -477,7 +512,9 @@ describe("capture workspace", () => {
       </CaptureWorkspaceController>,
     );
 
-    expect(await screen.findByText("季度访谈")).toBeVisible();
+    expect(
+      await screen.findByRole("heading", { name: "季度访谈" }),
+    ).toBeVisible();
     expect(screen.queryByRole("button", { name: "编辑录制名称" })).toBeNull();
     expect(screen.queryByRole("button", { name: "季度访谈" })).toBeNull();
   });

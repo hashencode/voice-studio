@@ -15,6 +15,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { Checkbox } from "@/components/ui/checkbox";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import {
   Card,
   CardAction,
@@ -810,6 +811,28 @@ describe("current shadcn primitives", () => {
         "focus-visible:ring-1",
       );
     }
+  });
+
+  it("provides a surface-free text button with the shared thin focus", () => {
+    render(
+      <Button variant="text" disabled>
+        可编辑标题
+      </Button>,
+    );
+
+    const button = screen.getByRole("button", { name: "可编辑标题" });
+    expect(button).toHaveAttribute("data-variant", "text");
+    expect(button).toBeDisabled();
+    expect(button).toHaveClass(
+      "focus-visible:border-ring",
+      "focus-visible:ring-1",
+      "focus-visible:ring-ring/40",
+      "disabled:pointer-events-none",
+      "disabled:opacity-50",
+    );
+    expect(button.className).not.toMatch(
+      /hover:(?:bg|border|underline)|dark:hover:bg/,
+    );
   });
 
   it("forwards controlled RadioGroup values with the Electron thin-focus exception", async () => {

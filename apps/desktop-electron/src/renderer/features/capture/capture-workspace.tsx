@@ -1100,7 +1100,7 @@ function CaptureTitleEditor({
   return (
     <Button
       type="button"
-      variant="ghost"
+      variant="text"
       size="sm"
       className="-mx-1.5 min-w-0 cursor-text justify-start truncate px-1.5 font-semibold"
       title="点击编辑录制名称"
