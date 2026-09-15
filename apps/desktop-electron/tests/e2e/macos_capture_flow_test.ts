@@ -178,6 +178,94 @@ describe("macOS capture parity flow", () => {
     }
   });
 
+  it("waits for the startup recovery scan before listing recovery capabilities", async () => {
+    const captureRoot = mkdtempSync(join(tmpdir(), "voice2text-scan-wait-"));
+    const database = openAudioDatabase(":memory:");
+    const repository = new CaptureRepository(database);
+    const sessionId = "session-scan-wait-123456";
+    const workspacePath = join(captureRoot, sessionId);
+    mkdirSync(workspacePath);
+    writeFileSync(join(workspacePath, "journal.json"), "{}");
+    repository.beginSession({
+      sessionId,
+      title: "Scan wait",
+      workspacePath,
+      nowMs: 1,
+    });
+    repository.saveSnapshot(
+      snapshot({
+        sessionId,
+        state: "recoverable",
+        journalSha256: "a".repeat(64),
+      }),
+      2,
+    );
+    const native = nativeFixture();
+    const recovery = deferred<CaptureSnapshot[]>();
+    native.recover.mockImplementationOnce(() => recovery.promise);
+    const service = new DesktopCaptureService(repository, native, captureRoot);
+    let listed = false;
+    try {
+      const scan = service.recover();
+      const listing = service.listRecoveries().then((items) => {
+        listed = true;
+        return items;
+      });
+
+      await Promise.resolve();
+      expect(listed).toBe(false);
+
+      const recovered = snapshot({
+        sessionId,
+        state: "recoverable",
+        journalSha256: "a".repeat(64),
+      });
+      recovery.resolve([recovered]);
+      await expect(scan).resolves.toEqual([recovered]);
+      await expect(listing).resolves.toEqual([
+        expect.objectContaining({
+          sessionId,
+          capability: "discard-only",
+          reason: "no-audio-data",
+        }),
+      ]);
+    } finally {
+      database.close();
+      rmSync(captureRoot, { recursive: true, force: true });
+    }
+  });
+
+  it("does not start a new recording while the startup recovery scan is running", async () => {
+    const database = openAudioDatabase(":memory:");
+    const repository = new CaptureRepository(database);
+    const native = nativeFixture();
+    const recovery = deferred<CaptureSnapshot[]>();
+    native.recover.mockImplementationOnce(() => recovery.promise);
+    const service = new DesktopCaptureService(repository, native, "/tmp");
+    try {
+      const scan = service.recover();
+      const start = service.start({
+        sessionId: "session-after-recovery-scan-123456",
+        title: "After recovery scan",
+        idempotencyKey: "start-after-recovery-scan-123456",
+        minimumFreeBytes: 0,
+        captionEnabled: false,
+      });
+
+      await Promise.resolve();
+      expect(native.start).not.toHaveBeenCalled();
+
+      recovery.resolve([]);
+      await expect(scan).resolves.toEqual([]);
+      await expect(start).resolves.toMatchObject({
+        sessionId: "session-after-recovery-scan-123456",
+      });
+      expect(native.start).toHaveBeenCalledOnce();
+    } finally {
+      database.close();
+    }
+  });
+
   it("keeps zero-chunk candidate audio discoverable and discards only a proven-empty workspace", async () => {
     const captureRoot = mkdtempSync(
       join(tmpdir(), "voice2text-actionability-"),

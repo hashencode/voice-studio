@@ -41,6 +41,7 @@ export class DesktopCaptureService {
   private recoveryProjectionSessionId: string | null = null;
   private currentAudioActivity = 0;
   private recoveryScanComplete = false;
+  private recoveryScan: Promise<CaptureSnapshot[]> | null = null;
   private readonly nativeRecoveries = new Map<string, CaptureSnapshot>();
   private readonly recoveryActions = new Map<
     string,
@@ -76,6 +77,7 @@ export class DesktopCaptureService {
       "start",
     );
     if (cached) return cached;
+    await this.waitForRecoveryScan();
     if (this.repository.hasActionReceipt(parsed.sessionId, "start")) {
       throw new Error("capture start idempotency conflict");
     }
@@ -288,6 +290,18 @@ export class DesktopCaptureService {
   }
 
   async recover(): Promise<CaptureSnapshot[]> {
+    if (this.recoveryScan) return await this.recoveryScan;
+    const operation = this.runRecoveryScan();
+    this.recoveryScan = operation;
+    try {
+      return await operation;
+    } finally {
+      if (this.recoveryScan === operation) this.recoveryScan = null;
+    }
+  }
+
+  private async runRecoveryScan(): Promise<CaptureSnapshot[]> {
+    this.recoveryScanComplete = false;
     await this.cleanupDiscardedRecoveries();
     const values = captureSnapshotSchema
       .array()
@@ -332,11 +346,17 @@ export class DesktopCaptureService {
   }
 
   async listRecoveries(): Promise<CaptureRecoveryItem[]> {
+    await this.waitForRecoveryScan();
     const recoveries: CaptureRecoveryItem[] = [];
     for (const candidate of this.repository.listRecoveryCandidates()) {
       recoveries.push(await this.assessRecovery(candidate));
     }
     return recoveries;
+  }
+
+  private async waitForRecoveryScan(): Promise<void> {
+    const scan = this.recoveryScan;
+    if (!this.recoveryScanComplete && scan) await scan;
   }
 
   async actOnRecoveries(

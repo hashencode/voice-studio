@@ -1716,7 +1716,7 @@ describe("capture workspace", () => {
   });
 
   describe("explicit recovery decisions", () => {
-    it("partitions mixed candidates into a restorable dialog, automatic cleanup, and a preserve Toast", async () => {
+    it("partitions mixed candidates into a restorable dialog and silent preserved data", async () => {
       const restorable = recoveryItem({
         sessionId: "session-recovery-restorable-123456",
       });
@@ -1778,10 +1778,7 @@ describe("capture workspace", () => {
         "1 段无可恢复内容的录音数据已处理。",
         expect.objectContaining({ id: "capture-recovery-cleanup-completed" }),
       );
-      expect(toastSpies.warning).toHaveBeenCalledWith(
-        "1 段录音暂时无法验证，原始数据已保留。",
-        expect.objectContaining({ id: "capture-recovery-preserved" }),
-      );
+      expect(toastSpies.warning).not.toHaveBeenCalled();
     });
 
     it("requires an explicit delete and freezes the user-decision request while pending", async () => {
@@ -2004,7 +2001,7 @@ describe("capture workspace", () => {
       expect(actOnCaptureRecovery).toHaveBeenCalledTimes(1);
     });
 
-    it("shows preserve-only candidates once without opening a dialog or mutating data", async () => {
+    it("silently preserves passive preserve-only candidates without opening a dialog or mutating data", async () => {
       const item = recoveryItem({
         capability: "preserve-only",
         reason: "audio-integrity-failed",
@@ -2014,8 +2011,11 @@ describe("capture workspace", () => {
       });
       const view = render(<CaptureWorkspace capture={idle} />);
 
-      await waitFor(() => expect(toastSpies.warning).toHaveBeenCalledTimes(1));
+      await waitFor(() =>
+        expect(api.listCaptureRecoveries).toHaveBeenCalledOnce(),
+      );
       expect(screen.queryByRole("dialog")).toBeNull();
+      expect(toastSpies.warning).not.toHaveBeenCalled();
       expect(api.actOnCaptureRecovery).not.toHaveBeenCalled();
       view.rerender(
         <CaptureWorkspace capture={idle} focusSessionId={item.sessionId} />,
@@ -2023,7 +2023,7 @@ describe("capture workspace", () => {
       await waitFor(() =>
         expect(api.listCaptureRecoveries).toHaveBeenCalledTimes(2),
       );
-      expect(toastSpies.warning).toHaveBeenCalledTimes(1);
+      expect(toastSpies.warning).not.toHaveBeenCalled();
       expect(api.actOnCaptureRecovery).not.toHaveBeenCalled();
     });
 

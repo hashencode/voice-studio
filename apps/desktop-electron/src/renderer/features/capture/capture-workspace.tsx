@@ -276,13 +276,9 @@ export function CaptureWorkspaceController({
         });
         return;
       }
-      const preserved = response.recoveries.filter(
-        (item) => item.capability === "preserve-only",
-      );
       const authoritativeById = new Map(
         response.recoveries.map((item) => [item.sessionId, item]),
       );
-      notifyPreservedRecoveries(preserved);
       mergeRestorableRecoveries(response.recoveries);
       const outcomes = response.outcomes.filter((outcome) =>
         request.sessionIds.includes(outcome.sessionId),
@@ -322,7 +318,7 @@ export function CaptureWorkspaceController({
         });
       }
     },
-    [mergeRestorableRecoveries, notifyPreservedRecoveries],
+    [mergeRestorableRecoveries],
   );
 
   React.useEffect(() => {
@@ -349,9 +345,6 @@ export function CaptureWorkspaceController({
           (item) => item.capability === "restorable",
         );
         setRecoveries(restorable);
-        notifyPreservedRecoveries(
-          nextRecoveries.filter((item) => item.capability === "preserve-only"),
-        );
         void runAutomaticCleanup(nextRecoveries);
         if (!recoveryDialogStateRef.current.startsWith("pending-")) {
           transitionRecoveryDialog(restorable.length > 0 ? "choice" : "hidden");
@@ -369,7 +362,6 @@ export function CaptureWorkspaceController({
       active = false;
     };
   }, [
-    notifyPreservedRecoveries,
     prioritizedRecoverySessionId,
     runAutomaticCleanup,
     transitionRecoveryDialog,
