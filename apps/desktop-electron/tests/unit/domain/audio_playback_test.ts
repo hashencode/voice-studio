@@ -18,6 +18,28 @@ afterEach(() => {
 });
 
 describe("Main-owned audio playback", () => {
+  it("treats closing unopened playback as an idempotent no-op", async () => {
+    const port: MainPlaybackPort = {
+      open: vi.fn(),
+      play: vi.fn(),
+      pause: vi.fn(),
+      seek: vi.fn(),
+      setSpeed: vi.fn(),
+      close: vi.fn(),
+    };
+    const service = new AudioPlaybackService(
+      { resolvePlayback: vi.fn(() => null) },
+      port,
+    );
+
+    await expect(
+      service.command({ audioId: 7, action: "close" }),
+    ).resolves.toEqual(
+      expect.objectContaining({ audioId: null, initialized: false }),
+    );
+    expect(port.close).not.toHaveBeenCalled();
+  });
+
   it("resolves media privately and accepts only bounded opaque actions", async () => {
     const calls: Array<[string, unknown?]> = [];
     const port: MainPlaybackPort = {
@@ -63,6 +85,9 @@ describe("Main-owned audio playback", () => {
     ).rejects.toThrow(/speed/i);
     await expect(
       service.command({ audioId: 8, action: "play" }),
+    ).rejects.toThrow(/open/i);
+    await expect(
+      service.command({ audioId: 8, action: "close" }),
     ).rejects.toThrow(/open/i);
   });
 

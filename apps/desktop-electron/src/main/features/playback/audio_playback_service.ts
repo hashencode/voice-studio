@@ -50,6 +50,9 @@ export class AudioPlaybackService {
     input: { audioId: number } & PlaybackAction,
   ): Promise<AudioPlaybackSnapshot> {
     if (input.action === "open") return await this.open(input.audioId);
+    if (input.action === "close" && !this.state.initialized) {
+      return this.snapshot();
+    }
     if (!this.state.initialized || this.state.audioId !== input.audioId) {
       throw new Error("audio must be opened before playback actions");
     }
