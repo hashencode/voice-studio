@@ -103,6 +103,7 @@ import {
 } from "@/components/ui/modal-coordinator";
 import componentConfig from "../../../components.json";
 import { Toaster } from "@/components/ui/sonner";
+import { EmptyState, FullScreenEmptyState } from "@/components/ui/empty-state";
 
 afterEach(() => {
   toast.dismiss();
@@ -147,6 +148,96 @@ function ControlledSidebar({
 }
 
 describe("current shadcn primitives", () => {
+  it("keeps local empty states to three rectangles and one description", () => {
+    const { rerender } = render(<EmptyState description="暂无匹配内容" />);
+
+    const root = document.querySelector(
+      '[data-slot="empty-state"]',
+    ) as HTMLElement;
+    const graphic = root?.querySelector('[data-slot="empty-state-graphic"]');
+    expect(graphic?.querySelectorAll("rect")).toHaveLength(3);
+    expect(within(root).getAllByText("暂无匹配内容")).toHaveLength(1);
+    expect(root?.querySelectorAll("p")).toHaveLength(1);
+    expect(root?.querySelector("h1, h2, h3, h4, h5, h6")).toBeNull();
+    expect(
+      root?.querySelector("button, a, [data-slot='empty-state-icon']"),
+    ).toBeNull();
+    expect(root).toHaveClass("min-h-72", "px-6", "py-12");
+
+    rerender(<EmptyState description="暂无匹配内容" compact />);
+    const compactRoot = document.querySelector('[data-slot="empty-state"]');
+    expect(compactRoot).toHaveClass("px-4", "py-8");
+    expect(compactRoot).not.toHaveClass("min-h-72");
+    expect(
+      compactRoot?.querySelectorAll('[data-slot="empty-state-graphic"] rect'),
+    ).toHaveLength(3);
+  });
+
+  it("owns the responsive guided full-screen composition", () => {
+    render(
+      <FullScreenEmptyState
+        icon={<BoxesIcon />}
+        title="开始整理音频"
+        description="录制或导入音频后继续。"
+        actions={<button type="button">开始录制</button>}
+        feedback={<p role="alert">麦克风不可用</p>}
+        busy
+      />,
+    );
+
+    const root = document.querySelector(
+      '[data-slot="full-screen-empty-state"]',
+    ) as HTMLElement;
+    const layout = root.querySelector(
+      '[data-slot="full-screen-empty-state-layout"]',
+    ) as HTMLElement;
+    const content = root.querySelector(
+      '[data-slot="full-screen-empty-state-content"]',
+    ) as HTMLElement;
+    const actions = root.querySelector(
+      '[data-slot="full-screen-empty-state-actions"]',
+    ) as HTMLElement;
+    const preview = root.querySelector(
+      '[data-slot="full-screen-empty-state-preview"]',
+    ) as HTMLElement;
+
+    expect(root).toHaveAttribute("aria-busy", "true");
+    expect(root).not.toHaveAttribute("role");
+    expect(root).toHaveAttribute(
+      "aria-labelledby",
+      screen.getByRole("heading", { level: 2 }).id,
+    );
+    expect(root).toHaveAttribute(
+      "aria-describedby",
+      screen.getByText("录制或导入音频后继续。").id,
+    );
+    expect(root).toHaveClass("@container/empty-state");
+    expect(root).not.toHaveClass("overflow-hidden");
+    expect(layout).toHaveClass(
+      "grid-cols-1",
+      "@min-[48rem]/empty-state:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]",
+    );
+    expect(content.compareDocumentPosition(preview)).toBe(
+      Node.DOCUMENT_POSITION_FOLLOWING,
+    );
+    expect(actions).toHaveClass("flex-wrap");
+    expect(screen.getByText("麦克风不可用")).toBeInTheDocument();
+    expect(
+      root.querySelector('[data-slot="full-screen-empty-state-icon"]'),
+    ).toHaveAttribute("aria-hidden", "true");
+    expect(preview).toHaveAttribute("aria-hidden", "true");
+    expect(
+      preview.querySelector(
+        "button, a, input, select, textarea, [tabindex]:not([tabindex='-1'])",
+      ),
+    ).toBeNull();
+    expect(
+      preview.querySelector(
+        '[data-slot="full-screen-empty-state-preview-surface"]',
+      ),
+    ).toBeInTheDocument();
+  });
+
   it("uses the shadowless local Sonner host without a theme provider", () => {
     render(<Toaster />);
     const toaster = document.querySelector('section[aria-live="polite"]');
