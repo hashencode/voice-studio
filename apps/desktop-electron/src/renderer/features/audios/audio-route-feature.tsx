@@ -80,6 +80,7 @@ import type {
   ImportAudioResponse,
   ProcessingTask,
   Voice2TextDesktopApi,
+  ApplicationSnapshot,
 } from "@shared/contracts";
 
 type AudioRouteOptions = {
@@ -886,7 +887,7 @@ export function useAudioRouteController({
         );
         audiosRef.current = nextAudios;
         setAudios(nextAudios);
-        if (selected) {
+        if (workspaceRef.current?.summary.audioId === audioId) {
           workspaceRef.current = null;
           setWorkspaceState(null);
           setPlayback(null);
@@ -1299,7 +1300,7 @@ export function AudioContextPane({
         ) : null}
         {controller.filteredAudios.length === 0 ? (
           <EmptyState
-            title="没有匹配的音频"
+            description="没有匹配的音频"
             compact
             className="min-h-0 flex-1"
           />
@@ -1499,10 +1500,14 @@ export function AudioMainWorkspace({
   controller,
   operationError,
   showRecordingReady = true,
+  recordingSessionId = null,
+  libraryProjection,
 }: {
   controller: AudioRouteController;
   operationError?: string | null;
   showRecordingReady?: boolean;
+  recordingSessionId?: string | null;
+  libraryProjection?: ApplicationSnapshot["libraryProjection"];
 }) {
   const workspace = controller.workspace;
   const task = workspace
@@ -1601,15 +1606,96 @@ export function AudioMainWorkspace({
         showRecordingReady ? (
         <RecordingReadyState controller={controller} />
       ) : controller.libraryPresentation === "true-empty" ? (
-        <div
-          role="status"
-          className="flex min-h-72 flex-1 flex-col items-center justify-center gap-1 text-center"
-        >
-          <p className="text-sm font-medium">录音已保存</p>
-          <p className="text-sm text-muted-foreground">正在同步音频资料库。</p>
-        </div>
+        <RecordingLibrarySyncState
+          api={controller.api}
+          sessionId={recordingSessionId}
+          projection={libraryProjection}
+        />
       ) : controller.libraryPresentation === "populated" && !workspace ? (
         <AudioSelectionPrompt />
+      ) : null}
+    </div>
+  );
+}
+
+function RecordingLibrarySyncState({
+  api,
+  sessionId,
+  projection,
+}: {
+  api: Voice2TextDesktopApi;
+  sessionId: string | null;
+  projection: ApplicationSnapshot["libraryProjection"] | undefined;
+}) {
+  const [retryPending, setRetryPending] = React.useState(false);
+  if (
+    projection?.phase === "registering" ||
+    projection?.phase === "registered"
+  ) {
+    const opening = projection.phase === "registered";
+    return (
+      <div
+        role="status"
+        aria-label={opening ? "正在打开新音频" : "正在同步音频资料库"}
+        className="flex min-h-72 flex-1 flex-col items-center justify-center gap-2 text-center"
+      >
+        <LoaderCircle
+          className="size-5 animate-spin text-muted-foreground"
+          aria-hidden="true"
+        />
+        <p className="text-sm font-medium">录音已保存</p>
+        <p className="text-sm text-muted-foreground">
+          {opening
+            ? "音频已加入资料库，正在打开详情。"
+            : "正在同步音频资料库。"}
+        </p>
+      </div>
+    );
+  }
+
+  const retryRequest =
+    sessionId && projection?.phase === "failed"
+      ? {
+          sessionId: projection.sessionId,
+          intentId: projection.intentId,
+        }
+      : sessionId && projection?.phase === "idle"
+        ? { sessionId, intentId: "idle-recovery" }
+        : null;
+  const message =
+    projection?.phase === "failed"
+      ? projection.message
+      : "音频资料库尚未更新。";
+  return (
+    <div
+      role="alert"
+      className="flex min-h-72 flex-1 flex-col items-center justify-center gap-3 text-center"
+    >
+      <div className="space-y-1">
+        <p className="text-sm font-medium">录音已保存</p>
+        <p className="text-sm text-muted-foreground">{message}</p>
+      </div>
+      {retryRequest ? (
+        <Button
+          type="button"
+          size="sm"
+          variant="outline"
+          disabled={retryPending}
+          onClick={() => {
+            setRetryPending(true);
+            void api
+              .retryCaptureLibraryProjection(retryRequest)
+              .catch((cause) => {
+                toast.error(userFacingError(cause, "无法重新同步音频资料库"));
+              })
+              .finally(() => setRetryPending(false));
+          }}
+        >
+          {retryPending ? (
+            <LoaderCircle className="size-4 animate-spin" aria-hidden="true" />
+          ) : null}
+          重试同步
+        </Button>
       ) : null}
     </div>
   );
@@ -1704,28 +1790,7 @@ function AudioImportError({
 }
 
 function AudioSelectionPrompt() {
-  return (
-    <FullScreenEmptyState
-      accessibleLabel="未选择音频"
-      description="请选择左侧音频"
-      className="flex-1"
-    />
-  );
-}
-
-function AudioFirstUsePreview() {
-  return (
-    <div
-      data-audio-first-use="preview"
-      aria-hidden="true"
-      className="-mr-10 -mb-30 ml-auto flex min-w-0 items-end bg-muted/10 px-6 pt-2 pb-0 sm:px-7 lg:absolute lg:top-[calc(50%-146px)] lg:right-0 lg:bottom-0 lg:left-[calc(50%+10px)] lg:m-0 lg:block lg:p-0"
-    >
-      <div
-        data-audio-first-use="preview-surface"
-        className="flex min-h-[350px] min-w-[450px] overflow-hidden rounded-tl-xl border-t border-l border-border/60 bg-background sm:min-h-[360px] lg:h-full lg:min-h-0 lg:w-full lg:min-w-0"
-      />
-    </div>
-  );
+  return <EmptyState description="请选择左侧音频" className="flex-1" />;
 }
 
 function RecordingReadyState({
@@ -1741,104 +1806,84 @@ function RecordingReadyState({
   );
 
   return (
-    <section
-      data-audio-first-use="frame"
-      aria-label="首次使用音频"
-      aria-busy={
-        controller.capturePreflightPending ||
-        controller.captureStartPending ||
-        controller.transitionPending
-      }
-      className="relative mx-auto flex min-h-0 w-full flex-1 items-center justify-center overflow-hidden"
-    >
-      <div
-        data-audio-first-use="layout"
-        className="mx-auto grid min-h-[440px] w-full max-w-4xl min-w-0 grid-cols-1 items-center lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]"
-      >
-        <div
-          data-audio-first-use="content"
-          className="flex min-w-0 items-center px-7 py-8 sm:px-9 sm:py-10 lg:pr-5"
-        >
-          <div className="flex w-full min-w-0 flex-1 flex-col items-start justify-center gap-6 p-6 text-left text-balance">
-            <div className="flex max-w-md flex-col items-start gap-4 text-left">
-              <span className="flex size-8 shrink-0 items-center justify-center self-start rounded-[10px] bg-muted text-foreground">
-                <AudioLines className="size-4" aria-hidden="true" />
-              </span>
-              <div className="flex flex-col gap-2">
-                <h2 className="text-xl leading-7 font-semibold tracking-tight sm:text-2xl sm:leading-8">
-                  开始你的第一段音频
-                </h2>
-                <p className="max-w-md text-sm leading-5 text-muted-foreground">
-                  <span className="block">录制一段新音频，或导入已有文件</span>
-                  <span className="block">开始转写和整理。</span>
-                </p>
-              </div>
-            </div>
-            <div
-              data-audio-first-use="actions"
-              className="flex w-full min-w-0 items-center gap-2 max-[420px]:flex-wrap"
+    <div data-audio-first-use="frame" className="contents">
+      <FullScreenEmptyState
+        icon={<AudioLines aria-hidden="true" />}
+        title="开始你的第一段音频"
+        description={
+          <>
+            <span className="block">录制一段新音频，或导入已有文件</span>
+            <span className="block">开始转写和整理。</span>
+          </>
+        }
+        busy={
+          controller.capturePreflightPending ||
+          controller.captureStartPending ||
+          controller.transitionPending
+        }
+        actions={
+          <>
+            <Button
+              type="button"
+              disabled={
+                controller.capturePreflightPending ||
+                controller.captureStartPending ||
+                !controller.captureReadyWithMicrophone ||
+                !microphone ||
+                controller.recordingActive ||
+                controller.newRecordingBlocked
+              }
+              onClick={() => controller.record()}
             >
-              <Button
-                type="button"
-                disabled={
-                  controller.capturePreflightPending ||
-                  controller.captureStartPending ||
-                  !controller.captureReadyWithMicrophone ||
-                  !microphone ||
-                  controller.recordingActive ||
-                  controller.newRecordingBlocked
-                }
-                onClick={() => controller.record()}
-              >
-                {controller.capturePreflightPending ||
-                controller.captureStartPending ? (
-                  <LoaderCircle
-                    className="size-4 animate-spin"
-                    aria-hidden="true"
-                  />
-                ) : (
-                  <Mic aria-hidden="true" />
-                )}
-                {controller.captureStartPending
-                  ? "正在开始录制…"
-                  : controller.capturePreflightPending
-                    ? "正在检查麦克风…"
-                    : "开始录制"}
-              </Button>
-              <AudioImportButton
-                controller={controller}
-                label="导入外部音频"
-                showIcon={false}
-              />
-            </div>
-            {controller.importError || controller.capturePreflightError ? (
-              <div className="min-w-0 space-y-2">
-                <AudioImportError controller={controller} />
-                {controller.capturePreflightError ? (
-                  <div role="alert" className="space-y-2 text-sm">
-                    <p>{controller.capturePreflightError}</p>
-                    <Button
-                      type="button"
-                      size="sm"
-                      variant="outline"
-                      onClick={() =>
-                        void controller
-                          .refreshCapturePreflight(true)
-                          .catch(() => undefined)
-                      }
-                    >
-                      <RotateCcw aria-hidden="true" />
-                      重试
-                    </Button>
-                  </div>
-                ) : null}
-              </div>
-            ) : null}
-          </div>
-        </div>
-        <AudioFirstUsePreview />
-      </div>
-    </section>
+              {controller.capturePreflightPending ||
+              controller.captureStartPending ? (
+                <LoaderCircle
+                  className="size-4 animate-spin"
+                  aria-hidden="true"
+                />
+              ) : (
+                <Mic aria-hidden="true" />
+              )}
+              {controller.captureStartPending
+                ? "正在开始录制…"
+                : controller.capturePreflightPending
+                  ? "正在检查麦克风…"
+                  : "开始录制"}
+            </Button>
+            <AudioImportButton
+              controller={controller}
+              label="导入外部音频"
+              showIcon={false}
+            />
+          </>
+        }
+        feedback={
+          controller.importError || controller.capturePreflightError ? (
+            <>
+              <AudioImportError controller={controller} />
+              {controller.capturePreflightError ? (
+                <div role="alert" className="space-y-2 text-sm">
+                  <p>{controller.capturePreflightError}</p>
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="outline"
+                    onClick={() =>
+                      void controller
+                        .refreshCapturePreflight(true)
+                        .catch(() => undefined)
+                    }
+                  >
+                    <RotateCcw aria-hidden="true" />
+                    重试
+                  </Button>
+                </div>
+              ) : null}
+            </>
+          ) : undefined
+        }
+      />
+    </div>
   );
 }
 

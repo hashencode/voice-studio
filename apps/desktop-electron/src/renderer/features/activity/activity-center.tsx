@@ -93,7 +93,7 @@ export function ActivityContextPane({
       ) : null}
       {visibleItems.length === 0 ? (
         <EmptyState
-          title={items.length === 0 ? "暂无消息" : "没有匹配的消息"}
+          description={items.length === 0 ? "暂无消息" : "没有匹配的消息"}
           compact
           className="min-h-0 flex-1"
         />
@@ -249,6 +249,7 @@ export function ActivityMainWorkspace({
   if (!item) {
     return (
       <FullScreenEmptyState
+        icon={<TriangleAlert aria-hidden="true" />}
         title="还没有消息"
         description="这里只显示需要跨页面关注的应用错误。"
       />

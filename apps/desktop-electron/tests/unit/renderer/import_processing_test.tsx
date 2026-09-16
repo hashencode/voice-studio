@@ -110,8 +110,11 @@ it.each([
   "renders a visible named %s terminal transition",
   async (state, label) => {
     const view = renderRoute([running]);
+    await userEvent
+      .setup()
+      .click(await screen.findByRole("button", { name: /打开 项目音频/ }));
     view.rerender(route([{ ...running, state }]));
-    expect(await screen.findByText(label, { selector: "span" })).toBeVisible();
+    expect(await screen.findByRole("heading", { name: label })).toBeVisible();
   },
 );
 

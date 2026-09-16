@@ -689,12 +689,12 @@ function App() {
     !captureDetailVisible &&
     activityItems.length === 0;
   const fullScreenEmptyPresentation =
-    audioFirstUsePresentation ||
-    audioSelectionEmptyPresentation ||
-    messageEmptyPresentation;
+    audioFirstUsePresentation || messageEmptyPresentation;
+  const emptyPresentationHidesChrome =
+    fullScreenEmptyPresentation || audioSelectionEmptyPresentation;
   let contentPadding: "none" | "compact" | "page" = "none";
   if (presentation.contentMode === "padded") {
-    if (fullScreenEmptyPresentation) contentPadding = "none";
+    if (emptyPresentationHidesChrome) contentPadding = "none";
     else if (audioDetailPresentation) contentPadding = "none";
     else if (audioWorkspacePresentation) contentPadding = "compact";
     else contentPadding = "page";
@@ -848,7 +848,7 @@ function App() {
           customTitle={
             captureDetailVisible ? captureWorkspace.customTitle : undefined
           }
-          showHeader={!fullScreenEmptyPresentation && !audioDetailPresentation}
+          showHeader={!emptyPresentationHidesChrome && !audioDetailPresentation}
           visibility={{
             navigation: recordingShellMode !== "recordingFocus",
           }}
@@ -1029,6 +1029,12 @@ function ShellContent({
           <AudioMainWorkspace
             controller={audio}
             showRecordingReady={snapshot.capture.phase === "idle"}
+            recordingSessionId={
+              snapshot.capture.phase === "completed"
+                ? snapshot.capture.sessionId
+                : null
+            }
+            libraryProjection={snapshot.libraryProjection}
           />
         </div>
       );

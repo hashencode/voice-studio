@@ -148,14 +148,18 @@ function ControlledSidebar({
 }
 
 describe("current shadcn primitives", () => {
-  it("keeps local empty states to three rectangles and one description", () => {
+  it("keeps local empty states to the three-cube illustration and one description", () => {
     const { rerender } = render(<EmptyState description="暂无匹配内容" />);
 
     const root = document.querySelector(
       '[data-slot="empty-state"]',
     ) as HTMLElement;
     const graphic = root?.querySelector('[data-slot="empty-state-graphic"]');
-    expect(graphic?.querySelectorAll("rect")).toHaveLength(3);
+    expect(
+      graphic?.querySelectorAll('[data-slot="empty-state-cube"]'),
+    ).toHaveLength(3);
+    expect(graphic?.tagName).toBe("DIV");
+    expect(graphic?.querySelector("svg")).not.toBeNull();
     expect(within(root).getAllByText("暂无匹配内容")).toHaveLength(1);
     expect(root?.querySelectorAll("p")).toHaveLength(1);
     expect(root?.querySelector("h1, h2, h3, h4, h5, h6")).toBeNull();
@@ -169,7 +173,9 @@ describe("current shadcn primitives", () => {
     expect(compactRoot).toHaveClass("px-4", "py-8");
     expect(compactRoot).not.toHaveClass("min-h-72");
     expect(
-      compactRoot?.querySelectorAll('[data-slot="empty-state-graphic"] rect'),
+      compactRoot?.querySelectorAll(
+        '[data-slot="empty-state-graphic"] [data-slot="empty-state-cube"]',
+      ),
     ).toHaveLength(3);
   });
 

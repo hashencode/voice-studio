@@ -205,14 +205,14 @@ describe("Companion route composition", () => {
     const pane = await screen.findByRole("complementary", {
       name: "互联上下文面板",
     });
-    const emptyHeading = await within(pane).findByRole("heading", {
-      name: "没有已信任设备",
-    });
-    const empty = emptyHeading.parentElement!;
+    const empty = (
+      await within(pane).findByText("没有已信任设备")
+    ).closest<HTMLElement>('[data-slot="empty-state"]')!;
     expect(empty).toHaveClass("flex-1", "min-h-0");
     expect(
-      within(empty).getByRole("heading", { name: "没有已信任设备" }),
-    ).toBeVisible();
+      empty.querySelectorAll('[data-slot="empty-state-cube"]'),
+    ).toHaveLength(3);
+    expect(within(empty).queryByRole("heading")).toBeNull();
     expect(within(pane).queryByText("Old Phone")).not.toBeInTheDocument();
     expect(
       screen.getByRole("heading", { level: 1, name: "互联" }),
@@ -228,6 +228,29 @@ describe("Companion route composition", () => {
     ).toBeVisible();
     expect(screen.getByText("历史录音.wav")).toBeVisible();
     expect(screen.getByText("已签收，可由发送端删除原件")).toBeVisible();
+  });
+
+  it("uses the local empty state for an empty device transfer history", async () => {
+    const initial: CompanionSnapshot = {
+      ...baseSnapshot,
+      peers: [peer("phone-a", "Alpha Phone", "active")],
+    };
+    installApi(initial);
+    const user = userEvent.setup();
+    render(<App />);
+
+    const pane = await screen.findByRole("complementary", {
+      name: "互联上下文面板",
+    });
+    await user.click(within(pane).getByRole("button", { name: /Alpha Phone/ }));
+    const deviceEmpty = screen
+      .getByText("暂无传输记录")
+      .closest<HTMLElement>('[data-slot="empty-state"]')!;
+    expect(deviceEmpty).toHaveClass("border-b");
+    expect(
+      deviceEmpty.querySelectorAll('[data-slot="empty-state-cube"]'),
+    ).toHaveLength(3);
+    expect(within(deviceEmpty).queryByRole("heading")).toBeNull();
   });
 
   it("never auto-selects one device and restores a still-valid explicit selection", async () => {

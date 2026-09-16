@@ -66,6 +66,57 @@ it("deletes a recording from its context menu after confirmation", async () => {
   ).not.toBeInTheDocument();
 });
 
+it("does not clear a newer live recording when an older delete resolves", async () => {
+  const pendingDelete = deferred<{ deleted: boolean }>();
+  const recorded = summary(9, "刚保存的录音.wav");
+  const deleteAudio = vi.fn(() => pendingDelete.promise);
+  const desktop = api({
+    deleteAudio,
+    openAudio: vi.fn(async (audioId) =>
+      workspace(audioId === recorded.audioId ? recorded : audioA),
+    ),
+  });
+  const props = {
+    api: desktop,
+    tasks: [],
+    pendingJobActions: new Map<number, never>(),
+    writable: true,
+    paneOpen: true,
+    onRecord: vi.fn(),
+    onImport: vi.fn(),
+    onCancel: vi.fn(),
+    onRetry: vi.fn(),
+  };
+  const view = render(
+    <AudioRouteFeature {...props} liveRegisteredAudio={null} />,
+  );
+  const user = userEvent.setup();
+
+  await user.click(await screen.findByRole("button", { name: /打开 音频 A/ }));
+  fireEvent.contextMenu(screen.getByRole("button", { name: /打开 音频 A/ }));
+  await user.click(await screen.findByRole("menuitem", { name: "删除" }));
+  await user.click(
+    within(
+      await screen.findByRole("alertdialog", { name: "删除确认" }),
+    ).getByRole("button", { name: "确认删除" }),
+  );
+  await waitFor(() => expect(deleteAudio).toHaveBeenCalledWith(audioA.audioId));
+
+  view.rerender(
+    <AudioRouteFeature
+      {...props}
+      liveRegisteredAudio={{ intentId: "live-9", audioId: recorded.audioId }}
+    />,
+  );
+  await waitFor(() => expect(desktop.openAudio).toHaveBeenCalledWith(9));
+
+  await act(async () => pendingDelete.resolve({ deleted: true }));
+
+  expect(
+    await screen.findByRole("region", { name: "刚保存的录音.wav 工作区" }),
+  ).toBeVisible();
+});
+
 it("opens a live registered recording by id without waiting for the audio list", async () => {
   const list = deferred<AudioSummary[]>();
   const recorded = summary(9, "刚保存的录音.wav");
@@ -336,17 +387,26 @@ it("renders the authoritative first-use state only after an empty list succeeds"
   expect(main).toHaveTextContent(
     "录制一段新音频，或导入已有文件开始转写和整理。",
   );
-  const frame = main.querySelector('[data-audio-first-use="frame"]');
+  const routeState = main.querySelector('[data-audio-first-use="frame"]');
+  expect(routeState).toBeInTheDocument();
+  const frame = routeState?.querySelector(
+    '[data-slot="full-screen-empty-state"]',
+  );
   expect(frame).toBeInTheDocument();
   expect(frame).not.toHaveAttribute("data-slot", "card");
   expect(frame?.querySelector('[data-slot="card"]')).not.toBeInTheDocument();
   expect(
-    frame?.querySelector('[data-audio-first-use="content"]'),
+    frame?.querySelector('[data-slot="full-screen-empty-state-content"]'),
   ).toBeInTheDocument();
-  const preview = frame?.querySelector('[data-audio-first-use="preview"]');
+  expect(frame?.querySelector("svg.lucide-audio-lines")).not.toBeNull();
+  const preview = frame?.querySelector(
+    '[data-slot="full-screen-empty-state-preview"]',
+  );
   expect(preview).toHaveAttribute("aria-hidden", "true");
   expect(
-    preview?.querySelector('[data-audio-first-use="preview-surface"]'),
+    preview?.querySelector(
+      '[data-slot="full-screen-empty-state-preview-surface"]',
+    ),
   ).toBeEmptyDOMElement();
   expect(
     preview?.querySelectorAll(
@@ -479,24 +539,24 @@ it("creates processing only after the user explicitly starts transcription", asy
     .setup()
     .click(await screen.findByRole("button", { name: /打开 音频 A/ }));
   const transcriptPanel = screen.getByRole("tabpanel", { name: "转写文本" });
-  const empty = within(transcriptPanel)
-    .getByText("当前音频尚未转写成文本")
-    .closest<HTMLElement>('[data-slot="full-screen-empty-state"]')!;
-  expect(empty).toBeVisible();
-  expect(within(empty).queryByRole("heading")).toBeNull();
+  const description =
+    within(transcriptPanel).getByText("当前音频尚未转写成文本");
+  const localEmpty = description.closest<HTMLElement>(
+    '[data-slot="empty-state"]',
+  )!;
   expect(
-    empty.querySelector('[data-slot="full-screen-empty-state-illustration"]'),
-  ).not.toBeNull();
+    description.closest('[data-slot="full-screen-empty-state"]'),
+  ).toBeNull();
+  expect(localEmpty).toBeVisible();
   expect(
-    empty
-      .querySelector('[data-slot="full-screen-empty-state-graphic"]')
-      ?.querySelectorAll("polygon"),
+    localEmpty.querySelectorAll('[data-slot="empty-state-cube"]'),
   ).toHaveLength(3);
-  expect(within(empty).getByRole("button", { name: "开始转写" })).toBeVisible();
-  await userEvent.setup().click(screen.getByRole("tab", { name: "AI 总结" }));
+  expect(within(localEmpty).queryByRole("heading")).toBeNull();
   expect(
-    within(transcriptPanel).getByText("当前音频尚未转写成文本"),
-  ).not.toBeVisible();
+    within(transcriptPanel).getByRole("button", { name: "开始转写" }),
+  ).toBeVisible();
+  await userEvent.setup().click(screen.getByRole("tab", { name: "AI 总结" }));
+  expect(description).not.toBeVisible();
   await userEvent.setup().click(screen.getByRole("tab", { name: "转写文本" }));
   expect(startTranscription).not.toHaveBeenCalled();
   await userEvent
@@ -749,14 +809,24 @@ it("preserves a populated workspace during background refresh and query-empty", 
   expect(populatedImport.querySelector("svg")).toBeInTheDocument();
   const selectionPrompt = within(
     screen.getByRole("region", { name: "音频工作区" }),
-  ).getByRole("status", { name: "未选择音频" });
+  )
+    .getByText("请选择左侧音频")
+    .closest<HTMLElement>('[data-slot="empty-state"]')!;
   expect(selectionPrompt).toBeVisible();
-  expect(selectionPrompt).toHaveAttribute(
-    "data-slot",
-    "full-screen-empty-state",
-  );
-  expect(selectionPrompt.querySelectorAll("polygon")).toHaveLength(3);
-  expect(within(selectionPrompt).queryByRole("heading")).toBeNull();
+  expect(selectionPrompt).toHaveAttribute("data-slot", "empty-state");
+  expect(
+    within(selectionPrompt).queryByRole("heading"),
+  ).not.toBeInTheDocument();
+  expect(
+    selectionPrompt.querySelectorAll(
+      '[data-slot="empty-state-graphic"] [data-slot="empty-state-cube"]',
+    ),
+  ).toHaveLength(3);
+  expect(
+    selectionPrompt.querySelector(
+      '[data-slot="full-screen-empty-state-preview"]',
+    ),
+  ).not.toBeInTheDocument();
   expect(selectionPrompt).toHaveTextContent("请选择左侧音频");
   expect(
     screen
@@ -770,7 +840,14 @@ it("preserves a populated workspace during background refresh and query-empty", 
 
   await act(async () => refresh.resolve([audioA]));
   await userEvent.setup().type(search, "不存在");
-  expect(screen.getByText("没有匹配的音频")).toBeVisible();
+  const filteredEmpty = screen
+    .getByText("没有匹配的音频")
+    .closest<HTMLElement>('[data-slot="empty-state"]')!;
+  expect(filteredEmpty).toBeVisible();
+  expect(
+    filteredEmpty.querySelectorAll('[data-slot="empty-state-cube"]'),
+  ).toHaveLength(3);
+  expect(within(filteredEmpty).queryByRole("heading")).toBeNull();
   expect(selectionPrompt).toBeVisible();
 });
 
@@ -988,9 +1065,15 @@ it("refreshes once when recording completes and never guesses an audio selection
       recordingCompletionToken="capture-session-1"
     />,
   );
+  const selectionPrompt = (
+    await screen.findByText("请选择左侧音频")
+  ).closest<HTMLElement>('[data-slot="empty-state"]')!;
+  expect(selectionPrompt).toBeVisible();
   expect(
-    await screen.findByRole("status", { name: "未选择音频" }),
-  ).toBeVisible();
+    selectionPrompt.querySelectorAll(
+      '[data-slot="empty-state-graphic"] [data-slot="empty-state-cube"]',
+    ),
+  ).toHaveLength(3);
   expect(listAudios).toHaveBeenCalledTimes(2);
   expect(openAudio).not.toHaveBeenCalled();
   view.rerender(
@@ -1032,9 +1115,7 @@ it("queues an authoritative refresh when recording completes during a list reque
   );
   await act(async () => staleList.resolve([]));
 
-  expect(
-    await screen.findByRole("status", { name: "未选择音频" }),
-  ).toBeVisible();
+  expect(await screen.findByText("请选择左侧音频")).toBeVisible();
   expect(listAudios).toHaveBeenCalledTimes(2);
 });
 
@@ -1595,6 +1676,58 @@ it("serializes rapid title and description saves without dropping the trailing d
   expect(
     screen.getByRole("button", { name: "编辑音频标题" }),
   ).toHaveTextContent("发布复盘");
+});
+
+it("persists a same-field restoration queued behind an in-flight save", async () => {
+  const firstSave = deferred<AudioWorkspaceSnapshot>();
+  const restoringSave = deferred<AudioWorkspaceSnapshot>();
+  const updateAudioMetadata = vi
+    .fn()
+    .mockImplementationOnce(() => firstSave.promise)
+    .mockImplementationOnce(() => restoringSave.promise);
+  renderRoute(api({ updateAudioMetadata }));
+  const user = userEvent.setup();
+
+  await user.click(await screen.findByRole("button", { name: /打开 音频 A/ }));
+  await user.click(screen.getByRole("button", { name: "编辑音频标题" }));
+  let title = screen.getByRole("textbox", { name: "音频标题" });
+  await user.clear(title);
+  await user.type(title, "临时标题");
+  await user.tab();
+  await waitFor(() => expect(updateAudioMetadata).toHaveBeenCalledTimes(1));
+
+  await user.click(screen.getByRole("button", { name: "编辑音频标题" }));
+  title = screen.getByRole("textbox", { name: "音频标题" });
+  await user.clear(title);
+  await user.type(title, audioA.displayName);
+  await user.tab();
+  expect(updateAudioMetadata).toHaveBeenCalledTimes(1);
+
+  await act(async () => {
+    firstSave.resolve({
+      ...workspace({ ...audioA, displayName: "临时标题" }),
+      revision: 2,
+    });
+    await firstSave.promise;
+  });
+  await waitFor(() =>
+    expect(updateAudioMetadata).toHaveBeenNthCalledWith(2, {
+      audioId: audioA.audioId,
+      title: audioA.displayName,
+      expectedRevision: 2,
+    }),
+  );
+
+  await act(async () => {
+    restoringSave.resolve({ ...workspace(audioA), revision: 3 });
+    await restoringSave.promise;
+  });
+  expect(
+    screen.getByRole("button", { name: "编辑音频标题" }),
+  ).toHaveTextContent(audioA.displayName);
+  expect(
+    screen.getByRole("button", { name: `打开 ${audioA.displayName}` }),
+  ).toBeVisible();
 });
 
 it("rebases a metadata save once after a workspace conflict", async () => {

@@ -346,7 +346,14 @@ it("edits metadata and exposes summary and knowledge as tabs", async () => {
   await user.click(screen.getByRole("tab", { name: "AI 总结" }));
   expect(screen.getByRole("tabpanel", { name: "AI 总结" })).toBeVisible();
   await user.click(screen.getByRole("tab", { name: "知识库" }));
-  expect(screen.getByText("知识库即将推出")).toBeVisible();
+  const knowledgeEmpty = screen
+    .getByText("知识库即将推出，之后可以在这里检索与当前音频相关的内容。")
+    .closest<HTMLElement>('[data-slot="empty-state"]')!;
+  expect(knowledgeEmpty).toBeVisible();
+  expect(
+    knowledgeEmpty.querySelectorAll('[data-slot="empty-state-cube"]'),
+  ).toHaveLength(3);
+  expect(within(knowledgeEmpty).queryByRole("heading")).toBeNull();
   expect(screen.getByRole("region", { name: "音频播放器" })).toBeVisible();
 
   expect(
@@ -725,10 +732,39 @@ it("shows a recoverable list error and then the explicit empty state", async () 
   await userEvent
     .setup()
     .click(screen.getByRole("button", { name: "重新载入" }));
+  const reviewEmpty = (
+    await screen.findByText("还没有可复核的音频")
+  ).closest<HTMLElement>('[data-slot="empty-state"]')!;
+  expect(reviewEmpty).toBeVisible();
   expect(
-    await screen.findByRole("heading", { name: "还没有可复核的音频" }),
-  ).toBeVisible();
+    reviewEmpty.querySelectorAll('[data-slot="empty-state-cube"]'),
+  ).toHaveLength(3);
+  expect(within(reviewEmpty).queryByRole("heading")).toBeNull();
   expect(listAudios).toHaveBeenCalledTimes(2);
+});
+
+it("uses the local empty state when AI summary needs a transcript", async () => {
+  const user = userEvent.setup();
+  render(
+    <AudioDetailWorkspace
+      api={api()}
+      workspace={{
+        ...snapshot,
+        summary: { ...snapshot.summary, generationId: null },
+      }}
+      routePending={false}
+      onWorkspaceChange={() => undefined}
+    />,
+  );
+
+  await user.click(screen.getByRole("tab", { name: "AI 总结" }));
+  const summaryEmpty = screen
+    .getByText("完成转写后即可生成 AI 总结")
+    .closest<HTMLElement>('[data-slot="empty-state"]')!;
+  expect(
+    summaryEmpty.querySelectorAll('[data-slot="empty-state-cube"]'),
+  ).toHaveLength(3);
+  expect(within(summaryEmpty).queryByRole("heading")).toBeNull();
 });
 
 it("renders only a bounded virtual window for a 3001 segment transcript", async () => {

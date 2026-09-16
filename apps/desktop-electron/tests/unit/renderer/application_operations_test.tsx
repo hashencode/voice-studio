@@ -541,7 +541,7 @@ describe("renderer processing operation races", () => {
       await screen.findByRole("button", { name: "重试 项目周会.wav" }),
     );
     await waitFor(() => expect(listProcessingTasks).toHaveBeenCalledTimes(2));
-    expect(screen.getByText("等待处理", { selector: "span" })).toBeVisible();
+    expect(screen.getByRole("heading", { name: "等待处理" })).toBeVisible();
 
     emit({
       protocolVersion: 3,
@@ -551,7 +551,7 @@ describe("renderer processing operation races", () => {
       phase: "asr",
       progressFraction: 0.6,
     });
-    expect(screen.getByText("等待处理", { selector: "span" })).toBeVisible();
+    expect(screen.getByRole("heading", { name: "等待处理" })).toBeVisible();
 
     emit({
       protocolVersion: 3,
@@ -561,7 +561,7 @@ describe("renderer processing operation races", () => {
       phase: "asr",
       progressFraction: 0.2,
     });
-    expect(screen.getByText("正在处理", { selector: "span" })).toBeVisible();
+    expect(screen.getByRole("heading", { name: "正在处理" })).toBeVisible();
     expect(
       screen.getByRole("progressbar", { name: "项目周会.wav 处理进度" }),
     ).toHaveValue(0.2);

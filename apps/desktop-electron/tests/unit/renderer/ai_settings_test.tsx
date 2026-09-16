@@ -388,7 +388,18 @@ describe("cloud model settings", () => {
     });
     const user = userEvent.setup();
     render(<AiSettingsFeature api={desktop} settingsPage />);
-    expect(await screen.findByText("还没有云端模型")).toBeVisible();
+    const description = await screen.findByText(
+      "还没有云端模型，新增一个云端模型即可开始使用。",
+    );
+    const empty = description.closest<HTMLElement>(
+      '[data-slot="empty-state"]',
+    )!;
+    expect(
+      empty.querySelectorAll('[data-slot="empty-state-cube"]'),
+    ).toHaveLength(3);
+    expect(within(empty).queryByRole("heading")).toBeNull();
+    expect(empty.closest('[role="listitem"]')).not.toBeNull();
+    expect(empty.closest('[role="list"]')).not.toBeNull();
     const add = screen.getByRole("button", { name: "新增云端模型" });
     await user.click(add);
     await user.type(screen.getByLabelText("API 密钥"), "discard-me");

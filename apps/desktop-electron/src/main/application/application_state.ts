@@ -282,14 +282,17 @@ export function canRetryCaptureLibraryProjection(
   request: { sessionId: string; intentId: string },
 ): boolean {
   const projection = snapshot.libraryProjection;
-  return (
-    projection?.phase === "failed" &&
-    projection.sessionId === request.sessionId &&
-    projection.intentId === request.intentId &&
+  const targetsTerminalCapture =
     snapshot.capture.phase !== "idle" &&
     snapshot.capture.sessionId === request.sessionId &&
     (snapshot.capture.phase === "completed" ||
-      snapshot.capture.phase === "partial_capture")
+      snapshot.capture.phase === "partial_capture");
+  if (!targetsTerminalCapture) return false;
+  return (
+    (projection?.phase === "failed" &&
+      projection.sessionId === request.sessionId &&
+      projection.intentId === request.intentId) ||
+    (projection?.phase === "idle" && request.intentId === "idle-recovery")
   );
 }
 

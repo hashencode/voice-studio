@@ -21,7 +21,7 @@ import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Bubble, BubbleContent } from "@/components/ui/bubble";
 import { ButtonGroup } from "@/components/ui/button-group";
-import { EmptyState, FullScreenEmptyState } from "@/components/ui/empty-state";
+import { EmptyState } from "@/components/ui/empty-state";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
@@ -279,7 +279,7 @@ export function AudioWorkspaceFeature({
             onRetry={() => void loadAudios(libraryQuery)}
           />
         ) : audios?.length === 0 ? (
-          <EmptyState title="还没有可复核的音频" className="border-b" />
+          <EmptyState description="还没有可复核的音频" className="border-b" />
         ) : (
           <ul
             aria-label="音频列表"
@@ -436,6 +436,10 @@ function WorkspaceView({
   >(null);
   const editingFieldRef = React.useRef(editingField);
   const metadataDirtyRef = React.useRef({ title: false, description: false });
+  const metadataSavePendingRef = React.useRef({
+    title: false,
+    description: false,
+  });
   const metadataVersionRef = React.useRef({ title: 0, description: 0 });
   const [metadataError, setMetadataError] = React.useState<string | null>(null);
   const [compactHeader, setCompactHeader] = React.useState(false);
@@ -652,7 +656,10 @@ function WorkspaceView({
     const value = field === "title" ? draft.trim() : draft;
     const authoritativeValue =
       field === "title" ? workspace.summary.displayName : workspace.description;
-    if (value === authoritativeValue) {
+    if (
+      value === authoritativeValue &&
+      !metadataSavePendingRef.current[field]
+    ) {
       metadataDirtyRef.current[field] = false;
       return;
     }
@@ -678,10 +685,12 @@ function WorkspaceView({
     const patch = { [field]: value } as AudioMetadataPatch;
     const version = metadataVersionRef.current[field];
     if (onSaveMetadata) {
+      metadataSavePendingRef.current[field] = true;
       void onSaveMetadata(patch)
         .then((next) => {
           if (!next) return;
           if (metadataVersionRef.current[field] === version) {
+            metadataSavePendingRef.current[field] = false;
             metadataDirtyRef.current[field] = false;
             if (field === "title") {
               setTitle(next.summary.displayName);
@@ -691,6 +700,9 @@ function WorkspaceView({
           }
         })
         .catch((cause: unknown) => {
+          if (metadataVersionRef.current[field] === version) {
+            metadataSavePendingRef.current[field] = false;
+          }
           toast.error(userFacingError(cause, "音频信息保存失败，请重试。"), {
             id: "audio-metadata-save",
           });
@@ -996,11 +1008,13 @@ function WorkspaceView({
           className="space-y-4"
         >
           {workspace.segments.length === 0 ? (
-            <FullScreenEmptyState
-              description="当前音频尚未转写成文本"
-              actions={transcriptStatus}
-              className="min-h-96"
-            />
+            <div className="flex min-h-96 flex-col items-center justify-center gap-4">
+              <EmptyState
+                description="当前音频尚未转写成文本"
+                className="min-h-0 py-8"
+              />
+              {transcriptStatus}
+            </div>
           ) : (
             <>
               {transcriptStatus}
@@ -1253,7 +1267,7 @@ function WorkspaceView({
               }}
             />
           ) : (
-            <EmptyState title="完成转写后即可生成 AI 总结" />
+            <EmptyState description="完成转写后即可生成 AI 总结" />
           )}
         </div>
 
@@ -1262,18 +1276,9 @@ function WorkspaceView({
           role="tabpanel"
           aria-labelledby="audio-tab-trigger-knowledge"
           hidden={activeTab !== "knowledge"}
-          className="grid min-h-80 place-items-center text-center"
+          className="min-h-80"
         >
-          <div>
-            <HardDrive
-              className="mx-auto size-7 text-muted-foreground"
-              aria-hidden="true"
-            />
-            <h2 className="mt-3 font-medium">知识库即将推出</h2>
-            <p className="mt-1 text-sm text-muted-foreground">
-              之后可以在这里检索与当前音频相关的内容。
-            </p>
-          </div>
+          <EmptyState description="知识库即将推出，之后可以在这里检索与当前音频相关的内容。" />
         </div>
       </div>
       {!usesExternalPlayback ? (

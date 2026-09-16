@@ -981,14 +981,19 @@ async function audioFirstUseGeometry(
   await expect(page.locator('[data-shell-slot="content-head"]')).toHaveCount(0);
   return await page.evaluate(() => {
     const main = required("#main-content");
-    const frame = required('[data-audio-first-use="frame"]');
-    const layout = required('[data-audio-first-use="layout"]');
-    const content = required('[data-audio-first-use="content"]');
-    const preview = required('[data-audio-first-use="preview"]');
-    const previewSurface = required('[data-audio-first-use="preview-surface"]');
+    required('[data-audio-first-use="frame"]');
+    const frame = required('[data-slot="full-screen-empty-state"]');
+    const layout = required('[data-slot="full-screen-empty-state-layout"]');
+    const content = required('[data-slot="full-screen-empty-state-content"]');
+    const preview = required('[data-slot="full-screen-empty-state-preview"]');
+    const previewSurface = required(
+      '[data-slot="full-screen-empty-state-preview-surface"]',
+    );
     const primaryAction = button("开始录制");
     const importAction = button("导入外部音频");
-    const actionGroup = required('[data-audio-first-use="actions"]');
+    const actionGroup = required(
+      '[data-slot="full-screen-empty-state-actions"]',
+    );
     const mainRect = main.getBoundingClientRect();
     const mainStyle = getComputedStyle(main);
     const previewRect = preview.getBoundingClientRect();

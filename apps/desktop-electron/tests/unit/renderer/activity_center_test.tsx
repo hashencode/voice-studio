@@ -28,15 +28,16 @@ describe("activity pages", () => {
     render(
       <ActivityContextPane items={[]} selectedId={null} onSelect={vi.fn()} />,
     );
-    const empty = screen.getByRole("heading", {
-      name: "暂无消息",
-    }).parentElement!;
+    const empty = screen
+      .getByText("暂无消息")
+      .closest<HTMLElement>('[data-slot="empty-state"]')!;
     expect(empty).toBeVisible();
     expect(empty).toHaveTextContent("暂无消息");
+    expect(within(empty).queryByRole("heading")).toBeNull();
     expect(
       empty
         .querySelector('[data-slot="empty-state-graphic"]')
-        ?.querySelectorAll("rect"),
+        ?.querySelectorAll('[data-slot="empty-state-cube"]'),
     ).toHaveLength(3);
   });
 
@@ -50,17 +51,12 @@ describe("activity pages", () => {
     expect(empty).toBeVisible();
     expect(empty).toHaveTextContent("这里只显示需要跨页面关注的应用错误。");
     expect(
-      empty.querySelector('[data-slot="full-screen-empty-state-illustration"]'),
+      empty.querySelector('[data-slot="full-screen-empty-state-preview"]'),
     ).not.toBeNull();
     expect(
-      empty.querySelector('[data-slot="full-screen-empty-state-graphic"]'),
-    ).toBeInstanceOf(SVGElement);
-    expect(
-      empty
-        .querySelector('[data-slot="full-screen-empty-state-graphic"]')
-        ?.querySelectorAll("polygon"),
-    ).toHaveLength(3);
-    expect(empty.querySelector("svg.lucide-inbox")).toBeNull();
+      empty.querySelector('[data-slot="full-screen-empty-state-icon"]'),
+    ).toHaveAttribute("aria-hidden", "true");
+    expect(empty.querySelector("svg.lucide-triangle-alert")).not.toBeNull();
     expect(within(empty).queryByRole("button")).toBeNull();
   });
 
@@ -191,7 +187,14 @@ describe("activity pages", () => {
       screen.getByRole("searchbox", { name: "搜索消息" }),
       "alpha",
     );
-    expect(screen.getByText("没有匹配的消息")).toBeVisible();
+    const filteredEmpty = screen
+      .getByText("没有匹配的消息")
+      .closest<HTMLElement>('[data-slot="empty-state"]')!;
+    expect(filteredEmpty).toBeVisible();
+    expect(
+      filteredEmpty.querySelectorAll('[data-slot="empty-state-cube"]'),
+    ).toHaveLength(3);
+    expect(within(filteredEmpty).queryByRole("heading")).toBeNull();
   });
 
   it("keeps the all-read action disabled without unread items and exposes failures", () => {

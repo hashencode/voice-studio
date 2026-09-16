@@ -239,7 +239,7 @@ export function CompanionContextPane({
       <SidebarGroupContent className="flex h-full flex-col">
         {controller.peers.length === 0 ? (
           <EmptyState
-            title="没有已信任设备"
+            description="没有已信任设备"
             compact
             className="min-h-0 flex-1"
           />
@@ -517,7 +517,7 @@ function DeviceWorkspace({
           title="此设备的传输"
         />
       ) : (
-        <EmptyState title="暂无传输记录" compact className="border-b" />
+        <EmptyState description="暂无传输记录" compact className="border-b" />
       )}
     </div>
   );
@@ -802,7 +802,7 @@ function TransfersPanel({
         </h2>
       ) : null}
       {transfers.length === 0 ? (
-        <EmptyState title="暂无手机传输" compact className="border-b" />
+        <EmptyState description="暂无手机传输" compact className="border-b" />
       ) : (
         <ul className="space-y-3">
           {transfers.map((transfer) => (

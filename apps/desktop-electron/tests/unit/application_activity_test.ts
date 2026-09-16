@@ -134,6 +134,19 @@ describe("application activity", () => {
     expect(state.snapshot()).toEqual(failed);
   });
 
+  it("admits recovery for a completed capture with an idle projection", () => {
+    const state = new DesktopApplicationState();
+    const capture = completedCapture(5);
+    state.setCapture(capture);
+
+    expect(
+      canRetryCaptureLibraryProjection(state.snapshot(), {
+        sessionId: capture.sessionId,
+        intentId: "idle-recovery",
+      }),
+    ).toBe(true);
+  });
+
   it("resets the previous projection when a new capture lifecycle begins", () => {
     const state = new DesktopApplicationState();
     const command = {

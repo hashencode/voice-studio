@@ -996,7 +996,7 @@ describe("application shell", () => {
     const user = userEvent.setup();
     render(<App />);
 
-    await screen.findByRole("heading", { name: "请选择音频", level: 1 });
+    expect(await screen.findByText("请选择左侧音频")).toBeVisible();
 
     const wrapper = document.querySelector<HTMLElement>(
       '[data-slot="sidebar-wrapper"]',
@@ -1079,7 +1079,7 @@ describe("application shell", () => {
     const insetHeader = document.querySelector<HTMLElement>(
       '[data-slot="sidebar-inset"] > header',
     );
-    expect(insetHeader).not.toBeNull();
+    expect(insetHeader).toBeNull();
     const pane = screen.getByRole("complementary", {
       name: "音频上下文面板",
     });
@@ -1142,13 +1142,9 @@ describe("application shell", () => {
     expect(pane.querySelector("[data-context-pane-search]")).toContainElement(
       within(pane).getByRole("searchbox", { name: "搜索音频" }),
     );
-    expect(insetHeader).not.toContainElement(contextTrigger);
     expect(fixedPaneHeader).toHaveClass("h-[50px]");
     expect(pane).toHaveClass("bg-background", "text-foreground");
-    expect(insetHeader).toHaveClass("h-[50px]");
-    expect(insetHeader).not.toHaveAttribute("style");
     expect(within(pane).getByRole("group", { name: "音频操作" })).toBeVisible();
-    expect(insetHeader).not.toContainElement(importButton);
 
     const mains = screen.getAllByRole("main");
     expect(mains).toHaveLength(1);
@@ -1167,18 +1163,11 @@ describe("application shell", () => {
       "ease-linear",
     );
     expect(document.getElementById("main-content")?.tagName).toBe("DIV");
-    expect(document.getElementById("main-content")).toHaveClass("p-4");
-    expect(document.getElementById("main-content")).not.toHaveClass("sm:p-6");
-    expect(mains[0]!.querySelector("header")).toHaveClass(
-      "h-[50px]",
-      "shrink-0",
-      "border-b",
-      "bg-background",
+    expect(document.getElementById("main-content")).not.toHaveClass(
+      "p-4",
+      "sm:p-6",
     );
-    expect(mains[0]!.querySelector("header")).not.toHaveClass(
-      "sticky",
-      "top-0",
-    );
+    expect(mains[0]!.querySelector("header")).toBeNull();
 
     await user.click(within(navigation).getByRole("button", { name: "设置" }));
     await waitFor(() => expect(api.navigate).toHaveBeenCalledWith("settings"));
@@ -1675,10 +1664,9 @@ describe("application shell", () => {
     expect(screen.queryByRole("button", { name: "后退" })).toBeNull();
     expect(screen.queryByRole("button", { name: "前进" })).toBeNull();
     expect(screen.getByRole("button", { name: "导入外部音频" })).toBeVisible();
-    expect(screen.getByRole("region", { name: "首次使用音频" })).toHaveClass(
-      "flex-1",
-      "justify-center",
-    );
+    expect(
+      screen.getByRole("region", { name: "开始你的第一段音频" }),
+    ).toHaveClass("flex-1", "justify-center");
     expect(
       screen.queryByRole("complementary", { name: "音频上下文面板" }),
     ).not.toBeInTheDocument();
@@ -2101,8 +2089,8 @@ describe("application shell", () => {
     expect(openAudio).toHaveBeenCalledTimes(1);
   });
 
-  it("renders a saved state instead of a blank main region for a true-empty library", async () => {
-    installApi(
+  it("offers recovery instead of claiming an idle projection is syncing", async () => {
+    const api = installApi(
       {
         ...readySnapshot,
         capture: {
@@ -2121,7 +2109,47 @@ describe("application shell", () => {
     });
     expect(savedState).toBeVisible();
     const main = savedState.closest("main");
-    expect(main).toHaveTextContent("正在同步音频资料库。");
+    expect(main).toHaveTextContent("音频资料库尚未更新。");
+    expect(main).not.toHaveTextContent("正在同步音频资料库。");
+
+    await userEvent
+      .setup()
+      .click(screen.getByRole("button", { name: "重试同步" }));
+    expect(api.retryCaptureLibraryProjection).toHaveBeenCalledWith({
+      sessionId: "saved-session-empty",
+      intentId: "idle-recovery",
+    });
+  });
+
+  it("shows a spinner only while the saved recording is actually syncing", async () => {
+    installApi(
+      {
+        ...readySnapshot,
+        capture: {
+          phase: "completed",
+          sessionId: "saved-session-syncing",
+          title: "第一段录音",
+          elapsedMs: 1_000,
+        },
+        libraryProjection: {
+          phase: "registering",
+          sessionId: "saved-session-syncing",
+          intentId: "live-intent-syncing",
+        },
+      },
+      { listAudios: vi.fn(async () => []) },
+    );
+    const user = userEvent.setup();
+    render(<App />);
+
+    await screen.findByRole("heading", { name: "正在加入音频资料库" });
+    await user.click(screen.getByRole("button", { name: "关闭录制详情" }));
+
+    const syncing = await screen.findByRole("status", {
+      name: "正在同步音频资料库",
+    });
+    expect(syncing).toHaveTextContent("录音已保存");
+    expect(syncing.querySelector(".animate-spin")).not.toBeNull();
   });
 
   it("preserves focus after the user leaves the disappearing capture workspace", async () => {
@@ -2309,7 +2337,7 @@ describe("application shell", () => {
       document.querySelector<HTMLElement>(
         '[data-slot="sidebar-inset"] > header',
       ),
-    ).not.toContainElement(openAudioPane);
+    ).toBeNull();
     expect(
       document.querySelector<HTMLElement>('[data-slot="sidebar-wrapper"]'),
     ).toContainElement(openAudioPane);

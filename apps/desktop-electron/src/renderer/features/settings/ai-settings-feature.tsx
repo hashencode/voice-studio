@@ -13,6 +13,7 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
+import { EmptyState } from "@/components/ui/empty-state";
 import {
   Dialog,
   DialogClose,
@@ -270,11 +271,12 @@ function ProviderProfileList({
       ) : null}
       {settings.profiles.length === 0 ? (
         <SettingsItemGroup>
-          <Item role="listitem" className="rounded-none">
-            <ItemContent>
-              <ItemTitle>还没有云端模型</ItemTitle>
-              <ItemDescription>新增一个云端模型即可开始使用</ItemDescription>
-            </ItemContent>
+          <Item role="listitem" className="rounded-none p-0">
+            <EmptyState
+              description="还没有云端模型，新增一个云端模型即可开始使用。"
+              compact
+              className="w-full"
+            />
           </Item>
         </SettingsItemGroup>
       ) : (

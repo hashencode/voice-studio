@@ -171,27 +171,22 @@ describe("capture Renderer flow", () => {
     expect(screen.queryByText(/切换页面不会停止|安全保存到本机/)).toBeNull();
   });
 
-  it("keeps one application-owned workspace across navigation and reflects menu state events", async () => {
+  it("keeps one application-owned workspace while recording focus reflects state events", async () => {
     const bridge = installApi();
-    const user = userEvent.setup();
     render(createElement(App));
 
     expect(
       screen.queryByRole("complementary", { name: "录制控制" }),
     ).not.toBeInTheDocument();
     expect(await screen.findByText("跨页面访谈")).toBeVisible();
-    const navigation = screen.getByRole("navigation", { name: "工作站主导航" });
-    await user.click(within(navigation).getByRole("button", { name: "设置" }));
-    expect(await screen.findByRole("heading", { name: "设置" })).toBeVisible();
-    expect(screen.queryByRole("contentinfo")).not.toBeInTheDocument();
     expect(
-      screen.queryByRole("complementary", { name: "录制控制" }),
+      screen.queryByRole("navigation", { name: "工作站主导航" }),
     ).not.toBeInTheDocument();
 
     bridge.publish({
       ...initial,
       revision: 12,
-      navigation: { section: "settings" },
+      navigation: { section: "library" },
       capture: {
         phase: "paused",
         sessionId: "session-renderer-e2e-123456",
@@ -202,7 +197,6 @@ describe("capture Renderer flow", () => {
         message: "电脑已唤醒，请确认后手动继续录制。",
       },
     });
-    await user.click(within(navigation).getByRole("button", { name: "音频" }));
     expect(await screen.findByText("等待你确认继续录制")).toBeVisible();
     expect(
       screen.getByRole("button", { name: "确认并继续录制" }),
