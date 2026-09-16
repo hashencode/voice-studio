@@ -139,6 +139,39 @@ describe("audio workspace authority", () => {
     }
   });
 
+  it("allows normalized media to be imported again after deletion", () => {
+    const context = fixture();
+    try {
+      const mediaPath = join(context.profile.mediaDirectory, "reimport.wav");
+      const bytes = Buffer.alloc(64, 7);
+      writeFileSync(mediaPath, bytes, { mode: 0o600 });
+      const sha256 = createHash("sha256").update(bytes).digest("hex");
+      const command = {
+        displayName: "重新导入.wav",
+        normalizedPath: mediaPath,
+        normalizedSha256: sha256,
+        sourceSha256: sha256,
+        normalizedSizeBytes: bytes.length,
+        durationMs: 6_000,
+        receipt: { schemaVersion: 1 },
+      };
+      const first = context.repository.commitValidatedImport(command, 1_001);
+
+      expect(context.workspace.deleteAudio(first.audio.id)).toBe(true);
+      expect(
+        context.database
+          .prepare("SELECT id FROM media_authorities WHERE id = ?")
+          .get(first.mediaAuthorityId),
+      ).toBeUndefined();
+
+      const second = context.repository.commitValidatedImport(command, 1_002);
+      expect(second.inserted).toBe(true);
+      expect(second.audio.id).not.toBe(first.audio.id);
+    } finally {
+      context.database.close();
+    }
+  });
+
   it("persists editable metadata and restores the original title when cleared", () => {
     const context = fixture();
     try {

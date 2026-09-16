@@ -113,6 +113,9 @@ export class AudioWorkspaceRepository {
 
   deleteAudio(audioId: number): boolean {
     return withTransaction(this.database, () => {
+      const audio = this.database
+        .prepare("SELECT media_authority_id FROM audio_items WHERE id = ?")
+        .get(audioId);
       this.database
         .prepare(
           "UPDATE caption_formal_handoffs SET audio_id = NULL, processing_job_id = NULL WHERE audio_id = ?",
@@ -123,11 +126,22 @@ export class AudioWorkspaceRepository {
           "UPDATE companion_transfers SET audio_id = NULL, processing_job_id = NULL WHERE audio_id = ?",
         )
         .run(audioId);
-      return (
+      const deleted =
         this.database
           .prepare("DELETE FROM audio_items WHERE id = ?")
-          .run(audioId).changes === 1
-      );
+          .run(audioId).changes === 1;
+      if (deleted && audio?.media_authority_id != null) {
+        this.database
+          .prepare(
+            `DELETE FROM media_authorities
+             WHERE id = ?
+               AND NOT EXISTS (
+                 SELECT 1 FROM audio_items WHERE media_authority_id = ?
+               )`,
+          )
+          .run(audio.media_authority_id, audio.media_authority_id);
+      }
+      return deleted;
     });
   }
 
