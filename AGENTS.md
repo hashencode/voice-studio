@@ -33,6 +33,14 @@ Electron renderer.
 - Shared primitives own decorative defaults. Renderer consumers may override
   layout such as width, direction, alignment, and contextual density, but must
   not duplicate surface, radius, shadow, or interaction-state styling.
+- Treat empty-state primitive selection, occupied content scope, and Shell
+  chrome policy as independent decisions. Migrating between `EmptyState` and
+  `FullScreenEmptyState` must not implicitly change the Header, outer content
+  padding, context panes, copy, actions, focus, or navigation.
+- Preserve those surrounding behaviors during component migrations unless an
+  explicit current requirement changes them, and protect intentional behavior
+  at both the feature-component and Shell boundaries. See
+  `docs/solutions/logic-errors/separate-empty-state-component-scope-from-shell-chrome.md`.
 
 ## Electron accessibility guidance
 
@@ -76,6 +84,11 @@ Electron renderer.
 - Keep keyboard focus visible but lightweight. Inputs, buttons, and other form controls should use a thin focus indicator rather than a thick ring or glow.
 - Keep interface copy concise, natural, and considerate. Include only information that affects the user's next action or decision; do not repeat visible controls, states, or capabilities. For instructions, prefer brief and polite wording when it adds warmth without adding explanation.
 - When a Modal conveys one brief system message and has no distinct task name, use the title to identify the message type or semantic category, state the complete fact once in the body, and keep only actions required for a decision or continuation in the footer. Do not repeat the same content across the title, body, and actions; keep a task-specific title when the Modal has a distinct named task.
+
+## Project knowledge
+
+- `docs/solutions/` contains documented solutions to past bugs, architecture decisions, best practices, and workflow issues. Entries are organized by category and may use YAML frontmatter such as `module`, `tags`, and `problem_type`; they are relevant when implementing or debugging in a documented area.
+- `CONCEPTS.md` defines shared domain vocabulary for entities, named processes, and status concepts; it is relevant when orienting to the codebase or discussing domain behavior.
 
 ## Visual validation permission
 
