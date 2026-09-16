@@ -599,9 +599,9 @@ function seedCommittedImport(database: DatabaseSync) {
       duration_ms, receipt_json, created_at_ms
     ) VALUES (99, '${"d".repeat(64)}', '/private/tmp/media.wav', '${manifest.wholeFileSha256}', 5000, 1000, '{}', 1);
     INSERT INTO audio_items (
-      id, idempotency_key, source_identity, display_name, media_path,
+      id, idempotency_key, source_identity, display_name, original_name, media_path,
       duration_ms, media_authority_id, created_at_ms, updated_at_ms
-    ) VALUES (1, 'audio-1', 'source-1', 'Audio', '/private/tmp/media.wav', 1000, 99, 1, 1);
+    ) VALUES (1, 'audio-1', 'source-1', 'Audio', 'Audio', '/private/tmp/media.wav', 1000, 99, 1, 1);
     INSERT INTO processing_jobs (
       id, audio_id, idempotency_key, operation_id, resource_identity,
       state, attempt, created_at_ms, updated_at_ms

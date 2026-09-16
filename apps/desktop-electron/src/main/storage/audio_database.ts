@@ -13,6 +13,7 @@ import {
   createAudioSchema,
   REQUIRED_AUDIO_SCHEMA_TABLES,
 } from "./audio_schema";
+import { migrateAudioV4ToV5 } from "./audio_migrations/v4_to_v5";
 
 export { AUDIO_APPLICATION_ID, AUDIO_SCHEMA_VERSION } from "./audio_schema";
 
@@ -49,7 +50,9 @@ export function openAudioDatabase(databasePath: string): DatabaseSync {
     databasePath === ":memory:" ? databasePath : resolve(databasePath);
   const existing =
     resolvedPath !== ":memory:" && hasNonEmptyDatabase(resolvedPath);
-  if (existing) inspectExistingDatabase(resolvedPath);
+  const existingVersion = existing
+    ? inspectExistingDatabase(resolvedPath)
+    : null;
   if (resolvedPath !== ":memory:") {
     mkdirSync(dirname(resolvedPath), { recursive: true, mode: 0o700 });
   }
@@ -68,6 +71,15 @@ export function openAudioDatabase(databasePath: string): DatabaseSync {
       } catch (error) {
         database.exec("ROLLBACK");
         throw error;
+      }
+    } else if (existingVersion === 4) {
+      try {
+        migrateAudioV4ToV5(database);
+      } catch (error) {
+        throw new AudioStorageCorruptionError(
+          `Audio database v4 migration failed: ${errorMessage(error)}`,
+          { cause: error },
+        );
       }
     }
     validateAudioSchema(database, AUDIO_SCHEMA_VERSION);
@@ -113,7 +125,7 @@ function inspectExistingDatabase(path: string): number {
         "Existing database does not belong to the Audio store",
       );
     }
-    if (version !== AUDIO_SCHEMA_VERSION) {
+    if (version !== AUDIO_SCHEMA_VERSION && version !== 4) {
       throw new AudioStorageCompatibilityError(
         `Audio database schema version ${version} is unsupported`,
       );
@@ -177,6 +189,7 @@ function validateAudioSchema(
       `Audio database is missing schema tables: ${missing.join(", ")}`,
     );
   }
+  assertAudioItemsSchema(database, expectedVersion);
   assertProviderProfileSchema(database);
   if (database.prepare("PRAGMA foreign_key_check").all().length > 0) {
     throw new AudioStorageCorruptionError(
@@ -184,6 +197,39 @@ function validateAudioSchema(
     );
   }
   assertIntegrity(database);
+}
+
+function assertAudioItemsSchema(database: DatabaseSync, version: number): void {
+  const expected = [
+    "id",
+    "idempotency_key",
+    "source_identity",
+    "display_name",
+    ...(version >= 5 ? ["original_name", "description"] : []),
+    "media_path",
+    "duration_ms",
+    "media_authority_id",
+    "active_publication_id",
+    "active_generation_id",
+    "created_at_ms",
+    "updated_at_ms",
+  ];
+  const columns = database.prepare("PRAGMA table_info(audio_items)").all();
+  if (!hasExactColumns(columns, expected)) {
+    throw new AudioStorageCorruptionError(
+      `Audio database audio_items schema does not match v${version}`,
+    );
+  }
+  if (version >= 5) {
+    for (const name of ["original_name", "description"]) {
+      const column = columns.find((row) => String(row.name) === name);
+      if (Number(column?.notnull) !== 1) {
+        throw new AudioStorageCorruptionError(
+          `Audio database audio_items.${name} must be NOT NULL in v${version}`,
+        );
+      }
+    }
+  }
 }
 
 function assertProviderProfileSchema(database: DatabaseSync): void {
@@ -280,4 +326,8 @@ function pragmaNumber(database: DatabaseSync, pragma: string): number {
     throw new AudioStorageCorruptionError(`SQLite PRAGMA ${pragma} is invalid`);
   }
   return Number(value);
+}
+
+function errorMessage(error: unknown): string {
+  return error instanceof Error ? error.message : String(error);
 }

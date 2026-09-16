@@ -80,11 +80,12 @@ export class DesktopRepository {
       }
       const result = this.database
         .prepare(
-          "INSERT INTO audio_items (idempotency_key, source_identity, display_name, media_path, duration_ms, created_at_ms, updated_at_ms) VALUES (?, ?, ?, ?, ?, ?, ?)",
+          "INSERT INTO audio_items (idempotency_key, source_identity, display_name, original_name, media_path, duration_ms, created_at_ms, updated_at_ms) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
         )
         .run(
           command.idempotencyKey,
           command.sourceIdentity,
+          command.displayName,
           command.displayName,
           command.mediaPath,
           command.durationMs,
@@ -817,11 +818,12 @@ export class DesktopRepository {
       const mediaId = Number(media.lastInsertRowid);
       const audio = this.database
         .prepare(
-          "INSERT INTO audio_items (idempotency_key, source_identity, display_name, media_path, duration_ms, media_authority_id, created_at_ms, updated_at_ms) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+          "INSERT INTO audio_items (idempotency_key, source_identity, display_name, original_name, media_path, duration_ms, media_authority_id, created_at_ms, updated_at_ms) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
         )
         .run(
           `media:${command.normalizedSha256}`,
           `pcm:${command.normalizedSha256}`,
+          command.displayName,
           command.displayName,
           command.normalizedPath,
           command.durationMs,

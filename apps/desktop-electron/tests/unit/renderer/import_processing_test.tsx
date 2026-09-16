@@ -26,6 +26,7 @@ const audio: AudioSummary = {
 const workspace: AudioWorkspaceSnapshot = {
   revision: 1,
   summary: audio,
+  description: "",
   segments: [
     {
       id: 1,

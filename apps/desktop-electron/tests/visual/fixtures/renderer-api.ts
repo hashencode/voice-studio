@@ -197,6 +197,7 @@ function audioWorkspace(summary: AudioSummary): AudioWorkspaceSnapshot {
   return {
     revision: 7,
     summary,
+    description: "",
     speakers: [
       {
         id: 1,

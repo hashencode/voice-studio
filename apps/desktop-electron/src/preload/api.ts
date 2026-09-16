@@ -25,9 +25,12 @@ import {
   listAudiosResponseSchema,
   openAudioRequestSchema,
   openAudioResponseSchema,
+  deleteAudioRequestSchema,
+  deleteAudioResponseSchema,
   searchTranscriptRequestSchema,
   searchTranscriptResponseSchema,
   editAudioSegmentRequestSchema,
+  updateAudioMetadataRequestSchema,
   audioHistoryRequestSchema,
   renameAudioSpeakerRequestSchema,
   mergeAudioSpeakersRequestSchema,
@@ -148,8 +151,10 @@ const ipcResponseSchemas: Readonly<Record<string, z.ZodType>> = Object.freeze({
   [ipcChannels.captionFormalRetry]: captionSnapshotSchema,
   [ipcChannels.audioList]: listAudiosResponseSchema,
   [ipcChannels.audioOpen]: openAudioResponseSchema,
+  [ipcChannels.audioDelete]: deleteAudioResponseSchema,
   [ipcChannels.audioSearch]: searchTranscriptResponseSchema,
   [ipcChannels.audioEditSegment]: audioWorkspaceSnapshotSchema,
+  [ipcChannels.audioUpdateMetadata]: audioWorkspaceSnapshotSchema,
   [ipcChannels.audioUndo]: audioWorkspaceSnapshotSchema,
   [ipcChannels.audioRedo]: audioWorkspaceSnapshotSchema,
   [ipcChannels.audioRenameSpeaker]: audioWorkspaceSnapshotSchema,
@@ -653,6 +658,12 @@ export function createDesktopApi(
         await bridge.invoke(ipcChannels.audioOpen, payload),
       );
     },
+    async deleteAudio(audioId: number) {
+      const payload = deleteAudioRequestSchema.parse({ audioId });
+      return deleteAudioResponseSchema.parse(
+        await bridge.invoke(ipcChannels.audioDelete, payload),
+      );
+    },
     async searchTranscript(audioId: number, query: string, limit = 200) {
       const payload = searchTranscriptRequestSchema.parse({
         audioId,
@@ -668,6 +679,14 @@ export function createDesktopApi(
       const payload = editAudioSegmentRequestSchema.parse(command);
       return audioWorkspaceSnapshotSchema.parse(
         await bridge.invoke(ipcChannels.audioEditSegment, payload),
+      );
+    },
+    async updateAudioMetadata(
+      command: Parameters<Voice2TextDesktopApi["updateAudioMetadata"]>[0],
+    ) {
+      const payload = updateAudioMetadataRequestSchema.parse(command);
+      return audioWorkspaceSnapshotSchema.parse(
+        await bridge.invoke(ipcChannels.audioUpdateMetadata, payload),
       );
     },
     async undoAudioEdit(

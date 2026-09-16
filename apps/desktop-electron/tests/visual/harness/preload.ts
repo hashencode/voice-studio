@@ -76,6 +76,15 @@ const api: Voice2TextDesktopApi = {
       audio.displayName.toLocaleLowerCase("zh-CN").includes(normalized),
     );
   },
+  async deleteAudio(audioId) {
+    const index = fixture.audios.findIndex(
+      (audio) => audio.audioId === audioId,
+    );
+    if (index < 0) return { deleted: false };
+    fixture.audios.splice(index, 1);
+    workspaceById.delete(audioId);
+    return { deleted: true };
+  },
   async openAudio(audioId) {
     return structuredClone(workspaceById.get(audioId) ?? null);
   },
@@ -86,6 +95,20 @@ const api: Voice2TextDesktopApi = {
   },
   async editAudioSegment(command) {
     return requiredWorkspace(command.audioId);
+  },
+  async updateAudioMetadata(command) {
+    const workspace = requiredWorkspace(command.audioId);
+    const updated = {
+      ...workspace,
+      revision: workspace.revision + 1,
+      description: command.description ?? workspace.description,
+      summary: {
+        ...workspace.summary,
+        displayName: command.title?.trim() || workspace.summary.displayName,
+      },
+    };
+    workspaceById.set(command.audioId, updated);
+    return structuredClone(updated);
   },
   async undoAudioEdit(audioId) {
     return requiredWorkspace(audioId);

@@ -90,7 +90,7 @@ describe("U10 AI storage authority", () => {
     malformed.close();
 
     expect(() => openAudioDatabase(databasePath)).toThrow(
-      /secret cleanup schema does not match v4/,
+      /secret cleanup schema does not match v5/,
     );
   });
 
@@ -262,9 +262,9 @@ describe("U10 AI storage authority", () => {
 function seedAudio(database: DatabaseSync): void {
   database.exec(`
     INSERT INTO audio_items (
-      id, idempotency_key, source_identity, display_name, media_path,
+      id, idempotency_key, source_identity, display_name, original_name, media_path,
       duration_ms, created_at_ms, updated_at_ms
-    ) VALUES (1, 'audio-1', 'source-1', 'Audio', '/private/tmp/media.wav', 1000, 1, 1);
+    ) VALUES (1, 'audio-1', 'source-1', 'Audio', 'Audio', '/private/tmp/media.wav', 1000, 1, 1);
     INSERT INTO processing_jobs (
       id, audio_id, idempotency_key, operation_id, resource_identity,
       state, attempt, created_at_ms, updated_at_ms

@@ -33,7 +33,11 @@ describe("activity pages", () => {
     }).parentElement!;
     expect(empty).toBeVisible();
     expect(empty).toHaveTextContent("暂无消息");
-    expect(empty.querySelector("svg.lucide-sprout")).not.toBeNull();
+    expect(
+      empty
+        .querySelector('[data-slot="empty-state-graphic"]')
+        ?.querySelectorAll("rect"),
+    ).toHaveLength(3);
   });
 
   it("uses an empty state when no message is selected", () => {

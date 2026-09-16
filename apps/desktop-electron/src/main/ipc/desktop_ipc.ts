@@ -30,8 +30,10 @@ import {
   type WorkerHealthResponse,
   listAudiosRequestSchema,
   openAudioRequestSchema,
+  deleteAudioRequestSchema,
   searchTranscriptRequestSchema,
   editAudioSegmentRequestSchema,
+  updateAudioMetadataRequestSchema,
   audioHistoryRequestSchema,
   renameAudioSpeakerRequestSchema,
   mergeAudioSpeakersRequestSchema,
@@ -303,6 +305,7 @@ export interface DesktopIpcServices {
     offset: number;
   }): Promise<AudioSummary[]>;
   openAudio(audioId: number): Promise<AudioWorkspaceSnapshot | null>;
+  deleteAudio(audioId: number): Promise<{ deleted: boolean }>;
   searchTranscript(options: {
     audioId: number;
     query: string;
@@ -311,6 +314,11 @@ export interface DesktopIpcServices {
   editAudioSegment(
     command: Parameters<
       import("../domain/workspace/audio_workspace_service").AudioWorkspaceService["editSegment"]
+    >[0],
+  ): Promise<AudioWorkspaceSnapshot>;
+  updateAudioMetadata(
+    command: Parameters<
+      import("../domain/workspace/audio_workspace_service").AudioWorkspaceService["updateMetadata"]
     >[0],
   ): Promise<AudioWorkspaceSnapshot>;
   undoAudioEdit(
@@ -931,6 +939,14 @@ export function createDesktopIpcHandlers(options: {
       } as RegisteredHandler,
     ],
     [
+      ipcChannels.audioDelete,
+      {
+        schema: deleteAudioRequestSchema,
+        invoke: async (payload: { audioId: number }) =>
+          await options.services.deleteAudio(payload.audioId),
+      } as RegisteredHandler,
+    ],
+    [
       ipcChannels.audioSearch,
       {
         schema: searchTranscriptRequestSchema,
@@ -949,6 +965,14 @@ export function createDesktopIpcHandlers(options: {
         schema: editAudioSegmentRequestSchema,
         invoke: async (payload: never) =>
           await options.services.editAudioSegment(payload),
+      },
+    ],
+    [
+      ipcChannels.audioUpdateMetadata,
+      {
+        schema: updateAudioMetadataRequestSchema,
+        invoke: async (payload: never) =>
+          await options.services.updateAudioMetadata(payload),
       },
     ],
     [
@@ -1087,11 +1111,13 @@ const mutationChannels = new Set<string>([
   ipcChannels.aiProviderProfileDelete,
   ipcChannels.audioAiGenerate,
   ipcChannels.audioAiRetry,
+  ipcChannels.audioDelete,
   ipcChannels.captureStart,
   ipcChannels.captureControl,
   ipcChannels.captureLibraryProjectionRetry,
   ipcChannels.captureRecoveryAction,
   ipcChannels.audioEditSegment,
+  ipcChannels.audioUpdateMetadata,
   ipcChannels.audioUndo,
   ipcChannels.audioRedo,
   ipcChannels.audioRenameSpeaker,

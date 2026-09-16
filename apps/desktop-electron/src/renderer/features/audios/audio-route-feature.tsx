@@ -2,19 +2,42 @@ import * as React from "react";
 import { toast } from "sonner";
 import {
   AudioLines,
-  Ban,
-  CircleAlert,
-  Clock3,
   FileInput,
+  FileMusic,
   LoaderCircle,
   Mic,
   RotateCcw,
+  Search,
   Square,
+  Trash2,
 } from "lucide-react";
 
+import {
+  AlertDialog,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
-import { EmptyState } from "@/components/ui/empty-state";
+import { ButtonGroup } from "@/components/ui/button-group";
+import {
+  ContextMenu,
+  ContextMenuContent,
+  ContextMenuItem,
+  ContextMenuTrigger,
+} from "@/components/ui/context-menu";
+import { EmptyState, FullScreenEmptyState } from "@/components/ui/empty-state";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuLabel,
+  DropdownMenuRadioGroup,
+  DropdownMenuRadioItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import {
   Dialog,
   DialogClose,
@@ -32,11 +55,12 @@ import {
 } from "@/components/ui/item";
 import { Progress } from "@/components/ui/progress";
 import { SidebarGroup, SidebarGroupContent } from "@/components/ui/sidebar";
+import { ContextPaneSearch } from "@/features/shell/context-pane-controls";
+import { ContextPaneSearchRegion } from "@/features/shell/context-pane-shell";
 import {
-  ContextPaneFilter,
-  ContextPaneSearch,
-} from "@/features/shell/context-pane-controls";
-import { AudioDetailWorkspace } from "@/features/audios/audio-workspace-feature";
+  AudioDetailWorkspace,
+  AudioPlaybackControls,
+} from "@/features/audios/audio-workspace-feature";
 import {
   resolveRecordingMicrophone,
   useRecordingPreference,
@@ -48,7 +72,9 @@ import {
   userFacingError,
 } from "@/lib/user-facing-error";
 import type {
+  AudioMetadataPatch,
   AudioSummary,
+  AudioPlaybackSnapshot,
   AudioWorkspaceSnapshot,
   CapturePreflight,
   ImportAudioResponse,
@@ -81,8 +107,10 @@ type AudioRouteOptions = {
   onRetry: (jobId: number, attempt: number) => void | Promise<void>;
 };
 
-type AudioFilter = "all" | "attention" | "processing" | "completed";
-
+type AudioFilter =
+  "all" | "pending" | "transcribing" | "transcribed" | "exception";
+const AUDIO_SEARCH_VISIBILITY_STORAGE_KEY =
+  "voice2text.audio.context-search-visible.v1";
 export type AudioRouteController = ReturnType<typeof useAudioRouteController>;
 
 // Route-local state is intentionally colocated with the two route surfaces.
@@ -111,6 +139,9 @@ export function useAudioRouteController({
   const [audios, setAudios] = React.useState<AudioSummary[] | null>(null);
   const [query, setQuery] = React.useState("");
   const [filter, setFilter] = React.useState<AudioFilter>("all");
+  const [searchVisible, setSearchVisible] = React.useState(
+    readAudioSearchVisibility,
+  );
   const [listError, setListError] = React.useState<string | null>(null);
   const [listPending, setListPending] = React.useState(true);
   const [workspace, setWorkspaceState] =
@@ -119,6 +150,10 @@ export function useAudioRouteController({
     null,
   );
   const [transitionPending, setTransitionPending] = React.useState(false);
+  const [playback, setPlayback] = React.useState<AudioPlaybackSnapshot | null>(
+    null,
+  );
+  const [playbackPending, setPlaybackPending] = React.useState(false);
   const [autoOpenState, setAutoOpenState] =
     React.useState<CaptureLibraryOpenState>({ phase: "idle" });
   const [importPending, setImportPending] = React.useState(false);
@@ -142,6 +177,18 @@ export function useAudioRouteController({
     audioId: number;
     promise: Promise<void>;
   } | null>(null);
+  const playbackPendingRef = React.useRef(false);
+  const playbackActionTailRef = React.useRef<Promise<void>>(Promise.resolve());
+  const preparedLeaveAudioIdRef = React.useRef<number | null>(null);
+  const leaveRef = React.useRef<Promise<boolean> | null>(null);
+  const workspaceMutationTailRef = React.useRef<Promise<void>>(
+    Promise.resolve(),
+  );
+  const metadataDraftsRef = React.useRef(new Map<number, AudioMetadataPatch>());
+  const metadataSavesRef = React.useRef(
+    new Map<number, Promise<AudioWorkspaceSnapshot | null>>(),
+  );
+  const confirmedMetadataTitlesRef = React.useRef(new Map<number, string>());
   const activeRef = React.useRef(active);
   const observedLiveIntentRef = React.useRef<string | null>(null);
   const protectedWorkspaceAudioIdRef = React.useRef<number | null>(null);
@@ -185,9 +232,11 @@ export function useAudioRouteController({
     (audioId: number) => {
       if (closeRef.current?.audioId === audioId)
         return closeRef.current.promise;
-      const promise = Promise.resolve(
-        api.controlAudioPlayback(audioId, { action: "close" }),
-      ).then(() => undefined);
+      const promise = playbackActionTailRef.current
+        .catch(() => undefined)
+        .then(() => api.controlAudioPlayback(audioId, { action: "close" }))
+        .then(() => undefined);
+      playbackActionTailRef.current = promise.catch(() => undefined);
       closeRef.current = { audioId, promise };
       void promise.then(
         () => {
@@ -222,6 +271,7 @@ export function useAudioRouteController({
       }
       workspaceRef.current = null;
       setWorkspaceState(null);
+      setPlayback(null);
       closeRef.current = null;
     },
     [requestPlaybackClose],
@@ -238,8 +288,25 @@ export function useAudioRouteController({
         if (intent !== listIntentRef.current) return;
         await clearRemovedSelection(next);
         if (intent !== listIntentRef.current) return;
-        audiosRef.current = next;
-        setAudios(next);
+        const presentAudioIds = new Set(next.map((audio) => audio.audioId));
+        for (const audioId of confirmedMetadataTitlesRef.current.keys()) {
+          if (!presentAudioIds.has(audioId)) {
+            confirmedMetadataTitlesRef.current.delete(audioId);
+          }
+        }
+        const projected = next.map((audio) => {
+          const confirmedTitle = confirmedMetadataTitlesRef.current.get(
+            audio.audioId,
+          );
+          if (confirmedTitle === undefined) return audio;
+          if (audio.displayName === confirmedTitle) {
+            confirmedMetadataTitlesRef.current.delete(audio.audioId);
+            return audio;
+          }
+          return { ...audio, displayName: confirmedTitle };
+        });
+        audiosRef.current = projected;
+        setAudios(projected);
         if (
           protectedWorkspaceAudioIdRef.current !== null &&
           next.some(
@@ -273,6 +340,159 @@ export function useAudioRouteController({
     if (activeRequest) await activeRequest;
     await loadAudios();
   }, [loadAudios]);
+
+  const runWorkspaceMutation = React.useCallback(
+    <T,>(action: () => Promise<T>): Promise<T> => {
+      const request = workspaceMutationTailRef.current
+        .catch(() => undefined)
+        .then(action);
+      workspaceMutationTailRef.current = request.then(
+        () => undefined,
+        () => undefined,
+      );
+      return request;
+    },
+    [],
+  );
+
+  const applyWorkspaceMutation = React.useCallback(
+    async (
+      action: (
+        current: AudioWorkspaceSnapshot,
+      ) => Promise<AudioWorkspaceSnapshot>,
+    ): Promise<AudioWorkspaceSnapshot> =>
+      await runWorkspaceMutation(async () => {
+        const current = workspaceRef.current;
+        if (!current) throw new Error("audio workspace is unavailable");
+        const next = await action(current);
+        if (workspaceRef.current?.summary.audioId === next.summary.audioId) {
+          setWorkspace(next);
+        }
+        return next;
+      }),
+    [runWorkspaceMutation, setWorkspace],
+  );
+
+  const stageMetadata = React.useCallback(
+    (audioId: number, patch: AudioMetadataPatch) => {
+      metadataDraftsRef.current.set(audioId, {
+        ...metadataDraftsRef.current.get(audioId),
+        ...patch,
+      });
+    },
+    [],
+  );
+
+  const saveMetadata = React.useCallback(
+    (
+      audioId: number,
+      patch?: AudioMetadataPatch,
+    ): Promise<AudioWorkspaceSnapshot | null> => {
+      if (patch) stageMetadata(audioId, patch);
+      const existing = metadataSavesRef.current.get(audioId);
+      if (existing) return existing;
+      const request = (async () => {
+        let lastSnapshot: AudioWorkspaceSnapshot | null = null;
+        let shouldRefresh = false;
+        try {
+          while (metadataDraftsRef.current.has(audioId)) {
+            const nextPatch = metadataDraftsRef.current.get(audioId)!;
+            metadataDraftsRef.current.delete(audioId);
+            try {
+              const next = await runWorkspaceMutation(async () => {
+                let current = workspaceRef.current;
+                if (!current || current.summary.audioId !== audioId) {
+                  throw new Error(
+                    "audio selection changed before metadata save",
+                  );
+                }
+                try {
+                  return await api.updateAudioMetadata({
+                    audioId,
+                    ...nextPatch,
+                    expectedRevision: current.revision,
+                  });
+                } catch (cause) {
+                  if (
+                    !desktopFailureHasCode(
+                      cause,
+                      "audio-workspace",
+                      "WORKSPACE_CONFLICT",
+                    )
+                  ) {
+                    throw cause;
+                  }
+                  const refreshed = await api.openAudio(audioId);
+                  if (!refreshed) throw cause;
+                  current = refreshed;
+                  if (workspaceRef.current?.summary.audioId === audioId) {
+                    workspaceRef.current = refreshed;
+                    setWorkspaceState(refreshed);
+                  }
+                  return await api.updateAudioMetadata({
+                    audioId,
+                    ...nextPatch,
+                    expectedRevision: current.revision,
+                  });
+                }
+              });
+              lastSnapshot = next;
+              if (workspaceRef.current?.summary.audioId === audioId) {
+                workspaceRef.current = next;
+                setWorkspaceState(next);
+              }
+              if (nextPatch.title !== undefined) {
+                confirmedMetadataTitlesRef.current.set(
+                  audioId,
+                  next.summary.displayName,
+                );
+                const currentAudios = audiosRef.current;
+                if (currentAudios) {
+                  const updated = currentAudios.map((audio) =>
+                    audio.audioId === audioId ? next.summary : audio,
+                  );
+                  audiosRef.current = updated;
+                  setAudios(updated);
+                }
+              }
+              shouldRefresh = true;
+            } catch (cause) {
+              metadataDraftsRef.current.set(audioId, {
+                ...nextPatch,
+                ...metadataDraftsRef.current.get(audioId),
+              });
+              throw cause;
+            }
+          }
+          return lastSnapshot;
+        } finally {
+          if (shouldRefresh) void refreshAudios();
+        }
+      })();
+      metadataSavesRef.current.set(audioId, request);
+      const clearRequest = () => {
+        if (metadataSavesRef.current.get(audioId) === request) {
+          metadataSavesRef.current.delete(audioId);
+        }
+      };
+      void request.then(clearRequest, clearRequest);
+      return request;
+    },
+    [api, refreshAudios, runWorkspaceMutation, stageMetadata],
+  );
+
+  const flushMetadata = React.useCallback(
+    async (audioId: number, discardOnFailure = false): Promise<boolean> => {
+      try {
+        await saveMetadata(audioId);
+        return true;
+      } catch {
+        if (discardOnFailure) metadataDraftsRef.current.delete(audioId);
+        return false;
+      }
+    },
+    [saveMetadata],
+  );
 
   React.useEffect(() => {
     if (!enabled) return;
@@ -349,12 +569,14 @@ export function useAudioRouteController({
     () => () => {
       selectionIntentRef.current += 1;
       const current = workspaceRef.current;
-      if (current)
-        void requestPlaybackClose(current.summary.audioId).catch(
-          () => undefined,
-        );
+      if (current) {
+        void (async () => {
+          await flushMetadata(current.summary.audioId, true);
+          await requestPlaybackClose(current.summary.audioId);
+        })().catch(() => undefined);
+      }
     },
-    [requestPlaybackClose],
+    [flushMetadata, requestPlaybackClose],
   );
 
   React.useEffect(() => {
@@ -364,7 +586,14 @@ export function useAudioRouteController({
     if (wasActive && !active) {
       selectionIntentRef.current += 1;
       if (current) {
-        void requestPlaybackClose(current.summary.audioId).catch((cause) => {
+        if (preparedLeaveAudioIdRef.current === current.summary.audioId) {
+          preparedLeaveAudioIdRef.current = null;
+          return;
+        }
+        void (async () => {
+          await flushMetadata(current.summary.audioId, true);
+          await requestPlaybackClose(current.summary.audioId);
+        })().catch((cause) => {
           setTransitionError(
             userFacingError(cause, "离开音频工作区时无法关闭播放"),
           );
@@ -373,7 +602,7 @@ export function useAudioRouteController({
     } else if (!wasActive && active) {
       closeRef.current = null;
     }
-  }, [active, requestPlaybackClose]);
+  }, [active, flushMetadata, requestPlaybackClose]);
 
   const selectAudio = React.useCallback(
     async (
@@ -381,6 +610,7 @@ export function useAudioRouteController({
       options?: { fromRoute?: boolean; source?: "user" | "auto" },
     ): Promise<"opened" | "failed" | "canceled"> => {
       const current = workspaceRef.current;
+      preparedLeaveAudioIdRef.current = null;
       if (current?.summary.audioId === audioId) {
         setTransitionError(null);
         if (!options?.fromRoute)
@@ -393,6 +623,7 @@ export function useAudioRouteController({
       setTransitionError(null);
       try {
         if (current) {
+          await flushMetadata(current.summary.audioId, true);
           try {
             await requestPlaybackClose(current.summary.audioId);
           } catch (cause) {
@@ -404,6 +635,7 @@ export function useAudioRouteController({
             return "failed";
           }
         }
+        setPlayback(null);
         if (intent !== selectionIntentRef.current) return "canceled";
         const next = await api.openAudio(audioId);
         if (intent !== selectionIntentRef.current) return "canceled";
@@ -432,7 +664,7 @@ export function useAudioRouteController({
         }
       }
     },
-    [api, onAudioSelected, requestPlaybackClose],
+    [api, flushMetadata, onAudioSelected, requestPlaybackClose],
   );
 
   const openRegisteredAudio = React.useCallback(
@@ -511,6 +743,7 @@ export function useAudioRouteController({
     const current = workspaceRef.current;
     if (!current) return;
     const intent = ++selectionIntentRef.current;
+    await flushMetadata(current.summary.audioId, true);
     try {
       await requestPlaybackClose(current.summary.audioId);
     } catch (cause) {
@@ -522,8 +755,80 @@ export function useAudioRouteController({
     if (intent !== selectionIntentRef.current) return;
     workspaceRef.current = null;
     setWorkspaceState(null);
+    setPlayback(null);
     closeRef.current = null;
-  }, [requestPlaybackClose]);
+  }, [flushMetadata, requestPlaybackClose]);
+
+  const prepareToLeave = React.useCallback((): Promise<boolean> => {
+    if (leaveRef.current) return leaveRef.current;
+    const request = (async () => {
+      const current = workspaceRef.current;
+      if (!current) return true;
+      await flushMetadata(current.summary.audioId, true);
+      try {
+        await requestPlaybackClose(current.summary.audioId);
+        if (workspaceRef.current?.summary.audioId === current.summary.audioId) {
+          preparedLeaveAudioIdRef.current = current.summary.audioId;
+          setPlayback(null);
+        }
+        return true;
+      } catch (cause) {
+        setTransitionError(
+          userFacingError(cause, "离开音频工作区时无法关闭播放"),
+        );
+        return false;
+      }
+    })();
+    leaveRef.current = request;
+    const clear = () => {
+      if (leaveRef.current === request) leaveRef.current = null;
+    };
+    void request.then(clear, clear);
+    return request;
+  }, [flushMetadata, requestPlaybackClose]);
+
+  const controlPlayback = React.useCallback(
+    async (
+      command: Parameters<Voice2TextDesktopApi["controlAudioPlayback"]>[1],
+    ) => {
+      const current = workspaceRef.current;
+      if (!current || playbackPendingRef.current || closeRef.current) return;
+      const audioId = current.summary.audioId;
+      playbackPendingRef.current = true;
+      setPlaybackPending(true);
+      try {
+        let next: AudioPlaybackSnapshot | null = null;
+        const request = playbackActionTailRef.current
+          .catch(() => undefined)
+          .then(async () => {
+            let snapshot = playback;
+            if (!snapshot?.initialized && command.action !== "open") {
+              snapshot = await api.controlAudioPlayback(audioId, {
+                action: "open",
+              });
+            }
+            next =
+              command.action === "open"
+                ? snapshot!
+                : await api.controlAudioPlayback(audioId, command);
+          });
+        playbackActionTailRef.current = request.catch(() => undefined);
+        await request;
+        if (workspaceRef.current?.summary.audioId === audioId && next) {
+          setPlayback(next);
+        }
+        toast.dismiss("audio-playback-action");
+      } catch (cause) {
+        toast.error(userFacingError(cause, "音频操作未完成，请重试。"), {
+          id: "audio-playback-action",
+        });
+      } finally {
+        playbackPendingRef.current = false;
+        setPlaybackPending(false);
+      }
+    },
+    [api, playback],
+  );
 
   const importAudio = React.useCallback(async () => {
     if (!writable || importPendingRef.current) return;
@@ -542,6 +847,65 @@ export function useAudioRouteController({
       setImportPending(false);
     }
   }, [onImport, refreshAudios, selectAudio, writable]);
+
+  const deleteAudio = React.useCallback(
+    async (audioId: number): Promise<boolean> => {
+      const selected = workspaceRef.current?.summary.audioId === audioId;
+      let discardedDraft: AudioMetadataPatch | undefined;
+      if (selected) {
+        selectionIntentRef.current += 1;
+        discardedDraft = metadataDraftsRef.current.get(audioId);
+        metadataDraftsRef.current.delete(audioId);
+        const activeMetadataSave = metadataSavesRef.current.get(audioId);
+        try {
+          await Promise.all([
+            activeMetadataSave?.catch(() => undefined) ?? Promise.resolve(),
+            requestPlaybackClose(audioId),
+          ]);
+        } catch (cause) {
+          if (discardedDraft) {
+            metadataDraftsRef.current.set(audioId, discardedDraft);
+          }
+          toast.error(userFacingError(cause, "无法关闭音频播放，请重试。"));
+          return false;
+        }
+        const requeuedDraft = metadataDraftsRef.current.get(audioId);
+        if (requeuedDraft) {
+          discardedDraft = { ...discardedDraft, ...requeuedDraft };
+          metadataDraftsRef.current.delete(audioId);
+        }
+      }
+      try {
+        await api.deleteAudio(audioId);
+        listIntentRef.current += 1;
+        metadataDraftsRef.current.delete(audioId);
+        metadataSavesRef.current.delete(audioId);
+        confirmedMetadataTitlesRef.current.delete(audioId);
+        const nextAudios = (audiosRef.current ?? []).filter(
+          (audio) => audio.audioId !== audioId,
+        );
+        audiosRef.current = nextAudios;
+        setAudios(nextAudios);
+        if (selected) {
+          workspaceRef.current = null;
+          setWorkspaceState(null);
+          setPlayback(null);
+          closeRef.current = null;
+        }
+        toast.success("录音已删除。", { id: "audio-delete" });
+        return true;
+      } catch (cause) {
+        if (discardedDraft) {
+          metadataDraftsRef.current.set(audioId, discardedDraft);
+        }
+        toast.error(userFacingError(cause, "无法删除录音，请重试。"), {
+          id: "audio-delete",
+        });
+        return false;
+      }
+    },
+    [api, requestPlaybackClose],
+  );
 
   const retryProcessing = React.useCallback(
     (jobId: number, attempt: number) => {
@@ -631,12 +995,19 @@ export function useAudioRouteController({
     capturePreflight.microphones.length > 0,
   );
 
+  const toggleSearchVisibility = React.useCallback(() => {
+    const next = !searchVisible;
+    setSearchVisible(next);
+    writeAudioSearchVisibility(next);
+  }, [searchVisible]);
+
   const filterCounts = React.useMemo(() => {
     const counts: Record<AudioFilter, number> = {
       all: audios?.length ?? 0,
-      attention: 0,
-      processing: 0,
-      completed: 0,
+      pending: 0,
+      transcribing: 0,
+      transcribed: 0,
+      exception: 0,
     };
     for (const audio of audios ?? []) {
       const category = audioFilterFor(
@@ -677,6 +1048,8 @@ export function useAudioRouteController({
     filteredAudios,
     query,
     setQuery,
+    searchVisible,
+    toggleSearchVisibility,
     filter,
     setFilter,
     filterCounts,
@@ -685,16 +1058,24 @@ export function useAudioRouteController({
     reload: loadAudios,
     workspace,
     setWorkspace,
+    applyWorkspaceMutation,
+    saveMetadata,
+    flushMetadata,
+    prepareToLeave,
     selectAudio,
     clearSelection,
     transitionError,
     dismissTransitionError: () => setTransitionError(null),
     transitionPending,
+    playback,
+    playbackPending,
+    controlPlayback,
     autoOpenState,
     retryAutoOpen,
     importPending,
     importError,
     importAudio,
+    deleteAudio,
     record: onRecord,
     recordingActive,
     newRecordingBlocked,
@@ -732,36 +1113,32 @@ export function AudioRouteFeature({
           {controller.libraryPresentation === "populated" ? (
             <div className="flex h-[50px] shrink-0 items-center justify-between border-b px-3">
               <h2 className="text-sm font-semibold">音频</h2>
-              {controller.workspace !== null ? (
-                <AudioContextPaneHeader controller={controller} />
-              ) : null}
+              <AudioContextPaneHeader controller={controller} />
             </div>
           ) : null}
           {controller.libraryPresentation === "populated" ? (
-            <div
-              data-context-pane-search="true"
-              className="flex h-[45px] shrink-0 items-center border-b px-3 py-2"
-            >
-              <AudioContextPaneSearch controller={controller} />
-            </div>
-          ) : null}
-          {controller.libraryPresentation === "populated" ? (
-            <div className="shrink-0 border-b px-3 py-2">
-              <AudioContextPaneFilters controller={controller} />
-            </div>
+            <ContextPaneSearchRegion open={controller.searchVisible}>
+              <AudioContextPaneToolbar controller={controller} />
+            </ContextPaneSearchRegion>
           ) : null}
           <div className="min-h-0 flex-1">
             <AudioContextPane controller={controller} />
           </div>
+          {controller.libraryPresentation === "populated" ? (
+            <div
+              data-audio-context-footer="true"
+              className="shrink-0 border-t p-2"
+            >
+              <AudioContextPaneFooter controller={controller} />
+            </div>
+          ) : null}
         </section>
       ) : null}
       <section role="region" aria-label="音频工作区">
-        {controller.libraryPresentation === "populated" ? (
-          <div className="flex h-12 items-center justify-end border-b px-4 py-2">
-            <AudioMainHeaderActions controller={controller} />
-          </div>
-        ) : null}
         <AudioMainWorkspace controller={controller} />
+        {controller.workspace ? (
+          <AudioMainPlaybackFooter controller={controller} />
+        ) : null}
       </section>
     </div>
   );
@@ -773,20 +1150,51 @@ export function AudioContextPaneHeader({
   controller: AudioRouteController;
 }) {
   return (
-    <div role="group" aria-label="录音操作">
+    <div className="flex items-center">
       <Button
-        data-recording-entry="audio-context-pane"
         type="button"
         size="icon-sm"
         variant="ghost"
         className="size-7"
-        aria-label={
-          controller.recordingActive
-            ? "正在录音"
-            : controller.captureStartPending
-              ? "正在开始录制"
-              : "新录音"
-        }
+        aria-label={controller.searchVisible ? "隐藏音频搜索" : "显示音频搜索"}
+        aria-pressed={controller.searchVisible}
+        onClick={controller.toggleSearchVisibility}
+      >
+        <Search aria-hidden="true" />
+      </Button>
+    </div>
+  );
+}
+
+export function AudioContextPaneFooter({
+  controller,
+}: {
+  controller: AudioRouteController;
+}) {
+  if (controller.libraryPresentation !== "populated") return null;
+  const recordingLabel = controller.recordingActive
+    ? "正在录音"
+    : controller.captureStartPending
+      ? "正在开始录制"
+      : "新录音";
+  return (
+    <div className="flex items-center gap-2" role="group" aria-label="音频操作">
+      <Button
+        type="button"
+        size="icon"
+        variant="outline"
+        aria-label="导入音频"
+        aria-busy={controller.importPending}
+        disabled={!controller.writable || controller.importPending}
+        onClick={() => void controller.importAudio()}
+      >
+        <FileMusic aria-hidden="true" />
+      </Button>
+      <Button
+        data-recording-entry="audio-context-pane"
+        type="button"
+        className="min-w-0 flex-1"
+        aria-label={recordingLabel}
         disabled={
           !controller.captureReadyWithMicrophone ||
           controller.recordingActive ||
@@ -801,6 +1209,11 @@ export function AudioContextPaneHeader({
         ) : (
           <Mic aria-hidden="true" />
         )}
+        {controller.recordingActive
+          ? "正在录音"
+          : controller.captureStartPending
+            ? "正在开始录制"
+            : "开始新录音"}
       </Button>
     </div>
   );
@@ -811,6 +1224,10 @@ export function AudioContextPane({
 }: {
   controller: AudioRouteController;
 }) {
+  const [deleteTarget, setDeleteTarget] = React.useState<AudioSummary | null>(
+    null,
+  );
+  const [deletePending, setDeletePending] = React.useState(false);
   if (controller.libraryPresentation !== "populated") {
     if (!controller.workspace) return null;
     return (
@@ -849,6 +1266,11 @@ export function AudioContextPane({
     <SidebarGroup className="h-full p-0">
       <SidebarGroupContent className="flex h-full flex-col">
         <h3 className="sr-only">音频列表</h3>
+        {controller.importError ? (
+          <div className="border-b px-3 py-2">
+            <AudioImportError controller={controller} />
+          </div>
+        ) : null}
         {controller.listPending ? (
           <p
             role="status"
@@ -884,101 +1306,193 @@ export function AudioContextPane({
         ) : (
           <ul aria-label="音频列表" data-flat-row-list="true">
             {controller.filteredAudios.map((audio) => {
-              const task = selectCurrentTask(
-                controller.tasksByAudioId.get(audio.audioId),
-              );
-              const state = processingStateForRow(audio, task);
               const selected =
                 controller.workspace?.summary.audioId === audio.audioId;
               return (
                 <li key={audio.audioId}>
-                  <Item
-                    asChild
-                    variant="context"
-                    size="context"
-                    className="text-left"
-                  >
-                    <button
-                      type="button"
-                      data-audio-id={audio.audioId}
-                      data-flat-row="true"
-                      aria-label={`打开 ${audio.displayName}`}
-                      aria-current={selected ? "true" : undefined}
-                      onClick={() => void controller.selectAudio(audio.audioId)}
-                    >
-                      <ItemContent>
-                        <ItemTitle>{audio.displayName}</ItemTitle>
-                        <ItemDescription>
-                          <span className="block">
-                            {formatAudioDate(audio.createdAtMs)} ·{" "}
-                            {formatAudioDuration(audio.durationMs)}
-                          </span>
-                          <span className="block">
-                            {audio.segmentCount} 个片段 ·{" "}
-                            {audioProcessingLabel(audio, task)}
-                          </span>
-                        </ItemDescription>
-                        {state ? (
-                          <Badge variant="outline" className="mt-1 gap-1.5">
-                            <ProcessingIcon state={state} />
-                            {taskStateLabel(state)}
-                          </Badge>
-                        ) : null}
-                      </ItemContent>
-                    </button>
-                  </Item>
+                  <ContextMenu>
+                    <ContextMenuTrigger asChild>
+                      <Item
+                        asChild
+                        variant="context"
+                        size="context"
+                        className="text-left"
+                      >
+                        <button
+                          type="button"
+                          data-audio-id={audio.audioId}
+                          data-flat-row="true"
+                          aria-label={`打开 ${audio.displayName}`}
+                          aria-current={selected ? "true" : undefined}
+                          onClick={() =>
+                            void controller.selectAudio(audio.audioId)
+                          }
+                        >
+                          <ItemContent>
+                            <ItemTitle>{audio.displayName}</ItemTitle>
+                            <ItemDescription>
+                              <span className="block">
+                                {formatAudioDate(audio.createdAtMs)} ·{" "}
+                                {formatAudioDuration(audio.durationMs)}
+                              </span>
+                            </ItemDescription>
+                          </ItemContent>
+                        </button>
+                      </Item>
+                    </ContextMenuTrigger>
+                    <ContextMenuContent>
+                      <ContextMenuItem
+                        variant="destructive"
+                        disabled={
+                          !controller.writable || controller.transitionPending
+                        }
+                        onSelect={() => setDeleteTarget(audio)}
+                      >
+                        <Trash2 aria-hidden="true" />
+                        删除
+                      </ContextMenuItem>
+                    </ContextMenuContent>
+                  </ContextMenu>
                 </li>
               );
             })}
           </ul>
         )}
+        <AlertDialog
+          open={deleteTarget !== null}
+          onOpenChange={(open) => {
+            if (!open && !deletePending) setDeleteTarget(null);
+          }}
+        >
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>删除确认</AlertDialogTitle>
+              <AlertDialogDescription>
+                {deleteTarget
+                  ? `“${deleteTarget.displayName}”及其转写内容和 AI 总结将从资料库中移除，且无法恢复。`
+                  : ""}
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel asChild>
+                <Button
+                  type="button"
+                  variant="outline"
+                  disabled={deletePending}
+                >
+                  取消
+                </Button>
+              </AlertDialogCancel>
+              <Button
+                type="button"
+                variant="destructive"
+                disabled={deletePending}
+                onClick={() => {
+                  if (!deleteTarget || deletePending) return;
+                  setDeletePending(true);
+                  void controller
+                    .deleteAudio(deleteTarget.audioId)
+                    .then((deleted) => {
+                      if (deleted) setDeleteTarget(null);
+                    })
+                    .finally(() => setDeletePending(false));
+                }}
+              >
+                {deletePending ? "正在删除…" : "确认删除"}
+              </Button>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
       </SidebarGroupContent>
     </SidebarGroup>
   );
 }
 
-export function AudioContextPaneSearch({
-  controller,
-}: {
-  controller: AudioRouteController;
-}) {
-  return (
-    <ContextPaneSearch
-      aria-label="搜索音频"
-      value={controller.query}
-      onChange={(event) => controller.setQuery(event.currentTarget.value)}
-    />
-  );
-}
-
-export function AudioContextPaneFilters({
+export function AudioContextPaneToolbar({
   controller,
 }: {
   controller: AudioRouteController;
 }) {
   const filters: readonly { value: AudioFilter; label: string }[] = [
     { value: "all", label: "全部" },
-    { value: "attention", label: "需处理" },
-    { value: "processing", label: "处理中" },
-    { value: "completed", label: "已完成" },
+    { value: "pending", label: "待转写" },
+    { value: "transcribing", label: "转写中" },
+    { value: "transcribed", label: "已转写" },
+    { value: "exception", label: "异常" },
   ];
+  const selectedFilter = filters.find(
+    (item) => item.value === controller.filter,
+  )!;
+  const searchInputRef = React.useRef<HTMLInputElement>(null);
+  React.useEffect(() => {
+    if (controller.searchVisible) searchInputRef.current?.focus();
+  }, [controller.searchVisible]);
   return (
-    <div
-      role="group"
-      aria-label="音频筛选"
-      className="flex min-w-0 items-center gap-0.5 overflow-x-auto"
-    >
-      {filters.map((item) => (
-        <ContextPaneFilter
-          key={item.value}
-          label={item.label}
-          count={controller.filterCounts[item.value]}
-          aria-pressed={controller.filter === item.value}
-          onClick={() => controller.setFilter(item.value)}
-        />
-      ))}
-    </div>
+    <ButtonGroup className="w-full">
+      <ContextPaneSearch
+        ref={searchInputRef}
+        aria-label="搜索音频"
+        className="rounded-r-none"
+        value={controller.query}
+        onChange={(event) => controller.setQuery(event.currentTarget.value)}
+      />
+      <DropdownMenu>
+        <DropdownMenuTrigger asChild>
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            className="shrink-0"
+            aria-label={`筛选音频：${selectedFilter.label}`}
+          >
+            {selectedFilter.label}
+          </Button>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent align="end" className="min-w-40">
+          <DropdownMenuLabel>筛选音频</DropdownMenuLabel>
+          <DropdownMenuRadioGroup
+            value={controller.filter}
+            onValueChange={(value) =>
+              controller.setFilter(value as AudioFilter)
+            }
+          >
+            {filters.map((item) => (
+              <DropdownMenuRadioItem key={item.value} value={item.value}>
+                <span className="flex flex-1 items-center justify-between gap-4">
+                  <span>{item.label}</span>
+                  <span className="text-xs text-muted-foreground">
+                    {controller.filterCounts[item.value]}
+                  </span>
+                </span>
+              </DropdownMenuRadioItem>
+            ))}
+          </DropdownMenuRadioGroup>
+        </DropdownMenuContent>
+      </DropdownMenu>
+    </ButtonGroup>
   );
+}
+
+function readAudioSearchVisibility(): boolean {
+  try {
+    return (
+      window.localStorage.getItem(AUDIO_SEARCH_VISIBILITY_STORAGE_KEY) ===
+      "true"
+    );
+  } catch {
+    return false;
+  }
+}
+
+function writeAudioSearchVisibility(visible: boolean) {
+  try {
+    window.localStorage.setItem(
+      AUDIO_SEARCH_VISIBILITY_STORAGE_KEY,
+      String(visible),
+    );
+  } catch {
+    // A denied storage write must not prevent the user from toggling search.
+  }
 }
 
 export function AudioMainWorkspace({
@@ -1013,38 +1527,42 @@ export function AudioMainWorkspace({
       ) : null}
       {workspace ? (
         <div key={workspace.summary.audioId} className="space-y-4">
-          {!task && workspace.segments.length === 0 ? (
-            <div className="flex flex-wrap items-center justify-between gap-3 border-y py-3">
-              <div>
-                <p className="text-sm font-medium">尚未转写</p>
-                <p className="text-xs text-muted-foreground">
-                  音频已安全保存，需要时再使用本地模型转写。
-                </p>
-              </div>
-              <Button
-                data-recording-entry="audio-first-use"
-                type="button"
-                disabled={controller.transitionPending}
-                onClick={() => void controller.startTranscription()}
-              >
-                开始转写
-              </Button>
-            </div>
-          ) : null}
-          {task &&
-          !(task.state === "completed" && workspace.segments.length > 0) ? (
-            <AudioProcessingDetail
-              task={task}
-              pendingAction={controller.pendingJobActions.get(task.id)}
-              onCancel={controller.onCancel}
-              onRetry={controller.onRetry}
-            />
-          ) : null}
           <AudioDetailWorkspace
             api={controller.api}
             workspace={workspace}
             routePending={controller.transitionPending}
             onWorkspaceChange={controller.setWorkspace}
+            onWorkspaceMutation={controller.applyWorkspaceMutation}
+            onSaveMetadata={(patch) =>
+              controller.saveMetadata(workspace.summary.audioId, patch)
+            }
+            playback={controller.playback}
+            playbackPending={
+              controller.playbackPending || controller.transitionPending
+            }
+            onPlaybackAction={controller.controlPlayback}
+            transcriptStatus={
+              !task && workspace.segments.length === 0 ? (
+                <Button
+                  data-recording-entry="audio-first-use"
+                  type="button"
+                  disabled={controller.transitionPending}
+                  onClick={() => void controller.startTranscription()}
+                >
+                  开始转写
+                </Button>
+              ) : task &&
+                !(
+                  task.state === "completed" && workspace.segments.length > 0
+                ) ? (
+                <AudioProcessingDetail
+                  task={task}
+                  pendingAction={controller.pendingJobActions.get(task.id)}
+                  onCancel={controller.onCancel}
+                  onRetry={controller.onRetry}
+                />
+              ) : null
+            }
           />
         </div>
       ) : controller.autoOpenState.phase === "opening" ? (
@@ -1097,6 +1615,22 @@ export function AudioMainWorkspace({
   );
 }
 
+export function AudioMainPlaybackFooter({
+  controller,
+}: {
+  controller: AudioRouteController;
+}) {
+  if (!controller.workspace) return null;
+  return (
+    <AudioPlaybackControls
+      playback={controller.playback}
+      durationMs={controller.workspace.summary.durationMs}
+      pending={controller.playbackPending || controller.transitionPending}
+      onAction={(command) => void controller.controlPlayback(command)}
+    />
+  );
+}
+
 function AudioLibraryLoading() {
   return (
     <div
@@ -1130,20 +1664,6 @@ function AudioLibraryError({
         <RotateCcw aria-hidden="true" />
         重新载入
       </Button>
-    </div>
-  );
-}
-
-export function AudioMainHeaderActions({
-  controller,
-}: {
-  controller: AudioRouteController;
-}) {
-  if (controller.libraryPresentation !== "populated") return null;
-  return (
-    <div className="flex min-w-0 items-center gap-3">
-      <AudioImportError controller={controller} />
-      <AudioImportButton controller={controller} />
     </div>
   );
 }
@@ -1185,10 +1705,9 @@ function AudioImportError({
 
 function AudioSelectionPrompt() {
   return (
-    <EmptyState
-      title="选择一段音频"
-      description="从列表中选择一段音频。"
-      icon={false}
+    <FullScreenEmptyState
+      accessibleLabel="未选择音频"
+      description="请选择左侧音频"
       className="flex-1"
     />
   );
@@ -1417,40 +1936,17 @@ function currentTasksByAudioId(
   return current;
 }
 
-function processingStateForRow(
-  audio: AudioSummary,
-  task: ProcessingTask | null,
-): ProcessingTask["state"] | null {
-  const state = task?.state ?? audio.processingState;
-  if (
-    state === "not-started" ||
-    state === "completed" ||
-    state === "partial-success"
-  )
-    return null;
-  return state;
-}
-
 function audioFilterFor(
   audio: AudioSummary,
   task: ProcessingTask | null,
 ): Exclude<AudioFilter, "all"> {
   const state = task?.state ?? audio.processingState;
-  if (state === "completed") return "completed";
+  if (state === "not-started") return "pending";
+  if (state === "completed") return "transcribed";
   if (state === "queued" || state === "running" || state === "canceling") {
-    return "processing";
+    return "transcribing";
   }
-  return "attention";
-}
-
-function audioProcessingLabel(
-  audio: AudioSummary,
-  task: ProcessingTask | null,
-): string {
-  const state = task?.state ?? audio.processingState;
-  if (state === "not-started") return "未转写";
-  if (state === "partial-success") return "部分完成";
-  return taskStateLabel(state);
+  return "exception";
 }
 
 const audioDateFormatter = new Intl.DateTimeFormat("zh-CN", {
@@ -1469,28 +1965,6 @@ function formatAudioDuration(value: number): string {
   const minutes = Math.floor(totalSeconds / 60);
   const seconds = totalSeconds % 60;
   return `${minutes}:${seconds.toString().padStart(2, "0")}`;
-}
-
-function ProcessingIcon({ state }: { state: ProcessingTask["state"] }) {
-  const Icon = {
-    queued: Clock3,
-    running: LoaderCircle,
-    canceling: LoaderCircle,
-    canceled: Ban,
-    interrupted: CircleAlert,
-    completed: Clock3,
-    failed: CircleAlert,
-  }[state];
-  return (
-    <Icon
-      className={
-        state === "running" || state === "canceling"
-          ? "size-3.5 animate-spin"
-          : "size-3.5"
-      }
-      aria-hidden="true"
-    />
-  );
 }
 
 function taskStateLabel(state: ProcessingTask["state"]): string {

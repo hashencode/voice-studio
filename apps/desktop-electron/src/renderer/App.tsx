@@ -1,8 +1,9 @@
 import * as React from "react";
-import { Cloud, HardDrive, Mic, Settings2 } from "lucide-react";
+import { Cloud, HardDrive, Mic, Settings2, X } from "lucide-react";
 import { toast } from "sonner";
 
 import { Item, ItemContent, ItemMedia, ItemTitle } from "@/components/ui/item";
+import { Button } from "@/components/ui/button";
 import {
   ActivityContextPane,
   ActivityContextPaneFilters,
@@ -15,10 +16,10 @@ import {
 import { SidebarGroup, SidebarGroupContent } from "@/components/ui/sidebar";
 import {
   AudioContextPane,
-  AudioContextPaneFilters,
+  AudioContextPaneFooter,
   AudioContextPaneHeader,
-  AudioContextPaneSearch,
-  AudioMainHeaderActions,
+  AudioContextPaneToolbar,
+  AudioMainPlaybackFooter,
   AudioMainWorkspace,
   type AudioRouteController,
   useAudioRouteController,
@@ -36,7 +37,6 @@ import { AppShellFrame } from "@/features/shell/app-shell-frame";
 import { SectionContentProvider } from "@/features/shell/content-routes";
 import {
   navigateSection,
-  navigateSectionDelta,
   SectionRouterProvider,
   useSectionRouteSnapshot,
 } from "@/features/shell/section-router-registry";
@@ -90,6 +90,8 @@ export default function AppRoot() {
 }
 
 function App() {
+  const audioLeaveRef = React.useRef<(() => Promise<boolean>) | null>(null);
+  const primaryNavigationIntentRef = React.useRef(0);
   const { modalOpen, requestNavigationAfterModals } = useModalCoordinator();
   const {
     snapshot,
@@ -250,18 +252,30 @@ function App() {
   const navigatePrimary = React.useCallback(
     (section: RendererShellSection) => {
       if (applicationBlocked || modalOpen || shellNavigationBlocked) return;
-      captureInvokerRef.current = null;
-      setCaptureDetailOpen(false);
-      setCaptureDetailSessionId(null);
-      if (section === "messages") {
-        setMessagesOpen(true);
-        const nextSelection = selectedActivity ?? activityItems[0] ?? null;
-        setSelectedActivityId(nextSelection?.id ?? null);
-        if (nextSelection) void markActivityRead(nextSelection);
+      const intent = ++primaryNavigationIntentRef.current;
+      const completeNavigation = () => {
+        captureInvokerRef.current = null;
+        setCaptureDetailOpen(false);
+        setCaptureDetailSessionId(null);
+        if (section === "messages") {
+          setMessagesOpen(true);
+          const nextSelection = selectedActivity ?? activityItems[0] ?? null;
+          setSelectedActivityId(nextSelection?.id ?? null);
+          if (nextSelection) void markActivityRead(nextSelection);
+          return;
+        }
+        setMessagesOpen(false);
+        navigate(section);
+      };
+      if (current === "audio" && section !== "audio" && audioLeaveRef.current) {
+        void audioLeaveRef.current().then((canLeave) => {
+          if (canLeave && intent === primaryNavigationIntentRef.current) {
+            completeNavigation();
+          }
+        });
         return;
       }
-      setMessagesOpen(false);
-      navigate(section);
+      completeNavigation();
     },
     [
       activityItems,
@@ -269,16 +283,10 @@ function App() {
       markActivityRead,
       modalOpen,
       navigate,
+      current,
       selectedActivity,
       shellNavigationBlocked,
     ],
-  );
-  const navigateShellHistory = React.useCallback(
-    (delta: -1 | 1) => {
-      if (shellNavigationBlocked) return;
-      void navigateSectionDelta(current, delta);
-    },
-    [current, shellNavigationBlocked],
   );
   const changeCaptureDetail = React.useCallback(
     (open: boolean, sessionId: string | null = null) => {
@@ -309,19 +317,52 @@ function App() {
     },
     [applicationBlocked],
   );
+  const dismissCaptureDetail = React.useCallback(() => {
+    if (shellNavigationBlocked) return;
+    setDismissedCaptureDetailSessionId(automaticCaptureDetailSessionId);
+    changeCaptureDetail(false);
+  }, [
+    automaticCaptureDetailSessionId,
+    changeCaptureDetail,
+    shellNavigationBlocked,
+  ]);
+  const returnFromRoutedCapture = React.useCallback(() => {
+    if (!routedCaptureSessionId || shellNavigationBlocked) return;
+    setDismissedCaptureDetailSessionId(routedCaptureSessionId);
+    setCaptureDetailOpen(false);
+    setCaptureDetailSessionId(null);
+    void navigateSection(current, captureOwnerPath(routeDestination), {
+      replace: true,
+    });
+  }, [
+    current,
+    routeDestination,
+    routedCaptureSessionId,
+    shellNavigationBlocked,
+  ]);
   const openSettingsTarget = React.useCallback(
     (settingsTarget: SettingsSection) => {
       if (applicationBlocked) return;
+      const intent = ++primaryNavigationIntentRef.current;
       const navigateToSettings = () => {
-        pendingSettingsTargetRef.current = settingsTarget;
-        setMessagesOpen(false);
-        void navigateSection("settings", `/settings/${settingsTarget}`);
-        void navigateAuthorizedRef.current("settings");
+        void (async () => {
+          if (current === "audio" && audioLeaveRef.current) {
+            const canLeave = await audioLeaveRef.current();
+            if (!canLeave || intent !== primaryNavigationIntentRef.current) {
+              return;
+            }
+          }
+          if (intent !== primaryNavigationIntentRef.current) return;
+          pendingSettingsTargetRef.current = settingsTarget;
+          setMessagesOpen(false);
+          await navigateSection("settings", `/settings/${settingsTarget}`);
+          void navigateAuthorizedRef.current("settings");
+        })();
       };
       if (modalOpen) requestNavigationAfterModals(navigateToSettings);
       else navigateToSettings();
     },
-    [applicationBlocked, modalOpen, requestNavigationAfterModals],
+    [applicationBlocked, current, modalOpen, requestNavigationAfterModals],
   );
   const openFailureSettings = React.useCallback(
     (item: ActivityItemView) => {
@@ -429,6 +470,14 @@ function App() {
     onCancel: cancelProcessing,
     onRetry: retryProcessing,
   });
+  React.useEffect(() => {
+    audioLeaveRef.current = audio.prepareToLeave;
+    return () => {
+      if (audioLeaveRef.current === audio.prepareToLeave) {
+        audioLeaveRef.current = null;
+      }
+    };
+  }, [audio.prepareToLeave]);
   const navigateCompanionView = React.useCallback((view: CompanionView) => {
     void navigateSection("companion", companionPath(view));
   }, []);
@@ -625,19 +674,28 @@ function App() {
     (current !== "messages" || activityItems.length > 0);
   const audioWorkspacePresentation =
     current === "audio" && !captureDetailVisible;
+  const audioDetailPresentation =
+    audioWorkspacePresentation && audio.workspace !== null;
   const audioFirstUsePresentation =
     audioWorkspacePresentation &&
     audio.libraryPresentation === "true-empty" &&
     snapshot.capture.phase === "idle";
+  const audioSelectionEmptyPresentation =
+    audioWorkspacePresentation &&
+    audio.libraryPresentation === "populated" &&
+    audio.workspace === null;
   const messageEmptyPresentation =
     current === "messages" &&
     !captureDetailVisible &&
     activityItems.length === 0;
   const fullScreenEmptyPresentation =
-    audioFirstUsePresentation || messageEmptyPresentation;
+    audioFirstUsePresentation ||
+    audioSelectionEmptyPresentation ||
+    messageEmptyPresentation;
   let contentPadding: "none" | "compact" | "page" = "none";
   if (presentation.contentMode === "padded") {
     if (fullScreenEmptyPresentation) contentPadding = "none";
+    else if (audioDetailPresentation) contentPadding = "none";
     else if (audioWorkspacePresentation) contentPadding = "compact";
     else contentPadding = "page";
   }
@@ -652,6 +710,16 @@ function App() {
     audio.autoOpenState.audioId === snapshot.libraryProjection.audioId
       ? audio.autoOpenState
       : ({ phase: "idle" } as const);
+  const backAction =
+    recordingShellMode === "browsing" && routedCaptureSessionId
+      ? {
+          label:
+            routeDestination.kind === "message-capture"
+              ? "返回消息"
+              : "返回音频",
+          onBack: returnFromRoutedCapture,
+        }
+      : undefined;
   return (
     <CaptureWorkspaceController
       capture={snapshot.capture}
@@ -677,13 +745,7 @@ function App() {
         if (open && current !== "audio") return;
         if (!open && shellNavigationBlocked) return;
         if (!open && routedCaptureSessionId) {
-          if (activeRoute.canGoBack) {
-            navigateShellHistory(-1);
-          } else {
-            void navigateSection(current, captureOwnerPath(routeDestination), {
-              replace: true,
-            });
-          }
+          returnFromRoutedCapture();
           return;
         }
         changeCaptureDetail(open);
@@ -710,15 +772,19 @@ function App() {
                   onRequestClose: requestPaneClose,
                   search:
                     pane.paneSection === "audio" ? (
-                      <AudioContextPaneSearch controller={audio} />
+                      <AudioContextPaneToolbar controller={audio} />
                     ) : pane.paneSection === "messages" ? (
                       <ActivityContextPaneSearch
                         value={activityQuery}
                         onValueChange={setActivityQuery}
                       />
                     ) : undefined,
+                  searchOpen:
+                    pane.paneSection === "audio"
+                      ? audio.searchVisible
+                      : undefined,
                   head:
-                    pane.paneSection === "audio" && audio.workspace !== null ? (
+                    pane.paneSection === "audio" ? (
                       <AudioContextPaneHeader controller={audio} />
                     ) : pane.paneSection === "messages" ? (
                       <ActivityContextPaneHead
@@ -728,9 +794,7 @@ function App() {
                       />
                     ) : null,
                   filters:
-                    pane.paneSection === "audio" ? (
-                      <AudioContextPaneFilters controller={audio} />
-                    ) : pane.paneSection === "messages" ? (
+                    pane.paneSection === "messages" ? (
                       <ActivityContextPaneFilters
                         items={activityItems}
                         value={activityFilter}
@@ -738,8 +802,11 @@ function App() {
                       />
                     ) : undefined,
                   footer:
-                    pane.paneSection === "companion" &&
-                    companion.view.kind === "device" ? (
+                    pane.paneSection === "audio" &&
+                    audio.libraryPresentation === "populated" ? (
+                      <AudioContextPaneFooter controller={audio} />
+                    ) : pane.paneSection === "companion" &&
+                      companion.view.kind === "device" ? (
                       <CompanionContextPaneFooter controller={companion} />
                     ) : null,
                   children:
@@ -781,20 +848,26 @@ function App() {
           customTitle={
             captureDetailVisible ? captureWorkspace.customTitle : undefined
           }
-          showHeader={!fullScreenEmptyPresentation}
+          showHeader={!fullScreenEmptyPresentation && !audioDetailPresentation}
           visibility={{
             navigation: recordingShellMode !== "recordingFocus",
-            history: recordingShellMode !== "recordingFocus",
           }}
-          history={{
-            canGoBack: activeRoute.canGoBack,
-            canGoForward: activeRoute.canGoForward,
-            onBack: () => navigateShellHistory(-1),
-            onForward: () => navigateShellHistory(1),
-          }}
+          navigationDisabled={recordingShellMode === "startPending"}
+          backAction={backAction}
           actions={
-            audioWorkspacePresentation ? (
-              <AudioMainHeaderActions controller={audio} />
+            captureDetailVisible &&
+            !routedCaptureSessionId &&
+            recordingShellMode === "browsing" ? (
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon-sm"
+                className="size-7"
+                aria-label="关闭录制详情"
+                onClick={dismissCaptureDetail}
+              >
+                <X aria-hidden="true" />
+              </Button>
             ) : null
           }
           notice={
@@ -803,7 +876,13 @@ function App() {
           contentRef={mainContentRef}
           contentPadding={contentPadding}
           contentTone={current === "settings" ? "muted" : "default"}
-          footer={captureDetailVisible ? captureWorkspace.footer : null}
+          footer={
+            captureDetailVisible ? (
+              captureWorkspace.footer
+            ) : audioDetailPresentation ? (
+              <AudioMainPlaybackFooter controller={audio} />
+            ) : null
+          }
         >
           <SectionContentProvider
             content={

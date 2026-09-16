@@ -1,22 +1,36 @@
 import * as React from "react";
 import { toast } from "sonner";
 import {
-  ChevronDown,
-  Download,
+  Astroid,
+  HardDrive,
+  MessageSquareText,
+  MessagesSquare,
   Pause,
   Play,
   Redo2,
+  Rows3,
   RotateCcw,
   RotateCw,
   Search,
+  SquareArrowOutUpRight,
   Undo2,
 } from "lucide-react";
+import { audioWorkspaceLimits } from "../../../shared/contracts";
 
 import { Button } from "@/components/ui/button";
-import { Card } from "@/components/ui/card";
-import { EmptyState } from "@/components/ui/empty-state";
+import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { Bubble, BubbleContent } from "@/components/ui/bubble";
+import { ButtonGroup } from "@/components/ui/button-group";
+import { EmptyState, FullScreenEmptyState } from "@/components/ui/empty-state";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import {
+  Message,
+  MessageAvatar,
+  MessageContent,
+  MessageFooter,
+  MessageHeader,
+} from "@/components/ui/message";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -37,6 +51,7 @@ import { AudioAiFeature } from "@/features/audio-ai/audio-ai-feature";
 import { userFacingError } from "@/lib/user-facing-error";
 import type {
   AudioExportFormat,
+  AudioMetadataPatch,
   AudioPlaybackSnapshot,
   AudioSegment,
   AudioSpeakerState,
@@ -48,11 +63,114 @@ import type {
 const rowHeight = 190;
 const visibleRows = 12;
 const overscan = 4;
+const audioWorkspaceTabs = [
+  { value: "transcript", label: "转写文本", icon: MessageSquareText },
+  { value: "summary", label: "AI 总结", icon: Astroid },
+  { value: "knowledge", label: "知识库", icon: HardDrive },
+] as const;
+type AudioWorkspaceTab = (typeof audioWorkspaceTabs)[number]["value"];
+type TranscriptViewMode = "flat" | "conversation";
 
 type SearchResultIdentity = Pick<
   AudioSegment,
   "id" | "stableKey" | "sequenceId"
 >;
+type WorkspaceMutationAction = (
+  current: AudioWorkspaceSnapshot,
+) => Promise<AudioWorkspaceSnapshot>;
+
+function InlineTextEditor({
+  ariaLabel,
+  className,
+  initialValue,
+  onCancel,
+  onCommit,
+  onKeyboardExit,
+}: {
+  ariaLabel: string;
+  className: string;
+  initialValue: string;
+  onCancel: () => void;
+  onCommit: (value: string) => void;
+  onKeyboardExit: () => void;
+}) {
+  const normalizeSingleLine = (value: string) =>
+    value.replaceAll(/\r?\n/g, " ");
+  const editorRef = React.useRef<HTMLSpanElement>(null);
+  const canceledRef = React.useRef(false);
+  const initialValueRef = React.useRef(initialValue);
+
+  React.useLayoutEffect(() => {
+    const editor = editorRef.current;
+    if (!editor) return;
+    editor.textContent = normalizeSingleLine(initialValueRef.current);
+    editor.focus();
+    const selection = window.getSelection();
+    if (!selection) return;
+    const range = document.createRange();
+    range.selectNodeContents(editor);
+    range.collapse(false);
+    selection.removeAllRanges();
+    selection.addRange(range);
+  }, []);
+
+  const readValue = (editor: HTMLSpanElement) => {
+    const value = editor.innerText || editor.textContent || "";
+    return normalizeSingleLine(value);
+  };
+
+  const insertText = (text: string) => {
+    const selection = window.getSelection();
+    if (!selection?.rangeCount) return;
+    const range = selection.getRangeAt(0);
+    range.deleteContents();
+    const node = document.createTextNode(text);
+    range.insertNode(node);
+    range.setStartAfter(node);
+    range.collapse(true);
+    selection.removeAllRanges();
+    selection.addRange(range);
+  };
+
+  return (
+    <span
+      ref={editorRef}
+      role="textbox"
+      aria-label={ariaLabel}
+      contentEditable
+      data-plaintext-only="true"
+      suppressContentEditableWarning
+      spellCheck
+      className={className}
+      onPaste={(event) => {
+        event.preventDefault();
+        const pasted = event.clipboardData.getData("text/plain");
+        const text = normalizeSingleLine(pasted);
+        insertText(text);
+      }}
+      onBlur={(event) => {
+        if (canceledRef.current) return;
+        onCommit(readValue(event.currentTarget));
+      }}
+      onKeyDown={(event) => {
+        if (event.nativeEvent.isComposing) return;
+        if (event.key === "Escape") {
+          event.preventDefault();
+          canceledRef.current = true;
+          onKeyboardExit();
+          onCancel();
+          event.currentTarget.blur();
+          return;
+        }
+        if (event.key === "Enter") {
+          event.preventDefault();
+          onKeyboardExit();
+          event.currentTarget.blur();
+        }
+      }}
+    />
+  );
+}
 
 export function AudioWorkspaceFeature({
   api = window.voice2text,
@@ -64,7 +182,6 @@ export function AudioWorkspaceFeature({
     React.useState<AudioWorkspaceSnapshot | null>(null);
   const [error, setError] = React.useState<string | null>(null);
   const [pending, setPending] = React.useState(false);
-  const [status, setStatus] = React.useState("正在载入音频资料库");
   const [libraryQuery, setLibraryQuery] = React.useState("");
   const pendingRef = React.useRef(false);
 
@@ -77,9 +194,6 @@ export function AudioWorkspaceFeature({
       try {
         const next = await api.listAudios(query);
         setAudios(next);
-        setStatus(
-          next.length === 0 ? "音频资料库为空" : `已载入 ${next.length} 个音频`,
-        );
       } catch (cause) {
         setError(userFacingError(cause, "无法载入音频资料库"));
       } finally {
@@ -97,9 +211,6 @@ export function AudioWorkspaceFeature({
       .then((next) => {
         if (!active) return;
         setAudios(next);
-        setStatus(
-          next.length === 0 ? "音频资料库为空" : `已载入 ${next.length} 个音频`,
-        );
       })
       .catch((cause: unknown) => {
         if (active) setError(userFacingError(cause, "无法载入音频资料库"));
@@ -118,7 +229,6 @@ export function AudioWorkspaceFeature({
       const next = await api.openAudio(audioId);
       if (!next) throw new Error("音频不存在或已被移除");
       setWorkspace(next);
-      setStatus(`已打开 ${next.summary.displayName}`);
     } catch (cause) {
       setError(userFacingError(cause, "无法打开音频"));
     } finally {
@@ -197,7 +307,6 @@ export function AudioWorkspaceFeature({
             ))}
           </ul>
         )}
-        <LiveStatus status={status} />
       </section>
     );
   }
@@ -208,16 +317,13 @@ export function AudioWorkspaceFeature({
       workspace={workspace}
       pending={pending}
       error={error}
-      status={status}
       setPending={setPending}
       setError={setError}
-      setStatus={setStatus}
       setWorkspace={setWorkspace}
       onBack={() => {
         const audioId = workspace.summary.audioId;
         setWorkspace(null);
         setError(null);
-        setStatus("已返回音频资料库");
         window.requestAnimationFrame(() => {
           document
             .querySelector<HTMLButtonElement>(`[data-audio-id="${audioId}"]`)
@@ -233,28 +339,47 @@ export function AudioDetailWorkspace({
   workspace,
   routePending,
   onWorkspaceChange,
+  playback,
+  playbackPending,
+  onPlaybackAction,
+  onWorkspaceMutation,
+  onSaveMetadata,
+  transcriptStatus,
 }: {
   api: Voice2TextDesktopApi;
   workspace: AudioWorkspaceSnapshot;
   routePending: boolean;
   onWorkspaceChange: (value: AudioWorkspaceSnapshot) => void;
+  playback?: AudioPlaybackSnapshot | null;
+  playbackPending?: boolean;
+  onPlaybackAction?: (
+    command: Parameters<Voice2TextDesktopApi["controlAudioPlayback"]>[1],
+  ) => void;
+  onWorkspaceMutation?: (
+    action: WorkspaceMutationAction,
+  ) => Promise<AudioWorkspaceSnapshot>;
+  onSaveMetadata?: (
+    patch: AudioMetadataPatch,
+  ) => Promise<AudioWorkspaceSnapshot | null>;
+  transcriptStatus?: React.ReactNode;
 }) {
   const [pending, setPending] = React.useState(false);
   const [error, setError] = React.useState<string | null>(null);
-  const [status, setStatus] = React.useState(
-    `已打开 ${workspace.summary.displayName}`,
-  );
   return (
     <WorkspaceView
       api={api}
       workspace={workspace}
       pending={pending || routePending}
       error={error}
-      status={status}
       setPending={setPending}
       setError={setError}
-      setStatus={setStatus}
       setWorkspace={onWorkspaceChange}
+      externalPlayback={playback}
+      externalPlaybackPending={playbackPending}
+      onExternalPlaybackAction={onPlaybackAction}
+      onWorkspaceMutation={onWorkspaceMutation}
+      onSaveMetadata={onSaveMetadata}
+      transcriptStatus={transcriptStatus}
     />
   );
 }
@@ -264,25 +389,64 @@ function WorkspaceView({
   workspace,
   pending,
   error,
-  status,
   setPending,
   setError,
-  setStatus,
   setWorkspace,
   onBack,
+  externalPlayback,
+  externalPlaybackPending,
+  onExternalPlaybackAction,
+  onWorkspaceMutation,
+  onSaveMetadata,
+  transcriptStatus,
 }: {
   api: Voice2TextDesktopApi;
   workspace: AudioWorkspaceSnapshot;
   pending: boolean;
   error: string | null;
-  status: string;
   setPending: (value: boolean) => void;
   setError: (value: string | null) => void;
-  setStatus: (value: string) => void;
   setWorkspace: (value: AudioWorkspaceSnapshot) => void;
   onBack?: () => void;
+  externalPlayback?: AudioPlaybackSnapshot | null;
+  externalPlaybackPending?: boolean;
+  onExternalPlaybackAction?: (
+    command: Parameters<Voice2TextDesktopApi["controlAudioPlayback"]>[1],
+  ) => void;
+  onWorkspaceMutation?: (
+    action: WorkspaceMutationAction,
+  ) => Promise<AudioWorkspaceSnapshot>;
+  onSaveMetadata?: (
+    patch: AudioMetadataPatch,
+  ) => Promise<AudioWorkspaceSnapshot | null>;
+  transcriptStatus?: React.ReactNode;
 }) {
   const [query, setQuery] = React.useState("");
+  const [searchOpen, setSearchOpen] = React.useState(false);
+  const [transcriptViewMode, setTranscriptViewMode] =
+    React.useState<TranscriptViewMode>("flat");
+  const [activeTab, setActiveTab] =
+    React.useState<AudioWorkspaceTab>("transcript");
+  const [title, setTitle] = React.useState(workspace.summary.displayName);
+  const [description, setDescription] = React.useState(
+    workspace.description ?? "",
+  );
+  const [editingField, setEditingField] = React.useState<
+    "title" | "description" | null
+  >(null);
+  const editingFieldRef = React.useRef(editingField);
+  const metadataDirtyRef = React.useRef({ title: false, description: false });
+  const metadataVersionRef = React.useRef({ title: 0, description: 0 });
+  const [metadataError, setMetadataError] = React.useState<string | null>(null);
+  const [compactHeader, setCompactHeader] = React.useState(false);
+  const observedCompactHeaderRef = React.useRef(false);
+  const titleMarkerRef = React.useRef<HTMLDivElement>(null);
+  const expandedTitleTriggerRef = React.useRef<HTMLButtonElement>(null);
+  const expandedDescriptionTriggerRef = React.useRef<HTMLButtonElement>(null);
+  const compactTitleTriggerRef = React.useRef<HTMLButtonElement>(null);
+  const metadataFocusRestoreFieldRef = React.useRef<
+    "title" | "description" | null
+  >(null);
   const [playback, setPlayback] = React.useState<AudioPlaybackSnapshot | null>(
     null,
   );
@@ -291,7 +455,64 @@ function WorkspaceView({
   >([]);
   const [activeSearchIndex, setActiveSearchIndex] = React.useState(-1);
   const operationPendingRef = React.useRef(false);
+  const searchInputRef = React.useRef<HTMLInputElement>(null);
+  const tabRefs = React.useRef<Array<HTMLButtonElement | null>>([]);
   const playbackCloseRef = React.useRef<Promise<void> | null>(null);
+
+  React.useEffect(() => {
+    editingFieldRef.current = editingField;
+    if (!editingField) {
+      setCompactHeader(observedCompactHeaderRef.current);
+    }
+  }, [editingField]);
+
+  React.useEffect(() => {
+    const field = metadataFocusRestoreFieldRef.current;
+    if (
+      editingField ||
+      !field ||
+      pending ||
+      compactHeader !== observedCompactHeaderRef.current
+    ) {
+      return;
+    }
+    const target = compactHeader
+      ? compactTitleTriggerRef.current
+      : field === "title"
+        ? expandedTitleTriggerRef.current
+        : expandedDescriptionTriggerRef.current;
+    if (!target) return;
+    metadataFocusRestoreFieldRef.current = null;
+    target.focus();
+  }, [compactHeader, editingField, pending]);
+
+  React.useEffect(() => {
+    if (!metadataDirtyRef.current.title) {
+      setTitle(workspace.summary.displayName);
+    }
+    if (!metadataDirtyRef.current.description) {
+      setDescription(workspace.description);
+    }
+  }, [workspace.description, workspace.summary.displayName]);
+
+  React.useEffect(() => {
+    const marker = titleMarkerRef.current;
+    if (!marker || typeof IntersectionObserver === "undefined") return;
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        const nextCompactHeader = !entry?.isIntersecting;
+        observedCompactHeaderRef.current = nextCompactHeader;
+        if (!editingFieldRef.current) setCompactHeader(nextCompactHeader);
+      },
+      { rootMargin: "-50px 0px 0px", threshold: 0 },
+    );
+    observer.observe(marker);
+    return () => observer.disconnect();
+  }, [workspace.summary.audioId]);
+
+  React.useEffect(() => {
+    if (searchOpen) searchInputRef.current?.focus();
+  }, [searchOpen]);
 
   const requestPlaybackClose = React.useCallback(() => {
     if (playbackCloseRef.current) return playbackCloseRef.current;
@@ -326,7 +547,6 @@ function WorkspaceView({
     } catch (cause) {
       const detail = userFacingError(cause, "音频关闭未完成");
       setError(detail);
-      setStatus(`音频关闭失败：${detail}`);
     } finally {
       operationPendingRef.current = false;
       setPending(false);
@@ -337,27 +557,33 @@ function WorkspaceView({
     const result = searchResults[index];
     if (!result) return;
     setActiveSearchIndex(index);
-    setStatus(
-      `搜索结果 ${index + 1} / ${searchResults.length}，片段 ${result.sequenceId + 1}`,
-    );
   };
 
   const mutate = async (
-    action: () => Promise<AudioWorkspaceSnapshot>,
-    success: string,
-  ) => {
-    if (operationPendingRef.current) return;
+    action: WorkspaceMutationAction,
+  ): Promise<AudioWorkspaceSnapshot | null> => {
+    if (operationPendingRef.current) return null;
     operationPendingRef.current = true;
     setPending(true);
     setError(null);
     try {
-      setWorkspace(await action());
-      setStatus(success);
+      const next = onWorkspaceMutation
+        ? await onWorkspaceMutation(action)
+        : await action(workspace);
+      if (!onWorkspaceMutation) setWorkspace(next);
+      if (!metadataDirtyRef.current.title) {
+        setTitle(next.summary.displayName);
+      }
+      if (!metadataDirtyRef.current.description) {
+        setDescription(next.description);
+      }
       toast.dismiss("audio-workspace-mutation");
+      return next;
     } catch (cause) {
       toast.error(userFacingError(cause, "音频修改未完成，请重新载入。"), {
         id: "audio-workspace-mutation",
       });
+      return null;
     } finally {
       operationPendingRef.current = false;
       setPending(false);
@@ -383,7 +609,6 @@ function WorkspaceView({
           ? current!
           : await api.controlAudioPlayback(workspace.summary.audioId, command);
       setPlayback(next);
-      setStatus(playbackStatus(next));
       toast.dismiss("audio-playback-action");
     } catch (cause) {
       toast.error(userFacingError(cause, "音频操作未完成，请重试。"), {
@@ -403,10 +628,8 @@ function WorkspaceView({
     try {
       const result = await api.exportAudio(workspace.summary.audioId, format);
       if (result.state === "saved") {
-        setStatus(`已导出 ${result.fileName}`);
-        toast.dismiss("audio-export");
+        toast.success(`已导出 ${result.fileName}`, { id: "audio-export" });
       } else if (result.state === "canceled") {
-        setStatus("已取消导出");
         toast.dismiss("audio-export");
       } else {
         toast.error("音频导出失败，请重试。", { id: "audio-export" });
@@ -421,11 +644,144 @@ function WorkspaceView({
     }
   };
 
+  const saveMetadataField = (
+    field: "title" | "description",
+    explicitValue?: string,
+  ) => {
+    const draft = explicitValue ?? (field === "title" ? title : description);
+    const value = field === "title" ? draft.trim() : draft;
+    const authoritativeValue =
+      field === "title" ? workspace.summary.displayName : workspace.description;
+    if (value === authoritativeValue) {
+      metadataDirtyRef.current[field] = false;
+      return;
+    }
+    if (
+      field === "title" &&
+      value.length > audioWorkspaceLimits.titleCharacters
+    ) {
+      setMetadataError(
+        `标题不能超过 ${audioWorkspaceLimits.titleCharacters} 个字符，请精简后重试。`,
+      );
+      return;
+    }
+    if (
+      field === "description" &&
+      value.length > audioWorkspaceLimits.descriptionCharacters
+    ) {
+      setMetadataError(
+        `描述不能超过 ${audioWorkspaceLimits.descriptionCharacters} 个字符，请精简后重试。`,
+      );
+      return;
+    }
+    setMetadataError(null);
+    const patch = { [field]: value } as AudioMetadataPatch;
+    const version = metadataVersionRef.current[field];
+    if (onSaveMetadata) {
+      void onSaveMetadata(patch)
+        .then((next) => {
+          if (!next) return;
+          if (metadataVersionRef.current[field] === version) {
+            metadataDirtyRef.current[field] = false;
+            if (field === "title") {
+              setTitle(next.summary.displayName);
+            } else {
+              setDescription(next.description);
+            }
+          }
+        })
+        .catch((cause: unknown) => {
+          toast.error(userFacingError(cause, "音频信息保存失败，请重试。"), {
+            id: "audio-metadata-save",
+          });
+        });
+      return;
+    }
+    void mutate((current) =>
+      api.updateAudioMetadata({
+        audioId: current.summary.audioId,
+        ...patch,
+        expectedRevision: current.revision,
+      }),
+    ).then((next) => {
+      if (!next || metadataVersionRef.current[field] !== version) return;
+      metadataDirtyRef.current[field] = false;
+      if (field === "title") {
+        setTitle(next.summary.displayName);
+      } else {
+        setDescription(next.description);
+      }
+    });
+  };
+
+  const commitMetadataEdit = (
+    field: "title" | "description",
+    value: string,
+  ) => {
+    metadataDirtyRef.current[field] = true;
+    metadataVersionRef.current[field] += 1;
+    if (field === "title") setTitle(value);
+    else setDescription(value);
+    saveMetadataField(field, value);
+    setEditingField(null);
+  };
+
+  const requestMetadataFocusRestore = (field: "title" | "description") => {
+    metadataFocusRestoreFieldRef.current = field;
+  };
+
+  const showEvidence = (
+    evidence: { segmentId: number; startMs: number; endMs: number },
+    generationId: number,
+  ) => {
+    setActiveTab("transcript");
+    const segment = workspace.segments.find(
+      (item) =>
+        item.id === evidence.segmentId &&
+        item.startMs === evidence.startMs &&
+        item.endMs === evidence.endMs,
+    );
+    if (!segment) {
+      setSearchResults([]);
+      setActiveSearchIndex(-1);
+      toast.warning("对应的转写片段已变化，请重新生成总结", {
+        id: "audio-evidence-stale",
+      });
+      return;
+    }
+    if (workspace.summary.generationId !== generationId) {
+      setSearchResults([]);
+      setActiveSearchIndex(-1);
+      toast.warning("对应的转写片段已变化，请重新生成总结", {
+        id: "audio-evidence-stale",
+      });
+      return;
+    }
+    setSearchResults([
+      {
+        id: segment.id,
+        stableKey: segment.stableKey,
+        sequenceId: segment.sequenceId,
+      },
+    ]);
+    setActiveSearchIndex(0);
+  };
+
+  const usesExternalPlayback = onExternalPlaybackAction !== undefined;
+  const effectivePlayback = usesExternalPlayback ? externalPlayback : playback;
+  const effectivePlaybackPending = usesExternalPlayback
+    ? Boolean(externalPlaybackPending)
+    : pending;
+  const handlePlaybackAction = usesExternalPlayback
+    ? onExternalPlaybackAction
+    : (command: Parameters<Voice2TextDesktopApi["controlAudioPlayback"]>[1]) =>
+        void playbackAction(command);
+
   return (
     <section
       aria-label={`${workspace.summary.displayName} 工作区`}
       aria-busy={pending}
-      className="space-y-5"
+      className="min-h-full"
     >
       {onBack ? (
         <Button
@@ -444,201 +800,492 @@ function WorkspaceView({
           message={error}
           pending={pending}
           onRetry={() =>
-            void mutate(async () => {
-              const next = await api.openAudio(workspace.summary.audioId);
+            void mutate(async (current) => {
+              const next = await api.openAudio(current.summary.audioId);
               if (!next) throw new Error("音频已不可用");
               return next;
-            }, "已重新载入音频")
+            })
           }
         />
       ) : null}
 
-      <AudioCommandDeck
-        playback={playback}
-        workspace={workspace}
-        pending={pending}
-        onAction={(command) => void playbackAction(command)}
-        onUndo={() =>
-          void mutate(
-            () =>
-              api.undoAudioEdit(
-                workspace.summary.audioId,
-                workspace.summary.generationId!,
-                workspace.revision,
-              ),
-            "已撤销上次文本修改",
-          )
-        }
-        onRedo={() =>
-          void mutate(
-            () =>
-              api.redoAudioEdit(
-                workspace.summary.audioId,
-                workspace.summary.generationId!,
-                workspace.revision,
-              ),
-            "已重做文本修改",
-          )
-        }
-        onExport={(format) => void exportAudio(format)}
-      />
+      <div
+        data-audio-sticky-actions
+        className="pointer-events-none sticky top-0 z-30 mx-auto h-0 w-full max-w-5xl px-5 sm:px-8"
+      >
+        <div
+          data-audio-sticky-actions-content
+          className={
+            compactHeader
+              ? "pointer-events-auto ml-auto w-fit translate-y-[9px] transition-transform duration-200 motion-reduce:transition-none"
+              : "pointer-events-auto ml-auto w-fit translate-y-8 transition-transform duration-200 motion-reduce:transition-none"
+          }
+        >
+          <AudioWorkspaceActions
+            pending={pending}
+            onExport={(format) => void exportAudio(format)}
+          />
+        </div>
+      </div>
 
-      <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_18rem]">
-        <div className="space-y-4">
-          <form
-            role="search"
-            className="flex gap-2 border-y py-3"
-            onSubmit={(event) => {
-              event.preventDefault();
-              if (query.trim().length === 0 || operationPendingRef.current)
-                return;
-              operationPendingRef.current = true;
-              setPending(true);
-              void api
-                .searchTranscript(workspace.summary.audioId, query)
-                .then((results) => {
-                  const identities = results.map(
-                    ({ id, stableKey, sequenceId }) => ({
-                      id,
-                      stableKey,
-                      sequenceId,
-                    }),
-                  );
-                  setSearchResults(identities);
-                  setActiveSearchIndex(identities.length > 0 ? 0 : -1);
-                  setStatus(
-                    identities.length === 0
-                      ? "没有找到匹配片段"
-                      : `搜索结果 1 / ${identities.length}，片段 ${identities[0]!.sequenceId + 1}`,
-                  );
-                })
-                .catch((cause) =>
-                  setError(userFacingError(cause, "搜索未完成")),
-                )
-                .finally(() => {
-                  operationPendingRef.current = false;
-                  setPending(false);
-                });
-            }}
-          >
-            <Input
-              type="search"
-              aria-label="搜索音频转写"
-              value={query}
-              onChange={(event) => setQuery(event.target.value)}
-            />
-            <Button
-              type="submit"
-              variant="outline"
-              disabled={pending || query.trim().length === 0}
-            >
-              <Search aria-hidden="true" />
-              搜索
-            </Button>
-          </form>
-          {searchResults.length > 0 ? (
-            <div
-              role="group"
-              aria-label="搜索结果导航"
-              className="flex flex-wrap items-center justify-between gap-2 border-y py-2"
-            >
-              <p className="text-sm text-muted-foreground">
-                搜索结果 {activeSearchIndex + 1} / {searchResults.length}，片段{" "}
-                {searchResults[activeSearchIndex]!.sequenceId + 1}
+      <div
+        ref={titleMarkerRef}
+        data-audio-hero
+        className="mx-auto w-full max-w-5xl px-5 pt-8 sm:px-8"
+      >
+        <div
+          data-audio-expanded-title
+          aria-hidden={compactHeader}
+          inert={compactHeader ? true : undefined}
+          className={
+            compactHeader
+              ? "pointer-events-none pr-12 opacity-0 transition-opacity duration-200 motion-reduce:transition-none"
+              : "pr-12 opacity-100 transition-opacity duration-200 motion-reduce:transition-none"
+          }
+        >
+          <div className="min-w-0">
+            <h1 className="text-3xl font-semibold tracking-tight">
+              {editingField === "title" && !compactHeader ? (
+                <InlineTextEditor
+                  ariaLabel="音频标题"
+                  initialValue={title}
+                  className="block min-w-[1ch] max-w-full rounded-sm outline-none"
+                  onCancel={() => setEditingField(null)}
+                  onCommit={(value) => commitMetadataEdit("title", value)}
+                  onKeyboardExit={() => requestMetadataFocusRestore("title")}
+                />
+              ) : (
+                <button
+                  ref={expandedTitleTriggerRef}
+                  type="button"
+                  aria-label="编辑音频标题"
+                  className="max-w-full rounded-sm text-left outline-none focus-visible:underline focus-visible:underline-offset-2"
+                  disabled={pending}
+                  onClick={() => setEditingField("title")}
+                >
+                  {title.trim() || "未命名音频"}
+                </button>
+              )}
+            </h1>
+            <p className="mt-1 text-sm text-muted-foreground">
+              {editingField === "description" ? (
+                <InlineTextEditor
+                  ariaLabel="音频描述"
+                  initialValue={description}
+                  className="block min-h-5 w-full whitespace-nowrap rounded-sm outline-none"
+                  onCancel={() => setEditingField(null)}
+                  onCommit={(value) => commitMetadataEdit("description", value)}
+                  onKeyboardExit={() =>
+                    requestMetadataFocusRestore("description")
+                  }
+                />
+              ) : (
+                <button
+                  ref={expandedDescriptionTriggerRef}
+                  type="button"
+                  aria-label="编辑音频描述"
+                  className="rounded-sm text-left outline-none focus-visible:underline focus-visible:underline-offset-2"
+                  disabled={pending}
+                  onClick={() => setEditingField("description")}
+                >
+                  {description.trim() || "添加描述"}
+                </button>
+              )}
+            </p>
+            {metadataError ? (
+              <p role="alert" className="mt-2 text-sm text-destructive">
+                {metadataError}
               </p>
-              <div className="flex gap-2">
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  disabled={pending}
-                  aria-label="上一个搜索结果"
-                  onClick={() =>
-                    selectSearchResult(
-                      (activeSearchIndex - 1 + searchResults.length) %
-                        searchResults.length,
-                    )
-                  }
-                >
-                  上一个
-                </Button>
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  disabled={pending}
-                  aria-label="下一个搜索结果"
-                  onClick={() =>
-                    selectSearchResult(
-                      (activeSearchIndex + 1) % searchResults.length,
-                    )
-                  }
-                >
-                  下一个
-                </Button>
-              </div>
-            </div>
-          ) : null}
+            ) : null}
+          </div>
+        </div>
+      </div>
+
+      <div
+        data-audio-sticky-header
+        className="sticky top-[50px] z-20 mt-5 h-11"
+      >
+        <div
+          aria-hidden="true"
+          className={
+            compactHeader
+              ? "pointer-events-none absolute inset-x-0 -top-[50px] h-[50px] bg-background/95 opacity-100 backdrop-blur-sm transition-opacity duration-200 motion-reduce:transition-none"
+              : "pointer-events-none absolute inset-x-0 -top-[50px] h-[50px] bg-background/95 opacity-0 backdrop-blur-sm transition-opacity duration-200 motion-reduce:transition-none"
+          }
+        />
+        <div
+          aria-hidden="true"
+          className="pointer-events-none absolute inset-x-0 top-0 h-11 border-b bg-background/95 backdrop-blur-sm"
+        />
+        <div className="relative mx-auto h-11 w-full max-w-5xl px-5 sm:px-8">
+          <div
+            data-audio-compact-title
+            aria-hidden={!compactHeader}
+            inert={!compactHeader ? true : undefined}
+            className={
+              compactHeader
+                ? "absolute inset-x-5 -top-[35px] h-5 min-w-0 pr-12 text-sm leading-5 font-semibold opacity-100 transition-opacity duration-200 motion-reduce:transition-none sm:inset-x-8"
+                : "pointer-events-none absolute inset-x-5 -top-[35px] h-5 min-w-0 pr-12 text-sm leading-5 font-semibold opacity-0 transition-opacity duration-200 motion-reduce:transition-none sm:inset-x-8"
+            }
+          >
+            {editingField === "title" && compactHeader ? (
+              <InlineTextEditor
+                ariaLabel="音频标题"
+                initialValue={title}
+                className="block min-w-[1ch] max-w-full flex-1 truncate rounded-sm outline-none"
+                onCancel={() => setEditingField(null)}
+                onCommit={(value) => commitMetadataEdit("title", value)}
+                onKeyboardExit={() => requestMetadataFocusRestore("title")}
+              />
+            ) : (
+              <button
+                ref={compactTitleTriggerRef}
+                type="button"
+                aria-label="编辑音频标题"
+                className="block min-w-0 max-w-full truncate rounded-sm text-left outline-none focus-visible:underline focus-visible:underline-offset-2"
+                disabled={pending}
+                onClick={() => setEditingField("title")}
+              >
+                {title.trim() || "未命名音频"}
+              </button>
+            )}
+          </div>
+          <div
+            role="tablist"
+            aria-label="音频内容"
+            className="relative flex h-11 translate-y-0 gap-6"
+          >
+            {audioWorkspaceTabs.map(({ value, label, icon: Icon }, index) => (
+              <button
+                key={value}
+                type="button"
+                role="tab"
+                aria-selected={activeTab === value}
+                aria-controls={`audio-tab-${value}`}
+                id={`audio-tab-trigger-${value}`}
+                ref={(node) => {
+                  tabRefs.current[index] = node;
+                }}
+                tabIndex={activeTab === value ? 0 : -1}
+                className="flex h-11 items-center gap-1.5 border-b-2 border-transparent text-sm text-muted-foreground outline-none transition-colors hover:text-foreground focus-visible:ring-1 focus-visible:ring-ring data-[active=true]:border-foreground data-[active=true]:text-foreground"
+                data-active={activeTab === value}
+                onClick={() => setActiveTab(value)}
+                onKeyDown={(event) => {
+                  const keys = ["ArrowLeft", "ArrowRight", "Home", "End"];
+                  if (!keys.includes(event.key)) return;
+                  event.preventDefault();
+                  const nextIndex = nextTabIndex(event.key, index);
+                  setActiveTab(audioWorkspaceTabs[nextIndex]!.value);
+                  tabRefs.current[nextIndex]?.focus();
+                }}
+              >
+                <Icon className="size-4" aria-hidden="true" />
+                {label}
+              </button>
+            ))}
+          </div>
+        </div>
+      </div>
+
+      <div className="mx-auto w-full max-w-5xl px-5 py-6 sm:px-8">
+        <div
+          id="audio-tab-transcript"
+          role="tabpanel"
+          aria-labelledby="audio-tab-trigger-transcript"
+          hidden={activeTab !== "transcript"}
+          className="space-y-4"
+        >
           {workspace.segments.length === 0 ? (
-            <EmptyState title="转写尚未就绪" className="border-b" />
+            <FullScreenEmptyState
+              description="当前音频尚未转写成文本"
+              actions={transcriptStatus}
+              className="min-h-96"
+            />
           ) : (
-            <VirtualTranscript
-              workspace={workspace}
-              pending={pending}
-              activeSearchResult={searchResults[activeSearchIndex] ?? null}
-              onEdit={(segment, text) =>
-                void mutate(
-                  () =>
+            <>
+              {transcriptStatus}
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <div
+                  role="group"
+                  aria-label="转写编辑操作"
+                  className="flex gap-1"
+                >
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon-sm"
+                    disabled={pending || !workspace.canUndo}
+                    aria-label="撤销"
+                    onClick={() =>
+                      void mutate((current) =>
+                        api.undoAudioEdit(
+                          current.summary.audioId,
+                          current.summary.generationId!,
+                          current.revision,
+                        ),
+                      )
+                    }
+                  >
+                    <Undo2 aria-hidden="true" />
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon-sm"
+                    disabled={pending || !workspace.canRedo}
+                    aria-label="重做"
+                    onClick={() =>
+                      void mutate((current) =>
+                        api.redoAudioEdit(
+                          current.summary.audioId,
+                          current.summary.generationId!,
+                          current.revision,
+                        ),
+                      )
+                    }
+                  >
+                    <Redo2 aria-hidden="true" />
+                  </Button>
+                </div>
+                <form
+                  role="search"
+                  onSubmit={(event) => {
+                    event.preventDefault();
+                    if (
+                      query.trim().length === 0 ||
+                      operationPendingRef.current
+                    )
+                      return;
+                    operationPendingRef.current = true;
+                    setPending(true);
+                    void api
+                      .searchTranscript(workspace.summary.audioId, query)
+                      .then((results) => {
+                        const identities = results.map(
+                          ({ id, stableKey, sequenceId }) => ({
+                            id,
+                            stableKey,
+                            sequenceId,
+                          }),
+                        );
+                        setSearchResults(identities);
+                        setActiveSearchIndex(identities.length > 0 ? 0 : -1);
+                        if (identities.length === 0) {
+                          toast.info("没有找到匹配片段", {
+                            id: "audio-transcript-search",
+                          });
+                        } else {
+                          toast.dismiss("audio-transcript-search");
+                        }
+                      })
+                      .catch((cause) =>
+                        toast.error(userFacingError(cause, "搜索未完成"), {
+                          id: "audio-transcript-search",
+                        }),
+                      )
+                      .finally(() => {
+                        operationPendingRef.current = false;
+                        setPending(false);
+                      });
+                  }}
+                >
+                  <ButtonGroup aria-label="转写显示工具">
+                    {searchOpen ? (
+                      <Input
+                        ref={searchInputRef}
+                        type="search"
+                        aria-label="搜索音频转写"
+                        className="w-56"
+                        value={query}
+                        onChange={(event) => setQuery(event.target.value)}
+                        onKeyDown={(event) => {
+                          if (event.key === "Escape") {
+                            event.preventDefault();
+                            setSearchOpen(false);
+                          }
+                        }}
+                      />
+                    ) : null}
+                    <Button
+                      type={searchOpen && query.trim() ? "submit" : "button"}
+                      variant="outline"
+                      size="icon-sm"
+                      aria-label="搜索转写"
+                      aria-pressed={searchOpen}
+                      disabled={pending}
+                      onClick={() => {
+                        if (!searchOpen) setSearchOpen(true);
+                      }}
+                    >
+                      <Search aria-hidden="true" />
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="icon-sm"
+                      aria-label={
+                        transcriptViewMode === "flat"
+                          ? "切换为对话模式"
+                          : "切换为平铺模式"
+                      }
+                      aria-pressed={transcriptViewMode === "conversation"}
+                      onClick={() =>
+                        setTranscriptViewMode((value) =>
+                          value === "flat" ? "conversation" : "flat",
+                        )
+                      }
+                    >
+                      {transcriptViewMode === "flat" ? (
+                        <MessagesSquare aria-hidden="true" />
+                      ) : (
+                        <Rows3 aria-hidden="true" />
+                      )}
+                    </Button>
+                  </ButtonGroup>
+                </form>
+              </div>
+              {searchResults.length > 0 ? (
+                <div
+                  role="group"
+                  aria-label="搜索结果导航"
+                  className="flex flex-wrap items-center justify-between gap-2 border-y py-2"
+                >
+                  <p className="text-sm text-muted-foreground">
+                    搜索结果 {activeSearchIndex + 1} / {searchResults.length}
+                    ，片段 {searchResults[activeSearchIndex]!.sequenceId + 1}
+                  </p>
+                  <div className="flex gap-2">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      disabled={pending}
+                      aria-label="上一个搜索结果"
+                      onClick={() =>
+                        selectSearchResult(
+                          (activeSearchIndex - 1 + searchResults.length) %
+                            searchResults.length,
+                        )
+                      }
+                    >
+                      上一个
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      disabled={pending}
+                      aria-label="下一个搜索结果"
+                      onClick={() =>
+                        selectSearchResult(
+                          (activeSearchIndex + 1) % searchResults.length,
+                        )
+                      }
+                    >
+                      下一个
+                    </Button>
+                  </div>
+                </div>
+              ) : null}
+              <VirtualTranscript
+                workspace={workspace}
+                pending={pending}
+                viewMode={transcriptViewMode}
+                activeSearchResult={searchResults[activeSearchIndex] ?? null}
+                onEdit={(segment, text) =>
+                  void mutate((current) =>
                     api.editAudioSegment({
-                      audioId: workspace.summary.audioId,
-                      generationId: workspace.summary.generationId!,
+                      audioId: current.summary.audioId,
+                      generationId: current.summary.generationId!,
                       segmentId: segment.id,
                       text,
-                      expectedRevision: workspace.revision,
+                      expectedRevision: current.revision,
                     }),
-                  `已保存片段 ${segment.sequenceId + 1}`,
-                )
-              }
-              onAssign={(segment, state, speakerId) =>
-                void mutate(
-                  () =>
+                  )
+                }
+                onAssign={(segment, state, speakerId) =>
+                  void mutate((current) =>
                     api.assignAudioSpeaker({
-                      audioId: workspace.summary.audioId,
-                      generationId: workspace.summary.generationId!,
+                      audioId: current.summary.audioId,
+                      generationId: current.summary.generationId!,
                       segmentId: segment.id,
                       state,
                       speakerId,
-                      expectedRevision: workspace.revision,
+                      expectedRevision: current.revision,
                     }),
-                  `已更新片段 ${segment.sequenceId + 1} 的说话人`,
-                )
-              }
-            />
+                  )
+                }
+              />
+              <SpeakerPanel
+                key={`${workspace.summary.generationId}:${workspace.speakers
+                  .filter((speaker) => speaker.mergedIntoSpeakerId === null)
+                  .map((speaker) => speaker.id)
+                  .join(",")}`}
+                api={api}
+                workspace={workspace}
+                pending={pending}
+                mutate={mutate}
+              />
+            </>
           )}
         </div>
 
-        <aside aria-label="音频操作" className="space-y-4">
+        <div
+          id="audio-tab-summary"
+          role="tabpanel"
+          aria-labelledby="audio-tab-trigger-summary"
+          hidden={activeTab !== "summary"}
+        >
           {workspace.summary.generationId !== null ? (
             <AudioAiFeature
               key={`${workspace.summary.audioId}:${workspace.summary.generationId}`}
               api={api}
               audioId={workspace.summary.audioId}
               generationId={workspace.summary.generationId}
+              onEvidenceSelect={(evidence) =>
+                showEvidence(evidence, workspace.summary.generationId!)
+              }
+              onSuggestedTitle={(nextTitle) => {
+                metadataDirtyRef.current.title = true;
+                metadataVersionRef.current.title += 1;
+                setTitle(nextTitle);
+                saveMetadataField("title", nextTitle);
+              }}
             />
-          ) : null}
-          <SpeakerPanel
-            key={`${workspace.summary.generationId}:${workspace.speakers
-              .filter((speaker) => speaker.mergedIntoSpeakerId === null)
-              .map((speaker) => speaker.id)
-              .join(",")}`}
-            api={api}
-            workspace={workspace}
-            pending={pending}
-            mutate={mutate}
-          />
-        </aside>
+          ) : (
+            <EmptyState title="完成转写后即可生成 AI 总结" />
+          )}
+        </div>
+
+        <div
+          id="audio-tab-knowledge"
+          role="tabpanel"
+          aria-labelledby="audio-tab-trigger-knowledge"
+          hidden={activeTab !== "knowledge"}
+          className="grid min-h-80 place-items-center text-center"
+        >
+          <div>
+            <HardDrive
+              className="mx-auto size-7 text-muted-foreground"
+              aria-hidden="true"
+            />
+            <h2 className="mt-3 font-medium">知识库即将推出</h2>
+            <p className="mt-1 text-sm text-muted-foreground">
+              之后可以在这里检索与当前音频相关的内容。
+            </p>
+          </div>
+        </div>
       </div>
-      <LiveStatus status={status} />
+      {!usesExternalPlayback ? (
+        <div className="sticky bottom-0 z-20 border-t bg-background">
+          <AudioPlaybackControls
+            playback={effectivePlayback}
+            durationMs={workspace.summary.durationMs}
+            pending={effectivePlaybackPending}
+            onAction={handlePlaybackAction!}
+          />
+        </div>
+      ) : null}
     </section>
   );
 }
@@ -646,12 +1293,14 @@ function WorkspaceView({
 function VirtualTranscript({
   workspace,
   pending,
+  viewMode,
   activeSearchResult,
   onEdit,
   onAssign,
 }: {
   workspace: AudioWorkspaceSnapshot;
   pending: boolean;
+  viewMode: TranscriptViewMode;
   activeSearchResult: SearchResultIdentity | null;
   onEdit: (segment: AudioSegment, text: string) => void;
   onAssign: (
@@ -709,6 +1358,7 @@ function VirtualTranscript({
             segment={segment}
             speakers={workspace.speakers}
             pending={pending}
+            viewMode={viewMode}
             top={(start + visibleIndex) * rowHeight}
             total={workspace.segments.length}
             onEdit={onEdit}
@@ -724,6 +1374,7 @@ function SegmentRow({
   segment,
   speakers,
   pending,
+  viewMode,
   top,
   total,
   onEdit,
@@ -732,6 +1383,7 @@ function SegmentRow({
   segment: AudioSegment;
   speakers: AudioWorkspaceSnapshot["speakers"];
   pending: boolean;
+  viewMode: TranscriptViewMode;
   top: number;
   total: number;
   onEdit: (segment: AudioSegment, text: string) => void;
@@ -747,10 +1399,93 @@ function SegmentRow({
   const editorId = `segment-${segment.id}-text`;
   const speakerId = `segment-${segment.id}-speaker`;
   const save = () => {
-    if (text.trim().length === 0 || pending) return;
-    onEdit(segment, text.trim());
+    if (pending) return;
+    const nextText = text.trim();
+    if (nextText.length === 0 || nextText === segment.text) {
+      setText(segment.text);
+      setEditing(false);
+      return;
+    }
+    onEdit(segment, nextText);
     setEditing(false);
   };
+  const activeSpeakers = speakers.filter(
+    (speaker) => speaker.mergedIntoSpeakerId === null,
+  );
+  const activeSpeakerIndex = activeSpeakers.findIndex(
+    (speaker) => speaker.id === segment.speakerId,
+  );
+  const messageAlign =
+    segment.speakerState === "assigned" && activeSpeakerIndex % 2 === 1
+      ? "end"
+      : "start";
+  const speakerSelect = (
+    <Select
+      value={
+        segment.speakerState === "assigned"
+          ? `speaker:${segment.speakerId}`
+          : segment.speakerState
+      }
+      disabled={pending}
+      onValueChange={(value) => {
+        if (value.startsWith("speaker:"))
+          onAssign(segment, "assigned", Number(value.slice(8)));
+        else onAssign(segment, value as "overlap" | "unknown", null);
+      }}
+    >
+      <SelectTrigger
+        id={speakerId}
+        size="sm"
+        aria-label={`片段 ${index} 说话人`}
+      >
+        <SelectValue />
+      </SelectTrigger>
+      <SelectContent>
+        <SelectItem value="unknown">未知说话人</SelectItem>
+        <SelectItem value="overlap">多人重叠</SelectItem>
+        {activeSpeakers.map((speaker) => (
+          <SelectItem key={speaker.id} value={`speaker:${speaker.id}`}>
+            {speaker.displayName}
+          </SelectItem>
+        ))}
+      </SelectContent>
+    </Select>
+  );
+  const segmentEditor = (
+    <div
+      className={viewMode === "conversation" ? "flex gap-2" : "mt-2 flex gap-2"}
+    >
+      <Label htmlFor={editorId} className="sr-only">
+        片段 {index} 文本
+      </Label>
+      <Textarea
+        id={editorId}
+        className={
+          viewMode === "conversation"
+            ? "field-sizing-fixed h-16 min-h-16 max-h-16 flex-1 resize-none overflow-y-auto"
+            : "field-sizing-fixed h-20 min-h-20 max-h-20 flex-1 resize-none overflow-y-auto"
+        }
+        value={text}
+        onChange={(event) => setText(event.target.value)}
+        onBlur={save}
+        onKeyDown={(event) => {
+          if (event.key === "Enter" && !event.nativeEvent.isComposing) {
+            event.preventDefault();
+            save();
+          }
+        }}
+      />
+      <Button
+        type="button"
+        size={viewMode === "conversation" ? "sm" : "default"}
+        disabled={pending || text.trim().length === 0}
+        onPointerDown={(event) => event.preventDefault()}
+        onClick={save}
+      >
+        保存
+      </Button>
+    </div>
+  );
   return (
     <li
       aria-label={`片段 ${index}，${clock(segment.startMs)} ${speakerLabel(segment)}`}
@@ -758,270 +1493,231 @@ function SegmentRow({
       aria-setsize={total}
       data-segment-id={segment.id}
       tabIndex={-1}
-      className="absolute left-0 right-0 border-b p-4"
+      className="absolute right-0 left-0 border-b p-4"
       style={{ height: rowHeight, top }}
     >
-      <div className="flex items-center justify-between gap-3">
-        <p className="text-xs font-medium text-muted-foreground">
-          {clock(segment.startMs)} · {speakerLabel(segment)}
-          {segment.speakerSource === "manual" ? " · 已手工校正" : ""}
-        </p>
-        <Button
-          type="button"
-          variant="ghost"
-          size="sm"
-          onClick={() => setEditing((value) => !value)}
-        >
-          编辑片段 {index}
-        </Button>
-      </div>
-      {editing ? (
-        <div className="mt-2 flex gap-2">
-          <Label htmlFor={editorId} className="sr-only">
-            片段 {index} 文本
-          </Label>
-          <Textarea
-            id={editorId}
-            className="min-h-20 flex-1 resize-none"
-            value={text}
-            onChange={(event) => setText(event.target.value)}
-            onKeyDown={(event) => {
-              if ((event.ctrlKey || event.metaKey) && event.key === "Enter") {
-                event.preventDefault();
-                save();
-              }
-            }}
-          />
-          <Button
-            type="button"
-            disabled={pending || text.trim().length === 0}
-            onClick={save}
-          >
-            保存
-          </Button>
-        </div>
+      {viewMode === "conversation" ? (
+        <Message align={messageAlign} className="h-full">
+          <MessageAvatar>
+            <Avatar size="sm">
+              <AvatarFallback>{speakerAvatarLabel(segment)}</AvatarFallback>
+            </Avatar>
+          </MessageAvatar>
+          <MessageContent className="gap-1.5">
+            <MessageHeader className="justify-between gap-3">
+              <span>
+                {speakerLabel(segment)} · {clock(segment.startMs)}
+              </span>
+              <Button
+                type="button"
+                variant="ghost"
+                size="xs"
+                onClick={() => setEditing((value) => !value)}
+              >
+                编辑片段 {index}
+              </Button>
+            </MessageHeader>
+            {editing ? (
+              segmentEditor
+            ) : (
+              <Bubble variant="muted" className="h-16">
+                <BubbleContent className="h-16 overflow-hidden">
+                  {segment.text}
+                </BubbleContent>
+              </Bubble>
+            )}
+            <MessageFooter className="gap-2">
+              <Label htmlFor={speakerId} className="sr-only">
+                说话人
+              </Label>
+              {speakerSelect}
+            </MessageFooter>
+          </MessageContent>
+        </Message>
       ) : (
-        <p className="mt-2 line-clamp-3 text-sm leading-6">{segment.text}</p>
+        <>
+          <div className="flex items-center justify-between gap-3">
+            <p className="text-xs font-medium text-muted-foreground">
+              {clock(segment.startMs)} · {speakerLabel(segment)}
+              {segment.speakerSource === "manual" ? " · 已手工校正" : ""}
+            </p>
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              onClick={() => setEditing((value) => !value)}
+            >
+              编辑片段 {index}
+            </Button>
+          </div>
+          {editing ? (
+            segmentEditor
+          ) : (
+            <p className="mt-2 h-20 line-clamp-3 text-sm leading-6">
+              {segment.text}
+            </p>
+          )}
+          <div className="mt-2 flex items-center gap-2">
+            <Label
+              htmlFor={speakerId}
+              className="text-xs text-muted-foreground"
+            >
+              说话人
+            </Label>
+            {speakerSelect}
+          </div>
+        </>
       )}
-      <div className="mt-2 flex items-center gap-2">
-        <Label htmlFor={speakerId} className="text-xs text-muted-foreground">
-          说话人
-        </Label>
-        <Select
-          value={
-            segment.speakerState === "assigned"
-              ? `speaker:${segment.speakerId}`
-              : segment.speakerState
-          }
-          disabled={pending}
-          onValueChange={(value) => {
-            if (value.startsWith("speaker:"))
-              onAssign(segment, "assigned", Number(value.slice(8)));
-            else onAssign(segment, value as "overlap" | "unknown", null);
-          }}
-        >
-          <SelectTrigger
-            id={speakerId}
-            size="sm"
-            aria-label={`片段 ${index} 说话人`}
-          >
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="unknown">未知说话人</SelectItem>
-            <SelectItem value="overlap">多人重叠</SelectItem>
-            {speakers
-              .filter((speaker) => speaker.mergedIntoSpeakerId === null)
-              .map((speaker) => (
-                <SelectItem key={speaker.id} value={`speaker:${speaker.id}`}>
-                  {speaker.displayName}
-                </SelectItem>
-              ))}
-          </SelectContent>
-        </Select>
-      </div>
     </li>
   );
 }
 
-function AudioCommandDeck({
-  playback,
-  workspace,
+function AudioWorkspaceActions({
   pending,
-  onAction,
-  onUndo,
-  onRedo,
   onExport,
 }: {
-  playback: AudioPlaybackSnapshot | null;
-  workspace: Pick<AudioWorkspaceSnapshot, "summary" | "canUndo" | "canRedo">;
+  pending: boolean;
+  onExport: (format: AudioExportFormat) => void;
+}) {
+  return (
+    <div
+      className="flex shrink-0 items-center gap-1"
+      role="group"
+      aria-label="音频操作"
+    >
+      <DropdownMenu>
+        <DropdownMenuTrigger asChild>
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon-sm"
+            disabled={pending}
+            aria-label="导出"
+          >
+            <SquareArrowOutUpRight aria-hidden="true" />
+          </Button>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent align="end">
+          <DropdownMenuLabel>选择导出格式</DropdownMenuLabel>
+          {(["txt", "md", "vtt", "srt", "json"] as const).map((format) => (
+            <DropdownMenuItem key={format} onSelect={() => onExport(format)}>
+              {format.toUpperCase()}
+            </DropdownMenuItem>
+          ))}
+        </DropdownMenuContent>
+      </DropdownMenu>
+    </div>
+  );
+}
+
+export function AudioPlaybackControls({
+  playback,
+  durationMs,
+  pending,
+  onAction,
+}: {
+  playback: AudioPlaybackSnapshot | null | undefined;
+  durationMs: number;
   pending: boolean;
   onAction: (
     command: Parameters<Voice2TextDesktopApi["controlAudioPlayback"]>[1],
   ) => void;
-  onUndo: () => void;
-  onRedo: () => void;
-  onExport: (format: AudioExportFormat) => void;
 }) {
   const playing = playback?.playing ?? false;
   const positionMs = playback?.positionMs ?? 0;
-  const resolvedDurationMs = Math.max(
-    1,
-    playback?.durationMs ?? workspace.summary.durationMs,
-  );
+  const resolvedDurationMs = Math.max(1, playback?.durationMs ?? durationMs);
   return (
-    <section aria-label="音频控制台">
-      <Card className="gap-0 p-4">
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <p className="text-sm text-muted-foreground">
-            {workspace.summary.segmentCount} 个片段 ·{" "}
-            {generationLabel(workspace.summary.generationKind)}
-          </p>
-          <div
-            className="flex flex-wrap items-center gap-1"
-            role="group"
-            aria-label="音频工作区操作"
-          >
-            <Button
-              type="button"
-              variant="ghost"
-              size="icon-sm"
-              disabled={pending || !workspace.canUndo}
-              aria-label="撤销"
-              onClick={onUndo}
-            >
-              <Undo2 aria-hidden="true" />
-            </Button>
-            <Button
-              type="button"
-              variant="ghost"
-              size="icon-sm"
-              disabled={pending || !workspace.canRedo}
-              aria-label="重做"
-              onClick={onRedo}
-            >
-              <Redo2 aria-hidden="true" />
-            </Button>
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  disabled={pending}
-                >
-                  <Download aria-hidden="true" />
-                  导出
-                  <ChevronDown aria-hidden="true" />
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end">
-                <DropdownMenuLabel>选择导出格式</DropdownMenuLabel>
-                {(["txt", "md", "vtt", "srt", "json"] as const).map(
-                  (format) => (
-                    <DropdownMenuItem
-                      key={format}
-                      onSelect={() => onExport(format)}
-                    >
-                      {format.toUpperCase()}
-                    </DropdownMenuItem>
-                  ),
-                )}
-              </DropdownMenuContent>
-            </DropdownMenu>
-          </div>
-        </div>
-        <div className="mt-4 grid items-center gap-4 md:grid-cols-[auto_minmax(12rem,1fr)_auto]">
-          <div
-            className="flex items-center gap-1"
-            role="group"
-            aria-label="播放控制"
-          >
-            <Button
-              type="button"
-              variant="ghost"
-              size="icon"
-              disabled={pending}
-              aria-label="后退 10 秒"
-              onClick={() =>
-                onAction({
-                  action: "seek",
-                  positionMs: Math.max(0, positionMs - 10_000),
-                })
-              }
-            >
-              <RotateCcw aria-hidden="true" />
-            </Button>
-            <Button
-              type="button"
-              size="icon"
-              disabled={pending}
-              aria-label={playing ? "暂停音频" : "播放音频"}
-              onClick={() => onAction({ action: playing ? "pause" : "play" })}
-            >
-              {playing ? (
-                <Pause aria-hidden="true" />
-              ) : (
-                <Play aria-hidden="true" />
-              )}
-            </Button>
-            <Button
-              type="button"
-              variant="ghost"
-              size="icon"
-              disabled={pending}
-              aria-label="前进 10 秒"
-              onClick={() =>
-                onAction({
-                  action: "seek",
-                  positionMs: Math.min(resolvedDurationMs, positionMs + 10_000),
-                })
-              }
-            >
-              <RotateCw aria-hidden="true" />
-            </Button>
-          </div>
-          <div className="space-y-2">
-            <div
-              className="flex justify-between text-xs text-muted-foreground"
-              aria-hidden="true"
-            >
-              <span>{clock(positionMs)}</span>
-              <span>{clock(resolvedDurationMs)}</span>
-            </div>
-            <Slider
-              aria-label="音频播放位置"
-              aria-valuetext={clock(positionMs)}
-              min={0}
-              max={resolvedDurationMs}
-              step={1}
-              value={[positionMs]}
-              disabled={pending}
-              onValueChange={(value) =>
-                onAction({ action: "seek", positionMs: value[0] ?? 0 })
-              }
-            />
-          </div>
-          <Select
-            value={String(playback?.speed ?? 1)}
+    <section aria-label="音频播放器" className="w-full px-4 py-3 sm:px-6">
+      <div className="mx-auto grid w-full max-w-5xl items-center gap-4 md:grid-cols-[auto_minmax(12rem,1fr)_auto]">
+        <div
+          className="flex items-center gap-1"
+          role="group"
+          aria-label="播放控制"
+        >
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon"
             disabled={pending}
-            onValueChange={(value) =>
-              onAction({ action: "speed", speed: Number(value) })
+            aria-label="后退 10 秒"
+            onClick={() =>
+              onAction({
+                action: "seek",
+                positionMs: Math.max(0, positionMs - 10_000),
+              })
             }
           >
-            <SelectTrigger aria-label="播放速度" size="sm">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              {[0.5, 0.75, 1, 1.25, 1.5, 2].map((speed) => (
-                <SelectItem key={speed} value={String(speed)}>
-                  {speed}×
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+            <RotateCcw aria-hidden="true" />
+          </Button>
+          <Button
+            type="button"
+            size="icon"
+            disabled={pending}
+            aria-label={playing ? "暂停音频" : "播放音频"}
+            onClick={() => onAction({ action: playing ? "pause" : "play" })}
+          >
+            {playing ? (
+              <Pause aria-hidden="true" />
+            ) : (
+              <Play aria-hidden="true" />
+            )}
+          </Button>
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon"
+            disabled={pending}
+            aria-label="前进 10 秒"
+            onClick={() =>
+              onAction({
+                action: "seek",
+                positionMs: Math.min(resolvedDurationMs, positionMs + 10_000),
+              })
+            }
+          >
+            <RotateCw aria-hidden="true" />
+          </Button>
         </div>
-      </Card>
+        <div className="space-y-2">
+          <div
+            className="flex justify-between text-xs text-muted-foreground"
+            aria-hidden="true"
+          >
+            <span>{clock(positionMs)}</span>
+            <span>{clock(resolvedDurationMs)}</span>
+          </div>
+          <Slider
+            aria-label="音频播放位置"
+            aria-valuetext={clock(positionMs)}
+            min={0}
+            max={resolvedDurationMs}
+            step={1}
+            value={[positionMs]}
+            disabled={pending}
+            onValueChange={(value) =>
+              onAction({ action: "seek", positionMs: value[0] ?? 0 })
+            }
+          />
+        </div>
+        <Select
+          value={String(playback?.speed ?? 1)}
+          disabled={pending}
+          onValueChange={(value) =>
+            onAction({ action: "speed", speed: Number(value) })
+          }
+        >
+          <SelectTrigger aria-label="播放速度" size="sm">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            {[0.5, 0.75, 1, 1.25, 1.5, 2].map((speed) => (
+              <SelectItem key={speed} value={String(speed)}>
+                {speed}×
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </div>
     </section>
   );
 }
@@ -1035,10 +1731,7 @@ function SpeakerPanel({
   api: Voice2TextDesktopApi;
   workspace: AudioWorkspaceSnapshot;
   pending: boolean;
-  mutate: (
-    action: () => Promise<AudioWorkspaceSnapshot>,
-    success: string,
-  ) => Promise<void>;
+  mutate: (action: WorkspaceMutationAction) => Promise<unknown>;
 }) {
   const active = workspace.speakers.filter(
     (speaker) => speaker.mergedIntoSpeakerId === null,
@@ -1079,16 +1772,14 @@ function SpeakerPanel({
             size="sm"
             disabled={pending || (names[speaker.id] ?? "").trim().length === 0}
             onClick={() =>
-              void mutate(
-                () =>
-                  api.renameAudioSpeaker({
-                    audioId: workspace.summary.audioId,
-                    generationId: workspace.summary.generationId!,
-                    speakerId: speaker.id,
-                    name: names[speaker.id]!,
-                    expectedRevision: workspace.revision,
-                  }),
-                `已重命名 ${speaker.displayName}`,
+              void mutate((current) =>
+                api.renameAudioSpeaker({
+                  audioId: current.summary.audioId,
+                  generationId: current.summary.generationId!,
+                  speakerId: speaker.id,
+                  name: names[speaker.id]!,
+                  expectedRevision: current.revision,
+                }),
               )
             }
           >
@@ -1158,16 +1849,14 @@ function SpeakerPanel({
             className="w-full"
             disabled={pending || target === source || source === 0}
             onClick={() =>
-              void mutate(
-                () =>
-                  api.mergeAudioSpeakers({
-                    audioId: workspace.summary.audioId,
-                    generationId: workspace.summary.generationId!,
-                    targetSpeakerId: target,
-                    sourceSpeakerIds: [source],
-                    expectedRevision: workspace.revision,
-                  }),
-                "已合并说话人",
+              void mutate((current) =>
+                api.mergeAudioSpeakers({
+                  audioId: current.summary.audioId,
+                  generationId: current.summary.generationId!,
+                  targetSpeakerId: target,
+                  sourceSpeakerIds: [source],
+                  expectedRevision: current.revision,
+                }),
               )
             }
           >
@@ -1224,29 +1913,38 @@ function RecoveryError({
   );
 }
 
-function LiveStatus({ status }: { status: string }) {
-  return (
-    <p
-      role="status"
-      aria-label="音频工作区状态"
-      aria-live="polite"
-      className="rounded-lg border bg-card px-3 py-2 text-sm text-muted-foreground"
-    >
-      {status}
-    </p>
-  );
-}
-
 function clock(milliseconds: number): string {
   const seconds = Math.floor(milliseconds / 1_000);
   const minutes = Math.floor(seconds / 60);
   return `${String(minutes).padStart(2, "0")}:${String(seconds % 60).padStart(2, "0")}`;
 }
 
+function nextTabIndex(key: string, current: number): number {
+  switch (key) {
+    case "Home":
+      return 0;
+    case "End":
+      return audioWorkspaceTabs.length - 1;
+    case "ArrowRight":
+      return (current + 1) % audioWorkspaceTabs.length;
+    default:
+      return (
+        (current - 1 + audioWorkspaceTabs.length) % audioWorkspaceTabs.length
+      );
+  }
+}
+
 function speakerLabel(segment: AudioSegment): string {
   if (segment.speakerState === "overlap") return "多人重叠";
   if (segment.speakerState === "unknown") return "未知说话人";
   return segment.speakerName ?? "匿名说话人";
+}
+
+function speakerAvatarLabel(segment: AudioSegment): string {
+  if (segment.speakerState === "overlap") return "多";
+  if (segment.speakerState === "unknown") return "?";
+  const label = segment.speakerName?.replaceAll(/\s/g, "");
+  return label ? [...label].slice(0, 2).join("") : "匿名";
 }
 
 function processingLabel(state: AudioSummary["processingState"]): string {
@@ -1261,17 +1959,4 @@ function processingLabel(state: AudioSummary["processingState"]): string {
     failed: "处理失败",
     "partial-success": "部分成功，可复核",
   }[state];
-}
-
-function generationLabel(kind: AudioSummary["generationKind"]): string {
-  if (kind === "formal") return "正式转写";
-  if (kind === "live-draft") return "实时草稿";
-  return "转写尚未就绪";
-}
-
-function playbackStatus(snapshot: AudioPlaybackSnapshot): string {
-  if (!snapshot.initialized) return "音频已关闭";
-  return snapshot.playing
-    ? `正在播放，速度 ${snapshot.speed} 倍`
-    : `已暂停在 ${clock(snapshot.positionMs)}`;
 }

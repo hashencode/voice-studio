@@ -154,8 +154,12 @@ it("reviews a completed audio through validated Main and Preload contracts witho
     retryFormalTranscript: vi.fn(),
     listAudios: async (options) => workspace.listAudios(options),
     openAudio: async (audioId) => workspace.openAudio(audioId),
+    deleteAudio: async (audioId) => ({
+      deleted: workspace.deleteAudio(audioId),
+    }),
     searchTranscript: async (options) => workspace.searchTranscript(options),
     editAudioSegment: async (command) => workspace.editSegment(command),
+    updateAudioMetadata: async (command) => workspace.updateMetadata(command),
     undoAudioEdit: async (audioId, generationId, revision) =>
       workspace.undo(audioId, generationId, revision),
     redoAudioEdit: async (audioId, generationId, revision) =>

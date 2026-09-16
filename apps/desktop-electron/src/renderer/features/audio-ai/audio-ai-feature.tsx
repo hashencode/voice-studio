@@ -2,6 +2,7 @@ import * as React from "react";
 import { BrainCircuit, LoaderCircle, RotateCcw } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
 import {
@@ -24,15 +25,22 @@ import type {
 type RequestTarget =
   | { kind: "generate" }
   | { kind: "retry"; jobId: number; expectedAttempt: number };
+type AudioAiEvidence = NonNullable<
+  AudioAiSnapshot["note"]
+>["items"][number]["evidence"][number];
 
 export function AudioAiFeature({
   audioId,
   generationId,
   api = window.voice2text,
+  onEvidenceSelect,
+  onSuggestedTitle,
 }: {
   audioId: number;
   generationId: number;
   api?: Voice2TextDesktopApi;
+  onEvidenceSelect?: (evidence: AudioAiEvidence) => void;
+  onSuggestedTitle?: (title: string) => void;
 }) {
   const [snapshot, setSnapshot] = React.useState<AudioAiSnapshot | null>(null);
   const [pending, setPending] = React.useState(false);
@@ -184,7 +192,11 @@ export function AudioAiFeature({
       ) : null}
 
       {snapshot?.state === "completed" && snapshot.note ? (
-        <AudioAiNote snapshot={snapshot} />
+        <AudioAiNote
+          snapshot={snapshot}
+          onEvidenceSelect={onEvidenceSelect}
+          onSuggestedTitle={onSuggestedTitle}
+        />
       ) : null}
 
       {canRetry ? (
@@ -317,29 +329,104 @@ function ConsentDialog({
   );
 }
 
-function AudioAiNote({ snapshot }: { snapshot: AudioAiSnapshot }) {
-  if (!snapshot.note) return null;
+function AudioAiNote({
+  snapshot,
+  onEvidenceSelect,
+  onSuggestedTitle,
+}: {
+  snapshot: AudioAiSnapshot;
+  onEvidenceSelect?: (evidence: AudioAiEvidence) => void;
+  onSuggestedTitle?: (title: string) => void;
+}) {
+  const note = snapshot.note;
+  if (!note) return null;
+  const suggestedTitle = note.suggestedTitle;
   return (
     <div className="mt-4 space-y-3" aria-label="云端音频草稿">
       <p className="text-xs text-muted-foreground">
         {snapshot.providerDisplayName} · {snapshot.modelId} · 需要人工核对
       </p>
+      {suggestedTitle || note.audioType ? (
+        <div className="flex flex-wrap items-center gap-2 border-y py-3">
+          {suggestedTitle ? (
+            <>
+              <span className="text-sm text-muted-foreground">建议标题</span>
+              <span className="text-sm font-medium">{suggestedTitle}</span>
+              {onSuggestedTitle ? (
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => onSuggestedTitle(suggestedTitle)}
+                >
+                  采用标题
+                </Button>
+              ) : null}
+            </>
+          ) : null}
+          {note.audioType ? (
+            <Badge variant="outline">{note.audioType}</Badge>
+          ) : null}
+        </div>
+      ) : null}
       <ul className="space-y-2">
-        {snapshot.note.items.map((item) => (
+        {note.items.map((item) => (
           <li
             key={item.insightId}
             className="border-t py-3 text-sm first:border-t-0"
           >
-            <p className="font-medium">{item.body}</p>
-            <p className="mt-1 text-xs text-muted-foreground">
-              {item.evidence.length} 条转写证据
-              {item.actionOwner ? ` · 负责人 ${item.actionOwner}` : ""}
-            </p>
+            <div className="flex flex-wrap items-center gap-2">
+              <Badge variant="outline">{insightKindLabel(item.kind)}</Badge>
+              <p className="font-medium">{item.body}</p>
+            </div>
+            {item.actionOwner || item.actionDueAtMs !== null ? (
+              <p className="mt-2 text-xs text-muted-foreground">
+                {item.actionOwner ? `负责人 ${item.actionOwner}` : ""}
+                {item.actionOwner && item.actionDueAtMs !== null ? " · " : ""}
+                {item.actionDueAtMs !== null
+                  ? `截止 ${formatDueDate(item.actionDueAtMs)}`
+                  : ""}
+              </p>
+            ) : null}
+            <div className="mt-2 flex flex-wrap gap-1.5" aria-label="转写证据">
+              {item.evidence.map((evidence, index) => (
+                <Button
+                  key={`${evidence.segmentId}:${evidence.startMs}`}
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  disabled={!onEvidenceSelect}
+                  onClick={() => onEvidenceSelect?.(evidence)}
+                >
+                  证据 {index + 1} · {clock(evidence.startMs)}
+                </Button>
+              ))}
+            </div>
           </li>
         ))}
       </ul>
     </div>
   );
+}
+
+function insightKindLabel(kind: string): string {
+  const labels: Record<string, string> = {
+    action: "行动项",
+    decision: "决定",
+    summary: "摘要",
+    chapter: "章节",
+    risk: "风险",
+    question: "待确认",
+  };
+  return labels[kind] ?? kind;
+}
+
+function formatDueDate(value: number): string {
+  return new Intl.DateTimeFormat("zh-CN", {
+    year: "numeric",
+    month: "short",
+    day: "numeric",
+  }).format(new Date(value));
 }
 
 function isNewerSnapshot(

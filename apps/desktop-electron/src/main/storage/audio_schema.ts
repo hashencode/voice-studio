@@ -8,7 +8,7 @@ import { addCaptionSchema } from "./audio_schema_fragments/v8";
 import { addAudioAiSchema } from "./audio_schema_fragments/v9";
 import { addCompanionSchema } from "./audio_schema_fragments/v10";
 
-export const AUDIO_SCHEMA_VERSION = 4;
+export const AUDIO_SCHEMA_VERSION = 5;
 export const AUDIO_APPLICATION_ID = 0x56324155;
 
 const REQUIRED_AUDIO_BASE_TABLES = [

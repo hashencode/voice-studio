@@ -24,10 +24,12 @@ export interface ShellNavigationItem {
 export function NavMain({
   items,
   current,
+  disabled = false,
   onNavigate,
 }: {
   items: readonly ShellNavigationItem[];
   current: RendererShellSection;
+  disabled?: boolean;
   onNavigate: (section: RendererShellSection) => void;
 }) {
   const primaryItems = items.filter((item) => item.placement !== "footer");
@@ -42,6 +44,7 @@ export function NavMain({
           isActive={current === item.section}
           aria-current={current === item.section ? "page" : undefined}
           aria-label={item.ariaLabel ?? item.title}
+          disabled={disabled}
           className="px-2.5 md:px-2"
           onClick={() => onNavigate(item.section)}
         >

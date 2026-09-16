@@ -14,6 +14,7 @@ import type {
   AudioSummary,
   AudioWorkspaceSnapshot,
   PlaybackAction,
+  UpdateAudioMetadataCommand,
 } from "./audio_workspace";
 import { audioAiErrorCodeSchema, type AudioAiErrorCode } from "./audio_ai";
 import type {
@@ -82,8 +83,10 @@ export const ipcChannels = {
   operationEvent: "desktop.processing.event.v1",
   audioList: "desktop.audio.list.v2",
   audioOpen: "desktop.audio.open.v2",
+  audioDelete: "desktop.audio.delete.v1",
   audioSearch: "desktop.audio.search.v2",
   audioEditSegment: "desktop.audio.edit-segment.v2",
+  audioUpdateMetadata: "desktop.audio.update-metadata.v1",
   audioUndo: "desktop.audio.undo.v2",
   audioRedo: "desktop.audio.redo.v2",
   audioRenameSpeaker: "desktop.audio.rename-speaker.v2",
@@ -501,6 +504,7 @@ export interface Voice2TextDesktopApi {
     offset?: number,
   ): Promise<AudioSummary[]>;
   openAudio(audioId: number): Promise<AudioWorkspaceSnapshot | null>;
+  deleteAudio(audioId: number): Promise<{ deleted: boolean }>;
   searchTranscript(
     audioId: number,
     query: string,
@@ -513,6 +517,9 @@ export interface Voice2TextDesktopApi {
     text: string;
     expectedRevision: number;
   }): Promise<AudioWorkspaceSnapshot>;
+  updateAudioMetadata(
+    command: UpdateAudioMetadataCommand,
+  ): Promise<AudioWorkspaceSnapshot>;
   undoAudioEdit(
     audioId: number,
     generationId: number,

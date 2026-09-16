@@ -126,9 +126,9 @@ function seedImport(sourceSha256: string, sizeBytes: number): void {
       duration_ms, receipt_json, created_at_ms
     ) VALUES (99, '${"d".repeat(64)}', '/private/tmp/interop.wav', '${sourceSha256}', ${sizeBytes}, 1000, '{}', 1);
     INSERT INTO audio_items (
-      id, idempotency_key, source_identity, display_name, media_path,
+      id, idempotency_key, source_identity, display_name, original_name, media_path,
       duration_ms, media_authority_id, created_at_ms, updated_at_ms
-    ) VALUES (1, 'interop-audio', 'interop-source', 'Interop', '/private/tmp/interop.wav', 1000, 99, 1, 1);
+    ) VALUES (1, 'interop-audio', 'interop-source', 'Interop', 'Interop', '/private/tmp/interop.wav', 1000, 99, 1, 1);
     INSERT INTO processing_jobs (
       id, audio_id, idempotency_key, operation_id, resource_identity,
       state, attempt, created_at_ms, updated_at_ms

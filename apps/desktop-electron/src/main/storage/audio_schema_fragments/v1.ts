@@ -18,6 +18,8 @@ export function createAudioCoreSchema(database: DatabaseSync): void {
       idempotency_key TEXT NOT NULL UNIQUE,
       source_identity TEXT NOT NULL UNIQUE,
       display_name TEXT NOT NULL,
+      original_name TEXT NOT NULL CHECK (length(original_name) > 0),
+      description TEXT NOT NULL DEFAULT '',
       media_path TEXT NOT NULL,
       duration_ms INTEGER NOT NULL CHECK (duration_ms >= 0),
       media_authority_id INTEGER,

@@ -7,6 +7,8 @@ export const audioWorkspaceLimits = Object.freeze({
   queryCharacters: 512,
   segmentTextCharacters: 1_000_000,
   speakerNameCharacters: 120,
+  titleCharacters: 256,
+  descriptionCharacters: 2_000,
 });
 
 export const audioProcessingStateSchema = z.enum([
@@ -42,7 +44,7 @@ export const audioExportFormatSchema = z.enum([
 export const audioSummarySchema = z
   .object({
     audioId: z.number().int().positive(),
-    displayName: z.string().min(1).max(256),
+    displayName: z.string().min(1),
     durationMs: z.number().int().nonnegative(),
     createdAtMs: z.number().int().nonnegative(),
     processingState: audioProcessingStateSchema,
@@ -89,6 +91,7 @@ export const audioWorkspaceSnapshotSchema = z
   .object({
     revision: z.number().int().nonnegative(),
     summary: audioSummarySchema,
+    description: z.string(),
     segments: z
       .array(audioSegmentSchema)
       .max(audioWorkspaceLimits.transcriptSegments),
@@ -119,6 +122,10 @@ export const openAudioRequestSchema = z
   .object({ audioId: z.number().int().positive() })
   .strict();
 export const openAudioResponseSchema = audioWorkspaceSnapshotSchema.nullable();
+export const deleteAudioRequestSchema = openAudioRequestSchema;
+export const deleteAudioResponseSchema = z
+  .object({ deleted: z.boolean() })
+  .strict();
 export const searchTranscriptRequestSchema = z
   .object({
     audioId: z.number().int().positive(),
@@ -151,6 +158,21 @@ export const editAudioSegmentRequestSchema = z
     text: z.string().min(1).max(audioWorkspaceLimits.segmentTextCharacters),
   })
   .strict();
+export const updateAudioMetadataRequestSchema = z
+  .object({
+    audioId: z.number().int().positive(),
+    title: z.string().max(audioWorkspaceLimits.titleCharacters).optional(),
+    description: z
+      .string()
+      .max(audioWorkspaceLimits.descriptionCharacters)
+      .optional(),
+    expectedRevision: z.number().int().nonnegative(),
+  })
+  .strict()
+  .refine(
+    (value) => value.title !== undefined || value.description !== undefined,
+    { message: "title or description is required" },
+  );
 export const audioHistoryRequestSchema = z
   .object({
     audioId: z.number().int().positive(),
@@ -247,6 +269,13 @@ export type AudioSegment = z.infer<typeof audioSegmentSchema>;
 export type AudioWorkspaceSnapshot = z.infer<
   typeof audioWorkspaceSnapshotSchema
 >;
+export type AudioMetadataPatch =
+  | { title: string; description?: string }
+  | { title?: string; description: string };
+export type UpdateAudioMetadataCommand = AudioMetadataPatch & {
+  audioId: number;
+  expectedRevision: number;
+};
 export type AudioReviewState = z.infer<typeof audioReviewStateSchema>;
 export type AudioSpeakerState = z.infer<typeof audioSpeakerStateSchema>;
 export type AudioExportFormat = z.infer<typeof audioExportFormatSchema>;

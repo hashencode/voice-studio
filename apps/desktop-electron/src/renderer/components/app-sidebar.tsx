@@ -43,12 +43,14 @@ export function AppSidebar({
   onNavigate,
   presentation,
   unreadActivityCount,
+  navigationDisabled = false,
   children,
 }: React.PropsWithChildren<{
   current: RendererShellSection;
   onNavigate: (section: RendererShellSection) => void;
   presentation: ContextPanePresentation | "closed";
   unreadActivityCount: number;
+  navigationDisabled?: boolean;
 }>) {
   return (
     <Sidebar
@@ -56,6 +58,8 @@ export function AppSidebar({
       mobileMode="inline"
       suppressTransitionKey={current}
       data-presentation={presentation}
+      data-navigation-disabled={navigationDisabled ? "true" : undefined}
+      inert={navigationDisabled}
       className="z-20 overflow-hidden *:data-[sidebar=sidebar]:flex-row data-[presentation=overlay]:!w-[min(var(--sidebar-width),100vw)]"
     >
       <Sidebar
@@ -85,6 +89,7 @@ export function AppSidebar({
               : item,
           )}
           current={current}
+          disabled={navigationDisabled}
           onNavigate={onNavigate}
         />
         <SidebarFooter className="items-center px-2 pt-0 pb-3">

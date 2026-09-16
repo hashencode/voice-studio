@@ -389,12 +389,6 @@ describe("app shell pane resizing", () => {
         }}
         onTogglePane={onTogglePane}
         title="音频"
-        history={{
-          canGoBack: false,
-          canGoForward: false,
-          onBack: vi.fn(),
-          onForward: vi.fn(),
-        }}
       >
         音频正文
       </AppShellFrame>,

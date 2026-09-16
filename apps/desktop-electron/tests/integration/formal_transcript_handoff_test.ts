@@ -301,13 +301,14 @@ describe("capture to formal transcript handoff", () => {
     const audio = database
       .prepare(
         `INSERT INTO audio_items (
-          idempotency_key, source_identity, display_name, media_path,
+          idempotency_key, source_identity, display_name, original_name, media_path,
           duration_ms, media_authority_id, created_at_ms, updated_at_ms
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       )
       .run(
         "unrelated-audio",
         "unrelated-source",
+        "Unrelated import",
         "Unrelated import",
         fixture.media.normalizedPath,
         fixture.media.durationMs,

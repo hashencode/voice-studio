@@ -10,6 +10,7 @@ import {
   audioAiConsentIdentitySchema,
   audioAiConsentPreviewSchema,
   audioAiSnapshotSchema,
+  audioWorkspaceSnapshotSchema,
   bootstrapActionRequestSchema,
   cancelProcessingRequestSchema,
   captureAudioActivitySchema,
@@ -35,12 +36,62 @@ import {
   selectAiProviderProfileRequestSchema,
   suggestCaptureTitleResponseSchema,
   updateAiProviderProfileRequestSchema,
+  updateAudioMetadataRequestSchema,
   workerHealthRequestSchema,
   workerHealthResponseSchema,
 } from "../../src/shared/contracts/index";
 import { createDesktopApi } from "../../src/preload/api";
 
 describe("shared IPC contracts", () => {
+  it("carries field-level audio metadata patches and reads legacy long titles", async () => {
+    const snapshot = audioWorkspaceSnapshotSchema.parse({
+      revision: 1,
+      summary: {
+        audioId: 1,
+        displayName: "旧".repeat(300),
+        durationMs: 1_000,
+        createdAtMs: 1,
+        processingState: "not-started",
+        generationId: null,
+        generationKind: null,
+        segmentCount: 0,
+      },
+      description: "更新后的描述",
+      segments: [],
+      speakers: [],
+      canUndo: false,
+      canRedo: false,
+    });
+    const invoke = vi.fn(async () => ({ ok: true, value: snapshot }));
+    const api = createDesktopApi({ invoke, on: vi.fn(), off: vi.fn() });
+
+    await expect(
+      api.updateAudioMetadata({
+        audioId: 1,
+        description: "更新后的描述",
+        expectedRevision: 0,
+      }),
+    ).resolves.toEqual(snapshot);
+    expect(invoke).toHaveBeenCalledWith(ipcChannels.audioUpdateMetadata, {
+      audioId: 1,
+      description: "更新后的描述",
+      expectedRevision: 0,
+    });
+    expect(() =>
+      updateAudioMetadataRequestSchema.parse({
+        audioId: 1,
+        expectedRevision: 0,
+      }),
+    ).toThrow();
+    expect(() =>
+      updateAudioMetadataRequestSchema.parse({
+        audioId: 1,
+        title: "x".repeat(257),
+        expectedRevision: 0,
+      }),
+    ).toThrow();
+  });
+
   it("validates capture library projection retry through preload", async () => {
     const snapshot = applicationSnapshotSchema.parse({
       protocolVersion: desktopProtocolVersion,

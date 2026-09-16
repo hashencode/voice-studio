@@ -4,6 +4,8 @@ import { ipcChannels } from "../../src/shared/contracts/index";
 import {
   IpcContractError,
   createDesktopIpcHandlers,
+  type DesktopFailureAdapterRegistry,
+  type DesktopIpcServices,
 } from "../../src/main/ipc/desktop_ipc";
 import { createDesktopApi } from "../../src/preload/api";
 import { companionCommandStubs } from "../fixtures/companion";
@@ -14,7 +16,10 @@ const trustedEvent = {
   origin: "http://localhost:5173",
 };
 
-function handlers() {
+function handlers(options?: {
+  deleteAudio?: DesktopIpcServices["deleteAudio"];
+  failureAdapters?: DesktopFailureAdapterRegistry;
+}) {
   const workerHealth = vi.fn(async () => ({
     protocolVersion: 3 as const,
     protocol: "desktop-sherpa-worker-health/v1" as const,
@@ -27,6 +32,8 @@ function handlers() {
     state: "canceled" as const,
   }));
   const openAudio = vi.fn(async () => null);
+  const deleteAudio =
+    options?.deleteAudio ?? vi.fn(async () => ({ deleted: true }));
   const openLocalModelRoot = vi.fn(async () => undefined);
   const renameCaptureSession = vi.fn(async () => applicationSnapshot());
   return {
@@ -88,8 +95,10 @@ function handlers() {
         retryFormalTranscript: vi.fn(),
         listAudios: vi.fn(async () => []),
         openAudio,
+        deleteAudio,
         searchTranscript: vi.fn(async () => []),
         editAudioSegment: vi.fn(),
+        updateAudioMetadata: vi.fn(),
         undoAudioEdit: vi.fn(),
         redoAudioEdit: vi.fn(),
         renameAudioSpeaker: vi.fn(),
@@ -99,9 +108,11 @@ function handlers() {
         exportAudio: vi.fn(),
       },
       maximumPayloadBytes: 1024,
+      failureAdapters: options?.failureAdapters,
     }),
     workerHealth,
     openAudio,
+    deleteAudio,
     openLocalModelRoot,
     renameCaptureSession,
   };
@@ -179,6 +190,33 @@ describe("Main IPC validation", () => {
     expect(fixture.openAudio).not.toHaveBeenCalled();
   });
 
+  it("classifies Audio deletion failures as mutations", async () => {
+    const contexts: Array<{ operation: string; mutation: boolean }> = [];
+    const fixture = handlers({
+      deleteAudio: vi.fn(async () => {
+        throw new Error("delete failed");
+      }),
+      failureAdapters: [
+        (_error, context) => {
+          contexts.push(context);
+          return null;
+        },
+      ],
+    });
+
+    await expect(
+      fixture.handlers.invoke(ipcChannels.audioDelete, trustedEvent, {
+        audioId: 7,
+      }),
+    ).resolves.toMatchObject({ ok: false });
+    expect(contexts).toEqual([
+      expect.objectContaining({
+        operation: ipcChannels.audioDelete,
+        mutation: true,
+      }),
+    ]);
+  });
+
   it("rejects oversized and non-serializable payloads before services", async () => {
     const fixture = handlers();
     await expect(
@@ -212,6 +250,18 @@ describe("Main IPC validation", () => {
     expect(fixture.cancelProcessing).toHaveBeenCalledOnce();
     expect(fixture.cancelProcessing).toHaveBeenCalledWith(23);
     await expect(
+      fixture.handlers.invoke(ipcChannels.audioDelete, trustedEvent, {
+        audioId: 7,
+      }),
+    ).resolves.toEqual({ ok: true, value: { deleted: true } });
+    expect(fixture.deleteAudio).toHaveBeenCalledWith(7);
+    await expect(
+      fixture.handlers.invoke(ipcChannels.audioDelete, trustedEvent, {
+        audioId: 0,
+      }),
+    ).rejects.toBeInstanceOf(IpcContractError);
+    expect(fixture.deleteAudio).toHaveBeenCalledTimes(1);
+    await expect(
       fixture.handlers.invoke(ipcChannels.importAudio, trustedEvent, {}),
     ).resolves.toEqual({
       ok: true,
@@ -236,6 +286,9 @@ describe("Main IPC validation", () => {
     await expect(
       createDesktopApi(bridge).listProcessingTasks(),
     ).resolves.toEqual([]);
+    await expect(createDesktopApi(bridge).deleteAudio(7)).resolves.toEqual({
+      deleted: true,
+    });
     await expect(
       fixture.handlers.invoke(ipcChannels.processingTasks, trustedEvent, {
         expectedProtocolVersion: 3,
@@ -383,8 +436,10 @@ describe("Main IPC validation", () => {
         retryFormalTranscript: vi.fn(),
         listAudios: vi.fn(async () => []),
         openAudio: vi.fn(async () => null),
+        deleteAudio: vi.fn(async () => ({ deleted: false })),
         searchTranscript: vi.fn(async () => []),
         editAudioSegment: vi.fn(),
+        updateAudioMetadata: vi.fn(),
         undoAudioEdit: vi.fn(),
         redoAudioEdit: vi.fn(),
         renameAudioSpeaker: vi.fn(),

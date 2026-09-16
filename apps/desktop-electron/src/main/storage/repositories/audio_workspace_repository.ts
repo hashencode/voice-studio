@@ -93,6 +93,7 @@ export class AudioWorkspaceRepository {
       return {
         revision,
         summary,
+        description: String(summaryRow.description),
         segments: [],
         speakers: [],
         canUndo: false,
@@ -102,11 +103,32 @@ export class AudioWorkspaceRepository {
     return {
       revision,
       summary,
+      description: String(summaryRow.description),
       segments: this.segments(summary.generationId),
       speakers: this.speakers(summary.generationId),
       canUndo: this.hasUndo(audioId),
       canRedo: this.hasRedo(audioId),
     };
+  }
+
+  deleteAudio(audioId: number): boolean {
+    return withTransaction(this.database, () => {
+      this.database
+        .prepare(
+          "UPDATE caption_formal_handoffs SET audio_id = NULL, processing_job_id = NULL WHERE audio_id = ?",
+        )
+        .run(audioId);
+      this.database
+        .prepare(
+          "UPDATE companion_transfers SET audio_id = NULL, processing_job_id = NULL WHERE audio_id = ?",
+        )
+        .run(audioId);
+      return (
+        this.database
+          .prepare("DELETE FROM audio_items WHERE id = ?")
+          .run(audioId).changes === 1
+      );
+    });
   }
 
   searchTranscript(options: {
@@ -179,6 +201,45 @@ export class AudioWorkspaceRepository {
           "UPDATE transcript_segments SET text = ?, text_source = 'manual', review_state = 'reviewed', updated_at_ms = ? WHERE id = ?",
         )
         .run(command.text, command.nowMs, command.segmentId);
+      this.bumpRevision(command.audioId, command.nowMs);
+    });
+  }
+
+  updateMetadata(command: {
+    audioId: number;
+    title?: string;
+    description?: string;
+    expectedRevision: number;
+    nowMs: number;
+  }): void {
+    withTransaction(this.database, () => {
+      this.assertHead(command.audioId, command.expectedRevision);
+      const audio = this.database
+        .prepare(
+          "SELECT display_name, original_name, description FROM audio_items WHERE id = ?",
+        )
+        .get(command.audioId);
+      if (!audio)
+        throw new WorkspaceConflictError("audio is no longer available");
+
+      const title =
+        command.title === undefined
+          ? String(audio.display_name)
+          : command.title.trim() || String(audio.original_name);
+      const description =
+        command.description === undefined
+          ? String(audio.description)
+          : command.description;
+      this.database
+        .prepare(
+          "UPDATE audio_items SET display_name = ?, description = ?, updated_at_ms = ? WHERE id = ?",
+        )
+        .run(title, description, command.nowMs, command.audioId);
+      this.database
+        .prepare(
+          "INSERT OR IGNORE INTO workspace_heads (audio_id, revision, updated_at_ms) VALUES (?, 0, ?)",
+        )
+        .run(command.audioId, command.nowMs);
       this.bumpRevision(command.audioId, command.nowMs);
     });
   }
@@ -693,7 +754,8 @@ export class AudioWorkspaceRepository {
   private summaryRow(audioId: number): Record<string, unknown> | undefined {
     return this.database
       .prepare(
-        `SELECT audio_items.id AS audio_id, audio_items.display_name, audio_items.duration_ms,
+        `SELECT audio_items.id AS audio_id, audio_items.display_name, audio_items.description,
+          audio_items.duration_ms,
           audio_items.created_at_ms, audio_generations.id AS generation_id,
           audio_generations.kind AS generation_kind, audio_generations.partial_success,
           COALESCE((SELECT COUNT(*) FROM transcript_segments WHERE generation_id = audio_generations.id), 0) AS segment_count,

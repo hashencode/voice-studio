@@ -5,7 +5,9 @@ import {
   audioHistoryRequestSchema,
   mergeAudioSpeakersRequestSchema,
   renameAudioSpeakerRequestSchema,
+  updateAudioMetadataRequestSchema,
   searchTranscriptRequestSchema,
+  type UpdateAudioMetadataCommand,
   type AudioWorkspaceSnapshot,
 } from "../../../shared/contracts";
 import { AudioWorkspaceRepository } from "../../storage/repositories/audio_workspace_repository";
@@ -36,6 +38,12 @@ export class AudioWorkspaceService {
     return this.repository.openAudio(audioId);
   }
 
+  deleteAudio(audioId: number): boolean {
+    if (!Number.isSafeInteger(audioId) || audioId <= 0)
+      throw new Error("audio identity is invalid");
+    return this.repository.deleteAudio(audioId);
+  }
+
   searchTranscript(options: {
     audioId: number;
     query: string;
@@ -63,6 +71,18 @@ export class AudioWorkspaceService {
       text: command.text.trim(),
     });
     this.repository.editSegment({ ...parsed, nowMs: this.now() });
+    return this.requireSnapshot(command.audioId);
+  }
+
+  updateMetadata(command: UpdateAudioMetadataCommand): AudioWorkspaceSnapshot {
+    const parsed = updateAudioMetadataRequestSchema.parse({
+      ...command,
+      ...(command.title === undefined ? {} : { title: command.title.trim() }),
+      ...(command.description === undefined
+        ? {}
+        : { description: command.description }),
+    });
+    this.repository.updateMetadata({ ...parsed, nowMs: this.now() });
     return this.requireSnapshot(command.audioId);
   }
 

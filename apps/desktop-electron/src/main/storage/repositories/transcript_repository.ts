@@ -1043,13 +1043,14 @@ export class TranscriptRepository {
         const audio = this.database
           .prepare(
             `INSERT INTO audio_items (
-              idempotency_key, source_identity, display_name, media_path,
+              idempotency_key, source_identity, display_name, original_name, media_path,
               duration_ms, media_authority_id, created_at_ms, updated_at_ms
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
           )
           .run(
             `caption-media:${handoff.normalized_sha256}`,
             `caption-pcm:${handoff.normalized_sha256}`,
+            handoff.display_name,
             handoff.display_name,
             handoff.normalized_path,
             handoff.duration_ms,

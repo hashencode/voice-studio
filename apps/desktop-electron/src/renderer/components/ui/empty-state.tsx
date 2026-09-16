@@ -1,7 +1,42 @@
 import { useId, type ReactNode } from "react";
-import { Sprout } from "lucide-react";
 
 import { cn } from "@/lib/utils";
+
+const stackedRectangles = [
+  { x: 8, y: 24, opacity: 0.24 },
+  { x: 20, y: 17, opacity: 0.36 },
+  { x: 32, y: 10, opacity: 0.52 },
+];
+
+function StackedRectangleGraphic({ compact }: { compact: boolean }) {
+  return (
+    <svg
+      data-slot="empty-state-graphic"
+      viewBox="0 0 88 64"
+      fill="none"
+      aria-hidden="true"
+      className={cn(
+        "text-muted-foreground",
+        compact ? "h-12 w-[4.125rem]" : "h-16 w-[5.5rem]",
+      )}
+    >
+      {stackedRectangles.map(({ x, y, opacity }) => (
+        <rect
+          key={`${x}:${y}`}
+          x={x}
+          y={y}
+          width="48"
+          height="30"
+          rx="4"
+          fill="currentColor"
+          fillOpacity={opacity * 0.12}
+          stroke="currentColor"
+          strokeOpacity={opacity}
+        />
+      ))}
+    </svg>
+  );
+}
 
 export function EmptyState({
   title,
@@ -26,9 +61,11 @@ export function EmptyState({
         className,
       )}
     >
-      {icon !== false ? (
+      {icon === undefined ? (
+        <StackedRectangleGraphic compact={compact} />
+      ) : icon !== false ? (
         <span className="flex size-11 items-center justify-center rounded-full bg-muted text-muted-foreground">
-          {icon ?? <Sprout className="size-5" aria-hidden="true" />}
+          {icon}
         </span>
       ) : null}
       <h3
@@ -52,17 +89,25 @@ export function EmptyState({
 export function FullScreenEmptyState({
   title,
   description,
+  actions,
+  accessibleLabel,
   className,
 }: {
-  title: string;
-  description: string;
+  title?: string;
+  description?: string;
+  actions?: ReactNode;
+  accessibleLabel?: string;
   className?: string;
 }) {
   const titleId = useId();
+  const descriptionId = useId();
   return (
     <section
       data-slot="full-screen-empty-state"
-      aria-labelledby={titleId}
+      role={accessibleLabel ? "status" : undefined}
+      aria-label={accessibleLabel}
+      aria-labelledby={title ? titleId : undefined}
+      aria-describedby={!title && description ? descriptionId : undefined}
       className={cn(
         "flex min-h-0 w-full flex-1 items-center justify-center px-6 py-12 text-center",
         className,
@@ -264,17 +309,27 @@ export function FullScreenEmptyState({
             />
           </svg>
         </div>
-        <div className="mt-6 flex flex-col items-center gap-2">
-          <h2
-            id={titleId}
-            className="text-xl leading-7 font-semibold tracking-tight"
-          >
-            {title}
-          </h2>
-          <p className="max-w-md text-sm leading-5 text-muted-foreground">
-            {description}
-          </p>
-        </div>
+        {title || description || actions ? (
+          <div className="mt-6 flex flex-col items-center gap-2">
+            {title ? (
+              <h2
+                id={titleId}
+                className="text-xl leading-7 font-semibold tracking-tight"
+              >
+                {title}
+              </h2>
+            ) : null}
+            {description ? (
+              <p
+                id={!title ? descriptionId : undefined}
+                className="max-w-md text-sm leading-5 text-muted-foreground"
+              >
+                {description}
+              </p>
+            ) : null}
+            {actions ? <div className="mt-3">{actions}</div> : null}
+          </div>
+        ) : null}
       </div>
     </section>
   );

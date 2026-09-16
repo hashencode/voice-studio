@@ -43,12 +43,13 @@ function fixture() {
 function createAudio(
   context: ReturnType<typeof fixture>,
   displayName = "项目周会.wav",
+  mediaFileName = displayName,
 ) {
   return context.domain.createAudio({
     idempotencyKey: `audio:${displayName}`,
     sourceIdentity: `source:${displayName}`,
     displayName,
-    mediaPath: join(context.profile.mediaDirectory, displayName),
+    mediaPath: join(context.profile.mediaDirectory, mediaFileName),
     durationMs: 6_000,
   }).value;
 }
@@ -123,6 +124,76 @@ const initialSegments = [
 ] as const;
 
 describe("audio workspace authority", () => {
+  it("deletes an audio workspace and its derived content", () => {
+    const context = fixture();
+    try {
+      const audio = createAudio(context);
+      publish(context, audio.id, "delete", [...initialSegments]);
+
+      expect(context.workspace.deleteAudio(audio.id)).toBe(true);
+      expect(context.workspace.openAudio(audio.id)).toBeNull();
+      expect(context.workspace.listAudios()).toEqual([]);
+      expect(context.workspace.deleteAudio(audio.id)).toBe(false);
+    } finally {
+      context.database.close();
+    }
+  });
+
+  it("persists editable metadata and restores the original title when cleared", () => {
+    const context = fixture();
+    try {
+      const audio = createAudio(context);
+      let snapshot = context.workspace.openAudio(audio.id)!;
+      snapshot = context.workspace.updateMetadata({
+        audioId: audio.id,
+        title: "周会复盘",
+        expectedRevision: snapshot.revision,
+      });
+      expect(snapshot.summary.displayName).toBe("周会复盘");
+      expect(snapshot.description).toBe("");
+      snapshot = context.workspace.updateMetadata({
+        audioId: audio.id,
+        description: " 跟进发布准备\n",
+        expectedRevision: snapshot.revision,
+      });
+      expect(snapshot.description).toBe(" 跟进发布准备\n");
+
+      snapshot = context.workspace.updateMetadata({
+        audioId: audio.id,
+        title: "",
+        expectedRevision: snapshot.revision,
+      });
+      expect(snapshot.summary.displayName).toBe("项目周会.wav");
+      expect(snapshot.description).toBe(" 跟进发布准备\n");
+      snapshot = context.workspace.updateMetadata({
+        audioId: audio.id,
+        description: "",
+        expectedRevision: snapshot.revision,
+      });
+      expect(snapshot.description).toBe("");
+    } finally {
+      context.database.close();
+    }
+  });
+
+  it("updates description without revalidating or rewriting a legacy long title", () => {
+    const context = fixture();
+    try {
+      const legacyTitle = "旧".repeat(300);
+      const audio = createAudio(context, legacyTitle, "legacy-title.wav");
+      const snapshot = context.workspace.openAudio(audio.id)!;
+      const updated = context.workspace.updateMetadata({
+        audioId: audio.id,
+        description: "只更新描述",
+        expectedRevision: snapshot.revision,
+      });
+      expect(updated.summary.displayName).toBe(legacyTitle);
+      expect(updated.description).toBe("只更新描述");
+    } finally {
+      context.database.close();
+    }
+  });
+
   it("persists edit, undo/redo and manual speaker authority across a later publication and restart", () => {
     const context = fixture();
     try {

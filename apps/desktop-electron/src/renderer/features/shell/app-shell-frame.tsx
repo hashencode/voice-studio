@@ -41,13 +41,11 @@ type AppShellFrameProps = React.PropsWithChildren<{
   showHeader?: boolean;
   visibility?: {
     navigation: boolean;
-    history: boolean;
   };
-  history: {
-    canGoBack: boolean;
-    canGoForward: boolean;
+  navigationDisabled?: boolean;
+  backAction?: {
+    label: string;
     onBack: () => void;
-    onForward: () => void;
   };
   actions?: React.ReactNode;
   notice?: React.ReactNode;
@@ -73,7 +71,8 @@ export function AppShellFrame({
   customTitle,
   showHeader = true,
   visibility,
-  history,
+  navigationDisabled = false,
+  backAction,
   actions,
   notice,
   contentRef,
@@ -85,7 +84,6 @@ export function AppShellFrame({
   const [contextPaneResizing, setContextPaneResizing] = React.useState(false);
   const open = contextPane?.open ?? false;
   const navigationVisible = visibility?.navigation ?? true;
-  const historyVisible = visibility?.history ?? true;
   const paneLabel = `${open ? "收起" : "打开"}${SHELL_SECTION_LABELS[contextPane?.section ?? section]}上下文面板`;
   const resizeLabel = `调整${SHELL_SECTION_LABELS[contextPane?.section ?? section]}上下文面板宽度`;
 
@@ -107,6 +105,7 @@ export function AppShellFrame({
         <AppSidebar
           current={section}
           onNavigate={onNavigate}
+          navigationDisabled={navigationDisabled}
           presentation={
             open && contextPane ? contextPane.presentation : "closed"
           }
@@ -138,6 +137,7 @@ export function AppShellFrame({
           title={paneLabel}
           tabIndex={0}
           aria-expanded={open}
+          disabled={navigationDisabled}
           onClick={onTogglePane}
           style={{
             left: open ? "var(--sidebar-width)" : "var(--sidebar-width-icon)",
@@ -150,16 +150,15 @@ export function AppShellFrame({
             data-shell-slot="content-head"
             className="flex h-[50px] shrink-0 items-center gap-1.5 border-b bg-background px-4"
           >
-            {historyVisible ? (
+            {backAction ? (
               <>
                 <Button
                   type="button"
                   variant="ghost"
                   size="icon-sm"
                   className="size-7"
-                  aria-label="后退"
-                  disabled={!history.canGoBack}
-                  onClick={history.onBack}
+                  aria-label={backAction.label}
+                  onClick={backAction.onBack}
                 >
                   <ArrowLeft aria-hidden="true" />
                 </Button>

@@ -78,6 +78,51 @@ function api(overrides: Record<string, unknown> = {}) {
 }
 
 describe("per-generation audio AI consent", () => {
+  it("shows every supported result field and links evidence back to the transcript", async () => {
+    const onEvidenceSelect = vi.fn();
+    const onSuggestedTitle = vi.fn();
+    render(
+      <AudioAiFeature
+        api={api({
+          getAudioAiSnapshot: vi.fn(async () => ({
+            ...completed,
+            note: {
+              ...completed.note!,
+              items: [
+                {
+                  ...completed.note!.items[0]!,
+                  actionDueAtMs: Date.UTC(2026, 8, 20),
+                },
+              ],
+            },
+          })),
+        })}
+        audioId={4}
+        generationId={9}
+        onEvidenceSelect={onEvidenceSelect}
+        onSuggestedTitle={onSuggestedTitle}
+      />,
+    );
+
+    expect(await screen.findByText("项目周会")).toBeVisible();
+    expect(screen.getByText("weekly")).toBeVisible();
+    expect(screen.getByText("行动项")).toBeVisible();
+    expect(screen.getByText(/负责人 主持人/)).toHaveTextContent("截止");
+
+    await userEvent
+      .setup()
+      .click(screen.getByRole("button", { name: "采用标题" }));
+    expect(onSuggestedTitle).toHaveBeenCalledWith("项目周会");
+    await userEvent
+      .setup()
+      .click(screen.getByRole("button", { name: "证据 1 · 00:01" }));
+    expect(onEvidenceSelect).toHaveBeenCalledWith({
+      segmentId: 12,
+      startMs: 1_500,
+      endMs: 3_000,
+    });
+  });
+
   it("classifies a stale preparation by stable code after message localization", async () => {
     const failure = new DesktopFailure({
       protocolVersion: 3,

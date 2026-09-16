@@ -67,8 +67,10 @@ function applicationApi(
     importAudio: vi.fn(),
     listAudios: vi.fn(async () => [navigationAudio]),
     openAudio: vi.fn(async () => null),
+    deleteAudio: vi.fn(async () => ({ deleted: true })),
     searchTranscript: vi.fn(async () => []),
     editAudioSegment: vi.fn(),
+    updateAudioMetadata: vi.fn(),
     undoAudioEdit: vi.fn(),
     redoAudioEdit: vi.fn(),
     renameAudioSpeaker: vi.fn(),
@@ -261,7 +263,12 @@ describe("sidebar navigation e2e", () => {
       document.querySelectorAll("[data-settings-section]:not([hidden])"),
     ).toHaveLength(1);
 
-    await user.click(screen.getByRole("button", { name: "后退" }));
+    expect(screen.queryByRole("button", { name: /返回/ })).toBeNull();
+    await user.click(
+      within(restoredSettingsNavigation).getByRole("button", {
+        name: "录制",
+      }),
+    );
     expect(
       await screen.findByRole("heading", { level: 1, name: "录制" }),
     ).toBeVisible();
@@ -583,6 +590,7 @@ describe("sidebar navigation e2e", () => {
         generationKind: "formal" as const,
         segmentCount: 0,
       },
+      description: "",
       segments: [],
       speakers: [],
       canUndo: false,

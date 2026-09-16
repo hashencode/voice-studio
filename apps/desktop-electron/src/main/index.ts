@@ -2768,6 +2768,15 @@ function bindDesktopIpc(window: BrowserWindow): void {
         throw new Error("audio workspace is unavailable");
       return audioWorkspaceService.openAudio(audioId);
     },
+    deleteAudio: async (audioId) => {
+      if (!audioWorkspaceService)
+        throw new Error("audio workspace is unavailable");
+      const deleted = audioWorkspaceService.deleteAudio(audioId);
+      if (deleted && desktopRepository) {
+        applicationState.setLibraryCount(desktopRepository.countAudios());
+      }
+      return { deleted };
+    },
     searchTranscript: async (options) => {
       if (!audioWorkspaceService)
         throw new Error("audio workspace is unavailable");
@@ -2777,6 +2786,11 @@ function bindDesktopIpc(window: BrowserWindow): void {
       if (!audioWorkspaceService)
         throw new Error("audio workspace is unavailable");
       return audioWorkspaceService.editSegment(command);
+    },
+    updateAudioMetadata: async (command) => {
+      if (!audioWorkspaceService)
+        throw new Error("audio workspace is unavailable");
+      return audioWorkspaceService.updateMetadata(command);
     },
     undoAudioEdit: async (audioId, generationId, expectedRevision) => {
       if (!audioWorkspaceService)

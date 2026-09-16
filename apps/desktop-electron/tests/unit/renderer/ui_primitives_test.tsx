@@ -955,7 +955,7 @@ describe("current shadcn primitives", () => {
     }
   });
 
-  it("uses the shared lightweight focus shadow for Input and Textarea", () => {
+  it("uses a single thin focus border for Input and Textarea", () => {
     render(
       <div>
         <Input aria-label="普通输入" />
@@ -969,12 +969,10 @@ describe("current shadcn primitives", () => {
     ];
 
     for (const textField of textFields) {
-      expect(textField).toHaveClass(
+      expect(textField).toHaveClass("focus-visible:border-ring");
+      expect(textField).not.toHaveClass(
         "focus-visible:shadow-[0_0_0_2px]",
         "focus-visible:shadow-ring/20",
-      );
-      expect(textField).not.toHaveClass(
-        "focus-visible:border-ring",
         "focus-visible:ring-1",
         "focus-visible:ring-ring/40",
       );

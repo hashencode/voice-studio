@@ -27,6 +27,7 @@ const application: ApplicationSnapshot = {
 
 const audio = {
   revision: 3,
+  description: "",
   summary: {
     audioId: 4,
     displayName: "项目周会.wav",
@@ -197,6 +198,7 @@ describe("audio AI Renderer e2e", () => {
     await user.click(
       await screen.findByRole("button", { name: /打开 项目周会/ }),
     );
+    await user.click(screen.getByRole("tab", { name: "AI 总结" }));
     await user.click(
       await screen.findByRole("button", { name: "生成云端音频草稿" }),
     );

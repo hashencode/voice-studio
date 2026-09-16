@@ -20,6 +20,7 @@ import {
   openAudioProfileDatabase,
   withTransaction,
 } from "../../../src/main/storage/audio_database";
+import { createFrozenAudioV4Schema } from "../../fixtures/frozen_audio_v4";
 
 const temporaryRoots: string[] = [];
 
@@ -57,6 +58,18 @@ describe("Electron SQLite v2", () => {
       expect(database.prepare("PRAGMA user_version").get()?.user_version).toBe(
         AUDIO_SCHEMA_VERSION,
       );
+      expect(
+        database
+          .prepare("PRAGMA table_info(audio_items)")
+          .all()
+          .map((column) => column.name),
+      ).toEqual(
+        expect.arrayContaining([
+          "display_name",
+          "original_name",
+          "description",
+        ]),
+      );
       expect(database.prepare("PRAGMA foreign_keys").get()?.foreign_keys).toBe(
         1,
       );
@@ -86,10 +99,10 @@ describe("Electron SQLite v2", () => {
       ).toThrow();
 
       database.exec(`
-        INSERT INTO audio_items (idempotency_key, source_identity, display_name, media_path, duration_ms, created_at_ms, updated_at_ms)
+        INSERT INTO audio_items (idempotency_key, source_identity, display_name, original_name, media_path, duration_ms, created_at_ms, updated_at_ms)
         VALUES
-          ('audio-a', 'source-a', 'Audio A', '/media-a.wav', 1, 1, 1),
-          ('audio-b', 'source-b', 'Audio B', '/media-b.wav', 1, 1, 1);
+          ('audio-a', 'source-a', 'Audio A', 'Audio A', '/media-a.wav', 1, 1, 1),
+          ('audio-b', 'source-b', 'Audio B', 'Audio B', '/media-b.wav', 1, 1, 1);
         INSERT INTO processing_jobs (audio_id, idempotency_key, operation_id, resource_identity, state, attempt, created_at_ms, updated_at_ms)
         VALUES
           (1, 'job-a', 'asr', 'resource', 'queued', 0, 1, 1),
@@ -107,7 +120,233 @@ describe("Electron SQLite v2", () => {
     }
   });
 
-  it("rejects unversioned, old, or future databases instead of migrating them", () => {
+  it("upgrades a frozen v4 database and preserves reserved draft metadata and notes", () => {
+    const databasePath = join(temporaryRoot(), "audio-v4.sqlite3");
+    const legacy = new DatabaseSync(databasePath);
+    createFrozenAudioV4Schema(legacy);
+    legacy.exec(`
+      INSERT INTO audio_items (
+        id, idempotency_key, source_identity, display_name, media_path,
+        duration_ms, created_at_ms, updated_at_ms
+      ) VALUES
+        (1, 'audio-1', 'source-1', '当前标题', '/media-1.wav', 1, 1, 1),
+        (2, 'audio-2', 'source-2', '历史标题', '/media-2.wav', 2, 2, 2);
+      INSERT INTO audio_notes (
+        id, audio_id, idempotency_key, body, created_at_ms, updated_at_ms
+      ) VALUES
+        (1, 1, 'workspace-title-origin:1', '首次标题', 1, 1),
+        (2, 1, 'workspace-description:1', '迁移描述', 1, 1),
+        (3, 1, 'ordinary-note', '普通笔记', 1, 1);
+      INSERT INTO processing_jobs (
+        id, audio_id, idempotency_key, operation_id, resource_identity,
+        state, attempt, created_at_ms, updated_at_ms
+      ) VALUES (1, 1, 'job-1', 'asr', 'resource-1', 'completed', 1, 1, 1);
+      INSERT INTO result_publications (
+        id, audio_id, job_id, operation_id, attempt, source_identity,
+        payload_json, created_at_ms
+      ) VALUES (1, 1, 1, 'asr', 1, 'source-1', '{}', 1);
+      INSERT INTO audio_generations (
+        id, audio_id, publication_id, kind, attempt, created_at_ms
+      ) VALUES (1, 1, 1, 'formal', 1, 1);
+      INSERT INTO transcript_segments (
+        id, audio_id, generation_id, stable_key, sequence_id, machine_text,
+        text, text_source, start_ms, end_ms, review_state, speaker_state,
+        speaker_source, created_at_ms, updated_at_ms
+      ) VALUES (
+        1, 1, 1, 'segment-1', 0, '迁移前文本', '迁移前文本', 'machine',
+        0, 1000, 'unreviewed', 'unknown', 'machine', 1, 1
+      );
+      INSERT INTO workspace_heads (audio_id, revision, updated_at_ms)
+      VALUES (1, 7, 1);
+      INSERT INTO ai_provider_profiles (
+        profile_id, kind, protocol, model_id, endpoint, secret_ref,
+        created_at_ms, updated_at_ms
+      ) VALUES (
+        'profile-1', 'custom', 'openai-compatible', 'model-1',
+        'https://example.invalid/v1', 'secret-1', 1, 1
+      );
+      INSERT INTO capture_sessions (
+        session_id, title, workspace_path, state, capture_mode,
+        created_at_ms, updated_at_ms
+      ) VALUES (
+        'capture-1', '迁移前录音', '/capture-1', 'completed',
+        'microphone_only', 1, 1
+      );
+      UPDATE companion_settings
+      SET receiver_enabled = 1, revision = 3, updated_at_ms = 1
+      WHERE id = 1;
+      PRAGMA application_id = ${AUDIO_APPLICATION_ID};
+      PRAGMA user_version = 4;
+    `);
+    const notesBefore = legacy
+      .prepare("SELECT * FROM audio_notes ORDER BY id")
+      .all();
+    const businessRowsBefore = {
+      processingJob: legacy.prepare("SELECT * FROM processing_jobs").get(),
+      publication: legacy.prepare("SELECT * FROM result_publications").get(),
+      generation: legacy.prepare("SELECT * FROM audio_generations").get(),
+      transcriptSegment: legacy
+        .prepare("SELECT * FROM transcript_segments")
+        .get(),
+      workspaceHead: legacy.prepare("SELECT * FROM workspace_heads").get(),
+      aiProfile: legacy.prepare("SELECT * FROM ai_provider_profiles").get(),
+      captureSession: legacy.prepare("SELECT * FROM capture_sessions").get(),
+      companionSettings: legacy
+        .prepare("SELECT * FROM companion_settings")
+        .get(),
+    };
+    legacy.close();
+
+    const migrated = openAudioDatabase(databasePath);
+    try {
+      expect(migrated.prepare("PRAGMA user_version").get()).toEqual({
+        user_version: 5,
+      });
+      expect(
+        migrated
+          .prepare(
+            "SELECT id, display_name, original_name, description FROM audio_items ORDER BY id",
+          )
+          .all(),
+      ).toEqual([
+        {
+          id: 1,
+          display_name: "当前标题",
+          original_name: "首次标题",
+          description: "迁移描述",
+        },
+        {
+          id: 2,
+          display_name: "历史标题",
+          original_name: "历史标题",
+          description: "",
+        },
+      ]);
+      expect(
+        migrated.prepare("SELECT * FROM audio_notes ORDER BY id").all(),
+      ).toEqual(notesBefore);
+      expect({
+        processingJob: migrated.prepare("SELECT * FROM processing_jobs").get(),
+        publication: migrated
+          .prepare("SELECT * FROM result_publications")
+          .get(),
+        generation: migrated.prepare("SELECT * FROM audio_generations").get(),
+        transcriptSegment: migrated
+          .prepare("SELECT * FROM transcript_segments")
+          .get(),
+        workspaceHead: migrated.prepare("SELECT * FROM workspace_heads").get(),
+        aiProfile: migrated.prepare("SELECT * FROM ai_provider_profiles").get(),
+        captureSession: migrated
+          .prepare("SELECT * FROM capture_sessions")
+          .get(),
+        companionSettings: migrated
+          .prepare("SELECT * FROM companion_settings")
+          .get(),
+      }).toEqual(businessRowsBefore);
+      expect(
+        migrated
+          .prepare("PRAGMA table_info(audio_items)")
+          .all()
+          .filter((column) =>
+            ["original_name", "description"].includes(String(column.name)),
+          )
+          .map((column) => ({ name: column.name, notnull: column.notnull })),
+      ).toEqual([
+        { name: "original_name", notnull: 1 },
+        { name: "description", notnull: 1 },
+      ]);
+    } finally {
+      migrated.close();
+    }
+  });
+
+  it("rolls back v4 migration when reserved metadata belongs to another audio", () => {
+    const databasePath = join(temporaryRoot(), "audio-v4-conflict.sqlite3");
+    const legacy = new DatabaseSync(databasePath);
+    createFrozenAudioV4Schema(legacy);
+    legacy.exec(`
+      INSERT INTO audio_items (
+        id, idempotency_key, source_identity, display_name, media_path,
+        duration_ms, created_at_ms, updated_at_ms
+      ) VALUES
+        (1, 'audio-1', 'source-1', 'Audio 1', '/media-1.wav', 1, 1, 1),
+        (2, 'audio-2', 'source-2', 'Audio 2', '/media-2.wav', 2, 2, 2);
+      INSERT INTO audio_notes (
+        audio_id, idempotency_key, body, created_at_ms, updated_at_ms
+      ) VALUES (2, 'workspace-description:1', 'wrong owner', 1, 1);
+      PRAGMA application_id = ${AUDIO_APPLICATION_ID};
+      PRAGMA user_version = 4;
+    `);
+    legacy.close();
+
+    expect(() => openAudioDatabase(databasePath)).toThrow(/reserved metadata/i);
+    const preserved = new DatabaseSync(databasePath);
+    try {
+      expect(preserved.prepare("PRAGMA user_version").get()).toEqual({
+        user_version: 4,
+      });
+      expect(
+        preserved
+          .prepare("PRAGMA table_info(audio_items)")
+          .all()
+          .map((column) => column.name),
+      ).not.toContain("original_name");
+    } finally {
+      preserved.close();
+    }
+  });
+
+  it("rolls back a v4 migration failure after schema changes and can retry", () => {
+    const databasePath = join(temporaryRoot(), "audio-v4-post-alter.sqlite3");
+    const legacy = new DatabaseSync(databasePath);
+    createFrozenAudioV4Schema(legacy);
+    legacy.exec(`
+      INSERT INTO audio_items (
+        id, idempotency_key, source_identity, display_name, media_path,
+        duration_ms, created_at_ms, updated_at_ms
+      ) VALUES (1, 'audio-1', 'source-1', '', '/media-1.wav', 1, 1, 1);
+      PRAGMA application_id = ${AUDIO_APPLICATION_ID};
+      PRAGMA user_version = 4;
+    `);
+    legacy.close();
+
+    expect(() => openAudioDatabase(databasePath)).toThrow(
+      /length\(original_name\) > 0/i,
+    );
+    const preserved = new DatabaseSync(databasePath);
+    try {
+      expect(preserved.prepare("PRAGMA user_version").get()).toEqual({
+        user_version: 4,
+      });
+      expect(
+        preserved
+          .prepare("PRAGMA table_info(audio_items)")
+          .all()
+          .map((column) => column.name),
+      ).not.toContain("original_name");
+      preserved
+        .prepare("UPDATE audio_items SET display_name = ? WHERE id = 1")
+        .run("恢复标题");
+    } finally {
+      preserved.close();
+    }
+
+    const retried = openAudioDatabase(databasePath);
+    try {
+      expect(retried.prepare("PRAGMA user_version").get()).toEqual({
+        user_version: 5,
+      });
+      expect(
+        retried
+          .prepare("SELECT original_name FROM audio_items WHERE id = 1")
+          .get(),
+      ).toEqual({ original_name: "恢复标题" });
+    } finally {
+      retried.close();
+    }
+  });
+
+  it("rejects unversioned, pre-v4, or future databases instead of migrating them", () => {
     const root = temporaryRoot();
     const databasePath = join(root, "audio.sqlite3");
     const versionZero = new DatabaseSync(databasePath);
@@ -131,7 +370,7 @@ describe("Electron SQLite v2", () => {
     const old = new DatabaseSync(oldPath);
     old.exec(`
       PRAGMA application_id = ${AUDIO_APPLICATION_ID};
-      PRAGMA user_version = ${AUDIO_SCHEMA_VERSION - 1};
+      PRAGMA user_version = 3;
       CREATE TABLE old_probe (value TEXT NOT NULL);
       INSERT INTO old_probe VALUES ('preserved');
     `);
@@ -141,7 +380,7 @@ describe("Electron SQLite v2", () => {
     );
     const preservedOld = new DatabaseSync(oldPath);
     expect(preservedOld.prepare("PRAGMA user_version").get()).toEqual({
-      user_version: AUDIO_SCHEMA_VERSION - 1,
+      user_version: 3,
     });
     preservedOld.close();
 
@@ -171,9 +410,18 @@ describe("Electron SQLite v2", () => {
         withTransaction(database, () => {
           database
             .prepare(
-              "INSERT INTO audio_items (idempotency_key, source_identity, display_name, media_path, duration_ms, created_at_ms, updated_at_ms) VALUES (?, ?, ?, ?, ?, ?, ?)",
+              "INSERT INTO audio_items (idempotency_key, source_identity, display_name, original_name, media_path, duration_ms, created_at_ms, updated_at_ms) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
             )
-            .run("rollback", "source", "Rollback", "/media.wav", 1, 1, 1);
+            .run(
+              "rollback",
+              "source",
+              "Rollback",
+              "Rollback",
+              "/media.wav",
+              1,
+              1,
+              1,
+            );
           throw new Error("force rollback");
         }),
       ).toThrow("force rollback");

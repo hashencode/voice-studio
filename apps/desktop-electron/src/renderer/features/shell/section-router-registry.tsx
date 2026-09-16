@@ -3,7 +3,6 @@ import * as React from "react";
 import {
   createMemoryRouter,
   RouterProvider,
-  type NavigationType,
   type RouteObject,
 } from "react-router";
 
@@ -18,9 +17,6 @@ type SectionRouter = ReturnType<typeof createMemoryRouter>;
 export type SectionRouteSnapshot = {
   pathname: string;
   locationKey: string;
-  action: NavigationType;
-  canGoBack: boolean;
-  canGoForward: boolean;
 };
 
 export type SectionRouterJournal = {
@@ -69,22 +65,10 @@ export function createSectionRouterJournal(
     ],
     { initialEntries: [`/${section}`] },
   );
-  let keys = [router.state.location.key];
-  let index = 0;
   let snapshot = project();
   const listeners = new Set<() => void>();
 
-  router.subscribe((state) => {
-    const key = state.location.key;
-    if (state.historyAction === "PUSH") {
-      keys = [...keys.slice(0, index + 1), key];
-      index = keys.length - 1;
-    } else if (state.historyAction === "REPLACE") {
-      keys[index] = key;
-    } else {
-      const target = keys.indexOf(key);
-      if (target >= 0) index = target;
-    }
+  router.subscribe(() => {
     snapshot = project();
     for (const listener of listeners) listener();
   });
@@ -93,9 +77,6 @@ export function createSectionRouterJournal(
     return {
       pathname: router.state.location.pathname,
       locationKey: router.state.location.key,
-      action: router.state.historyAction,
-      canGoBack: index > 0,
-      canGoForward: index < keys.length - 1,
     };
   }
 
@@ -108,8 +89,6 @@ export function createSectionRouterJournal(
     },
     resetForTests: async () => {
       await router.navigate(`/${section}`, { replace: true });
-      keys = [router.state.location.key];
-      index = 0;
       snapshot = project();
       for (const listener of listeners) listener();
     },
@@ -151,13 +130,6 @@ export function navigateSection(
   const journal = sectionRouterRegistry[section];
   if (journal.router.state.location.pathname === pathname) return;
   return journal.router.navigate(pathname, options);
-}
-
-export function navigateSectionDelta(
-  section: RendererShellSection,
-  delta: -1 | 1,
-) {
-  return sectionRouterRegistry[section].router.navigate(delta);
 }
 
 export async function resetSectionRoutersForTests() {
