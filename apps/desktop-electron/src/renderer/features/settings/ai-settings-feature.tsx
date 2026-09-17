@@ -533,9 +533,9 @@ function ProviderProfileDialog({
                   </AlertDialogTrigger>
                   <AlertDialogContent>
                     <AlertDialogHeader>
-                      <AlertDialogTitle>{`删除 ${profile.modelId}？`}</AlertDialogTitle>
+                      <AlertDialogTitle>删除模型确认</AlertDialogTitle>
                       <AlertDialogDescription>
-                        {`确定要删除“${profile.modelId}”吗？`}
+                        {`此操作会删除模型“${profile.modelId}”的配置。`}
                       </AlertDialogDescription>
                     </AlertDialogHeader>
                     <AlertDialogFooter>

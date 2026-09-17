@@ -6,12 +6,9 @@ import { Item, ItemContent, ItemMedia, ItemTitle } from "@/components/ui/item";
 import { Button } from "@/components/ui/button";
 import {
   ActivityContextPane,
-  ActivityContextPaneFilters,
   ActivityContextPaneHead,
-  ActivityContextPaneSearch,
   ActivityMainWorkspace,
   type ActivityItemView,
-  type ActivityFilter,
 } from "@/features/activity/activity-center";
 import { SidebarGroup, SidebarGroupContent } from "@/components/ui/sidebar";
 import {
@@ -185,9 +182,6 @@ function App() {
   >(null);
   const [markAllActivityPending, setMarkAllActivityPending] =
     React.useState(false);
-  const [activityQuery, setActivityQuery] = React.useState("");
-  const [activityFilter, setActivityFilter] =
-    React.useState<ActivityFilter>("all");
   const exactReadPendingRef = React.useRef<Set<string>>(new Set());
   const markAllReadPendingRef = React.useRef(false);
   const automaticCaptureDetailSessionId =
@@ -670,8 +664,7 @@ function App() {
     !captureDetailVisible &&
     (current !== "audio" ||
       audio.libraryPresentation === "populated" ||
-      audio.workspace !== null) &&
-    (current !== "messages" || activityItems.length > 0);
+      audio.workspace !== null);
   const audioWorkspacePresentation =
     current === "audio" && !captureDetailVisible;
   const audioDetailPresentation =
@@ -684,14 +677,15 @@ function App() {
     audioWorkspacePresentation &&
     audio.libraryPresentation === "populated" &&
     audio.workspace === null;
-  const messageEmptyPresentation =
+  const fullScreenEmptyPresentation = audioFirstUsePresentation;
+  const messageDetailUnavailable =
     current === "messages" &&
     !captureDetailVisible &&
-    activityItems.length === 0;
-  const fullScreenEmptyPresentation =
-    audioFirstUsePresentation || messageEmptyPresentation;
+    selectedActivity === null;
   const emptyPresentationHidesChrome =
-    fullScreenEmptyPresentation || audioSelectionEmptyPresentation;
+    fullScreenEmptyPresentation ||
+    audioSelectionEmptyPresentation ||
+    messageDetailUnavailable;
   let contentPadding: "none" | "compact" | "page" = "none";
   if (presentation.contentMode === "padded") {
     if (emptyPresentationHidesChrome) contentPadding = "none";
@@ -723,6 +717,7 @@ function App() {
   return (
     <CaptureWorkspaceController
       capture={snapshot.capture}
+      recoveryEnabled={snapshot.profile.phase === "ready"}
       libraryProjection={snapshot.libraryProjection}
       libraryOpenState={captureLibraryOpenState}
       recordRequest={recordRequest}
@@ -773,11 +768,6 @@ function App() {
                   search:
                     pane.paneSection === "audio" ? (
                       <AudioContextPaneToolbar controller={audio} />
-                    ) : pane.paneSection === "messages" ? (
-                      <ActivityContextPaneSearch
-                        value={activityQuery}
-                        onValueChange={setActivityQuery}
-                      />
                     ) : undefined,
                   searchOpen:
                     pane.paneSection === "audio"
@@ -793,14 +783,6 @@ function App() {
                         onMarkAllRead={() => void markAllActivityRead()}
                       />
                     ) : null,
-                  filters:
-                    pane.paneSection === "messages" ? (
-                      <ActivityContextPaneFilters
-                        items={activityItems}
-                        value={activityFilter}
-                        onValueChange={setActivityFilter}
-                      />
-                    ) : undefined,
                   footer:
                     pane.paneSection === "audio" &&
                     audio.libraryPresentation === "populated" ? (
@@ -826,11 +808,6 @@ function App() {
                             `/messages/${encodeURIComponent(item.id)}`,
                           );
                         }}
-                        unreadCount={unreadActivityCount}
-                        markAllPending={markAllActivityPending}
-                        onMarkAllRead={() => void markAllActivityRead()}
-                        query={activityQuery}
-                        filter={activityFilter}
                       />
                     ) : (
                       <SettingsContextPane
@@ -1054,6 +1031,7 @@ function ShellContent({
       section = (
         <ActivityMainWorkspace
           item={selectedActivity}
+          hasItems={(snapshot.activity ?? []).length > 0}
           onOpenSettingsTarget={onOpenFailureSettings}
         />
       );

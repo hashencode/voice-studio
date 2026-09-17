@@ -190,6 +190,25 @@ describe("CaptureQuitCoordinator", () => {
     expect(harness.ports.exit).toHaveBeenCalledOnce();
   });
 
+  it("bounds non-interactive normal teardown before forcing exit", async () => {
+    vi.useFakeTimers();
+    const harness = createHarness({ recoveryExitDeadlineMs: 5_000 });
+    harness.ports.currentCapture.mockReturnValue(null);
+    harness.ports.teardown.mockReturnValue(new Promise(() => undefined));
+    try {
+      const result = harness.coordinator.requestNonInteractive();
+      await vi.advanceTimersByTimeAsync(4_999);
+      expect(harness.ports.exit).not.toHaveBeenCalled();
+      await vi.advanceTimersByTimeAsync(1);
+      await expect(result).resolves.toBe("committed");
+      expect(harness.ports.teardown).toHaveBeenCalledWith("normal");
+      expect(harness.ports.quit).not.toHaveBeenCalled();
+      expect(harness.ports.exit).toHaveBeenCalledOnce();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it("bounds recovery teardown before issuing the single final exit", async () => {
     vi.useFakeTimers();
     const harness = createHarness({ recoveryExitDeadlineMs: 5_000 });

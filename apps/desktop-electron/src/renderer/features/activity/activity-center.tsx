@@ -1,9 +1,8 @@
-import * as React from "react";
 import { MailOpen, TriangleAlert } from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { EmptyState, FullScreenEmptyState } from "@/components/ui/empty-state";
+import { EmptyState } from "@/components/ui/empty-state";
 import {
   Item,
   ItemActions,
@@ -12,10 +11,6 @@ import {
   ItemMedia,
   ItemTitle,
 } from "@/components/ui/item";
-import {
-  ContextPaneFilter,
-  ContextPaneSearch,
-} from "@/features/shell/context-pane-controls";
 import {
   Tooltip,
   TooltipContent,
@@ -35,8 +30,6 @@ export type ActivityItemView = Pick<
   | "lastOccurredAt"
 >;
 
-export type ActivityFilter = "all" | "unread";
-
 const formatter = new Intl.DateTimeFormat("zh-CN", {
   month: "numeric",
   day: "numeric",
@@ -48,58 +41,25 @@ export function ActivityContextPane({
   items,
   selectedId,
   onSelect,
-  unreadCount = 0,
-  markAllPending = false,
   operationError = null,
-  onMarkAllRead = () => undefined,
-  query: controlledQuery,
-  filter: controlledFilter,
 }: {
   items: ActivityItemView[];
   selectedId: string | null;
   onSelect: (item: ActivityItemView) => void;
-  unreadCount?: number;
-  markAllPending?: boolean;
   operationError?: string | null;
-  onMarkAllRead?: () => void;
-  query?: string;
-  filter?: ActivityFilter;
 }) {
-  const [query, setQuery] = React.useState("");
-  const effectiveQuery = controlledQuery ?? query;
-  const effectiveFilter = controlledFilter ?? "all";
-  const visibleItems = filterActivityItems(
-    items,
-    effectiveQuery,
-    effectiveFilter,
-  );
-  const embeddedControls = controlledQuery === undefined;
   return (
     <div className="flex min-h-0 flex-1 flex-col">
-      {embeddedControls ? (
-        <div className="flex shrink-0 items-center gap-2 p-2">
-          <ActivityContextPaneSearch value={query} onValueChange={setQuery} />
-          <ActivityContextPaneHead
-            unreadCount={unreadCount}
-            markAllPending={markAllPending}
-            onMarkAllRead={onMarkAllRead}
-          />
-        </div>
-      ) : null}
       {operationError ? (
         <p role="alert" className="border-b px-3 py-2 text-sm">
           {operationError}
         </p>
       ) : null}
-      {visibleItems.length === 0 ? (
-        <EmptyState
-          description={items.length === 0 ? "暂无消息" : "没有匹配的消息"}
-          compact
-          className="min-h-0 flex-1"
-        />
+      {items.length === 0 ? (
+        <EmptyState description="暂无消息" compact className="min-h-0 flex-1" />
       ) : (
         <ul aria-label="消息列表" data-flat-row-list="true">
-          {visibleItems.map((item) => (
+          {items.map((item) => (
             <li key={item.id}>
               <Item
                 asChild
@@ -172,88 +132,19 @@ export function ActivityContextPaneHead({
   );
 }
 
-export function ActivityContextPaneSearch({
-  value,
-  onValueChange,
-}: {
-  value: string;
-  onValueChange: (value: string) => void;
-}) {
-  return (
-    <ContextPaneSearch
-      aria-label="搜索消息"
-      value={value}
-      onChange={(event) => onValueChange(event.currentTarget.value)}
-    />
-  );
-}
-
-export function ActivityContextPaneFilters({
-  items,
-  value,
-  onValueChange,
-}: {
-  items: readonly ActivityItemView[];
-  value: ActivityFilter;
-  onValueChange: (value: ActivityFilter) => void;
-}) {
-  const filters: readonly { value: ActivityFilter; label: string }[] = [
-    { value: "all", label: "全部" },
-    { value: "unread", label: "未读" },
-  ];
-  const counts: Record<ActivityFilter, number> = {
-    all: items.length,
-    unread: items.filter((item) => item.unread).length,
-  };
-  return (
-    <div
-      role="group"
-      aria-label="消息筛选"
-      className="flex min-w-0 items-center gap-0.5 overflow-x-auto"
-    >
-      {filters.map((item) => (
-        <ContextPaneFilter
-          key={item.value}
-          label={item.label}
-          count={counts[item.value]}
-          aria-pressed={value === item.value}
-          onClick={() => onValueChange(item.value)}
-        />
-      ))}
-    </div>
-  );
-}
-
-function filterActivityItems(
-  items: readonly ActivityItemView[],
-  query: string,
-  filter: ActivityFilter,
-): ActivityItemView[] {
-  const normalizedQuery = query.trim().toLocaleLowerCase("zh-CN");
-  return items.filter((item) => {
-    const matchesQuery =
-      !normalizedQuery ||
-      item.safeSummary.toLocaleLowerCase("zh-CN").includes(normalizedQuery);
-    const matchesFilter = filter === "all" || item.unread;
-    return matchesQuery && matchesFilter;
-  });
-}
-
 export function ActivityMainWorkspace({
   item,
+  hasItems,
   onOpenSettingsTarget,
 }: {
   item: ActivityItemView | null;
+  hasItems: boolean;
   onOpenSettingsTarget: (item: ActivityItemView) => void;
 }) {
   if (!item) {
-    return (
-      <FullScreenEmptyState
-        icon={<TriangleAlert aria-hidden="true" />}
-        title="还没有消息"
-        description="这里只显示需要跨页面关注的应用错误。"
-      />
-    );
+    return hasItems ? (
+      <EmptyState description="请选择左侧消息" className="flex-1" />
+    ) : null;
   }
   return (
     <section aria-label="消息详情" className="mx-auto max-w-2xl py-8">

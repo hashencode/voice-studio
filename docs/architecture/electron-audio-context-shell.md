@@ -56,7 +56,7 @@ closes details without affecting capture.
 Active capture is projected into a one-line controller at the global header's
 right edge. It contains only state, elapsed time, Pause/Resume, the two-step
 Stop and Save action, Open Details, and at most one attention indicator. The
-adjacent global activity entry holds at most 20 privacy-safe completion or
+adjacent global activity entry holds at most 30 privacy-safe completion or
 actionable-failure items for the current application session. It is not durable
 history and never contains a recording title, transcript, path, or raw native
 error.

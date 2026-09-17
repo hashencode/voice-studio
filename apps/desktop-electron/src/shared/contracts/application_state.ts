@@ -10,7 +10,7 @@ export const shellSectionSchema = z.enum([
   "settings",
 ]);
 
-export const bootstrapActionSchema = z.literal("recheck");
+export const bootstrapActionSchema = z.enum(["recheck", "reset-profile"]);
 
 const profileStateSchema = z.discriminatedUnion("phase", [
   z.object({ phase: z.literal("initializing") }).strict(),
@@ -147,6 +147,8 @@ export const settingsSectionSchema = z.enum([
 ]);
 export const applicationFailureSettingsTargetSchema = settingsSectionSchema;
 
+export const applicationActivityLimit = 30;
+
 export const activityItemSchema = z
   .object({
     id: z.string().min(1).max(260),
@@ -181,7 +183,10 @@ export const applicationSnapshotSchema = z
     libraryProjection: captureLibraryProjectionStateSchema.default({
       phase: "idle",
     }),
-    activity: z.array(activityItemSchema).max(20).optional(),
+    activity: z
+      .array(activityItemSchema)
+      .max(applicationActivityLimit)
+      .optional(),
   })
   .strict();
 

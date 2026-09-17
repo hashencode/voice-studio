@@ -266,9 +266,9 @@ describe("application activity", () => {
     ).toEqual(["general", "local-models"]);
   });
 
-  it("keeps distinct failures newest-first, caps at 20, and reads idempotently", () => {
+  it("keeps distinct failures newest-first, caps at 30, and reads idempotently", () => {
     const state = new DesktopApplicationState();
-    for (let index = 0; index < 22; index += 1) {
+    for (let index = 0; index < 32; index += 1) {
       state.recordApplicationFailure({
         kind: "startup_reconciliation_failed",
         safeSummary: `启动恢复暂未完成 ${index}`,
@@ -277,8 +277,8 @@ describe("application activity", () => {
     }
 
     const activity = state.snapshot().activity!;
-    expect(activity).toHaveLength(20);
-    expect(activity[0]!.safeSummary).toBe("启动恢复暂未完成 21");
+    expect(activity).toHaveLength(30);
+    expect(activity[0]!.safeSummary).toBe("启动恢复暂未完成 31");
     expect(activity.at(-1)!.safeSummary).toBe("启动恢复暂未完成 2");
     const beforeIds = activity.map((item) => item.id);
     const revision = state.snapshot().revision;
@@ -298,5 +298,61 @@ describe("application activity", () => {
     const allReadRevision = state.snapshot().revision;
     state.markAllActivityRead();
     expect(state.snapshot().revision).toBe(allReadRevision);
+  });
+
+  it("evicts the oldest read failure before an older unread failure", () => {
+    const state = new DesktopApplicationState();
+    for (let index = 0; index < 30; index += 1) {
+      state.recordApplicationFailure({
+        kind: "startup_reconciliation_failed",
+        safeSummary: `启动恢复暂未完成 ${index}`,
+        settingsTarget: null,
+      });
+    }
+    const oldestRead = state.snapshot().activity![20]!;
+    state.markActivityRead(oldestRead.id);
+
+    state.recordApplicationFailure({
+      kind: "startup_reconciliation_failed",
+      safeSummary: "启动恢复暂未完成 30",
+      settingsTarget: null,
+    });
+
+    const activity = state.snapshot().activity!;
+    expect(activity).toHaveLength(30);
+    expect(activity[0]!.safeSummary).toBe("启动恢复暂未完成 30");
+    expect(activity.map((item) => item.id)).not.toContain(oldestRead.id);
+    expect(activity.at(-1)!.safeSummary).toBe("启动恢复暂未完成 0");
+  });
+
+  it("refreshes an existing failure at capacity without evicting another item", () => {
+    const state = new DesktopApplicationState();
+    for (let index = 0; index < 30; index += 1) {
+      state.recordApplicationFailure({
+        kind: "startup_reconciliation_failed",
+        safeSummary: `启动恢复暂未完成 ${index}`,
+        settingsTarget: null,
+      });
+    }
+    const target = state.snapshot().activity![10]!;
+    const idsBefore = state.snapshot().activity!.map((item) => item.id);
+    state.markActivityRead(target.id);
+
+    state.recordApplicationFailure({
+      kind: target.kind,
+      safeSummary: target.safeSummary,
+      settingsTarget: target.settingsTarget,
+    });
+
+    const activity = state.snapshot().activity!;
+    expect(activity).toHaveLength(30);
+    expect(activity[0]).toMatchObject({
+      id: target.id,
+      occurrenceCount: 2,
+      unread: true,
+    });
+    expect(new Set(activity.map((item) => item.id))).toEqual(
+      new Set(idsBefore),
+    );
   });
 });

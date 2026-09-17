@@ -9,6 +9,7 @@ import {
   readSync,
   readdirSync,
   renameSync,
+  rmSync,
   rmdirSync,
   statfsSync,
   unlinkSync,
@@ -56,6 +57,10 @@ export interface AudioProfileInitializationOptions {
   now?: () => number;
   archiveLegacyDatabase?: (source: string, destination: string) => void;
   removeLegacyDatabaseMember?: (path: string) => void;
+}
+
+export interface AudioProfileResetOptions {
+  removeProfileRoot?: (path: string) => void;
 }
 
 export type AudioProfileInitializationResult =
@@ -203,6 +208,56 @@ export function initializeAudioProfile(
       return blocked("schema_invalid", error);
     }
     return blocked("filesystem_unavailable", error);
+  }
+}
+
+export function resetAudioProfile(
+  applicationDataRoot: string,
+  options: AudioProfileResetOptions = {},
+): void {
+  const finalProfile = profilePathsForApplicationData(applicationDataRoot);
+  const initializingProfile = profilePathsForRoot(
+    `${finalProfile.root}.initializing`,
+  );
+  assertResetProfileRoots(
+    applicationDataRoot,
+    finalProfile,
+    initializingProfile,
+  );
+
+  const removeProfileRoot =
+    options.removeProfileRoot ??
+    ((root: string) => rmSync(root, { force: true, recursive: true }));
+  removeProfileRoot(finalProfile.root);
+  removeProfileRoot(initializingProfile.root);
+}
+
+function assertResetProfileRoots(
+  applicationDataRoot: string,
+  finalProfile: AudioProfilePaths,
+  initializingProfile: AudioProfilePaths,
+): void {
+  const resolvedApplicationDataRoot = resolve(applicationDataRoot);
+  const profileContainer = join(
+    resolvedApplicationDataRoot,
+    "voice2text-electron",
+  );
+  if (
+    finalProfile.root !== join(profileContainer, "v2") ||
+    initializingProfile.root !== join(profileContainer, "v2.initializing") ||
+    dirname(finalProfile.root) !== profileContainer ||
+    dirname(initializingProfile.root) !== profileContainer ||
+    profileContainer === resolvedApplicationDataRoot
+  ) {
+    throw new AudioProfileError("Electron profile reset target is invalid");
+  }
+  if (pathEntryExists(profileContainer)) {
+    const metadata = lstatSync(profileContainer);
+    if (metadata.isSymbolicLink() || !metadata.isDirectory()) {
+      throw new AudioProfileError(
+        "Electron profile reset container is not a directory",
+      );
+    }
   }
 }
 

@@ -37,6 +37,10 @@ Electron renderer.
   chrome policy as independent decisions. Migrating between `EmptyState` and
   `FullScreenEmptyState` must not implicitly change the Header, outer content
   padding, context panes, copy, actions, focus, or navigation.
+- In linked multi-column interfaces, express one underlying absence once in
+  the column that owns it. Dependent columns stay blank and omit their Header
+  when they have no content; a distinct state such as data existing without a
+  selection may use its own local Empty State.
 - Preserve those surrounding behaviors during component migrations unless an
   explicit current requirement changes them, and protect intentional behavior
   at both the feature-component and Shell boundaries. See
@@ -84,6 +88,7 @@ Electron renderer.
 - Keep keyboard focus visible but lightweight. Inputs, buttons, and other form controls should use a thin focus indicator rather than a thick ring or glow.
 - Keep interface copy concise, natural, and considerate. Include only information that affects the user's next action or decision; do not repeat visible controls, states, or capabilities. For instructions, prefer brief and polite wording when it adds warmth without adding explanation.
 - When a Modal conveys one brief system message and has no distinct task name, use the title to identify the message type or semantic category, state the complete fact once in the body, and keep only actions required for a decision or continuation in the footer. Do not repeat the same content across the title, body, and actions; keep a task-specific title when the Modal has a distinct named task.
+- Use declarative copy in confirmation dialogs. Name the confirmation task directly in the title, such as “重置本机数据确认”; do not use question marks or interrogative wording in the title or body. State the consequence in the body and present the available decisions as footer actions.
 
 ## Project knowledge
 

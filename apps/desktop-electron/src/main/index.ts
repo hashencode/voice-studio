@@ -38,6 +38,7 @@ import {
   type CaptureRuntimeSnapshot,
   type CaptionSnapshot,
   type AudioAiSnapshot,
+  type BootstrapAction,
   type CompanionSnapshot,
   type CaptureLibraryProjectionFailureCode,
   type CaptureLibraryProjectionRetryRequest,
@@ -47,6 +48,7 @@ import {
   canRetryCaptureLibraryProjection,
 } from "./application/application_state";
 import {
+  createBootstrapActionRunner,
   publishStartupCaptureReconciliation,
   publishReadyLibrary,
   runBootstrapTransaction,
@@ -125,7 +127,10 @@ import {
   WorkerReportedError,
 } from "./processes/owned_process_supervisor";
 import { prepareProcessingAttempt } from "./processes/processing_attempt";
-import { initializeAudioProfile } from "./profile/audio_profile";
+import {
+  initializeAudioProfile,
+  resetAudioProfile,
+} from "./profile/audio_profile";
 import type { AudioProfilePaths } from "./profile/audio_profile";
 import {
   assertAuthorizedResourceCommand,
@@ -310,10 +315,25 @@ let captureSmokeStopCalls = 0;
 let teardownStarted = false;
 let teardownPromise: Promise<void> | null = null;
 let teardownComplete = false;
-let bootstrapPromise: Promise<void> | null = null;
 let processingLoop: Promise<void> | null = null;
 const packagedProgressObservationTimeoutMs = 30_000;
 const applicationState = new DesktopApplicationState();
+const runBootstrapAction = createBootstrapActionRunner({
+  getSnapshot: () => applicationState.snapshot(),
+  hasPublishedProfileResources: () =>
+    profileDatabase !== null || profilePaths !== null,
+  resetProfile: () =>
+    resetAudioProfile(smokeAppDataPath ?? app.getPath("appData")),
+  bootstrap: runApplicationBootstrapTransaction,
+  restoreBlockedProfile: (profile) => {
+    applicationState.completeBootstrap({
+      status: "blocked",
+      code: profile.code,
+      message: profile.message,
+      repairable: true,
+    });
+  },
+});
 const operationListeners = new Set<(event: OperationEvent) => void>();
 const captionListeners = new Set<(snapshot: CaptionSnapshot) => void>();
 const audioAiListeners = new Set<(snapshot: AudioAiSnapshot) => void>();
@@ -391,11 +411,21 @@ function createMainWindow(): BrowserWindow {
   window.on("hide", () => floatingCaptureController?.reconcileCurrent());
   window.on("closed", () => {
     if (mainWindow === window) mainWindow = null;
-    if (process.platform !== "darwin" && !teardownComplete) app.quit();
+    if (
+      (process.platform !== "darwin" || MAIN_WINDOW_VITE_DEV_SERVER_URL) &&
+      !teardownComplete
+    ) {
+      app.quit();
+    }
   });
 
   if (MAIN_WINDOW_VITE_DEV_SERVER_URL) {
-    void window.loadURL(MAIN_WINDOW_VITE_DEV_SERVER_URL);
+    void window
+      .loadURL(MAIN_WINDOW_VITE_DEV_SERVER_URL)
+      .catch((error: unknown) => {
+        console.error("Voice2Text development renderer failed to load", error);
+        app.exit(1);
+      });
   } else {
     void window.loadFile(
       path.join(__dirname, `../renderer/${MAIN_WINDOW_VITE_NAME}/index.html`),
@@ -2504,7 +2534,8 @@ function bindDesktopIpc(window: BrowserWindow): void {
     },
     applicationSnapshot: () => applicationState.snapshot(),
     navigate: (section) => applicationState.navigate(section),
-    requestBootstrapAction: async () => await requestBootstrapAction(),
+    requestBootstrapAction: async (action) =>
+      await requestBootstrapAction(action),
     markActivityRead: (activityId) =>
       applicationState.markActivityRead(activityId),
     markAllActivityRead: () => applicationState.markAllActivityRead(),
@@ -2969,23 +3000,20 @@ async function importAudioFromSource(
   }
 }
 
-async function requestBootstrapAction() {
-  await bootstrapApplication();
-  return applicationState.snapshot();
+async function requestBootstrapAction(action: BootstrapAction) {
+  return await runBootstrapAction(action);
 }
 
 async function bootstrapApplication(): Promise<void> {
-  if (bootstrapPromise) return await bootstrapPromise;
-  bootstrapPromise = runBootstrapTransaction({
+  await runBootstrapAction("recheck");
+}
+
+async function runApplicationBootstrapTransaction(): Promise<void> {
+  await runBootstrapTransaction({
     isReady: () => applicationState.snapshot().profile.phase === "ready",
     initialize: initializeApplication,
     resetPartialInitialization: resetPartialApplicationInitialization,
   });
-  try {
-    await bootstrapPromise;
-  } finally {
-    bootstrapPromise = null;
-  }
 }
 
 async function resetPartialApplicationInitialization(): Promise<void> {

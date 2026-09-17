@@ -13,11 +13,13 @@ export function ApplicationBlocker({
   open,
   title,
   description,
+  initialFocusRef,
   children,
 }: React.PropsWithChildren<{
   open: boolean;
   title: React.ReactNode;
   description: React.ReactNode;
+  initialFocusRef?: React.RefObject<HTMLElement | null>;
 }>) {
   useApplicationBlockerRegistration(open);
 
@@ -28,6 +30,11 @@ export function ApplicationBlocker({
         onEscapeKeyDown={(event) => event.preventDefault()}
         onPointerDownOutside={(event) => event.preventDefault()}
         onInteractOutside={(event) => event.preventDefault()}
+        onOpenAutoFocus={(event) => {
+          if (!initialFocusRef?.current) return;
+          event.preventDefault();
+          initialFocusRef.current.focus();
+        }}
       >
         <DialogHeader>
           <DialogTitle>{title}</DialogTitle>

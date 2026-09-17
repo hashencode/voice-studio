@@ -92,7 +92,7 @@ export class CaptureQuitCoordinator {
   ): Promise<CaptureQuitPreparationOutcome> {
     const capture = this.ports.currentCapture();
     if (!capture || !captureRequiresQuitConfirmation(capture)) {
-      return await this.commitAndExit(generation);
+      return await this.commitAndExit(generation, !interactive);
     }
 
     if (interactive) {
@@ -108,12 +108,13 @@ export class CaptureQuitCoordinator {
       }
     }
 
-    return await this.stopAndExit(generation, capture);
+    return await this.stopAndExit(generation, capture, !interactive);
   }
 
   private async stopAndExit(
     generation: number,
     capture: CaptureSnapshot,
+    boundTeardown: boolean,
   ): Promise<CaptureQuitPreparationOutcome> {
     this.currentPhase = "stopping";
     let result: CaptureStopReconciliation;
@@ -127,7 +128,7 @@ export class CaptureQuitCoordinator {
     }
     if (!this.isActive(generation)) return "cancelled";
     if (result.snapshot && isDurableTerminal(result.snapshot)) {
-      return await this.commitAndExit(generation);
+      return await this.commitAndExit(generation, boundTeardown);
     }
     return await this.recoveryExit(generation);
   }
@@ -143,9 +144,32 @@ export class CaptureQuitCoordinator {
 
   private async commitAndExit(
     generation: number,
+    boundTeardown = false,
   ): Promise<CaptureQuitPreparationOutcome> {
     if (!this.isActive(generation)) return "cancelled";
     this.currentPhase = "tearing-down";
+    if (boundTeardown) {
+      let timer: ReturnType<typeof setTimeout> | undefined;
+      const deadline = new Promise<"deadline">((resolve) => {
+        timer = this.setTimer(
+          () => resolve("deadline"),
+          this.recoveryExitDeadlineMs,
+        );
+      });
+      const teardown = Promise.resolve()
+        .then(async () => await this.ports.teardown("normal"))
+        .then(
+          () => "complete" as const,
+          () => "failed" as const,
+        );
+      const outcome = await Promise.race([teardown, deadline]);
+      if (timer) this.clearTimer(timer);
+      if (!this.isActive(generation)) return "cancelled";
+      this.currentPhase = "exiting";
+      if (outcome === "complete") this.ports.quit();
+      else this.issueFinalExit();
+      return "committed";
+    }
     try {
       await this.ports.teardown("normal");
     } catch {

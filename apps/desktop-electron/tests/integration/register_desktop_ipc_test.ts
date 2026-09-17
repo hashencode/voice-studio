@@ -115,6 +115,20 @@ describe("desktop IPC window registry", () => {
     ).resolves.toMatchObject({ ok: true, value: { revision: 1 } });
     expect(services.requestBootstrapAction).toHaveBeenCalledWith("recheck");
     await expect(
+      ipc.invoke(ipcChannels.applicationBootstrapAction, main.event, {
+        action: "reset-profile",
+      }),
+    ).resolves.toMatchObject({ ok: true, value: { revision: 1 } });
+    expect(services.requestBootstrapAction).toHaveBeenCalledWith(
+      "reset-profile",
+    );
+    await expect(
+      ipc.invoke(ipcChannels.applicationBootstrapAction, main.event, {
+        action: "unknown-action",
+      }),
+    ).rejects.toMatchObject({ code: "INVALID_PAYLOAD" });
+    expect(services.requestBootstrapAction).toHaveBeenCalledTimes(2);
+    await expect(
       ipc.invoke(ipcChannels.aiProviderProfileCreate, main.event, {
         expectedRevision: 2,
         protocol: "openai-compatible",

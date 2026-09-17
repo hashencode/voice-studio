@@ -184,14 +184,19 @@ export function useApplicationShell() {
             (startingRevision === null ||
               latestSnapshot.revision > startingRevision) &&
             (latestSnapshot.profile.phase === "ready" ||
-              latestSnapshot.profile.phase === "blocked");
+              (action === "recheck" &&
+                latestSnapshot.profile.phase === "blocked"));
           if (acceptedNewerResolvedSnapshot) {
             return;
           }
           if (surface === "load") {
             setLoadError("无法重新载入，请重试。");
           } else {
-            setBootstrapError("无法重新检查，请重试。");
+            setBootstrapError(
+              action === "reset-profile"
+                ? "无法重置本机数据，请重试。"
+                : "无法重新检查，请重试。",
+            );
           }
         } finally {
           setBootstrapPending(false);

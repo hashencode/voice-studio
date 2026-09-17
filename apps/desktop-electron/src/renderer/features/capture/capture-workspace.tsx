@@ -67,6 +67,7 @@ function isCompletedRecoveryOutcome(
 
 type CaptureWorkspaceProps = {
   capture: ApplicationSnapshot["capture"];
+  recoveryEnabled?: boolean;
   libraryProjection?: ApplicationSnapshot["libraryProjection"];
   libraryOpenState?: CaptureLibraryOpenState;
   /** @deprecated Capture state is authoritative in Main and arrives via snapshots. */
@@ -105,6 +106,7 @@ export function CaptureWorkspace(props: CaptureWorkspaceProps) {
 
 export function CaptureWorkspaceController({
   capture,
+  recoveryEnabled = true,
   libraryProjection = { phase: "idle" },
   libraryOpenState = { phase: "idle" },
   recordRequest,
@@ -331,6 +333,10 @@ export function CaptureWorkspaceController({
   );
 
   React.useEffect(() => {
+    if (!recoveryEnabled) {
+      recoveryListGenerationRef.current += 1;
+      return;
+    }
     if (recoveryDialogStateRef.current.startsWith("pending-")) return;
 
     let active = true;
@@ -372,6 +378,7 @@ export function CaptureWorkspaceController({
     };
   }, [
     prioritizedRecoverySessionId,
+    recoveryEnabled,
     runAutomaticCleanup,
     transitionRecoveryDialog,
   ]);
@@ -514,7 +521,7 @@ export function CaptureWorkspaceController({
       (capture.phase === "partial_capture" &&
         !capture.systemAudioHealthy &&
         !capture.microphoneHealthy));
-  const visibleError = stopFailureSettled ? null : error;
+  const visibleError = recoveryEnabled && !stopFailureSettled ? error : null;
 
   React.useEffect(() => {
     if (!successfulTerminalStopSessionId) return;
@@ -932,7 +939,9 @@ export function CaptureWorkspaceController({
     recoveries.length === 0 &&
     !focusSessionId;
   const recoveryDialogOpen =
-    recoveryDialogState !== "assessing" && recoveryDialogState !== "hidden";
+    recoveryEnabled &&
+    recoveryDialogState !== "assessing" &&
+    recoveryDialogState !== "hidden";
 
   const detail =
     detailOpen && !workspaceHidden && !recoveryDialogOpen ? (

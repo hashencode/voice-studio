@@ -16,6 +16,7 @@ import { afterEach, describe, expect, it } from "vitest";
 import {
   initializeAudioProfile,
   profilePathsForApplicationData,
+  resetAudioProfile,
 } from "../../src/main/profile/audio_profile";
 import { AUDIO_SCHEMA_VERSION } from "../../src/main/storage/audio_database";
 
@@ -204,5 +205,140 @@ describe("Electron-only profile initialization", () => {
     expect(readFileSync(poison, "utf8")).toBe(
       "flutter-profile-must-stay-untouched",
     );
+  });
+
+  it("resets both owned profile roots and rebuilds an empty current schema", () => {
+    const applicationDataRoot = temporaryRoot();
+    const externalRoot = temporaryRoot();
+    const profile = profilePathsForApplicationData(applicationDataRoot);
+    const initializingRoot = `${profile.root}.initializing`;
+    const adjacentRoot = join(
+      applicationDataRoot,
+      "voice2text-electron",
+      "local-models",
+    );
+
+    mkdirSync(profile.databaseDirectory, { recursive: true });
+    const legacyDatabase = new DatabaseSync(profile.databasePath);
+    legacyDatabase.exec(
+      "CREATE TABLE legacy_audio_items (id INTEGER PRIMARY KEY); PRAGMA user_version = 1;",
+    );
+    legacyDatabase.close();
+    writeFileSync(`${profile.databasePath}-wal`, "legacy-wal");
+    writeFileSync(`${profile.databasePath}-shm`, "legacy-shm");
+    mkdirSync(profile.mediaDirectory, { recursive: true });
+    writeFileSync(join(profile.mediaDirectory, "legacy.wav"), "legacy-media");
+    mkdirSync(profile.workspaceDirectory, { recursive: true });
+    writeFileSync(
+      join(profile.workspaceDirectory, "legacy.task"),
+      "legacy-task",
+    );
+    writeFileSync(profile.readyMarkerPath, "legacy-ready-marker");
+
+    mkdirSync(initializingRoot, { recursive: true });
+    writeFileSync(join(initializingRoot, "stale-initialization"), "stale");
+    const externalTarget = join(externalRoot, "must-survive.txt");
+    writeFileSync(externalTarget, "external-data");
+    symlinkSync(externalTarget, join(profile.mediaDirectory, "external-link"));
+    mkdirSync(adjacentRoot, { recursive: true });
+    const adjacentFile = join(adjacentRoot, "model.bin");
+    writeFileSync(adjacentFile, "adjacent-data");
+
+    resetAudioProfile(applicationDataRoot);
+    expect(existsSync(profile.root)).toBe(false);
+    expect(existsSync(initializingRoot)).toBe(false);
+    expect(readFileSync(externalTarget, "utf8")).toBe("external-data");
+    expect(readFileSync(adjacentFile, "utf8")).toBe("adjacent-data");
+
+    const result = requireReady(initializeAudioProfile(applicationDataRoot));
+    try {
+      expect(result.database.prepare("PRAGMA user_version").get()).toEqual({
+        user_version: AUDIO_SCHEMA_VERSION,
+      });
+      expect(
+        result.database
+          .prepare("SELECT COUNT(*) AS count FROM audio_items")
+          .get(),
+      ).toEqual({ count: 0 });
+      expect(existsSync(join(profile.mediaDirectory, "legacy.wav"))).toBe(
+        false,
+      );
+      expect(existsSync(join(profile.workspaceDirectory, "legacy.task"))).toBe(
+        false,
+      );
+      expect(existsSync(join(profile.mediaDirectory, "external-link"))).toBe(
+        false,
+      );
+      expect(existsSync(join(initializingRoot, "stale-initialization"))).toBe(
+        false,
+      );
+    } finally {
+      result.database.close();
+    }
+  });
+
+  it("can reset when both owned profile roots are already absent", () => {
+    const applicationDataRoot = temporaryRoot();
+
+    resetAudioProfile(applicationDataRoot);
+    expect(
+      existsSync(profilePathsForApplicationData(applicationDataRoot).root),
+    ).toBe(false);
+
+    const result = requireReady(initializeAudioProfile(applicationDataRoot));
+    try {
+      expect(result.database.prepare("PRAGMA user_version").get()).toEqual({
+        user_version: AUDIO_SCHEMA_VERSION,
+      });
+      expect(existsSync(result.profile.readyMarkerPath)).toBe(true);
+    } finally {
+      result.database.close();
+    }
+  });
+
+  it("propagates deletion failure without starting fresh initialization", () => {
+    const applicationDataRoot = temporaryRoot();
+    const profile = profilePathsForApplicationData(applicationDataRoot);
+    mkdirSync(profile.mediaDirectory, { recursive: true });
+    writeFileSync(join(profile.mediaDirectory, "partially-removed.wav"), "old");
+    const initializingRoot = `${profile.root}.initializing`;
+    mkdirSync(initializingRoot, { recursive: true });
+    const staleInitialization = join(
+      initializingRoot,
+      "must-remain-on-failure",
+    );
+    writeFileSync(staleInitialization, "stale");
+    let removalCount = 0;
+
+    expect(() =>
+      resetAudioProfile(applicationDataRoot, {
+        removeProfileRoot: (root) => {
+          removalCount += 1;
+          if (removalCount === 1) {
+            rmSync(root, { force: true, recursive: true });
+            return;
+          }
+          throw new Error("injected delete failure");
+        },
+      }),
+    ).toThrow("injected delete failure");
+
+    expect(existsSync(profile.root)).toBe(false);
+    expect(readFileSync(staleInitialization, "utf8")).toBe("stale");
+    expect(existsSync(profile.databasePath)).toBe(false);
+    expect(existsSync(profile.readyMarkerPath)).toBe(false);
+
+    resetAudioProfile(applicationDataRoot);
+    expect(existsSync(profile.root)).toBe(false);
+    expect(existsSync(initializingRoot)).toBe(false);
+
+    const retried = requireReady(initializeAudioProfile(applicationDataRoot));
+    try {
+      expect(retried.database.prepare("PRAGMA user_version").get()).toEqual({
+        user_version: AUDIO_SCHEMA_VERSION,
+      });
+    } finally {
+      retried.database.close();
+    }
   });
 });

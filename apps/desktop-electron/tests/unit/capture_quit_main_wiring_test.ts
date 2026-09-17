@@ -26,6 +26,18 @@ describe("capture quit Main wiring", () => {
     );
   });
 
+  it("quits the macOS development app when its main window closes", () => {
+    expect(mainSource).toMatch(
+      /window\.on\("closed"[\s\S]*process\.platform !== "darwin" \|\| MAIN_WINDOW_VITE_DEV_SERVER_URL[\s\S]*app\.quit\(\)/,
+    );
+  });
+
+  it("exits instead of leaving a blank development window when loading fails", () => {
+    expect(mainSource).toMatch(
+      /window\s*\.loadURL\(MAIN_WINDOW_VITE_DEV_SERVER_URL\)[\s\S]*catch\(\(error: unknown\)[\s\S]*Voice2Text development renderer failed to load[\s\S]*app\.exit\(1\)/,
+    );
+  });
+
   it("reopens transport-equivalent capture sessions and tears down the current one", () => {
     expect(mainSource).toContain(
       "captureNativePort = new MacOSCaptureNativePort(\n    captureNativeSession,\n    openCaptureSession",

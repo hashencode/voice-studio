@@ -2352,11 +2352,7 @@ describe("application shell", () => {
     ).toBeVisible();
   });
 
-  it("hides the message chrome while empty and restores the saved pane state when a message arrives", async () => {
-    window.localStorage.setItem(
-      "voice2text.shell.context-panes.v1",
-      JSON.stringify({ messages: "closed" }),
-    );
+  it("keeps the message workspace two-column while empty and when a message arrives", async () => {
     let publish: ((snapshot: ApplicationSnapshot) => void) | undefined;
     const initial = { ...readySnapshot, capture: { phase: "idle" as const } };
     installApi(initial, {
@@ -2369,19 +2365,19 @@ describe("application shell", () => {
     render(<App />);
 
     await user.click(await screen.findByRole("button", { name: "消息" }));
-    expect(screen.getByRole("heading", { name: "还没有消息" })).toBeVisible();
-    expect(
-      screen.getByText("这里只显示需要跨页面关注的应用错误。"),
-    ).toBeVisible();
     expect(
       document.querySelector('[data-shell-slot="content-head"]'),
     ).toBeNull();
     expect(
-      screen.queryByRole("complementary", { name: "消息上下文面板" }),
-    ).not.toBeInTheDocument();
-    expect(
-      screen.queryByRole("button", { name: "打开消息上下文面板" }),
-    ).not.toBeInTheDocument();
+      screen.getByRole("complementary", { name: "消息上下文面板" }),
+    ).toBeVisible();
+    expect(screen.getByText("暂无消息")).toBeVisible();
+    expect(screen.queryByText("还没有消息")).not.toBeInTheDocument();
+    expect(screen.queryByRole("searchbox", { name: "搜索消息" })).toBeNull();
+    expect(screen.queryByRole("group", { name: "消息筛选" })).toBeNull();
+    expect(document.querySelectorAll('[data-slot="empty-state"]')).toHaveLength(
+      1,
+    );
     expect(document.getElementById("main-content")).not.toHaveClass("p-4");
 
     act(() =>
@@ -2402,7 +2398,7 @@ describe("application shell", () => {
       }),
     );
 
-    expect(screen.queryByText("还没有消息")).not.toBeInTheDocument();
+    expect(screen.queryByText("暂无消息")).not.toBeInTheDocument();
     expect(
       document.querySelector('[data-shell-slot="content-head"]'),
     ).toBeVisible();
@@ -2411,11 +2407,22 @@ describe("application shell", () => {
       "sm:p-6",
     );
     expect(
-      screen.queryByRole("complementary", { name: "消息上下文面板" }),
-    ).not.toBeInTheDocument();
-    expect(
-      screen.getByRole("button", { name: "打开消息上下文面板" }),
+      screen.getByRole("complementary", { name: "消息上下文面板" }),
     ).toBeVisible();
+
+    act(() =>
+      publish?.({
+        ...initial,
+        revision: initial.revision + 2,
+        activity: [],
+      }),
+    );
+
+    expect(screen.getByText("暂无消息")).toBeVisible();
+    expect(screen.queryByRole("region", { name: "消息详情" })).toBeNull();
+    expect(
+      document.querySelector('[data-shell-slot="content-head"]'),
+    ).toBeNull();
   });
 
   it("does not treat context-pane child controls as dismissal", async () => {
@@ -2509,13 +2516,173 @@ describe("application shell", () => {
     expect(
       screen.queryByRole("navigation", { name: "工作站主导航" }),
     ).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: "重置本机数据" }),
+    ).not.toBeInTheDocument();
 
-    await user.click(screen.getByRole("button", { name: "重新检查" }));
+    await user.click(screen.getByRole("button", { name: "重试" }));
     expect(api.requestBootstrapAction).toHaveBeenCalledWith("recheck");
     expect(blocker).toBeInTheDocument();
     expect(await screen.findByText("无法重新检查，请重试。")).toBeVisible();
     expect(screen.queryByText(/private\/profile/)).not.toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "重新检查" })).toBeEnabled();
+    expect(screen.getByRole("button", { name: "重试" })).toBeEnabled();
+  });
+
+  it("confirms schema reset and keeps every blocker action latched until ready", async () => {
+    const blocked: ApplicationSnapshot = {
+      ...readySnapshot,
+      profile: {
+        phase: "blocked",
+        code: "schema_invalid",
+        message: "raw schema detail",
+        repairable: true,
+      },
+      capture: { phase: "idle" },
+    };
+    const initializing: ApplicationSnapshot = {
+      ...blocked,
+      revision: blocked.revision + 1,
+      profile: { phase: "initializing" },
+    };
+    const blockedAgain: ApplicationSnapshot = {
+      ...blocked,
+      revision: initializing.revision + 1,
+    };
+    const ready: ApplicationSnapshot = {
+      ...readySnapshot,
+      revision: blockedAgain.revision + 1,
+      capture: { phase: "idle" },
+    };
+    const reset = deferred<ApplicationSnapshot>();
+    let publish: ((snapshot: ApplicationSnapshot) => void) | undefined;
+    const requestBootstrapAction = vi.fn(() => reset.promise);
+    const listCaptureRecoveries = vi.fn(async () => []);
+    const api = installApi(blocked, {
+      listAudios: vi.fn(async () => []),
+      listCaptureRecoveries,
+      requestBootstrapAction,
+      onApplicationSnapshot: vi.fn((listener) => {
+        publish = listener;
+        return () => undefined;
+      }),
+    });
+    const user = userEvent.setup();
+    render(<App />);
+
+    const blocker = await screen.findByRole("dialog", {
+      name: "本机资料库暂不可用",
+    });
+    expect(listCaptureRecoveries).not.toHaveBeenCalled();
+    expect(
+      screen.queryByRole("dialog", { name: "录制遇到问题" }),
+    ).not.toBeInTheDocument();
+    const resetTrigger = within(blocker).getByRole("button", {
+      name: "重置本机数据",
+    });
+    const recheck = within(blocker).getByRole("button", { name: "重试" });
+    await waitFor(() => expect(recheck).toHaveFocus());
+    expect(resetTrigger).toHaveTextContent("重置本机数据");
+    expect(resetTrigger).not.toHaveTextContent("…");
+    expect(recheck.querySelector("svg")).toBeNull();
+    const actionRow = resetTrigger.parentElement;
+    expect(actionRow).toBe(recheck.parentElement);
+    expect(actionRow).toHaveClass("flex", "flex-nowrap", "justify-between");
+    expect(resetTrigger).toHaveAttribute("data-variant", "outline");
+    expect(recheck).toHaveAttribute("data-variant", "default");
+    expect(Array.from(actionRow!.querySelectorAll("button"))).toEqual([
+      resetTrigger,
+      recheck,
+    ]);
+
+    await user.click(resetTrigger);
+    let confirmation = await screen.findByRole("alertdialog", {
+      name: "重置本机数据确认",
+    });
+    expect(confirmation).toHaveTextContent(
+      "此操作会永久删除本机音频、转写、任务、资料库内配置和未完成录音，且无法恢复。",
+    );
+    await user.click(
+      within(confirmation).getByRole("button", { name: "取消" }),
+    );
+    expect(requestBootstrapAction).not.toHaveBeenCalled();
+    expect(screen.queryByRole("alertdialog")).not.toBeInTheDocument();
+
+    await user.click(resetTrigger);
+    confirmation = await screen.findByRole("alertdialog", {
+      name: "重置本机数据确认",
+    });
+    await user.click(
+      within(confirmation).getByRole("button", { name: "确认重置" }),
+    );
+
+    expect(api.requestBootstrapAction).toHaveBeenCalledTimes(1);
+    expect(api.requestBootstrapAction).toHaveBeenCalledWith("reset-profile");
+    expect(resetTrigger).toBeDisabled();
+    expect(recheck).toBeDisabled();
+    expect(
+      within(confirmation).getByRole("button", { name: "取消" }),
+    ).toBeDisabled();
+    const pendingConfirmation = within(confirmation).getByRole("button", {
+      name: "正在重置…",
+    });
+    expect(pendingConfirmation).toBeDisabled();
+    fireEvent.click(pendingConfirmation);
+    fireEvent.click(recheck);
+    expect(api.requestBootstrapAction).toHaveBeenCalledTimes(1);
+
+    act(() => publish?.(initializing));
+    expect(blocker).toBeInTheDocument();
+    expect(confirmation).toBeInTheDocument();
+    act(() => publish?.(blockedAgain));
+    expect(blocker).toBeInTheDocument();
+    expect(confirmation).toBeInTheDocument();
+
+    await act(async () => reset.resolve(ready));
+
+    expect(
+      screen.queryByRole("dialog", { name: "本机资料库暂不可用" }),
+    ).not.toBeInTheDocument();
+    expect(await screen.findByText("开始你的第一段音频")).toBeVisible();
+    expect(listCaptureRecoveries).toHaveBeenCalledOnce();
+  });
+
+  it("closes a failed schema reset safely and restores blocker actions", async () => {
+    const blocked: ApplicationSnapshot = {
+      ...readySnapshot,
+      profile: {
+        phase: "blocked",
+        code: "schema_invalid",
+        message: "raw schema detail",
+        repairable: true,
+      },
+      capture: { phase: "idle" },
+    };
+    const requestBootstrapAction = vi.fn(async () => {
+      throw new Error("raw /private/profile/reset failure");
+    });
+    const api = installApi(blocked, { requestBootstrapAction });
+    const user = userEvent.setup();
+    render(<App />);
+
+    await user.click(
+      await screen.findByRole("button", { name: "重置本机数据" }),
+    );
+    const confirmation = await screen.findByRole("alertdialog", {
+      name: "重置本机数据确认",
+    });
+    await user.click(
+      within(confirmation).getByRole("button", { name: "确认重置" }),
+    );
+
+    expect(api.requestBootstrapAction).toHaveBeenCalledWith("reset-profile");
+    expect(await screen.findByText("无法重置本机数据，请重试。")).toBeVisible();
+    expect(screen.queryByRole("alertdialog")).not.toBeInTheDocument();
+    expect(
+      screen.getByRole("dialog", { name: "本机资料库暂不可用" }),
+    ).toBeVisible();
+    expect(screen.getByRole("button", { name: "重置本机数据" })).toBeEnabled();
+    expect(screen.getByRole("button", { name: "重试" })).toBeEnabled();
+    expect(screen.queryByText(/private\/profile/)).not.toBeInTheDocument();
   });
 
   it("keeps one blocker mounted until a newer ready snapshot", async () => {
@@ -2578,7 +2745,7 @@ describe("application shell", () => {
     expect(window.location.hash).toBe("#/audio");
 
     const user = userEvent.setup();
-    await user.click(screen.getByRole("button", { name: "重新检查" }));
+    await user.click(screen.getByRole("button", { name: "重试" }));
     await user.click(screen.getByRole("button", { name: "正在检查" }));
     expect(requestBootstrapAction).toHaveBeenCalledTimes(1);
     expect(screen.getByRole("button", { name: "正在检查" })).toBeDisabled();
@@ -2594,7 +2761,7 @@ describe("application shell", () => {
     act(() => publish?.({ ...ready, revision: blockedAgain.revision }));
     expect(blocker).toBeInTheDocument();
     await act(async () => resolveRecheck?.(blockedAgain));
-    expect(screen.getByRole("button", { name: "重新检查" })).toBeEnabled();
+    expect(screen.getByRole("button", { name: "重试" })).toBeEnabled();
 
     act(() => publish?.(ready));
 
@@ -2769,11 +2936,13 @@ describe("application shell", () => {
     ).not.toBeInTheDocument();
     await user.click(await screen.findByRole("button", { name: "消息" }));
     expect(
-      screen.queryByRole("complementary", { name: "消息上下文面板" }),
-    ).not.toBeInTheDocument();
-    expect(
-      screen.getByRole("heading", { level: 2, name: "还没有消息" }),
+      screen.getByRole("complementary", { name: "消息上下文面板" }),
     ).toBeVisible();
+    expect(screen.getByText("暂无消息")).toBeVisible();
+    expect(screen.queryByText("还没有消息")).not.toBeInTheDocument();
+    expect(
+      document.querySelector('[data-shell-slot="content-head"]'),
+    ).toBeNull();
     expect(screen.queryByText("启动恢复需要确认")).not.toBeInTheDocument();
 
     expect(api.navigate).not.toHaveBeenCalled();
@@ -2809,12 +2978,14 @@ describe("application shell", () => {
     render(<App />);
 
     await user.click(await screen.findByRole("button", { name: "消息" }));
+    expect(screen.getByText("暂无消息")).toBeVisible();
+    expect(screen.queryByText("还没有消息")).not.toBeInTheDocument();
     expect(
-      screen.getByRole("heading", { level: 2, name: "还没有消息" }),
+      document.querySelector('[data-shell-slot="content-head"]'),
+    ).toBeNull();
+    expect(
+      screen.getByRole("complementary", { name: "消息上下文面板" }),
     ).toBeVisible();
-    expect(
-      screen.queryByRole("complementary", { name: "消息上下文面板" }),
-    ).not.toBeInTheDocument();
     expect(api.navigate).not.toHaveBeenCalled();
   });
 

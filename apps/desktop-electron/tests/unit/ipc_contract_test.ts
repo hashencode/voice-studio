@@ -43,6 +43,40 @@ import {
 import { createDesktopApi } from "../../src/preload/api";
 
 describe("shared IPC contracts", () => {
+  it("accepts at most 30 application activity items", () => {
+    const baseApplication = {
+      protocolVersion: desktopProtocolVersion,
+      revision: 1,
+      navigation: { section: "library" as const },
+      profile: { phase: "ready" as const, legacyDatabaseArchived: false },
+      connectivity: "online" as const,
+      capability: { processing: "available" as const },
+      library: { phase: "empty" as const },
+      reconciliation: [],
+      capture: { phase: "idle" as const },
+      libraryProjection: { phase: "idle" as const },
+    };
+    const activity = Array.from({ length: 31 }, (_, index) => ({
+      id: `activity-${index}`,
+      kind: "startup_reconciliation_failed" as const,
+      safeSummary: `启动恢复暂未完成 ${index}`,
+      occurrenceCount: 1,
+      unread: true,
+      settingsTarget: null,
+      lastOccurredAt: index,
+    }));
+
+    expect(
+      applicationSnapshotSchema.parse({
+        ...baseApplication,
+        activity: activity.slice(0, 30),
+      }).activity,
+    ).toHaveLength(30);
+    expect(() =>
+      applicationSnapshotSchema.parse({ ...baseApplication, activity }),
+    ).toThrow();
+  });
+
   it("carries field-level audio metadata patches and reads legacy long titles", async () => {
     const snapshot = audioWorkspaceSnapshotSchema.parse({
       revision: 1,
@@ -352,10 +386,13 @@ describe("shared IPC contracts", () => {
     ).rejects.toThrow();
   });
 
-  it("exposes recheck as the only application bootstrap action", () => {
+  it("exposes only the validated application bootstrap actions", () => {
     expect(bootstrapActionRequestSchema.parse({ action: "recheck" })).toEqual({
       action: "recheck",
     });
+    expect(
+      bootstrapActionRequestSchema.parse({ action: "reset-profile" }),
+    ).toEqual({ action: "reset-profile" });
     expect(() =>
       bootstrapActionRequestSchema.parse({ action: "repair-guidance" }),
     ).toThrow();

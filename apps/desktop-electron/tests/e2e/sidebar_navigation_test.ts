@@ -354,12 +354,14 @@ describe("sidebar navigation e2e", () => {
     ).not.toBeInTheDocument();
     expect(screen.queryByText("启动恢复需要确认")).not.toBeInTheDocument();
     await user.click(screen.getByRole("button", { name: "消息" }));
+    expect(screen.queryByText("还没有消息")).not.toBeInTheDocument();
     expect(
-      await screen.findByRole("region", { name: "还没有消息" }),
+      document.querySelector('[data-shell-slot="content-head"]'),
+    ).toBeNull();
+    expect(
+      screen.getByRole("complementary", { name: "消息上下文面板" }),
     ).toBeVisible();
-    expect(
-      screen.queryByRole("complementary", { name: "消息上下文面板" }),
-    ).not.toBeInTheDocument();
+    expect(screen.getByText("暂无消息")).toBeVisible();
     await user.click(screen.getByRole("button", { name: "音频" }));
     pane = await screen.findByRole("complementary", {
       name: "音频上下文面板",

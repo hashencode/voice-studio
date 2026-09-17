@@ -1,6 +1,7 @@
 import { randomUUID } from "node:crypto";
 
 import {
+  applicationActivityLimit,
   applicationSnapshotSchema,
   desktopProtocolVersion,
   type ApplicationSnapshot,
@@ -161,11 +162,11 @@ export class DesktopApplicationState {
           updated,
           ...activity.slice(0, matchingIndex),
           ...activity.slice(matchingIndex + 1),
-        ].slice(0, 20),
+        ],
       });
     }
     return this.update({
-      activity: [
+      activity: retainApplicationActivity([
         {
           id: randomUUID(),
           ...command,
@@ -175,7 +176,7 @@ export class DesktopApplicationState {
           lastOccurredAt,
         },
         ...activity,
-      ].slice(0, 20),
+      ]),
     });
   }
 
@@ -265,6 +266,14 @@ export class DesktopApplicationState {
       current.intentId === command.intentId
     );
   }
+}
+
+function retainApplicationActivity(activity: ActivityItem[]): ActivityItem[] {
+  if (activity.length <= applicationActivityLimit) return activity;
+  const oldestReadIndex = activity.findLastIndex((item) => !item.unread);
+  const evictionIndex =
+    oldestReadIndex >= 0 ? oldestReadIndex : activity.length - 1;
+  return activity.filter((_, index) => index !== evictionIndex);
 }
 
 function projectionFailureMessage(

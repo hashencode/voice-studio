@@ -1,6 +1,17 @@
+import * as React from "react";
 import { AlertTriangle, CloudOff, LoaderCircle, RefreshCw } from "lucide-react";
 
 import { ApplicationBlocker } from "@/components/application-blocker";
+import {
+  AlertDialog,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -70,23 +81,71 @@ export function ProfileBlocker({
   profile: Extract<ApplicationSnapshot["profile"], { phase: "blocked" }>;
   pending: boolean;
   error: string | null;
-  onRecheck: (action: BootstrapAction) => void;
+  onRecheck: (action: BootstrapAction) => Promise<void>;
 }) {
+  const [resetOpen, setResetOpen] = React.useState(false);
+  const recheckRef = React.useRef<HTMLButtonElement>(null);
+  const resetAvailable = profile.code === "schema_invalid";
+
   return (
     <ApplicationBlocker
       open
       title="本机资料库暂不可用"
       description={profileBlockerDescription(profile.code)}
+      initialFocusRef={recheckRef}
     >
       {error ? <p className="text-sm text-destructive">{error}</p> : null}
-      <div className="flex justify-end pt-2">
+      <div className="flex flex-nowrap items-center justify-between pt-2">
+        <AlertDialog
+          open={resetOpen}
+          onOpenChange={(open) => {
+            if (!pending) setResetOpen(open);
+          }}
+        >
+          {resetAvailable ? (
+            <AlertDialogTrigger asChild>
+              <Button type="button" variant="outline" disabled={pending}>
+                重置本机数据
+              </Button>
+            </AlertDialogTrigger>
+          ) : null}
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>重置本机数据确认</AlertDialogTitle>
+              <AlertDialogDescription>
+                此操作会永久删除本机音频、转写、任务、资料库内配置和未完成录音，且无法恢复。
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel asChild>
+                <Button type="button" variant="outline" disabled={pending}>
+                  取消
+                </Button>
+              </AlertDialogCancel>
+              <Button
+                type="button"
+                variant="destructive"
+                disabled={pending}
+                onClick={() => {
+                  if (pending) return;
+                  void onRecheck("reset-profile").finally(() => {
+                    setResetOpen(false);
+                  });
+                }}
+              >
+                {pending ? "正在重置…" : "确认重置"}
+              </Button>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
         <Button
+          ref={recheckRef}
           type="button"
+          className="ml-auto"
           disabled={pending}
           onClick={() => onRecheck("recheck")}
         >
-          <RefreshCw aria-hidden="true" />
-          {pending ? "正在检查" : "重新检查"}
+          {pending ? "正在检查" : "重试"}
         </Button>
       </div>
     </ApplicationBlocker>

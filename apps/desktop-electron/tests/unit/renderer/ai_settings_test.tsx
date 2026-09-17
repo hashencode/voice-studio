@@ -251,12 +251,14 @@ describe("cloud model settings", () => {
     const remove = within(edit).getByRole("button", { name: "删除模型" });
     expect(remove).not.toHaveTextContent("删除模型");
     await user.click(remove);
-    let alert = screen.getByRole("alertdialog", { name: "删除 team-chat？" });
-    expect(within(alert).getByText("确定要删除“team-chat”吗？")).toBeVisible();
+    let alert = screen.getByRole("alertdialog", { name: "删除模型确认" });
+    expect(
+      within(alert).getByText("此操作会删除模型“team-chat”的配置。"),
+    ).toBeVisible();
     await user.click(within(alert).getByRole("button", { name: "取消" }));
     expect(desktop.deleteAiProviderProfile).not.toHaveBeenCalled();
     await user.click(remove);
-    alert = screen.getByRole("alertdialog", { name: "删除 team-chat？" });
+    alert = screen.getByRole("alertdialog", { name: "删除模型确认" });
     await user.click(within(alert).getByRole("button", { name: "删除" }));
     await waitFor(() =>
       expect(desktop.deleteAiProviderProfile).toHaveBeenCalledWith({

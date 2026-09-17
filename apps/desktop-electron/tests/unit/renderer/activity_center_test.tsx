@@ -6,12 +6,10 @@ import { describe, expect, it, vi } from "vitest";
 
 import {
   ActivityContextPane,
-  ActivityContextPaneFilters,
-  ActivityContextPaneSearch,
+  ActivityContextPaneHead,
   ActivityMainWorkspace,
   type ActivityItemView,
 } from "../../../src/renderer/features/activity/activity-center";
-import { useState } from "react";
 
 const failed: ActivityItemView = {
   id: "failed",
@@ -41,22 +39,34 @@ describe("activity pages", () => {
     ).toHaveLength(3);
   });
 
-  it("uses an empty state when no message is selected", () => {
+  it("keeps the detail column blank when the message collection is empty", () => {
     render(
-      <ActivityMainWorkspace item={null} onOpenSettingsTarget={vi.fn()} />,
+      <ActivityMainWorkspace
+        item={null}
+        hasItems={false}
+        onOpenSettingsTarget={vi.fn()}
+      />,
+    );
+    expect(document.querySelector('[data-slot="empty-state"]')).toBeNull();
+    expect(screen.queryByRole("region", { name: "消息详情" })).toBeNull();
+  });
+
+  it("uses a local selection prompt when messages exist without a selection", () => {
+    render(
+      <ActivityMainWorkspace
+        item={null}
+        hasItems
+        onOpenSettingsTarget={vi.fn()}
+      />,
     );
     const empty = screen
-      .getByRole("heading", { name: "还没有消息" })
-      .closest<HTMLElement>('[data-slot="full-screen-empty-state"]')!;
+      .getByText("请选择左侧消息")
+      .closest<HTMLElement>('[data-slot="empty-state"]')!;
     expect(empty).toBeVisible();
-    expect(empty).toHaveTextContent("这里只显示需要跨页面关注的应用错误。");
     expect(
       empty.querySelector('[data-slot="full-screen-empty-state-preview"]'),
-    ).not.toBeNull();
-    expect(
-      empty.querySelector('[data-slot="full-screen-empty-state-icon"]'),
-    ).toHaveAttribute("aria-hidden", "true");
-    expect(empty.querySelector("svg.lucide-triangle-alert")).not.toBeNull();
+    ).toBeNull();
+    expect(within(empty).queryByRole("heading")).toBeNull();
     expect(within(empty).queryByRole("button")).toBeNull();
   });
 
@@ -72,6 +82,7 @@ describe("activity pages", () => {
         />
         <ActivityMainWorkspace
           item={failed}
+          hasItems
           onOpenSettingsTarget={openDetails}
         />
       </>,
@@ -94,42 +105,7 @@ describe("activity pages", () => {
     expect(openDetails).toHaveBeenCalledWith(failed);
   });
 
-  it("filters titles locally without changing selection and marks all only from MailOpen", async () => {
-    const complete: ActivityItemView = {
-      ...failed,
-      id: "complete",
-      kind: "startup_reconciliation_failed",
-      safeSummary: "Project Alpha",
-      occurrenceCount: 1,
-      settingsTarget: null,
-    };
-    const select = vi.fn();
-    const markAll = vi.fn();
-    render(
-      <ActivityContextPane
-        items={[failed, complete]}
-        selectedId="failed"
-        onSelect={select}
-        unreadCount={2}
-        onMarkAllRead={markAll}
-      />,
-    );
-    const user = userEvent.setup();
-    await user.type(
-      screen.getByRole("searchbox", { name: "搜索消息" }),
-      "ALPHA",
-    );
-    expect(
-      screen.queryByText("本地处理组件暂不可用。"),
-    ).not.toBeInTheDocument();
-    expect(screen.getByText("Project Alpha")).toBeVisible();
-    expect(select).not.toHaveBeenCalled();
-    await user.clear(screen.getByRole("searchbox", { name: "搜索消息" }));
-    await user.click(screen.getByRole("button", { name: "全部标记为已读" }));
-    expect(markAll).toHaveBeenCalledOnce();
-  });
-
-  it("combines real unread and attention counts with search", async () => {
+  it("renders every retained message in authoritative order without search or filters", () => {
     const complete: ActivityItemView = {
       ...failed,
       id: "complete",
@@ -139,73 +115,53 @@ describe("activity pages", () => {
       unread: false,
       settingsTarget: null,
     };
-    function Harness() {
-      const [query, setQuery] = useState("");
-      const [filter, setFilter] = useState<"all" | "unread">("all");
-      return (
-        <>
-          <ActivityContextPaneSearch value={query} onValueChange={setQuery} />
-          <ActivityContextPaneFilters
-            items={[failed, complete]}
-            value={filter}
-            onValueChange={setFilter}
-          />
-          <ActivityContextPane
-            items={[failed, complete]}
-            selectedId="complete"
-            onSelect={vi.fn()}
-            query={query}
-            filter={filter}
-          />
-        </>
-      );
-    }
-    render(<Harness />);
-    const user = userEvent.setup();
-
-    const allFilter = screen.getByRole("button", { name: "全部 2" });
-    expect(allFilter).toHaveAttribute("data-variant", "filter");
-    expect(allFilter).toHaveAttribute("aria-pressed", "true");
-    expect(allFilter.querySelector('[data-slot="badge"]')).toHaveTextContent(
-      "2",
+    render(
+      <ActivityContextPane
+        items={[failed, complete]}
+        selectedId="failed"
+        onSelect={vi.fn()}
+      />,
     );
-    expect(screen.queryByRole("tablist")).not.toBeInTheDocument();
-    expect(screen.getByRole("searchbox", { name: "搜索消息" })).toHaveAttribute(
-      "data-variant",
-      "context-search",
-    );
-    expect(screen.getByRole("button", { name: "未读 1" })).toBeVisible();
-    await user.click(screen.getByRole("button", { name: "未读 1" }));
-    expect(allFilter).toHaveAttribute("aria-pressed", "false");
-    expect(screen.getByRole("button", { name: "未读 1" })).toHaveAttribute(
-      "aria-pressed",
-      "true",
-    );
-    expect(screen.getByText("本地处理组件暂不可用。")).toBeVisible();
-    expect(screen.queryByText("Project Alpha")).not.toBeInTheDocument();
-    await user.type(
-      screen.getByRole("searchbox", { name: "搜索消息" }),
-      "alpha",
-    );
-    const filteredEmpty = screen
-      .getByText("没有匹配的消息")
-      .closest<HTMLElement>('[data-slot="empty-state"]')!;
-    expect(filteredEmpty).toBeVisible();
+    const rows = screen.getAllByRole("button");
+    expect(rows[0]).toHaveTextContent("本地处理组件暂不可用。");
+    expect(rows[1]).toHaveTextContent("Project Alpha");
+    expect(within(rows[0]!).getByLabelText("未读")).toBeVisible();
+    expect(within(rows[1]!).queryByLabelText("未读")).toBeNull();
+    expect(screen.queryByRole("searchbox")).not.toBeInTheDocument();
     expect(
-      filteredEmpty.querySelectorAll('[data-slot="empty-state-cube"]'),
-    ).toHaveLength(3);
-    expect(within(filteredEmpty).queryByRole("heading")).toBeNull();
+      screen.queryByRole("group", { name: "消息筛选" }),
+    ).not.toBeInTheDocument();
+  });
+
+  it("marks all only from the pane head action", async () => {
+    const markAll = vi.fn();
+    render(
+      <ActivityContextPaneHead
+        unreadCount={2}
+        markAllPending={false}
+        onMarkAllRead={markAll}
+      />,
+    );
+    const user = userEvent.setup();
+    await user.click(screen.getByRole("button", { name: "全部标记为已读" }));
+    expect(markAll).toHaveBeenCalledOnce();
   });
 
   it("keeps the all-read action disabled without unread items and exposes failures", () => {
     render(
-      <ActivityContextPane
-        items={[{ ...failed, unread: false }]}
-        selectedId="failed"
-        onSelect={vi.fn()}
-        unreadCount={0}
-        operationError="操作失败，请重试"
-      />,
+      <>
+        <ActivityContextPaneHead
+          unreadCount={0}
+          markAllPending={false}
+          onMarkAllRead={vi.fn()}
+        />
+        <ActivityContextPane
+          items={[{ ...failed, unread: false }]}
+          selectedId="failed"
+          onSelect={vi.fn()}
+          operationError="操作失败，请重试"
+        />
+      </>,
     );
     expect(
       screen.getByRole("button", { name: "全部标记为已读" }),
@@ -215,7 +171,11 @@ describe("activity pages", () => {
 
   it("does not expose file context in application error details", () => {
     render(
-      <ActivityMainWorkspace item={failed} onOpenSettingsTarget={vi.fn()} />,
+      <ActivityMainWorkspace
+        item={failed}
+        hasItems
+        onOpenSettingsTarget={vi.fn()}
+      />,
     );
     const detail = screen.getByRole("region", { name: "消息详情" });
     expect(detail).not.toHaveTextContent("录制详情");
