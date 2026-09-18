@@ -178,10 +178,7 @@ export function ActivityMainWorkspace({
   }
   const diagnostic = item.diagnostic;
   return (
-    <section
-      aria-label="消息详情"
-      className="mx-auto w-full max-w-3xl space-y-8 py-8"
-    >
+    <section aria-label="消息详情" className="w-full min-w-0 space-y-8 py-8">
       <section className="space-y-3">
         <div className="space-y-1">
           <h2 className="text-base font-semibold">错误概况</h2>

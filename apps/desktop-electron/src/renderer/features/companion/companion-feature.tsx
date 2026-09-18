@@ -364,8 +364,8 @@ function PairingWorkspace({
   if (!snapshot) return null;
   const pending = controller.pendingAction !== null;
   return (
-    <section className="grid min-h-72 place-items-center border-y py-5">
-      <div className="w-full max-w-3xl space-y-4">
+    <section className="grid min-h-72 w-full place-items-center border-y py-5">
+      <div className="w-full min-w-0 space-y-4">
         <div className="text-center">
           <KeyRound className="mx-auto size-8" aria-hidden="true" />
           <p className="mt-3 text-sm text-muted-foreground">

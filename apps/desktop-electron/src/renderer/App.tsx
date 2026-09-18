@@ -1105,7 +1105,7 @@ const SettingsContent = React.memo(function SettingsContent({
 
 const SettingsPanels = React.memo(function SettingsPanels() {
   return (
-    <div className="mx-auto w-full max-w-4xl px-4 py-6 sm:px-6 lg:px-10">
+    <div className="w-full min-w-0 px-4 py-6 sm:px-6 lg:px-10">
       <SettingsPageSection section="general" label="通用" />
       <SettingsPageSection section="recording" label="录制">
         <RecordingSettingsFeature />

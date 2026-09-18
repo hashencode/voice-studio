@@ -823,7 +823,7 @@ function WorkspaceView({
 
       <div
         data-audio-sticky-actions
-        className="pointer-events-none sticky top-0 z-30 mx-auto h-0 w-full max-w-5xl px-5 sm:px-8"
+        className="pointer-events-none sticky top-0 z-30 h-0 w-full min-w-0 px-5 sm:px-8"
       >
         <div
           data-audio-sticky-actions-content
@@ -843,7 +843,7 @@ function WorkspaceView({
       <div
         ref={titleMarkerRef}
         data-audio-hero
-        className="mx-auto w-full max-w-5xl px-5 pt-8 sm:px-8"
+        className="w-full min-w-0 px-5 pt-8 sm:px-8"
       >
         <div
           data-audio-expanded-title
@@ -929,7 +929,7 @@ function WorkspaceView({
           aria-hidden="true"
           className="pointer-events-none absolute inset-x-0 top-0 h-11 border-b bg-background/95 backdrop-blur-sm"
         />
-        <div className="relative mx-auto h-11 w-full max-w-5xl px-5 sm:px-8">
+        <div className="relative h-11 w-full min-w-0 px-5 sm:px-8">
           <div
             data-audio-compact-title
             aria-hidden={!compactHeader}
@@ -999,7 +999,7 @@ function WorkspaceView({
         </div>
       </div>
 
-      <div className="mx-auto w-full max-w-5xl px-5 py-6 sm:px-8">
+      <div className="w-full min-w-0 px-5 py-6 sm:px-8">
         <div
           id="audio-tab-transcript"
           role="tabpanel"
@@ -1637,8 +1637,8 @@ export function AudioPlaybackControls({
   const positionMs = playback?.positionMs ?? 0;
   const resolvedDurationMs = Math.max(1, playback?.durationMs ?? durationMs);
   return (
-    <section aria-label="音频播放器" className="w-full px-4 py-3 sm:px-6">
-      <div className="mx-auto grid w-full max-w-5xl items-center gap-4 md:grid-cols-[auto_minmax(12rem,1fr)_auto]">
+    <section aria-label="音频播放器" className="w-full px-5 py-3 sm:px-8">
+      <div className="grid w-full min-w-0 items-center gap-4 md:grid-cols-[auto_minmax(12rem,1fr)_auto]">
         <div
           className="flex items-center gap-1"
           role="group"
