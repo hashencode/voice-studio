@@ -1,94 +1,38 @@
 # Project Agent Instructions
 
-## Flutter Goo component guidance
+## Rule discovery before repository changes
 
-For Flutter work only, treat the sibling `flutter-ui-mobile` project as the
-design and implementation authority:
+- The root rules in this file always apply. Before changing repository files,
+  identify the planned paths and run `python3 tool/rules_for_change.py <paths>`
+  from the repository root. Add `--tag <task-type>` when the task has a relevant
+  tag in `docs/standards/rules-index.json`.
+- Read every document printed by the router before editing. Do not treat a
+  printed path or a link as if its contents had been loaded. If routing fails,
+  a referenced document is unavailable, or applicable rules conflict, resolve
+  that before changing code; never assume that no rule applies.
+- Before finishing, route every changed path again and read any newly matched
+  document. For cross-module changes, use the union of all matched rules. The
+  index is the only route map; do not maintain a second hand-written table.
+- Current code and importing package APIs establish implementation facts.
+  Historical plans, tests, review comments, and solution records provide
+  context; they do not independently create current product requirements.
 
-- Design guidance: `/Users/studio/Documents/GitHub/flutter-ui-mobile/DESIGN.md`
-- Flutter development guidance: `/Users/studio/Documents/GitHub/flutter-ui-mobile/DOC.md`
+## Worktree creation requires explicit confirmation
 
-Before changing UI, screens, navigation, visual states, or Flutter component usage, read and follow both files. In particular:
-
-- Prefer exported `Goo*` components from `package:flutter_ui_mobile/flutter_ui_mobile.dart`.
-- Do not invent undocumented Goo components, constructor arguments, enum values, variants, colors, shadows, motion, or surface styles.
-- If the docs and the installed package API disagree, the API that imports and passes analyzer in this project wins.
-- Use Goo design tokens and component variants before hand-writing Material surfaces, typography, colors, dividers, loading states, dialogs, panels, toasts, snackbars, or form controls.
-- Preserve existing business behavior and platform contracts when migrating UI to Goo components.
-
-Goo components, tokens, typography, and surface guidance do not govern the
-Electron renderer.
-
-## Electron renderer component guidance
-
-- Treat the official shadcn `radix-nova` recipe as the component and typography
-  authority for Electron renderer primitives. Keep the existing Radix APIs,
-  controlled state, keyboard behavior, focus restoration, and callbacks.
-- Merge only the scoped official Radix component diff and the required Nova
-  recipe classes into local primitives. Never overwrite a customized component
-  wholesale or import the full Nova preset stylesheet.
-- Electron owns exactly these visual exceptions: shadowless surfaces, a thin
-  keyboard focus indicator, and the current Dialog modal mask
-  (`bg-black/10` with `supports-backdrop-filter:backdrop-blur-xs`).
-- Shared primitives own decorative defaults. Renderer consumers may override
-  layout such as width, direction, alignment, and contextual density, but must
-  not duplicate surface, radius, shadow, or interaction-state styling.
-- Treat empty-state primitive selection, occupied content scope, and Shell
-  chrome policy as independent decisions. Migrating between `EmptyState` and
-  `FullScreenEmptyState` must not implicitly change the Header, outer content
-  padding, context panes, copy, actions, focus, or navigation.
-- In linked multi-column interfaces, express one underlying absence once in
-  the column that owns it. Dependent columns stay blank and omit their Header
-  when they have no content; a distinct state such as data existing without a
-  selection may use its own local Empty State.
-- Preserve those surrounding behaviors during component migrations unless an
-  explicit current requirement changes them, and protect intentional behavior
-  at both the feature-component and Shell boundaries. See
-  `docs/solutions/logic-errors/separate-empty-state-component-scope-from-shell-chrome.md`.
-
-## Electron accessibility guidance
-
-- Use the local shadcn components and their existing Radix primitives as the
-  default authority for standard roles, keyboard interaction, modal focus
-  containment, and ordinary trigger focus restoration. Preserve those APIs and
-  behaviors instead of reimplementing them in feature code.
-- Renderer features still own meaningful visible text, accessible names for
-  icon-only controls, labels for form controls, Dialog titles, and concise
-  descriptions. Prefer native HTML semantics and existing primitive parts
-  before adding ARIA attributes or custom keyboard handlers.
-- Historical plans, tests, accepted review comments, and release evidence are
-  context only. None independently establishes a current Electron product
-  requirement or justifies retaining custom accessibility behavior.
-- Every new custom accessibility protocol must cite either a current explicit
-  product requirement or a reproducible gap in the composed native HTML or
-  local shadcn/Radix component. A review suggestion or a hypothetical
-  assistive-technology benefit is not sufficient evidence by itself.
-- Do not add hidden live regions, duplicate `role="status"` / `role="alert"`
-  announcements, global announcers, or multi-state screen-reader protocols when
-  the same decision-relevant state is already conveyed by the current title,
-  description, visible status, or focused control.
-- Override Radix open/close autofocus only when its default target is invalid or
-  no longer exists, such as after deleting the trigger or completing a route
-  transition. Keep the fallback local and deterministic; do not create a global
-  focus state machine for a feature-level problem.
-- Accessibility fixes must not silently expand into unrelated navigation,
-  layout, styling, copy, component migration, or cross-platform work. Audit and
-  remove historical custom behavior only when current code evidence shows that
-  it duplicates primitives, has no remaining product requirement, or causes a
-  concrete regression.
-- Test application-owned semantics and deliberate deviations at the nearest
-  stable interaction boundary. Do not duplicate the primitive library's full
-  accessibility test suite or require assistive-technology/visual execution
-  without the explicit authorization required by this file.
-
-## Visual styling guidance
-
-- Default to shadowless UI. Do not add shadows unless the user explicitly requests them or an existing platform contract requires them.
-- Establish hierarchy with spacing, borders, surface color differences, and typography before considering elevation.
-- Keep keyboard focus visible but lightweight. Inputs, buttons, and other form controls should use a thin focus indicator rather than a thick ring or glow.
-- Keep interface copy concise, natural, and considerate. Include only information that affects the user's next action or decision; do not repeat visible controls, states, or capabilities. For instructions, prefer brief and polite wording when it adds warmth without adding explanation.
-- When a Modal conveys one brief system message and has no distinct task name, use the title to identify the message type or semantic category, state the complete fact once in the body, and keep only actions required for a decision or continuation in the footer. Do not repeat the same content across the title, body, and actions; keep a task-specific title when the Modal has a distinct named task.
-- Use declarative copy in confirmation dialogs. Name the confirmation task directly in the title, such as “重置本机数据确认”; do not use question marks or interrogative wording in the title or body. State the consequence in the body and present the available decisions as footer actions.
+- Before invoking any command, tool, API, or UI action that could start creating
+  or opening a new Git worktree, ask the user for explicit confirmation and wait
+  for their reply. This applies to `git worktree add`, Codex task creation or
+  forks with a worktree environment, and handoffs into a new worktree.
+- Before asking, run a read-only check that this repository has a valid `HEAD`.
+  If it has no valid commit, report that a worktree cannot be created and do
+  not attempt creation.
+- State the proposed repository, base branch or commit, new branch (if any),
+  worktree path, and reason in the confirmation request. General permission to
+  implement, fix, parallelize, delegate, or create a task is not worktree
+  permission.
+- Use the current checkout or same-directory task environment by default.
+  Confirmation applies only to the exact single worktree proposed; ask again
+  for another worktree.
 
 ## Project knowledge
 
@@ -102,74 +46,11 @@ Electron renderer.
 - A request to implement or change UI is not permission to perform visual validation. Ask first, and treat permission as limited to the scope granted for that task.
 - Without permission, use only non-visual static checks and tests that do not launch or control UI processes. Report visual validation as skipped by user policy; do not substitute another UI-launching command.
 
-## Verification lanes
+## Verification and build entry
 
-Use the lightest lane that proves the changed behavior. Routine work must not run
-the 20-stage `./tool/dev_check.sh` by default.
-
-| Change | Required verification |
-| --- | --- |
-| Documentation, comments, or analysis-only work | Inspect the diff and check affected references for consistency. Do not run tests, analyzers, or builds. |
-| Electron renderer layout, styling, navigation, or visual states | Run `bun run check:ui:quick` and the final `bun run check:ui` from `apps/desktop-electron` only after the user explicitly authorizes visual validation for the current task. Otherwise skip them and report that visual validation was not authorized. Do not rerun the final check unless UI code changes after that result. |
-| Electron Main, Preload, shared contracts, storage, or ordinary worker integration | Run `bun run check:code` from `apps/desktop-electron`. |
-| Electron release evidence, frozen-resource manifest/identity/packaged inventory, or an explicit candidate request | Run `VOICE2TEXT_RELEASE_VALIDATION=1 bun run check:release` from `apps/desktop-electron`. |
-| Pure Dart package (`audio_core`, `audio_workflows`, `companion_protocol`, `desktop_sherpa_worker`, or `processing_contracts`) | Run `dart analyze packages/<package>` and `dart test packages/<package>`. |
-| Flutter package (`packages/audio_storage`) | From the repository root, first run `python3 tool/build_cache_guard.py`, then run `flutter analyze packages/audio_storage` and `flutter test packages/audio_storage/test`. |
-| Flutter app (`apps/mobile-flutter`) | From the repository root, first run `python3 tool/build_cache_guard.py`; then, from the changed app directory, run `flutter analyze` and the narrowest relevant `flutter test <test-path>`. |
-| Cross-module or repository-wide release work, explicit full-validation request, or a change whose reverse-dependency set cannot be bounded | Run the complete `./tool/dev_check.sh` gate from the repository root. The dedicated Electron candidate row above takes precedence for Electron-only release evidence. |
-
-- Derive additional affected packages and apps from root workspace membership,
-  `pubspec.yaml` path dependencies, and import/reference searches. If that
-  evidence cannot bound the reverse-dependency set, use the complete gate.
-- Run the corresponding lane for every derived reverse consumer, not only the
-  directly changed package. This includes affected Flutter apps and Electron
-  worker or processing-contract integrations.
-- Deduplicate equivalent checks for the same code state. Do not repeat a
-  narrower check after an equivalent broader lane has passed.
-- Isolate and report unrelated pre-existing failures with evidence instead of
-  rerunning them.
-
-- Do not run `bun run package`, `resources:all`, or
-  `audio_sidebar_release_candidate.py prepare` merely because a routine UI or
-  code task changed files.
-- The release lane is intentionally disabled unless release intent is explicit.
-  Direct invocation of `python3 tool/audio_sidebar_release_candidate.py prepare`
-  remains available only for genuine candidate recovery or diagnostics.
-- A failed release preparation resumes its verified command prefix only when
-  source, target, toolchain, environment, acquisition mode, and package
-  identities still match.
-
-## Frozen resource download cache
-
-- Frozen Electron resources are cached by verified SHA-256 under
-  `${HOME}/Library/Caches/Voice2Text/resource-downloads-v1` and shared by local
-  worktrees. Cache hits are rehashed before use.
-- Override the location with `VOICE2TEXT_RESOURCE_CACHE_DIR`, the 4 GiB ceiling
-  with `VOICE2TEXT_RESOURCE_CACHE_LIMIT_GIB`, or request a deliberate fresh
-  acquisition with `VOICE2TEXT_FORCE_FRESH_RESOURCE_DOWNLOAD=1`.
-- Do not delete the shared cache in task cleanup. Disposable materialization
-  staging is separate and is removed automatically.
-
-## Build cache budget
-
-- Before running local Flutter or Gradle builds, tests, benchmarks, or code
-  generation, run `python3 tool/build_cache_guard.py`.
-- The guard covers the root app, `apps/desktop`, and every workspace package.
-  It preserves incremental artifacts below the measured 8 GiB repository
-  budget and also enforces per-project budgets.
-- If this repository has an active Dart, Flutter, Gradle, or Xcode process,
-  cleanup is deferred without failing the caller. Use `--wait-for-idle` when
-  cleanup should wait for the repository to become idle.
-- Override the budget with `VOICE2TEXT_BUILD_CACHE_LIMIT_GIB` only for a
-  documented benchmark. Use `python3 tool/build_cache_guard.py --force` after a
-  one-off full build matrix.
-
-## UI device watcher
-
-After generating or changing code in this `voice2text-flutter` project, run this best-effort watcher check before finishing only when the user has explicitly authorized visual validation for the current task:
-
-```bash
-./tool/ensure_ui_watcher.sh
-```
-
-Without that permission, do not run the script. When authorized, the script starts `tool/watch_ui_device.sh` only when a physical Android device is connected and the watcher is not already running. If no physical device is connected, or the watcher is already running, it exits without changing anything.
+- Read `docs/standards/verification.md` for the verification lane that matches
+  the changed files. Run the lightest required lane and all bounded reverse
+  consumers. Do not run the repository-wide gate for routine changes.
+- Read `docs/standards/build-resources.md` before builds, resource acquisition,
+  code generation, or device watcher work. The visual-validation permission
+  above still controls every UI process and visual test.

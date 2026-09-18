@@ -1,0 +1,84 @@
+{
+  "version": 1,
+  "routes": [
+    {
+      "id": "documentation",
+      "paths": ["AGENTS.md", "CONCEPTS.md", "README.md", "docs/**"],
+      "documents": ["docs/standards/verification.md"]
+    },
+    {
+      "id": "electron",
+      "paths": ["apps/desktop-electron/**"],
+      "documents": ["docs/standards/verification.md"]
+    },
+    {
+      "id": "electron-renderer",
+      "paths": [
+        "apps/desktop-electron/src/renderer/**",
+        "apps/desktop-electron/tests/unit/renderer/**",
+        "apps/desktop-electron/tests/e2e/**",
+        "apps/desktop-electron/tests/visual/**"
+      ],
+      "tags": ["electron-renderer", "electron-ui"],
+      "documents": [
+        "docs/standards/electron-renderer.md",
+        "docs/standards/visual-style.md"
+      ]
+    },
+    {
+      "id": "flutter-app",
+      "paths": [
+        "apps/mobile-flutter/**",
+        "lib/**",
+        "test/**",
+        "integration_test/**",
+        "android/**",
+        "ios/**"
+      ],
+      "tags": ["flutter-ui"],
+      "documents": [
+        "docs/standards/flutter-ui.md",
+        "docs/standards/verification.md",
+        "docs/standards/build-resources.md",
+        "docs/standards/visual-style.md"
+      ]
+    },
+    {
+      "id": "packages",
+      "paths": ["packages/**", "pubspec.yaml", "pubspec.lock"],
+      "documents": [
+        "docs/standards/verification.md",
+        "docs/standards/build-resources.md"
+      ]
+    },
+    {
+      "id": "tooling",
+      "paths": ["tool/**", "scripts/**", ".github/**"],
+      "documents": [
+        "docs/standards/verification.md",
+        "docs/standards/build-resources.md"
+      ]
+    },
+    {
+      "id": "build-resources",
+      "tags": ["build", "release", "resource-download", "device-watcher"],
+      "documents": ["docs/standards/build-resources.md"]
+    },
+    {
+      "id": "repository-config",
+      "paths": [
+        "*.yaml",
+        "*.yml",
+        "*.json",
+        "*.toml",
+        "*.sh",
+        "*.py",
+        "*.gradle",
+        "*.gradle.kts",
+        ".gitignore",
+        ".gitattributes"
+      ],
+      "documents": ["docs/standards/verification.md"]
+    }
+  ]
+}
