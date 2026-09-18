@@ -266,6 +266,52 @@ describe("application activity", () => {
     ).toEqual(["general", "local-models"]);
   });
 
+  it("keeps distinct diagnostic causes separate and updates the latest event", () => {
+    const state = new DesktopApplicationState();
+    const base = {
+      kind: "processing_runtime_unavailable" as const,
+      safeSummary: "本地处理组件暂不可用。",
+      settingsTarget: "local-models" as const,
+      diagnostic: {
+        eventId: "13b1980d-6874-408b-b186-fbf960dc3c1a",
+        stage: "模型加载",
+        code: "MODEL_LOAD_FAILED",
+        reason: "模型文件校验未通过。",
+        exceptionType: "ModelLoadError",
+        stackFrames: ["LocalModelService.initialize"],
+        appVersion: "0.1.0",
+        occurredAt: 100,
+      },
+    };
+    state.recordApplicationFailure(base);
+    state.recordApplicationFailure({
+      ...base,
+      diagnostic: {
+        ...base.diagnostic,
+        eventId: "e09377e0-10cf-40c6-922a-c94d4d070430",
+        occurredAt: 200,
+      },
+    });
+    state.recordApplicationFailure({
+      ...base,
+      diagnostic: {
+        ...base.diagnostic,
+        code: "MODEL_NOT_FOUND",
+        eventId: "b640799c-9454-40b8-845d-ae50c27cc2f7",
+        occurredAt: 300,
+      },
+    });
+
+    const activity = state.snapshot().activity!;
+    expect(activity).toHaveLength(2);
+    expect(activity[0]!.diagnostic?.code).toBe("MODEL_NOT_FOUND");
+    expect(activity[1]).toMatchObject({
+      occurrenceCount: 2,
+      lastOccurredAt: 200,
+      diagnostic: { eventId: "e09377e0-10cf-40c6-922a-c94d4d070430" },
+    });
+  });
+
   it("keeps distinct failures newest-first, caps at 30, and reads idempotently", () => {
     const state = new DesktopApplicationState();
     for (let index = 0; index < 32; index += 1) {

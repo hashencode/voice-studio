@@ -40,6 +40,31 @@ afterEach(() => {
   vi.restoreAllMocks();
 });
 
+it("shows an audio description between its title and date", async () => {
+  renderRoute(
+    api({
+      listAudios: vi.fn(async () => [
+        { ...audioA, description: "下周发布准备" },
+        { ...audioB, description: "   " },
+      ]),
+    }),
+  );
+
+  const described = await screen.findByRole("button", { name: /打开 音频 A/ });
+  const descriptions = described.querySelectorAll(
+    '[data-slot="item-description"]',
+  );
+  expect(descriptions).toHaveLength(2);
+  expect(descriptions[0]).toHaveTextContent("下周发布准备");
+  expect(descriptions[0]).toHaveClass("line-clamp-1");
+  expect(descriptions[1]).toHaveTextContent(" · ");
+
+  const blank = screen.getByRole("button", { name: /打开 音频 B/ });
+  expect(blank.querySelectorAll('[data-slot="item-description"]')).toHaveLength(
+    1,
+  );
+});
+
 it("deletes a recording from its context menu after confirmation", async () => {
   const deleteAudio = vi.fn(async () => ({ deleted: true }));
   renderRoute(api({ deleteAudio }));
@@ -698,7 +723,7 @@ it("places import and recording actions in the audio pane footer", async () => {
   expect(importButton).toHaveAttribute("data-size", "icon");
   expect(importButton.querySelector("svg")).toHaveClass("lucide-file-music");
   expect(recordButton).toHaveTextContent("开始新录音");
-  expect(within(pane).getByRole("button", { name: "显示音频搜索" })).not.toBe(
+  expect(within(pane).getByRole("searchbox", { name: "搜索音频" })).not.toBe(
     importButton,
   );
 
@@ -801,9 +826,6 @@ it("preserves a populated workspace during background refresh and query-empty", 
   );
 
   await screen.findByRole("button", { name: /打开 音频 A/ });
-  await userEvent
-    .setup()
-    .click(screen.getByRole("button", { name: "显示音频搜索" }));
   const search = screen.getByRole("searchbox", { name: "搜索音频" });
   const populatedImport = screen.getByRole("button", { name: "导入音频" });
   expect(populatedImport.querySelector("svg")).toBeInTheDocument();
@@ -851,15 +873,11 @@ it("preserves a populated workspace during background refresh and query-empty", 
   expect(selectionPrompt).toBeVisible();
 });
 
-it("persists only the audio search visibility preference", async () => {
+it("keeps audio search visible and resets the filter on remount", async () => {
   const desktop = api({ listAudios: vi.fn(async () => [audioA]) });
   const first = renderRoute(desktop);
   await screen.findByRole("button", { name: /打开 音频 A/ });
 
-  expect(screen.queryByRole("searchbox", { name: "搜索音频" })).toBeNull();
-  await userEvent
-    .setup()
-    .click(screen.getByRole("button", { name: "显示音频搜索" }));
   expect(screen.getByRole("searchbox", { name: "搜索音频" })).toBeVisible();
 
   await userEvent
@@ -870,7 +888,7 @@ it("persists only the audio search visibility preference", async () => {
     .click(await screen.findByRole("menuitemradio", { name: "已转写 1" }));
   expect(
     screen.getByRole("button", { name: "筛选音频：已转写" }),
-  ).toBeVisible();
+  ).toHaveTextContent("已转写");
 
   first.unmount();
   renderRoute(desktop);
@@ -1290,26 +1308,26 @@ it("filters Audio summaries into the five transcription states", async () => {
   expect(firstRow).not.toHaveTextContent("个片段");
   expect(firstRow).not.toHaveTextContent("等待处理");
   expect(screen.queryByRole("button", { name: "全部 9" })).toBeNull();
-  expect(screen.queryByRole("button", { name: "筛选音频：全部" })).toBeNull();
-  expect(screen.queryByRole("searchbox", { name: "搜索音频" })).toBeNull();
-  await userEvent
-    .setup()
-    .click(screen.getByRole("button", { name: "显示音频搜索" }));
   const search = screen.getByRole("searchbox", { name: "搜索音频" });
   expect(search).toHaveAttribute("data-variant", "context-search");
   expect(search).toHaveClass("h-8");
-  expect(search).toHaveFocus();
+  const pane = screen.getByRole("region", { name: "音频列表" });
+  expect(pane.querySelector("h2")?.parentElement).not.toHaveClass("border-b");
   expect(
-    window.localStorage.getItem("voice2text.audio.context-search-visible.v1"),
-  ).toBe("true");
+    pane.querySelector('[data-context-pane-search="true"]')?.firstElementChild
+      ?.firstElementChild,
+  ).toHaveClass("border-b", "px-2", "pb-2");
   const filterButton = screen.getByRole("button", {
     name: "筛选音频：全部",
   });
-  const searchTools = search.closest('[data-slot="button-group"]');
+  const searchTools = search.parentElement;
   expect(searchTools).toContainElement(filterButton);
-  expect(searchTools).toHaveClass("w-full");
-  expect(filterButton).toHaveClass("h-8");
-  expect(filterButton.querySelector("svg")).toBeNull();
+  expect(filterButton).toHaveTextContent("全部");
+  expect(filterButton).toHaveClass("focus-visible:ring-0");
+  expect(filterButton.querySelector("svg")).toHaveClass("lucide-list-filter");
+  expect(
+    window.localStorage.getItem("voice2text.audio.context-search-visible.v1"),
+  ).toBeNull();
   await userEvent.setup().click(filterButton);
   expect(
     await screen.findByRole("menuitemradio", { name: "全部 9" }),

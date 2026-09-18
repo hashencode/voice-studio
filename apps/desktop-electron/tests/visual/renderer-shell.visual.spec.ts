@@ -239,17 +239,17 @@ test.describe("sidebar-09 production Renderer", () => {
   test("1280x720 Activity messages with detail", async () => {
     await withVisualSession("activity-messages", 1280, 720, async (session) => {
       const { page } = session;
-      await page.getByRole("button", { name: "消息，2 条未读" }).click();
-      await page
-        .getByRole("button", { name: /产品设计评审录制不完整/ })
-        .click();
+      await page.getByRole("button", { name: "消息，有未读消息" }).click();
+      await page.getByRole("button", { name: /本地处理异常/ }).click();
       await expect(
         page.getByRole("region", { name: "消息详情" }),
-      ).toContainText("需要处理");
+      ).toContainText("MODEL_LOAD_FAILED");
 
       await assertRuntimeContract(page, 1280, 720);
       await assertDockedGeometry(page, 1280, 720);
-      await assertReferenceChrome(page, true);
+      await expect(
+        page.locator('[data-shell-slot="content-head"]'),
+      ).toHaveCount(0);
       await screenshot(session, "activity-messages.png", 1280, 720);
     });
   });

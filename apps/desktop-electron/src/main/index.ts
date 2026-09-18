@@ -42,11 +42,18 @@ import {
   type CompanionSnapshot,
   type CaptureLibraryProjectionFailureCode,
   type CaptureLibraryProjectionRetryRequest,
+  type ActivityItem,
 } from "../shared/contracts";
 import {
   DesktopApplicationState,
   canRetryCaptureLibraryProjection,
 } from "./application/application_state";
+import {
+  appendApplicationFailureLog,
+  createApplicationFailureDiagnostic,
+  readApplicationActivity,
+  writeApplicationActivity,
+} from "./application/application_failure_diagnostics";
 import {
   createBootstrapActionRunner,
   publishStartupCaptureReconciliation,
@@ -317,7 +324,66 @@ let teardownPromise: Promise<void> | null = null;
 let teardownComplete = false;
 let processingLoop: Promise<void> | null = null;
 const packagedProgressObservationTimeoutMs = 30_000;
-const applicationState = new DesktopApplicationState();
+const applicationState = new DesktopApplicationState(
+  readApplicationActivity(app.getPath("userData")),
+  (activity) => {
+    try {
+      writeApplicationActivity(app.getPath("userData"), activity);
+    } catch {
+      console.error("Unable to save application activity state");
+    }
+  },
+);
+function recordApplicationFailure(
+  command: Pick<ActivityItem, "kind" | "safeSummary" | "settingsTarget"> & {
+    stage: string;
+    fallbackCode: string;
+    error?: unknown;
+    reason?: string;
+  },
+): void {
+  const diagnostic = createApplicationFailureDiagnostic({
+    error: command.error,
+    stage: command.stage,
+    fallbackCode: command.fallbackCode,
+    appVersion: app.getVersion(),
+    reason: command.reason,
+  });
+  const item = {
+    kind: command.kind,
+    safeSummary: command.safeSummary,
+    settingsTarget: command.settingsTarget,
+    diagnostic,
+  };
+  try {
+    appendApplicationFailureLog(app.getPath("userData"), item);
+  } catch {
+    console.error("Unable to save application failure diagnostic", {
+      eventId: diagnostic.eventId,
+      code: diagnostic.code,
+    });
+  }
+  applicationState.recordApplicationFailure(item);
+}
+
+if (!app.isPackaged && !smokeAppDataPath) {
+  applicationState.recordApplicationFailure({
+    kind: "processing_runtime_unavailable",
+    safeSummary: "示例：本地转写模型加载失败，音频尚未开始处理。",
+    settingsTarget: "local-models",
+    sample: true,
+    diagnostic: {
+      eventId: "13b1980d-6874-408b-b186-fbf960dc3c1a",
+      stage: "模型加载",
+      code: "MODEL_LOAD_FAILED",
+      reason: "模型文件校验未通过，请检查本地模型设置。",
+      exceptionType: "ModelLoadError",
+      stackFrames: ["LocalModelService.initialize", "initializeApplication"],
+      appVersion: app.getVersion(),
+      occurredAt: Date.now(),
+    },
+  });
+}
 const runBootstrapAction = createBootstrapActionRunner({
   getSnapshot: () => applicationState.snapshot(),
   hasPublishedProfileResources: () =>
@@ -3120,11 +3186,13 @@ async function initializeApplication(): Promise<void> {
     await initializeCapture(profile.database, profile.profile);
     traceCaptureSmoke("capture-ready");
   } catch (error) {
-    console.error("macOS capture initialization failed", error);
-    applicationState.recordApplicationFailure({
+    recordApplicationFailure({
       kind: "capture_runtime_unavailable",
       safeSummary: "录制组件暂不可用。",
       settingsTarget: "recording",
+      stage: "录制组件初始化",
+      fallbackCode: "CAPTURE_INITIALIZATION_FAILED",
+      error,
     });
     await microphoneTestService?.stopBeforeFormalCapture();
     microphoneTestService = null;
@@ -3382,10 +3450,13 @@ async function initializeApplication(): Promise<void> {
     }
     traceCaptureSmoke("catalog-ready");
   } catch (error) {
-    applicationState.recordApplicationFailure({
+    recordApplicationFailure({
       kind: "processing_runtime_unavailable",
       safeSummary: "本地处理组件暂不可用。",
       settingsTarget: "local-models",
+      stage: "本地处理组件初始化",
+      fallbackCode: "PROCESSING_INITIALIZATION_FAILED",
+      error,
     });
     await initializeLocalModels(false);
     applicationState.setProcessingCapability(
@@ -3436,19 +3507,24 @@ async function initializeApplication(): Promise<void> {
           setLibraryCount: (audioCount) =>
             applicationState.setLibraryCount(audioCount),
           recordFailure: () =>
-            applicationState.recordApplicationFailure({
+            recordApplicationFailure({
               kind: "startup_reconciliation_failed",
               safeSummary: "启动恢复暂未完成。",
               settingsTarget: null,
+              stage: "录音资料库启动恢复",
+              fallbackCode: "CAPTURE_RECONCILIATION_INCOMPLETE",
+              reason: `${result.failed} 条录音未能完成自动恢复。`,
             }),
         });
       })
       .catch((error) => {
-        console.error("capture library startup reconciliation failed", error);
-        applicationState.recordApplicationFailure({
+        recordApplicationFailure({
           kind: "startup_reconciliation_failed",
           safeSummary: "启动恢复暂未完成。",
           settingsTarget: null,
+          stage: "录音资料库启动恢复",
+          fallbackCode: "CAPTURE_RECONCILIATION_FAILED",
+          error,
         });
       });
   }

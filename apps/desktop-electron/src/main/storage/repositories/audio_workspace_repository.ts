@@ -59,6 +59,7 @@ export class AudioWorkspaceRepository {
         `SELECT
           audio_items.id AS audio_id,
           audio_items.display_name,
+          audio_items.description,
           audio_items.duration_ms,
           audio_items.created_at_ms,
           audio_generations.id AS generation_id,
@@ -901,6 +902,7 @@ function mapSummary(row: Record<string, unknown>): AudioSummary {
   return {
     audioId: Number(row.audio_id),
     displayName: String(row.display_name),
+    description: String(row.description ?? ""),
     durationMs: Number(row.duration_ms),
     createdAtMs: Number(row.created_at_ms),
     processingState:

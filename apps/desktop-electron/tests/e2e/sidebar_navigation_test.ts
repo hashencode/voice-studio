@@ -557,16 +557,22 @@ describe("sidebar navigation e2e", () => {
     const user = userEvent.setup();
     render(createElement(App));
 
-    await user.click(
-      await screen.findByRole("button", { name: "消息，2 条未读" }),
-    );
+    const messagesButton = await screen.findByRole("button", {
+      name: "消息，有未读消息",
+    });
+    expect(
+      messagesButton.querySelector('[data-variant="dot-destructive"]'),
+    ).not.toBeNull();
+    await user.click(messagesButton);
     expect(markActivityRead).toHaveBeenCalledWith("complete");
     await user.click(screen.getByRole("button", { name: /启动恢复暂未完成/ }));
     expect(
       screen.getByRole("complementary", { name: "消息上下文面板" }),
     ).toBeVisible();
     const messageDetails = screen.getByRole("region", { name: "消息详情" });
-    expect(messageDetails).toHaveTextContent("需要处理");
+    expect(messageDetails).toHaveTextContent(
+      "这条消息生成时未记录具体错误原因。",
+    );
     expect(within(messageDetails).queryByRole("button")).toBeNull();
 
     await user.click(screen.getByRole("button", { name: /录制组件暂不可用/ }));

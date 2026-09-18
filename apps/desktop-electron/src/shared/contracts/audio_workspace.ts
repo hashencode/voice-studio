@@ -45,6 +45,7 @@ export const audioSummarySchema = z
   .object({
     audioId: z.number().int().positive(),
     displayName: z.string().min(1),
+    description: z.string().optional(),
     durationMs: z.number().int().nonnegative(),
     createdAtMs: z.number().int().nonnegative(),
     processingState: audioProcessingStateSchema,

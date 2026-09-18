@@ -16,6 +16,7 @@ const badgeVariants = cva(
         destructive: "bg-destructive text-white",
         "filter-count": "border-0 p-0 font-normal text-inherit",
         dot: "size-2 border-0 bg-primary p-0",
+        "dot-destructive": "size-2 border-0 bg-destructive p-0",
       },
     },
     defaultVariants: { variant: "default" },

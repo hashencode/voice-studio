@@ -14,7 +14,6 @@ import { SidebarGroup, SidebarGroupContent } from "@/components/ui/sidebar";
 import {
   AudioContextPane,
   AudioContextPaneFooter,
-  AudioContextPaneHeader,
   AudioContextPaneToolbar,
   AudioMainPlaybackFooter,
   AudioMainWorkspace,
@@ -769,14 +768,8 @@ function App() {
                     pane.paneSection === "audio" ? (
                       <AudioContextPaneToolbar controller={audio} />
                     ) : undefined,
-                  searchOpen:
-                    pane.paneSection === "audio"
-                      ? audio.searchVisible
-                      : undefined,
                   head:
-                    pane.paneSection === "audio" ? (
-                      <AudioContextPaneHeader controller={audio} />
-                    ) : pane.paneSection === "messages" ? (
+                    pane.paneSection === "messages" ? (
                       <ActivityContextPaneHead
                         unreadCount={unreadActivityCount}
                         markAllPending={markAllActivityPending}
@@ -825,7 +818,11 @@ function App() {
           customTitle={
             captureDetailVisible ? captureWorkspace.customTitle : undefined
           }
-          showHeader={!emptyPresentationHidesChrome && !audioDetailPresentation}
+          showHeader={
+            !emptyPresentationHidesChrome &&
+            !audioDetailPresentation &&
+            (current !== "messages" || captureDetailVisible)
+          }
           visibility={{
             navigation: recordingShellMode !== "recordingFocus",
           }}

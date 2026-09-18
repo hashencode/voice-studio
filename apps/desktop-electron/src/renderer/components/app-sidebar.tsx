@@ -83,8 +83,8 @@ export function AppSidebar({
             item.section === "messages" && unreadActivityCount > 0
               ? {
                   ...item,
-                  badgeCount: unreadActivityCount,
-                  ariaLabel: `消息，${unreadActivityCount} 条未读`,
+                  hasUnread: true,
+                  ariaLabel: "消息，有未读消息",
                 }
               : item,
           )}

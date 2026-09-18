@@ -4,10 +4,10 @@ import {
   AudioLines,
   FileInput,
   FileMusic,
+  ListFilter,
   LoaderCircle,
   Mic,
   RotateCcw,
-  Search,
   Square,
   Trash2,
 } from "lucide-react";
@@ -22,7 +22,6 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
-import { ButtonGroup } from "@/components/ui/button-group";
 import {
   ContextMenu,
   ContextMenuContent,
@@ -110,8 +109,6 @@ type AudioRouteOptions = {
 
 type AudioFilter =
   "all" | "pending" | "transcribing" | "transcribed" | "exception";
-const AUDIO_SEARCH_VISIBILITY_STORAGE_KEY =
-  "voice2text.audio.context-search-visible.v1";
 export type AudioRouteController = ReturnType<typeof useAudioRouteController>;
 
 // Route-local state is intentionally colocated with the two route surfaces.
@@ -140,9 +137,6 @@ export function useAudioRouteController({
   const [audios, setAudios] = React.useState<AudioSummary[] | null>(null);
   const [query, setQuery] = React.useState("");
   const [filter, setFilter] = React.useState<AudioFilter>("all");
-  const [searchVisible, setSearchVisible] = React.useState(
-    readAudioSearchVisibility,
-  );
   const [listError, setListError] = React.useState<string | null>(null);
   const [listPending, setListPending] = React.useState(true);
   const [workspace, setWorkspaceState] =
@@ -996,12 +990,6 @@ export function useAudioRouteController({
     capturePreflight.microphones.length > 0,
   );
 
-  const toggleSearchVisibility = React.useCallback(() => {
-    const next = !searchVisible;
-    setSearchVisible(next);
-    writeAudioSearchVisibility(next);
-  }, [searchVisible]);
-
   const filterCounts = React.useMemo(() => {
     const counts: Record<AudioFilter, number> = {
       all: audios?.length ?? 0,
@@ -1049,8 +1037,6 @@ export function useAudioRouteController({
     filteredAudios,
     query,
     setQuery,
-    searchVisible,
-    toggleSearchVisibility,
     filter,
     setFilter,
     filterCounts,
@@ -1112,13 +1098,12 @@ export function AudioRouteFeature({
           className="flex h-full min-h-0 flex-col"
         >
           {controller.libraryPresentation === "populated" ? (
-            <div className="flex h-[50px] shrink-0 items-center justify-between border-b px-3">
+            <div className="flex h-[42px] shrink-0 items-center justify-between px-3">
               <h2 className="text-sm font-semibold">音频</h2>
-              <AudioContextPaneHeader controller={controller} />
             </div>
           ) : null}
           {controller.libraryPresentation === "populated" ? (
-            <ContextPaneSearchRegion open={controller.searchVisible}>
+            <ContextPaneSearchRegion open compact>
               <AudioContextPaneToolbar controller={controller} />
             </ContextPaneSearchRegion>
           ) : null}
@@ -1141,28 +1126,6 @@ export function AudioRouteFeature({
           <AudioMainPlaybackFooter controller={controller} />
         ) : null}
       </section>
-    </div>
-  );
-}
-
-export function AudioContextPaneHeader({
-  controller,
-}: {
-  controller: AudioRouteController;
-}) {
-  return (
-    <div className="flex items-center">
-      <Button
-        type="button"
-        size="icon-sm"
-        variant="ghost"
-        className="size-7"
-        aria-label={controller.searchVisible ? "隐藏音频搜索" : "显示音频搜索"}
-        aria-pressed={controller.searchVisible}
-        onClick={controller.toggleSearchVisibility}
-      >
-        <Search aria-hidden="true" />
-      </Button>
     </div>
   );
 }
@@ -1331,6 +1294,11 @@ export function AudioContextPane({
                         >
                           <ItemContent>
                             <ItemTitle>{audio.displayName}</ItemTitle>
+                            {audio.description?.trim() ? (
+                              <ItemDescription className="line-clamp-1 text-muted-foreground/80">
+                                {audio.description.trim()}
+                              </ItemDescription>
+                            ) : null}
                             <ItemDescription>
                               <span className="block">
                                 {formatAudioDate(audio.createdAtMs)} ·{" "}
@@ -1424,76 +1392,51 @@ export function AudioContextPaneToolbar({
   const selectedFilter = filters.find(
     (item) => item.value === controller.filter,
   )!;
-  const searchInputRef = React.useRef<HTMLInputElement>(null);
-  React.useEffect(() => {
-    if (controller.searchVisible) searchInputRef.current?.focus();
-  }, [controller.searchVisible]);
   return (
-    <ButtonGroup className="w-full">
+    <DropdownMenu>
       <ContextPaneSearch
-        ref={searchInputRef}
         aria-label="搜索音频"
-        className="rounded-r-none"
+        className="pl-[76px]"
         value={controller.query}
         onChange={(event) => controller.setQuery(event.currentTarget.value)}
+        leadingAction={
+          <DropdownMenuTrigger asChild>
+            <Button
+              type="button"
+              variant="ghost"
+              size="xs"
+              className="gap-1 focus-visible:bg-accent/60 focus-visible:ring-0"
+              aria-label={`筛选音频：${selectedFilter.label}`}
+            >
+              <ListFilter
+                aria-hidden="true"
+                className="size-3.5 text-muted-foreground"
+              />
+              {selectedFilter.label}
+            </Button>
+          </DropdownMenuTrigger>
+        }
       />
-      <DropdownMenu>
-        <DropdownMenuTrigger asChild>
-          <Button
-            type="button"
-            variant="outline"
-            size="sm"
-            className="shrink-0"
-            aria-label={`筛选音频：${selectedFilter.label}`}
-          >
-            {selectedFilter.label}
-          </Button>
-        </DropdownMenuTrigger>
-        <DropdownMenuContent align="end" className="min-w-40">
-          <DropdownMenuLabel>筛选音频</DropdownMenuLabel>
-          <DropdownMenuRadioGroup
-            value={controller.filter}
-            onValueChange={(value) =>
-              controller.setFilter(value as AudioFilter)
-            }
-          >
-            {filters.map((item) => (
-              <DropdownMenuRadioItem key={item.value} value={item.value}>
-                <span className="flex flex-1 items-center justify-between gap-4">
-                  <span>{item.label}</span>
-                  <span className="text-xs text-muted-foreground">
-                    {controller.filterCounts[item.value]}
-                  </span>
+      <DropdownMenuContent align="start" className="min-w-40">
+        <DropdownMenuLabel>筛选音频</DropdownMenuLabel>
+        <DropdownMenuRadioGroup
+          value={controller.filter}
+          onValueChange={(value) => controller.setFilter(value as AudioFilter)}
+        >
+          {filters.map((item) => (
+            <DropdownMenuRadioItem key={item.value} value={item.value}>
+              <span className="flex flex-1 items-center justify-between gap-4">
+                <span>{item.label}</span>
+                <span className="text-xs text-muted-foreground">
+                  {controller.filterCounts[item.value]}
                 </span>
-              </DropdownMenuRadioItem>
-            ))}
-          </DropdownMenuRadioGroup>
-        </DropdownMenuContent>
-      </DropdownMenu>
-    </ButtonGroup>
+              </span>
+            </DropdownMenuRadioItem>
+          ))}
+        </DropdownMenuRadioGroup>
+      </DropdownMenuContent>
+    </DropdownMenu>
   );
-}
-
-function readAudioSearchVisibility(): boolean {
-  try {
-    return (
-      window.localStorage.getItem(AUDIO_SEARCH_VISIBILITY_STORAGE_KEY) ===
-      "true"
-    );
-  } catch {
-    return false;
-  }
-}
-
-function writeAudioSearchVisibility(visible: boolean) {
-  try {
-    window.localStorage.setItem(
-      AUDIO_SEARCH_VISIBILITY_STORAGE_KEY,
-      String(visible),
-    );
-  } catch {
-    // A denied storage write must not prevent the user from toggling search.
-  }
 }
 
 export function AudioMainWorkspace({

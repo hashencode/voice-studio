@@ -59,13 +59,27 @@ export function buildVisualFixture(
         scenario === "activity-messages" || scenario === "pane-resize"
           ? [
               {
-                id: "activity-visual-warning",
-                kind: "capture_runtime_unavailable",
-                safeSummary: "录制组件暂不可用。",
-                occurrenceCount: 2,
+                id: "activity-visual-diagnostic-sample",
+                kind: "processing_runtime_unavailable",
+                safeSummary: "示例：本地转写模型加载失败，音频尚未开始处理。",
+                occurrenceCount: 1,
                 unread: true,
-                settingsTarget: "recording",
+                settingsTarget: "local-models",
                 lastOccurredAt: VISUAL_NOW_MS - 120_000,
+                sample: true,
+                diagnostic: {
+                  eventId: "13b1980d-6874-408b-b186-fbf960dc3c1a",
+                  stage: "模型加载",
+                  code: "MODEL_LOAD_FAILED",
+                  reason: "模型文件校验未通过，请检查本地模型设置。",
+                  exceptionType: "ModelLoadError",
+                  stackFrames: [
+                    "LocalModelService.initialize",
+                    "initializeApplication",
+                  ],
+                  appVersion: "1.0.0",
+                  occurredAt: VISUAL_NOW_MS - 120_000,
+                },
               },
               {
                 id: "activity-visual-complete",

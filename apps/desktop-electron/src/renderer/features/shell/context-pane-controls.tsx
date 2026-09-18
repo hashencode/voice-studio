@@ -5,13 +5,22 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 
-export function ContextPaneSearch(props: React.ComponentProps<typeof Input>) {
+export function ContextPaneSearch({
+  leadingAction,
+  ...props
+}: React.ComponentProps<typeof Input> & { leadingAction?: React.ReactNode }) {
   return (
     <div className="relative min-w-0 flex-1">
-      <Search
-        aria-hidden="true"
-        className="pointer-events-none absolute top-1/2 left-2.5 size-3.5 -translate-y-1/2 text-muted-foreground"
-      />
+      {leadingAction ? (
+        <div className="absolute top-1/2 left-1 z-10 -translate-y-1/2">
+          {leadingAction}
+        </div>
+      ) : (
+        <Search
+          aria-hidden="true"
+          className="pointer-events-none absolute top-1/2 left-2.5 size-3.5 -translate-y-1/2 text-muted-foreground"
+        />
+      )}
       <Input {...props} type="search" variant="context-search" />
     </div>
   );

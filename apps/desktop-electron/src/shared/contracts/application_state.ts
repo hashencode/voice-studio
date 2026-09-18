@@ -149,6 +149,19 @@ export const applicationFailureSettingsTargetSchema = settingsSectionSchema;
 
 export const applicationActivityLimit = 30;
 
+export const activityDiagnosticSchema = z
+  .object({
+    eventId: z.string().uuid(),
+    stage: z.string().min(1).max(80),
+    code: z.string().regex(/^[A-Z][A-Z0-9_]{0,63}$/),
+    reason: z.string().min(1).max(240),
+    exceptionType: z.string().min(1).max(80).nullable(),
+    stackFrames: z.array(z.string().min(1).max(160)).max(8),
+    appVersion: z.string().min(1).max(40),
+    occurredAt: z.number().int().nonnegative(),
+  })
+  .strict();
+
 export const activityItemSchema = z
   .object({
     id: z.string().min(1).max(260),
@@ -158,6 +171,8 @@ export const activityItemSchema = z
     unread: z.boolean(),
     settingsTarget: applicationFailureSettingsTargetSchema.nullable(),
     lastOccurredAt: z.number().int().nonnegative(),
+    diagnostic: activityDiagnosticSchema.optional(),
+    sample: z.boolean().optional(),
   })
   .strict();
 
@@ -214,6 +229,7 @@ export type ShellSection = z.infer<typeof shellSectionSchema>;
 export type BootstrapAction = z.infer<typeof bootstrapActionSchema>;
 export type ApplicationSnapshot = z.output<typeof applicationSnapshotSchema>;
 export type ActivityItem = z.infer<typeof activityItemSchema>;
+export type ActivityDiagnostic = z.infer<typeof activityDiagnosticSchema>;
 export type ApplicationFailureKind = z.infer<
   typeof applicationFailureKindSchema
 >;

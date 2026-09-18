@@ -19,6 +19,16 @@ const failed: ActivityItemView = {
   unread: true,
   settingsTarget: "local-models",
   lastOccurredAt: Date.UTC(2026, 7, 19, 3, 20),
+  diagnostic: {
+    eventId: "13b1980d-6874-408b-b186-fbf960dc3c1a",
+    stage: "模型加载",
+    code: "MODEL_LOAD_FAILED",
+    reason: "模型文件校验未通过。",
+    exceptionType: "ModelLoadError",
+    stackFrames: ["LocalModelService.initialize"],
+    appVersion: "0.1.0",
+    occurredAt: Date.UTC(2026, 7, 19, 3, 20),
+  },
 };
 
 describe("activity pages", () => {
@@ -94,15 +104,65 @@ describe("activity pages", () => {
     expect(messageRow).toHaveAttribute("data-slot", "item");
     expect(messageRow).toHaveAttribute("data-variant", "context");
     expect(messageRow).toHaveAttribute("aria-current", "true");
-    expect(messageRow.querySelector('[data-slot="item-media"]')).not.toBeNull();
+    expect(messageRow).toHaveTextContent("处理消息");
+    expect(
+      messageRow.querySelector('[data-slot="item-title"]'),
+    ).toHaveTextContent("本地处理异常");
+    expect(
+      messageRow.querySelector('[data-slot="item-description"]'),
+    ).toHaveTextContent(failed.safeSummary);
+    expect(messageRow.querySelector("time")).toHaveAttribute(
+      "dateTime",
+      new Date(failed.lastOccurredAt).toISOString(),
+    );
+    expect(messageRow.querySelector('[data-slot="item-media"]')).toBeNull();
     await user.click(messageRow);
     expect(select).toHaveBeenCalledWith(failed);
     expect(select).toHaveBeenCalledOnce();
     const detail = screen.getByRole("region", { name: "消息详情" });
     expect(detail).toHaveTextContent("发生次数2");
-    expect(detail).toHaveTextContent("需要处理");
+    expect(within(detail).getAllByRole("heading", { level: 2 })).toHaveLength(
+      3,
+    );
+    expect(detail.querySelectorAll('[data-slot="card"]')).toHaveLength(3);
+    expect(detail).toHaveTextContent("模型文件校验未通过。");
+    expect(detail).toHaveTextContent("MODEL_LOAD_FAILED");
+    expect(detail).toHaveTextContent(failed.diagnostic!.eventId);
+    expect(detail).not.toHaveTextContent("需要处理");
     await user.click(screen.getByRole("button", { name: "前往本地模型设置" }));
     expect(openDetails).toHaveBeenCalledWith(failed);
+  });
+
+  it("labels a development sample and provides its diagnostic for copying", async () => {
+    const user = userEvent.setup();
+    const writeText = vi.fn(async (value: string) => {
+      expect(value).toContain("MODEL_LOAD_FAILED");
+    });
+    Object.defineProperty(navigator, "clipboard", {
+      configurable: true,
+      value: { writeText },
+    });
+    render(
+      <>
+        <ActivityContextPane
+          items={[{ ...failed, sample: true }]}
+          selectedId="failed"
+          onSelect={vi.fn()}
+        />
+        <ActivityMainWorkspace
+          item={{ ...failed, sample: true }}
+          hasItems
+          onOpenSettingsTarget={vi.fn()}
+        />
+      </>,
+    );
+
+    expect(screen.getByRole("region", { name: "消息详情" })).toHaveTextContent(
+      "示例消息",
+    );
+    await user.click(screen.getByRole("button", { name: "复制诊断信息" }));
+    expect(writeText).toHaveBeenCalledOnce();
+    expect(writeText.mock.calls[0]![0]).toContain(failed.diagnostic!.eventId);
   });
 
   it("renders every retained message in authoritative order without search or filters", () => {
@@ -125,6 +185,7 @@ describe("activity pages", () => {
     const rows = screen.getAllByRole("button");
     expect(rows[0]).toHaveTextContent("本地处理组件暂不可用。");
     expect(rows[1]).toHaveTextContent("Project Alpha");
+    expect(rows[1]).toHaveTextContent("系统消息");
     expect(within(rows[0]!).getByLabelText("未读")).toBeVisible();
     expect(within(rows[1]!).queryByLabelText("未读")).toBeNull();
     expect(screen.queryByRole("searchbox")).not.toBeInTheDocument();

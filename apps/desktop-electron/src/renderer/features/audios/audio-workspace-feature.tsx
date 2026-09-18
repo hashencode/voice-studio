@@ -1008,10 +1008,10 @@ function WorkspaceView({
           className="space-y-4"
         >
           {workspace.segments.length === 0 ? (
-            <div className="flex min-h-96 flex-col items-center justify-center gap-4">
+            <div className="flex flex-col items-center gap-4">
               <EmptyState
                 description="当前音频尚未转写成文本"
-                className="min-h-0 py-8"
+                className="min-h-96 w-full"
               />
               {transcriptStatus}
             </div>
@@ -1267,7 +1267,10 @@ function WorkspaceView({
               }}
             />
           ) : (
-            <EmptyState description="完成转写后即可生成 AI 总结" />
+            <EmptyState
+              description="完成转写后即可生成 AI 总结"
+              className="min-h-96"
+            />
           )}
         </div>
 
@@ -1276,9 +1279,11 @@ function WorkspaceView({
           role="tabpanel"
           aria-labelledby="audio-tab-trigger-knowledge"
           hidden={activeTab !== "knowledge"}
-          className="min-h-80"
         >
-          <EmptyState description="知识库即将推出，之后可以在这里检索与当前音频相关的内容。" />
+          <EmptyState
+            description="知识库即将推出，之后可以在这里检索与当前音频相关的内容。"
+            className="min-h-96"
+          />
         </div>
       </div>
       {!usesExternalPlayback ? (

@@ -10,6 +10,7 @@ import type {
   ContextPaneSection,
 } from "@/features/shell/context-pane-contract";
 import { SHELL_SECTION_LABELS } from "@/features/shell/context-pane-contract";
+import { cn } from "@/lib/utils";
 
 export function ContextPaneShell({
   open,
@@ -60,7 +61,11 @@ export function ContextPaneShell({
         data-shell-slot="context-head"
         data-context-pane-head="true"
         data-context-pane-fixed-header="true"
-        className="h-[50px] shrink-0 gap-0 border-b p-0"
+        className={cn(
+          "shrink-0 gap-0 p-0",
+          section === "audio" ? "h-[42px]" : "h-[50px]",
+          section !== "audio" && "border-b",
+        )}
       >
         <div className="flex h-full min-w-0 shrink-0 items-center justify-between gap-2 px-3">
           <h2 className="truncate text-sm font-semibold">{label}</h2>
@@ -68,7 +73,10 @@ export function ContextPaneShell({
         </div>
       </SidebarHeader>
       {search ? (
-        <ContextPaneSearchRegion open={searchOpen}>
+        <ContextPaneSearchRegion
+          open={searchOpen}
+          compact={section === "audio"}
+        >
           {search}
         </ContextPaneSearchRegion>
       ) : null}
@@ -103,8 +111,9 @@ export function ContextPaneShell({
 
 export function ContextPaneSearchRegion({
   open,
+  compact = false,
   children,
-}: React.PropsWithChildren<{ open: boolean }>) {
+}: React.PropsWithChildren<{ open: boolean; compact?: boolean }>) {
   return (
     <div
       data-shell-slot="context-search"
@@ -115,7 +124,12 @@ export function ContextPaneSearchRegion({
       className="grid shrink-0 grid-rows-[1fr] opacity-100 transition-[grid-template-rows,opacity] duration-150 ease-out motion-reduce:transition-none data-[state=closed]:grid-rows-[0fr] data-[state=closed]:opacity-0"
     >
       <div className="min-h-0 overflow-hidden">
-        <div className="flex h-[45px] items-center border-b border-border/60 px-3 py-1.5">
+        <div
+          className={cn(
+            "flex items-center border-b border-border/60",
+            compact ? "px-2 pt-1 pb-2" : "h-[45px] px-3 py-1.5",
+          )}
+        >
           <div className="min-w-0 flex-1">{children}</div>
         </div>
       </div>

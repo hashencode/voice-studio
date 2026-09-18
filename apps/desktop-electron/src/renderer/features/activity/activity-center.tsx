@@ -1,14 +1,14 @@
-import { MailOpen, TriangleAlert } from "lucide-react";
+import { Copy, MailOpen } from "lucide-react";
+import { toast } from "sonner";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Card, CardContent } from "@/components/ui/card";
 import { EmptyState } from "@/components/ui/empty-state";
 import {
   Item,
-  ItemActions,
   ItemContent,
   ItemDescription,
-  ItemMedia,
   ItemTitle,
 } from "@/components/ui/item";
 import {
@@ -28,6 +28,8 @@ export type ActivityItemView = Pick<
   | "unread"
   | "settingsTarget"
   | "lastOccurredAt"
+  | "diagnostic"
+  | "sample"
 >;
 
 const formatter = new Intl.DateTimeFormat("zh-CN", {
@@ -36,6 +38,26 @@ const formatter = new Intl.DateTimeFormat("zh-CN", {
   hour: "2-digit",
   minute: "2-digit",
 });
+
+const dateFormatter = new Intl.DateTimeFormat("zh-CN", {
+  month: "numeric",
+  day: "numeric",
+});
+
+const activityLabels: Record<
+  ActivityItemView["kind"],
+  { type: string; title: string }
+> = {
+  processing_runtime_unavailable: {
+    type: "处理消息",
+    title: "本地处理异常",
+  },
+  capture_runtime_unavailable: { type: "录制消息", title: "录制异常" },
+  startup_reconciliation_failed: {
+    type: "系统消息",
+    title: "启动恢复异常",
+  },
+};
 
 export function ActivityContextPane({
   items,
@@ -73,23 +95,31 @@ export function ActivityContextPane({
                   data-flat-row="true"
                   onClick={() => onSelect(item)}
                 >
-                  <ItemMedia variant="icon">
-                    <ActivityIcon />
-                  </ItemMedia>
                   <ItemContent>
-                    <ItemTitle>{item.safeSummary}</ItemTitle>
-                    <ItemDescription>
-                      {item.occurrenceCount > 1
-                        ? `发生 ${item.occurrenceCount} 次 · `
-                        : ""}
-                      {formatter.format(item.lastOccurredAt)}
+                    <div className="flex min-w-0 items-center justify-between gap-2 text-xs">
+                      <span className="flex min-w-0 items-center gap-2 font-medium">
+                        {item.unread ? (
+                          <Badge variant="dot" aria-label="未读" />
+                        ) : null}
+                        <span className="truncate">
+                          {activityLabels[item.kind].type}
+                        </span>
+                        {item.sample ? (
+                          <span className="text-muted-foreground">示例</span>
+                        ) : null}
+                      </span>
+                      <time
+                        dateTime={new Date(item.lastOccurredAt).toISOString()}
+                        className="shrink-0 text-muted-foreground"
+                      >
+                        {dateFormatter.format(item.lastOccurredAt)}
+                      </time>
+                    </div>
+                    <ItemTitle>{activityLabels[item.kind].title}</ItemTitle>
+                    <ItemDescription className="line-clamp-2">
+                      {item.safeSummary}
                     </ItemDescription>
                   </ItemContent>
-                  {item.unread ? (
-                    <ItemActions>
-                      <Badge variant="dot" aria-label="未读" />
-                    </ItemActions>
-                  ) : null}
                 </button>
               </Item>
             </li>
@@ -146,37 +176,137 @@ export function ActivityMainWorkspace({
       <EmptyState description="请选择左侧消息" className="flex-1" />
     ) : null;
   }
+  const diagnostic = item.diagnostic;
   return (
-    <section aria-label="消息详情" className="mx-auto max-w-2xl py-8">
-      <ActivityIcon large />
-      <dl className="mt-4 grid grid-cols-[auto_1fr] gap-x-4 gap-y-3 border-y py-4 text-sm">
-        <dt className="text-muted-foreground">最近发生</dt>
-        <dd>{formatter.format(item.lastOccurredAt)}</dd>
-        <dt className="text-muted-foreground">发生次数</dt>
-        <dd>{item.occurrenceCount}</dd>
-        <dt className="text-muted-foreground">状态</dt>
-        <dd>需要处理</dd>
-      </dl>
-      {item.settingsTarget ? (
-        <Button
-          type="button"
-          className="mt-6"
-          onClick={() => onOpenSettingsTarget(item)}
-        >
-          {settingsTargetLabel(item.settingsTarget)}
-        </Button>
+    <section
+      aria-label="消息详情"
+      className="mx-auto w-full max-w-3xl space-y-8 py-8"
+    >
+      <section className="space-y-3">
+        <div className="space-y-1">
+          <h2 className="text-base font-semibold">错误概况</h2>
+          <p className="text-sm text-muted-foreground">
+            {activityLabels[item.kind].title}
+            {item.sample ? " · 示例消息" : ""}
+          </p>
+        </div>
+        <Card>
+          <CardContent className="space-y-4">
+            <p>{item.safeSummary}</p>
+            <dl className="grid grid-cols-[auto_1fr] gap-x-6 gap-y-3 text-sm">
+              <dt className="text-muted-foreground">最近发生</dt>
+              <dd>{formatter.format(item.lastOccurredAt)}</dd>
+              <dt className="text-muted-foreground">发生次数</dt>
+              <dd>{item.occurrenceCount}</dd>
+            </dl>
+            {item.settingsTarget ? (
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => onOpenSettingsTarget(item)}
+              >
+                {settingsTargetLabel(item.settingsTarget)}
+              </Button>
+            ) : null}
+          </CardContent>
+        </Card>
+      </section>
+
+      <section className="space-y-3">
+        <div className="space-y-1">
+          <h2 className="text-base font-semibold">错误原因</h2>
+          <p className="text-sm text-muted-foreground">
+            错误发生的环节和可用于定位的原因。
+          </p>
+        </div>
+        <Card>
+          <CardContent>
+            {diagnostic ? (
+              <dl className="grid grid-cols-[auto_1fr] gap-x-6 gap-y-3 text-sm">
+                <dt className="text-muted-foreground">发生环节</dt>
+                <dd>{diagnostic.stage}</dd>
+                <dt className="text-muted-foreground">错误码</dt>
+                <dd className="font-mono text-xs">{diagnostic.code}</dd>
+                <dt className="text-muted-foreground">原因</dt>
+                <dd>{diagnostic.reason}</dd>
+              </dl>
+            ) : (
+              <p className="text-sm text-muted-foreground">
+                这条消息生成时未记录具体错误原因。
+              </p>
+            )}
+          </CardContent>
+        </Card>
+      </section>
+
+      {diagnostic ? (
+        <section className="space-y-3">
+          <div className="space-y-1">
+            <h2 className="text-base font-semibold">技术信息</h2>
+            <p className="text-sm text-muted-foreground">
+              将事件编号和诊断信息提供给开发者，可定位对应的错误记录。
+            </p>
+          </div>
+          <Card>
+            <CardContent className="space-y-4">
+              <dl className="grid grid-cols-[auto_1fr] gap-x-6 gap-y-3 text-sm">
+                <dt className="text-muted-foreground">事件编号</dt>
+                <dd className="break-all font-mono text-xs">
+                  {diagnostic.eventId}
+                </dd>
+                <dt className="text-muted-foreground">应用版本</dt>
+                <dd>{diagnostic.appVersion}</dd>
+                {diagnostic.exceptionType ? (
+                  <>
+                    <dt className="text-muted-foreground">异常类型</dt>
+                    <dd className="font-mono text-xs">
+                      {diagnostic.exceptionType}
+                    </dd>
+                  </>
+                ) : null}
+              </dl>
+              {diagnostic.stackFrames.length > 0 ? (
+                <pre className="overflow-x-auto rounded-md bg-muted p-3 font-mono text-xs leading-5">
+                  {diagnostic.stackFrames
+                    .map((frame) => `at ${frame}`)
+                    .join("\n")}
+                </pre>
+              ) : null}
+              <Button
+                type="button"
+                size="sm"
+                variant="outline"
+                onClick={() => void copyDiagnostic(item)}
+              >
+                <Copy aria-hidden="true" />
+                复制诊断信息
+              </Button>
+            </CardContent>
+          </Card>
+        </section>
       ) : null}
     </section>
   );
 }
 
-function ActivityIcon({ large = false }: { large?: boolean }) {
-  return (
-    <TriangleAlert
-      className={`${large ? "size-7" : "mt-0.5 size-4 shrink-0"} text-amber-700`}
-      aria-hidden="true"
-    />
-  );
+async function copyDiagnostic(item: ActivityItemView): Promise<void> {
+  if (!item.diagnostic) return;
+  try {
+    await navigator.clipboard.writeText(
+      JSON.stringify(
+        {
+          kind: item.kind,
+          summary: item.safeSummary,
+          diagnostic: item.diagnostic,
+        },
+        null,
+        2,
+      ),
+    );
+    toast.success("诊断信息已复制。");
+  } catch {
+    toast.error("无法复制诊断信息，请重试。");
+  }
 }
 
 function settingsTargetLabel(

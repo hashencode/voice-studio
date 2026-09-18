@@ -1112,6 +1112,7 @@ describe("application shell", () => {
     });
     expect(fixedPaneHeader).toContainElement(paneHeading);
     expect(paneHeading).toHaveClass("text-sm", "font-semibold");
+    expect(fixedPaneHeader).not.toHaveClass("border-b");
     expect(pane).toContainElement(importButton);
     expect(fixedPaneFooter).toContainElement(importButton);
     expect(fixedPaneFooter).toContainElement(
@@ -1121,20 +1122,18 @@ describe("application shell", () => {
     expect(
       fixedPaneHeader?.compareDocumentPosition(scrollingPaneContent!),
     ).toBe(Node.DOCUMENT_POSITION_FOLLOWING);
-    expect(
-      within(pane).queryByRole("searchbox", { name: "搜索音频" }),
-    ).toBeNull();
-    const collapsedSearch = pane.querySelector("[data-context-pane-search]");
-    expect(collapsedSearch).toHaveAttribute("data-state", "closed");
-    expect(collapsedSearch).toHaveAttribute("aria-hidden", "true");
-    expect(collapsedSearch).toHaveClass(
+    const persistentSearch = pane.querySelector("[data-context-pane-search]");
+    expect(persistentSearch).toHaveAttribute("data-state", "open");
+    expect(persistentSearch?.firstElementChild?.firstElementChild).toHaveClass(
+      "border-b",
+      "px-2",
+      "pb-2",
+    );
+    expect(persistentSearch).toHaveClass(
       "transition-[grid-template-rows,opacity]",
       "data-[state=closed]:grid-rows-[0fr]",
       "motion-reduce:transition-none",
     );
-    await userEvent
-      .setup()
-      .click(within(pane).getByRole("button", { name: "显示音频搜索" }));
     expect(pane.querySelector("[data-context-pane-search]")).toHaveAttribute(
       "data-state",
       "open",
@@ -1142,7 +1141,10 @@ describe("application shell", () => {
     expect(pane.querySelector("[data-context-pane-search]")).toContainElement(
       within(pane).getByRole("searchbox", { name: "搜索音频" }),
     );
-    expect(fixedPaneHeader).toHaveClass("h-[50px]");
+    expect(
+      within(pane).getByRole("button", { name: "筛选音频：全部" }),
+    ).toHaveTextContent("全部");
+    expect(fixedPaneHeader).toHaveClass("h-[42px]");
     expect(pane).toHaveClass("bg-background", "text-foreground");
     expect(within(pane).getByRole("group", { name: "音频操作" })).toBeVisible();
 
@@ -2401,7 +2403,7 @@ describe("application shell", () => {
     expect(screen.queryByText("暂无消息")).not.toBeInTheDocument();
     expect(
       document.querySelector('[data-shell-slot="content-head"]'),
-    ).toBeVisible();
+    ).toBeNull();
     expect(document.getElementById("main-content")).toHaveClass(
       "p-4",
       "sm:p-6",
@@ -2470,10 +2472,11 @@ describe("application shell", () => {
     expect(filterRegion).toContainElement(
       screen.getByRole("button", { name: "全部 1" }),
     );
-    expect(fixedHeader).toHaveClass("h-[50px]");
+    expect(fixedHeader).toHaveClass("h-[42px]");
     expect(searchRegion).toHaveAttribute("data-state", "open");
     expect(searchRegion?.firstElementChild?.firstElementChild).toHaveClass(
-      "h-[45px]",
+      "px-2",
+      "pb-2",
     );
     expect(pane).toHaveClass("bg-background", "text-foreground");
     expect(scrollingContent).toContainElement(

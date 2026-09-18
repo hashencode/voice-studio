@@ -1,5 +1,6 @@
 import type { LucideIcon } from "lucide-react";
 
+import { Badge } from "@/components/ui/badge";
 import {
   SidebarContent,
   SidebarFooter,
@@ -17,7 +18,7 @@ export interface ShellNavigationItem {
   title: string;
   icon: LucideIcon;
   placement?: "primary" | "footer";
-  badgeCount?: number;
+  hasUnread?: boolean;
   ariaLabel?: string;
 }
 
@@ -49,10 +50,12 @@ export function NavMain({
           onClick={() => onNavigate(item.section)}
         >
           <item.icon aria-hidden="true" />
-          {item.badgeCount && item.badgeCount > 0 ? (
-            <span className="absolute -top-1 -right-1 min-w-4 rounded-full bg-destructive px-1 text-center text-[10px] leading-4 text-white">
-              {item.badgeCount}
-            </span>
+          {item.hasUnread ? (
+            <Badge
+              variant="dot-destructive"
+              aria-hidden="true"
+              className="absolute top-0 right-0"
+            />
           ) : null}
           <span className="sr-only">{item.title}</span>
         </SidebarMenuButton>

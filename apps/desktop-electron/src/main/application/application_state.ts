@@ -15,20 +15,27 @@ import type { AudioProfileInitializationResult } from "../profile/audio_profile"
 type SnapshotListener = (snapshot: ApplicationSnapshot) => void;
 
 export class DesktopApplicationState {
-  private current: ApplicationSnapshot = applicationSnapshotSchema.parse({
-    protocolVersion: desktopProtocolVersion,
-    revision: 0,
-    navigation: { section: "library" },
-    profile: { phase: "initializing" },
-    connectivity: "online",
-    capability: { processing: "available" },
-    library: { phase: "loading" },
-    reconciliation: [],
-    capture: { phase: "idle" },
-    libraryProjection: { phase: "idle" },
-    activity: [],
-  });
+  private current: ApplicationSnapshot;
   private readonly listeners = new Set<SnapshotListener>();
+
+  constructor(
+    initialActivity: ActivityItem[] = [],
+    private readonly onActivityChange?: (activity: ActivityItem[]) => void,
+  ) {
+    this.current = applicationSnapshotSchema.parse({
+      protocolVersion: desktopProtocolVersion,
+      revision: 0,
+      navigation: { section: "library" },
+      profile: { phase: "initializing" },
+      connectivity: "online",
+      capability: { processing: "available" },
+      library: { phase: "loading" },
+      reconciliation: [],
+      capture: { phase: "idle" },
+      libraryProjection: { phase: "idle" },
+      activity: initialActivity,
+    });
+  }
 
   snapshot(): ApplicationSnapshot {
     return structuredClone(this.current);
@@ -138,7 +145,8 @@ export class DesktopApplicationState {
   }
 
   recordApplicationFailure(
-    command: Pick<ActivityItem, "kind" | "safeSummary" | "settingsTarget">,
+    command: Pick<ActivityItem, "kind" | "safeSummary" | "settingsTarget"> &
+      Pick<Partial<ActivityItem>, "diagnostic" | "sample">,
   ): ApplicationSnapshot {
     const safeSummary = command.safeSummary.trim();
     const activity = this.current.activity ?? [];
@@ -146,9 +154,12 @@ export class DesktopApplicationState {
       (item) =>
         item.kind === command.kind &&
         item.safeSummary === safeSummary &&
-        item.settingsTarget === command.settingsTarget,
+        item.settingsTarget === command.settingsTarget &&
+        item.diagnostic?.code === command.diagnostic?.code &&
+        item.diagnostic?.stage === command.diagnostic?.stage &&
+        item.sample === command.sample,
     );
-    const lastOccurredAt = Date.now();
+    const lastOccurredAt = command.diagnostic?.occurredAt ?? Date.now();
     if (matchingIndex >= 0) {
       const matching = activity[matchingIndex]!;
       const updated: ActivityItem = {
@@ -156,6 +167,7 @@ export class DesktopApplicationState {
         occurrenceCount: matching.occurrenceCount + 1,
         unread: true,
         lastOccurredAt,
+        ...(command.diagnostic ? { diagnostic: command.diagnostic } : {}),
       };
       return this.update({
         activity: [
@@ -251,6 +263,9 @@ export class DesktopApplicationState {
       revision: this.current.revision + 1,
     });
     const snapshot = this.snapshot();
+    if (patch.activity !== undefined) {
+      this.onActivityChange?.(snapshot.activity ?? []);
+    }
     for (const listener of this.listeners) listener(snapshot);
     return snapshot;
   }
