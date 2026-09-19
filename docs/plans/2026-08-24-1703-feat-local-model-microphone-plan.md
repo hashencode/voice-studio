@@ -2,14 +2,17 @@
 title: Local Model Management and Microphone Test - Plan
 type: feat
 date: 2026-08-24
+updated: 2026-09-19
 deepened: 2026-08-24
 artifact_contract: ce-unified-plan/v1
-artifact_readiness: implementation-ready
 product_contract_source: ce-plan-bootstrap
 execution: code
+superseded_by: docs/plans/2026-09-19-2035-feat-github-model-distribution-plan.md
 ---
 
 # Local Model Management and Microphone Test - Plan
+
+> This document is retained as the historical architecture and implementation plan for local-model management and microphone testing. Remaining GitHub model-distribution work is governed by `docs/plans/2026-09-19-2035-feat-github-model-distribution-plan.md`; the U1-U8 units and Definition of Done below are no longer the active execution backlog.
 
 ## Goal Capsule
 
@@ -17,10 +20,10 @@ execution: code
 | --- | --- |
 | Objective | 让桌面端在缺少本地模型时仍能可靠录音，并让用户在真正调用字幕或转写前获得可操作的模型提示；同时提供可信的模型下载、删除和安全统一根目录迁移，以及符合正式录音链路的麦克风测试。 |
 | Means | 拆分随应用发布的 Worker runtime 与用户管理的模型 bundle，增加 Main 进程模型服务、原生麦克风测试协议、能力租约和可恢复的复制校验迁移流程。（KTD1、KTD2、KTD5、KTD7） |
-| Authority | 本计划的 R-ID 定义产品行为；KTD-ID 定义实现机制；现有录音持久化与 Worker 命令校验契约不得被弱化；冻结资源 authority 的许可和 `distributionEligible` 字段决定生产下载准入。 |
+| Authority | 本计划的 R-ID 定义产品行为；KTD-ID 定义实现机制；现有录音持久化与 Worker 命令校验契约不得被弱化；冻结资源 authority 的许可和 `distributionEligible` 字段决定生产下载准入；v1 用户下载源固定为 GitHub Releases。 |
 | Execution profile | 里程碑一先交付无模型录音、纯音频导入、上下文提示、原生麦克风测试和按钮调整；里程碑二再交付模型服务、能力租约、统一根目录迁移恢复、设置和发布证据。 |
 | Stop conditions | 不下载、移动或删除 Worker 可执行文件及动态库；不把不可分发模型开放给生产用户；不在精确校验成功前发布或切换模型位置；新位置 probe 成功前不确认迁移完成，失败时按恢复协议回滚或隔离；不让模型缺失阻断普通录音；不进行未经当前任务授权的可视化验证。 |
-| Tail ownership | 本计划负责 macOS Electron 客户端、Native Helper、模型目录与下载协议、设置入口和打包边界；远端生产存储提供方、CDN 控制面、模型训练和云同步不在本计划内。 |
+| Tail ownership | 本计划负责 macOS Electron 客户端、Native Helper、模型目录与 GitHub Releases 下载协议、设置入口和打包边界；模型训练、云端转写和云同步不在本计划内。 |
 
 ---
 
@@ -34,8 +37,8 @@ execution: code
 只有在用户请求实时字幕、对已有音频发起转写、重试处理或手动转写时，应用才重新检查所需模型，并在不可用时给出“前往本地模型”的上下文提示。单纯导入音频不检查模型，也不自动创建或触发任何处理任务。
 
 设置新增“本地模型”页面。
-Worker runtime 继续作为签名应用的一部分，用户不能下载、删除或迁移它。
-用户可以管理“本地转写”和“实时字幕”两个模型 bundle，并可以选择一个统一模型根目录；各模型子目录由应用固定。
+Worker runtime、Silero VAD、Pyannote segmentation 和 3D-Speaker embedding 继续作为签名应用的一部分，用户不能下载、删除或迁移它们。
+用户可以管理“本地转写”Qwen3-ASR 和“实时字幕”SenseVoice 两个大模型 bundle，并可以选择一个统一模型根目录；各模型子目录由应用固定。
 已有模型迁移采用复制、完整校验、目标盘原子发布、指针切换、加载探测和旧目录清理。
 
 麦克风测试不再使用 Renderer 的 Web Audio 设备约束。
@@ -57,10 +60,11 @@ Chromium 不保证把该值识别为 Web Media 设备 ID，因此测试可能在
 
 - **录音不依赖模型。** 普通录音始终可以创建、保存和恢复；模型只约束字幕与转写。Governs R1、R2、R14。
 - **导入不触发处理。** 导入只复制、登记并持久化音频，不检查模型、不创建处理任务；字幕和转写必须由用户后续主动发起。Governs R2、R21。
-- **Worker runtime 不属于用户模型。** Runtime 随签名应用发布，模型数据才进入下载、删除和迁移范围。Governs R4、R5、R12。
+- **Runtime 与辅助模型不属于用户下载。** Worker runtime、Silero VAD、Pyannote segmentation 和 3D-Speaker embedding 随签名应用发布；只有 Qwen3-ASR 与 SenseVoice 进入下载、删除和迁移范围。Governs R4、R5、R12、R19。
 - **迁移采用安全复制。** (session-settled: user-approved — chosen over direct move: cross-volume move is not atomic and cannot provide verified rollback.) Governs R10、R11、R12。
 - **麦克风测试由用户结束。** (session-settled: user-directed — chosen over immediate or fixed short smoke test: the user needs time to speak and judge the meter.) Governs R6、R7、R8。
 - **生产下载以可分发资源为前提。** 当前开发 authority 不得直接成为用户下载目录。Governs R5、R9、R18。
+- **v1 只使用自有 GitHub Releases。** (session-settled: user-directed — chosen over upstream or private-repository assets: unauthenticated clients need stable public downloads under product control.) 生产模型发布到产品方控制的独立公开模型分发仓库；应用直接使用内置的固定 Release URL。开发可继续使用经校验的上游资源，生产仍须通过许可与完整性准入。Governs R5、R9、R18。
 - **模型只使用一个托管根目录。** 用户只能修改统一根目录；各模型子目录和内部 staging 目录由程序固定，不提供逐模型路径配置。Governs R10、R11、R17。
 - **目录迁移要求全局空闲。** 下载、安装、删除、迁移、Worker 使用或处理任务存在时都拒绝开始迁移；迁移开始后阻止新的模型操作和处理任务。Governs R11、R12、R13。
 - **首版不提供模型修复。** 损坏模型使用“删除并重新下载”；Runtime 损坏仍通过重新安装或修复应用处理。Governs R4、R5、R18。
@@ -73,7 +77,7 @@ Chromium 不保证把该值识别为 Web Media 设备 ID，因此测试可能在
 - R1. 模型缺失、模型目录不可达或本地处理初始化失败不得阻止普通录音的开始、停止、保存和恢复。
 - R2. 应用启动不得因模型缺失弹窗；Main 进程必须在每次字幕、对已有音频发起转写、重试处理和手动转写调用前重新检查所需 bundle，单纯导入音频不得触发该检查。
 - R3. 用户发起模型依赖操作且处理能力不可用时，必须显示面向用户的对话框，而不是把原始错误放进第三栏；对话框必须区分“模型未安装”“模型目录不可用”和“应用运行组件损坏”。
-- R4. Worker executable、dylib 和 runtime manifest 必须随应用发布并保持不可变；Runtime 缺失时提示重新安装或修复应用，不能伪装成模型下载问题。
+- R4. Worker executable、dylib、runtime manifest、Silero VAD、Pyannote segmentation 和 3D-Speaker embedding 必须随应用发布并保持不可变；这些资源缺失时提示重新安装或修复应用，不能伪装成模型下载问题。
 
 **Local model management**
 
@@ -88,7 +92,7 @@ Chromium 不保证把该值识别为 Web Media 设备 ID，因此测试可能在
 
 **Model storage and lifecycle**
 
-- R9. 模型下载必须使用应用内置的可信目录、HTTPS 和精确 hash/size 清单；暂停或退出后可在服务器验证器匹配时续传，否则安全地从零重启。
+- R9. Qwen3-ASR 与 SenseVoice 必须使用应用内置的固定、自有公开 GitHub Release HTTPS URL 和精确 hash/size 清单下载；客户端不需要 GitHub 登录或访问令牌，只接受受信的 GitHub Release 重定向链。下载必须显示已下载字节、总进度和近期传输速度；暂停或退出后可在服务器验证器匹配时续传，否则安全地从零重启。
 - R10. 应用必须维护一个带私有 marker、稳定 store ID 和固定内部布局的统一模型根目录；“本地转写”“实时字幕”、下载 staging 和迁移 staging 使用程序固定且不可由用户修改的子目录。首次启动使用应用数据目录下的默认根；用户选择新位置时由应用创建托管根，不得接管普通非空目录或把任意目录当成可递归删除的根。
 - R11. 已安装模型迁移必须迁移整个统一根目录，并按目标盘 staging 复制、清单与 SHA-256 校验、同盘原子发布、位置指针切换、新位置 probe、旧根目录删除的顺序执行；新旧根相同、互为父子或通过链接别名重叠时必须拒绝。
 - R12. 没有已安装模型时可直接切换到新的有效空根且不显示迁移确认；存在模型时，迁移在指针切换前可取消且不改变旧位置，指针切换后不可取消，旧目录清理失败时新位置仍保持生效并显示待清理状态。
@@ -104,8 +108,8 @@ Chromium 不保证把该值识别为 Web Media 设备 ID，因此测试可能在
 
 **Distribution and integrity**
 
-- R18. 生产构建必须拒绝 `distributionEligible: false`、开发专用、许可未完成、平台不匹配、runtime protocol 不兼容或 hash 不匹配的模型目录。
-- R19. “本地转写”v1 必须把 ASR 和 speaker diarization 作为一个不可拆 bundle；“实时字幕”保持独立 bundle。
+- R18. 生产构建必须拒绝 `distributionEligible: false`、开发专用、许可/notice 未完成、平台不匹配、runtime protocol 不兼容或 hash 不匹配的远程模型与内置辅助模型。两个远程模型还必须来自产品方控制的独立公开 GitHub 模型分发仓库，并使用不可覆盖的版本化 Release 资产。
+- R19. 用户管理的远程资源只有“本地转写”Qwen3-ASR 和“实时字幕”SenseVoice 两个独立 bundle；formal pipeline 所需的 Silero VAD、Pyannote segmentation 和 3D-Speaker embedding 属于随应用集成的不可变资源，不提供下载或删除操作。
 - R20. 模型删除不得删除音频、已生成字幕、转写结果或任务记录；模型重新安装后不得自动排队或启动旧任务。用户明确点击“转写”或“重试”时，Main 才以当前受信且兼容的模型身份创建新的执行意图。
 
 ### Key Flows
@@ -122,9 +126,9 @@ Chromium 不保证把该值识别为 Web Media 设备 ID，因此测试可能在
   - **Outcome:** 处理只在 authority 有效时开始，提示不会在启动阶段抢先出现。
   - **Covered by:** R2、R3、R4、R15、R17。
 
-- F3. 模型下载或重新下载
+- F3. GitHub 模型下载或重新下载
   - **Trigger:** 用户在“本地模型”下载 bundle，或对损坏 bundle 选择“删除并重新下载”。
-  - **Steps:** Main 从可信目录创建下载；支持暂停和继续；校验 archive；解包到 staging；校验精确 inventory；等待零租约；原子发布并 probe。
+  - **Steps:** Main 从应用内置的固定 GitHub Release URL 创建下载；持续发布进度与近期速度；支持暂停和继续；校验 archive；解包到 staging；校验精确 inventory；等待零租约；原子发布并 probe。
   - **Outcome:** 只有完整且可加载的 bundle 进入 installed 状态。
   - **Covered by:** R5、R9、R13、R17、R18、R19。
 
@@ -177,11 +181,10 @@ Chromium 不保证把该值识别为 Web Media 设备 ID，因此测试可能在
 - 两个固定模型 bundle 的下载、暂停、继续、取消、删除、重新下载和状态。
 - 用户选择统一模型根目录、固定模型子目录、安全整根迁移、外置盘状态和崩溃恢复。
 - 设置页、上下文能力对话框、导入按钮位置与图标调整。
-- Runtime-only 应用打包和模型目录的发布准入契约。
+- Runtime 与辅助模型应用打包、两个大模型包外下载和模型目录的发布准入契约。
 
 **Deferred to follow-up work**
 
-- Cloudflare R2 候选生产下载端点的最终配置、部署、运维控制面和发布前协议验证。
 - 远程签名目录和目录热更新；v1 使用随应用签名发布的固定目录。
 - 多版本模型选择、回滚 UI 和既有任务的跨版本 identity 迁移。
 
@@ -193,8 +196,8 @@ Chromium 不保证把该值识别为 Web Media 设备 ID，因此测试可能在
 
 ### Dependencies
 
-- 生产模型 authority 必须给出 `distributionEligible: true`、可审计许可与 notice、稳定 HTTPS URL、文件大小、SHA-256 和 runtime protocol 兼容性。
-- 生产下载源必须支持稳定对象和强验证器；若要真正跨重启续传，必须正确支持 HTTP Range。
+- 生产模型 authority 必须给出 `distributionEligible: true`、可审计许可与 notice、产品方控制的独立公开 GitHub 仓库中的固定 Release HTTPS URL、文件大小、SHA-256 和 runtime protocol 兼容性。
+- 固定 GitHub Release 资源及其受信重定向链必须支持稳定对象和强验证器；跨重启续传依赖有效的 HTTP Range、ETag 或 Last-Modified 响应。
 - macOS App Sandbox 构建必须通过 security-scoped bookmark 恢复用户选择目录的访问权限。
 - UI 实现必须遵循 `../flutter-ui-mobile/DESIGN.md` 和 `../flutter-ui-mobile/DOC.md`，并以当前项目可通过 analyzer 的 Goo API 为准。
 
@@ -215,7 +218,6 @@ Chromium 不保证把该值识别为 Web Media 设备 ID，因此测试可能在
 
 **External primary sources**
 
-- Electron DownloadItem: <https://www.electronjs.org/docs/latest/api/download-item>
 - Electron Session downloads: <https://www.electronjs.org/docs/latest/api/session>
 - Electron native dialogs: <https://www.electronjs.org/docs/latest/api/dialog>
 - Electron IPC tutorial: <https://www.electronjs.org/docs/latest/tutorial/ipc>
@@ -229,22 +231,22 @@ Chromium 不保证把该值识别为 Web Media 设备 ID，因此测试可能在
 
 ### Key Technical Decisions
 
-- KTD1. (session-settled: user-approved — chosen over treating the Worker directory as one installable unit: recording must remain independent from local processing.) Split resources into an immutable shipped Runtime Catalog, a user-managed Installed Model Catalog, and a resolved per-operation authority. Runtime paths remain under the app resources root; model paths resolve under the active managed store. Governs R1、R4、R5、R17、R19。
+- KTD1. (session-settled: user-approved — chosen over treating the Worker directory as one installable unit: recording must remain independent from local processing.) Split resources into an immutable shipped Runtime Catalog, a user-managed Installed Model Catalog, and a resolved per-operation authority. Runtime paths and bundled auxiliary-model paths remain under the app resources root; Qwen3-ASR and SenseVoice paths resolve under the active managed store. Governs R1、R4、R5、R17、R19。
 - KTD2. (session-settled: user-approved — chosen over Chromium Web Audio testing: CoreAudio unique IDs already belong to the native capture chain.) A Main-owned singleton test service adds start, snapshot and stop commands to the shared Native Helper and binds the only active test to its initiating main window. Native owns the 30-second timeout; Renderer loss stops only the test, not the shared Helper. Governs R6、R7、R8。
-- KTD3. Model catalogs are app-shipped trust authorities in v1. A catalog entry binds bundle ID, version, capabilities, target, distribution eligibility, license notices, byte sizes, URLs, hashes, exact installed inventory and runtime protocol compatibility. Every installed generation and partial download persists the catalog identity that created it; application upgrade reclassifies rather than automatically deleting old state. Governs R9、R18、R19、R20。
-- KTD4. Main uses Electron `DownloadItem` and a durable journal for download, pause, resume and cancellation. Resume is accepted only for matching validators and a valid partial response; download and extraction staging never become executable paths. Governs R9、R17、R18。
+- KTD3. Model catalogs are app-shipped trust authorities in v1. A downloadable entry binds bundle ID, version, capabilities, target, distribution eligibility, license notices, byte sizes, one fixed URL in the product-controlled public GitHub model repository, allowed GitHub redirect origins, hashes, exact installed inventory and runtime protocol compatibility. Every installed generation and partial download persists the catalog identity that created it; application upgrade reclassifies rather than automatically deleting old state. Governs R9、R18、R19、R20。
+- KTD4. Main extends the existing fetch-based `ModelDownloadCoordinator` and durable journal for GitHub download, pause, resume and cancellation. The coordinator validates each redirect hop, resumes with Range/If-Range only for matching validators and a valid partial response, and keeps download/extraction staging outside executable paths. Snapshot updates expose confirmed bytes, total bytes, normalized progress and a smoothed recent transfer rate. Governs R5、R9、R17、R18。
 - KTD5. (session-settled: user-approved — chosen over filesystem move or cross-volume rename: copy plus verification preserves a recoverable source until the target is proven.) Migration publishes from target-local staging with a same-volume rename, atomically replaces a pointer file in stable `userData`, probes the new authority, then deletes the old managed store. Governs R10、R11、R12。
 - KTD6. The active store pointer, operation journal and security-scoped bookmark metadata use a versioned two-slot commit protocol under stable Electron `userData`; each slot carries a monotonic generation, operation ID, schema and checksum. Recovery correlates both slots with store markers and probe evidence, and enters `recovery_required` without deleting either store when authority is ambiguous. Large models and archives never live in `userData`. Governs R9、R10、R11、R12。
 - KTD7. Processing and live-caption Workers hold shared model-generation and storage-access leases for their full lifetime. Destructive model commands atomically check the same Main-owned gate and return busy while a lease or conflicting operation exists; publication may retain verified staging while it waits for leases to drain. Directory migration requires the model service to be fully idle, then owns an exclusive state that blocks new model operations and model-dependent tasks until completion, rollback or safe pause. Startup reconciles or terminates orphan Workers before mutations reopen. Governs R13、R19。
 - KTD8. An operation command keeps the existing pre-spawn containment and exact-inventory verification, and its catalog identity becomes a deterministic composition of Runtime identity and Model Set identity. Durable processing fences therefore detect either side changing. Governs R17、R18、R19。
-- KTD9. ASR and diarization remain one “本地转写” bundle because the current formal pipeline requires a shared processing identity. Live captions use a separate bundle and lease. Governs R5、R19。
+- KTD9. Qwen3-ASR is the only user-managed “本地转写” bundle and SenseVoice is the only user-managed “实时字幕” bundle. The formal operation authority composes downloaded Qwen identity with the immutable bundled VAD/diarization resource identity so auxiliary models cannot drift invisibly. Governs R4、R5、R19。
 - KTD10. `LocalModelService` owns one aggregated snapshot with a monotonic revision across Runtime, store generation, bundles, operations, leases and storage availability. Settings consume that snapshot through the existing Zod → Main IPC → preload pattern; stale intents are rejected by operation identity and expected revision or generation. Renderer never receives bookmarks, unrestricted filesystem primitives or download credentials. Governs R5、R15、R17。
 - KTD11. Migration progress is phase-based: preparing, copying, verifying, switching, probing and cleaning. Admission already proves the model service is idle, so migration never enters a waiting-for-processing phase. Approximate copied bytes are advisory; phase order and durable state determine correctness. Governs R11、R12。
-- KTD12. Production download stays closed until a product-eligible frozen authority replaces the current development-only manifests. Development fixtures may exercise the client path but cannot satisfy release admission. Governs R18。
-- KTD13. Archive extraction and managed cleanup are inventory-driven. Before U4 commits to an extractor, a bounded technical probe must select a pinned, application-shipped streaming adapter that can reject each member before writing it. Extraction accepts only catalog-listed regular single-link files within a fresh private staging root and applies canonical-path, duplicate/case-conflict, member-count, per-file and total expanded-byte limits; cleanup revalidates root identity and deletes owned leaves before empty directories without following links. System shell extraction is not an allowed production dependency. Governs R9、R10、R18。
+- KTD12. Production GitHub download stays closed until product-eligible frozen authorities replace the current development-only manifests. Development fixtures may exercise the same GitHub-only client path but cannot satisfy release admission. Governs R18。
+- KTD13. Archive extraction and managed cleanup are inventory-driven. Before U4 commits to an extractor, a bounded technical probe must select a pinned, application-shipped streaming adapter that can reject each member before writing it. The catalog maps each installed file to its source `archiveMember`; extraction validates every member's path, type, count and expanded size, writes only mapped regular single-link files into a fresh private staging root, and safely consumes allowed unselected regular files/directories without publishing them. Links, special files, duplicate/case-conflicting mapped paths and unsafe paths are rejected. Cleanup revalidates root identity and deletes owned leaves before empty directories without following links. System shell extraction is not an allowed production dependency. Governs R9、R10、R18。
 - KTD14. `LocalModelService` restores pointers, journals, bookmarks and orphan Worker state before publishing capability or starting queues. Shutdown first closes admission, checkpoints resumable work, terminates Workers and releases leases, then closes storage access and the model service. Governs R1、R12、R13、R17。
 - KTD15. One managed model root contains fixed catalog-owned bundle subdirectories and private staging/metadata directories. First launch uses the app-data default root; an empty installation changes roots without migration confirmation, while an installation with models copies and verifies the complete managed root. Ordinary non-empty directories are never adopted. Governs R10、R11、R12。
-- KTD16. Bundle operation UI uses one simple state matrix: not installed → download; downloading → pause/cancel; paused → continue/cancel; failed → retry download, or continue only when validators prove safe resume; installed → delete; corrupt → delete and redownload. The first release serializes model mutations and has no model-repair action. Governs R5、R13。
+- KTD16. Bundle operation UI uses one state matrix: not installed → download; downloading → pause/cancel; paused → continue/cancel; verifying/extracting/probing → show phase and only allow cancellation when Main marks the operation cancellable; waiting for a lease → show the blocking task and cancel; failed → retry download, or continue only when validators prove safe resume; installed → delete; update available → keep the installed generation usable and offer update; corrupt or incompatible → delete and redownload. An update uses the same verified staging and probe path, retains the current generation until the replacement succeeds, and falls back to the current generation on failure. The first release serializes model mutations and has no model-repair action. Governs R5、R13。
 - KTD17. Migration is Main-owned background work. Route changes and normal window closure do not cancel it; true application quit checkpoints copy/verify work for restart, while the short switch/probe/cleanup boundary temporarily defers quit. Progress is phase-based rather than percentage-accurate. Governs R11、R12、R17。
 
 ### High-Level Technical Design
@@ -330,12 +332,12 @@ stateDiagram-v2
 5. Add leases and use-time capability checks before exposing delete or migration.
 6. Add unified-root selection, whole-root migration journal, background progress and recovery.
 7. Expose the local-model settings state matrix and keep production download disabled until release admission succeeds.
-8. Remove model payloads from production packaging only after Runtime-only smoke evidence is in place.
+8. Remove Qwen3-ASR and SenseVoice payloads from production packaging only after immutable Runtime/auxiliary-resource smoke evidence is in place.
 
 ### Risks & Dependencies
 
 - **License and distribution gate:** Both current frozen model authorities are non-distributable. Mitigation: keep production actions closed until a reviewed authority and notices pass release validation.
-- **Remote resume semantics:** Some origins advertise Range but return an invalid full response. Mitigation: bind partial data to strong validators and restart safely when the response contract does not match.
+- **GitHub resume semantics:** GitHub Release redirects can change their final asset host or return an invalid full response to a Range request. Mitigation: trust only the catalogued GitHub redirect-origin set, bind partial data to strong validators, and restart safely when the response contract does not match.
 - **Cross-volume and external-disk failure:** Copy or probe may fail after significant work. Mitigation: keep the old store immutable until pointer switch and successful probe; persist the journal off the external volume.
 - **Worker/model races:** A Worker can retain open model files while deletion appears safe. Mitigation: hold a generation lease for the entire Worker lifetime and establish an exclusive gate before mutation publication.
 - **Orphan process ownership:** A detached Worker can outlive a crashed Main and invalidate an in-memory lease. Mitigation: reconcile or terminate owned process groups before model mutations or processing queues reopen.
@@ -363,7 +365,7 @@ stateDiagram-v2
   - `apps/desktop-electron/tests/unit/resource_catalog_test.ts`
   - `apps/desktop-electron/tests/integration/worker_process_group_test.ts`
 - **Approach:**
-  1. Apply KTD1 and add characterization tests for current manifest validation, ASR/diarization shared identity and catalog identity fencing.
+  1. Apply KTD1 and add characterization tests for current manifest validation, downloaded-ASR plus bundled-diarization composite identity, and catalog identity fencing.
   2. Introduce separate Runtime and Model Set authorities, including a model-root placeholder resolved only from the active installed bundle.
   3. Preserve canonical-path, containment, no-symlink, exact-inventory and hash checks before every Worker spawn.
   4. Compose Runtime and model identities into the operation identity persisted with processing jobs.
@@ -372,7 +374,7 @@ stateDiagram-v2
   - Existing valid development resources still authorize the same formal and caption operations after the split.
   - Runtime path escaping the app resource root is rejected even when a model catalog is valid.
   - Model path escaping the selected installed bundle is rejected even when the Runtime is valid.
-  - ASR and diarization with different model-set identities fail the formal pipeline contract.
+  - Qwen3-ASR and the bundled VAD/diarization resource set compose one formal-operation identity; changing either side fences a stale durable intent.
   - Changing either Runtime or model generation changes the composite catalog identity and fences a stale durable intent.
 - **Verification:** The resource unit and Worker integration tests prove that the split changes storage authority without weakening pre-spawn verification.
 
@@ -457,21 +459,24 @@ stateDiagram-v2
   - `apps/desktop-electron/tests/unit/model_download_coordinator_test.ts`
   - `apps/desktop-electron/tests/integration/register_desktop_ipc_test.ts`
 - **Approach:**
-  1. Define app-shipped catalog, bundle snapshot, storage status and operation snapshot contracts.
-  2. Persist the catalog identity on installed generations, partial downloads and journals; on app upgrade, keep compatible verified bundles, mark older compatible bundles update-available, mark incompatible bundles redownload-required, and never automatically delete an unrecognized state.
+  1. Define an app-shipped GitHub-only catalog, bundle snapshot, storage status and operation snapshot contracts; the two downloadable entries are Qwen3-ASR and SenseVoice.
+  2. Persist the catalog identity on installed generations, partial downloads and journals; on app upgrade, keep compatible verified bundles, mark older compatible bundles update-available, mark incompatible bundles redownload-required, and never automatically delete an unrecognized state. Updating retains the current compatible generation until the replacement passes probe.
   3. Persist partial-download validators, confirmed offsets and stages in an atomic journal.
-  4. Download only trusted HTTPS entries, validate redirects, bind resume to matching validators, and restart safely on invalid partial responses.
-  5. Run the KTD13 extractor proof before fixing the adapter; stream members into a fresh private staging root only after pre-write validation, then verify archive size/hash and extracted exact inventory before target-local atomic publication.
+  4. Download only fixed `github.com/.../releases/download/...` HTTPS entries, validate every redirect against the catalogued GitHub asset-origin set, bind resume to matching validators, and restart safely on invalid partial responses.
+  5. Verify the complete archive size and SHA-256 before opening the streaming adapter. Then run the KTD13 extractor proof: use catalogued `archiveMember` mappings, validate every archive member before reading it, write only selected files into a fresh private staging root, safely discard allowed unselected regular content, and verify the exact installed inventory before target-local atomic publication.
   6. Probe every newly published generation, enter installed only after success, and isolate or roll back a failed generation.
   7. Represent a corrupt model as delete-and-redownload; implement delete only within a validated managed store and preserve all user audio and results.
-  8. Redact secrets and full paths before journal, snapshot, IPC or log publication; bookmark material remains Main-only with private file permissions.
+  8. Publish confirmed byte progress and a smoothed recent transfer rate without persisting volatile speed samples; redact query strings and full paths before journal, snapshot, IPC or log publication, while bookmark material remains Main-only with private file permissions.
 - **Execution note:** Develop download resume, integrity rejection and crash reconciliation test-first with a controllable local HTTP fixture.
 - **Patterns to follow:** Snapshot/event services, `scripts/resource-download-cache.ts` staging and integrity concepts, and `profile/atomic_json.ts` persistence.
 - **Test scenarios:**
   - Covers AE7. A matching partial response resumes from the durable confirmed offset and publishes only after exact verification.
   - Covers AE8. Missing Range support, a changed validator or invalid Content-Range discards the partial and restarts safely.
-  - A redirect outside the trusted HTTPS allowlist is rejected.
+  - A GitHub Release redirect within the catalogued asset-origin set is accepted; a redirect outside that set is rejected.
+  - Both production asset URLs download without GitHub authentication; a private-repository URL or a response requiring credentials fails release admission.
+  - Download snapshots report monotonic confirmed bytes, bounded progress and a non-negative recent speed; pause freezes confirmed progress and resume continues from the trusted offset.
   - Archive hash, extracted path, file size or file hash mismatch leaves no published bundle.
+  - Qwen and SenseVoice upstream archives may contain unmapped ordinary files or wrapper directories; the extractor validates and discards allowed unselected content while publishing only mapped inventory entries.
   - Absolute paths, parent traversal, links, special files, duplicate or case-folding-conflict members, excess member counts and expansion-limit violations never write outside staging or publish a bundle.
   - A first install that passes inventory verification but fails load probe is isolated or removed and never enters installed.
   - A corrupt bundle exposes delete-and-redownload rather than a repair command; deletion stays inside the managed bundle subtree.
@@ -547,7 +552,7 @@ stateDiagram-v2
 - **Patterns to follow:** `apps/desktop-electron/src/main/profile/audio_profile.ts` copy/verify/publish/rollback behavior and atomic JSON persistence.
 - **Test scenarios:**
   - Covers AE9. Same-volume and cross-volume targets both use copy, verify, publish, switch, probe and cleanup in order.
-  - Covers AE10. Cancellation during preflight, copy, verify or lease wait leaves the old pointer intact and removes target staging.
+  - Covers AE10. Cancellation during preflight, copy or verify leaves the old pointer intact and removes target staging.
   - UI cancellation is rejected from pointer switching onward.
   - A crash before switch restores the old location and cleans or resumes staging.
   - A crash after switch but before probe validates the target and either continues or rolls back to the preserved old pointer.
@@ -580,8 +585,8 @@ stateDiagram-v2
   - `apps/desktop-electron/tests/unit/renderer/shell_test.tsx`
 - **Approach:**
   1. Reread the sibling Goo design and development authorities before UI edits, then use exported components and existing tokens.
-  2. Add the “本地模型” settings section with separate Runtime health and two bundle rows, storage usage, one unified-root location and operation state; fixed per-model subdirectories are not configurable.
-  3. Implement KTD16's action matrix and serialize model mutations. Do not render a model-repair button; corrupt state offers “删除并重新下载”, while Runtime damage offers application reinstall guidance.
+  2. Add the “本地模型” settings section with separate Runtime/内置辅助模型 health and two downloadable bundle rows, storage usage, one unified-root location and operation state; fixed per-model subdirectories are not configurable.
+  3. Implement KTD16's action matrix and serialize model mutations. Transfer rows show percent, transferred/total bytes and recent speed; paused rows retain progress. Post-download rows distinguish “校验下载”“解包安装”“等待当前任务结束”“模型探测”, use indeterminate progress where bytes are unavailable, and expose pause/cancel only when Main reports the operation can perform it. Do not report installed until probe succeeds. Do not render a model-repair button; corrupt state offers “删除并重新下载”, while Runtime or bundled auxiliary-model damage offers application reinstall guidance.
   4. Show migration confirmation with source, target and approximate size only when installed models exist; show persistent phase progress across navigation and remove cancel once switching starts.
   5. Convert processing failures into typed dialogs with “前往本地模型” deep navigation; never expose ENOENT paths in the third column.
   6. Place the `file-up` import icon button at the right of search with the “导入音频” tooltip, keep “新录音” at the second-column bottom, and use `send-horizontal` for interconnection.
@@ -591,15 +596,17 @@ stateDiagram-v2
   - Covers AE2. A user-invoked unavailable action opens the correct dialog and deep-links to “本地模型”.
   - Covers AE3. Runtime damage uses repair-app copy and exposes no model download action.
   - Bundle actions match not-installed, downloading, paused, failed, installed, corrupt, storage-unavailable and cleanup-required states; no model state exposes a repair action.
+  - Downloading and paused states expose accessible progress text and recent speed without a download-source selector.
+  - Verifying, extracting, waiting and probing states show distinct text and Main-authoritative action availability; update keeps the current compatible model available until the new generation probes successfully.
   - Active processing or model operations disable destructive actions and unified-root changes with a concise busy reason; Main independently rejects bypass attempts.
   - Migration confirmation and phase progress remain visible; cancel disappears at switching.
   - The import control has accessible name and tooltip “导入音频”, uses `file-up`, and remains beside search; new recording stays at the column bottom.
   - The interconnection action uses `send-horizontal` without changing its behavior.
 - **Verification:** Static Renderer tests prove state, navigation, accessible labeling and icon placement; visual validation remains conditional on explicit user authorization.
 
-### U8. Make Packaging Runtime-Only and Close Release Evidence
+### U8. Package Immutable Runtime Resources and Close Release Evidence
 
-- **Goal:** Ship only immutable runtime assets in the app and gate production model downloads on distributable authorities and packaged evidence.
+- **Goal:** Ship immutable runtime plus auxiliary models in the app, exclude the two large downloadable models, and gate production GitHub downloads on distributable authorities and packaged evidence.
 - **Requirements:** R4、R18、R19。
 - **Dependencies:** U1、U4、U5、U6、U7.
 - **Files:**
@@ -614,19 +621,21 @@ stateDiagram-v2
   - `packages/desktop_sherpa_worker/assets/processing/frozen_sensevoice_macos_arm64.json`
   - `docs/releasing.md`
 - **Approach:**
-  1. Split runtime build/publication from development model materialization and cache acquisition.
-  2. Package only executable, dylib, Native Helper, playback and Runtime manifest resources.
-  3. Add release admission that requires product-eligible model authorities, notices, hashes, target and protocol compatibility before enabling production downloads.
+  1. Split immutable runtime/auxiliary-model build publication from Qwen3-ASR and SenseVoice development materialization and cache acquisition.
+  2. Package executable, dylib, Native Helper, playback, Runtime manifest, Silero VAD, Pyannote segmentation and 3D-Speaker embedding resources; exclude Qwen3-ASR and SenseVoice payloads.
+  3. Add release admission that requires product-eligible authorities, notices, hashes, target and protocol compatibility for every packaged auxiliary model, plus unauthenticated fixed URLs in the product-controlled public GitHub model repository for the two downloadable models.
   4. Update packaged inventory, smoke tests and release documentation to distinguish Runtime damage from model absence.
 - **Execution note:** This unit cannot enable production download until legal and distribution prerequisites are satisfied; fixtures may prove client behavior without changing that gate.
 - **Patterns to follow:** Existing frozen-resource manifests, release validation lane and exact packaged inventory checks.
 - **Test scenarios:**
   - A packaged app with Runtime assets and no models starts and can record.
   - Missing packaged Runtime fails the Runtime smoke check and is reported as installation damage.
-  - Model payloads are absent from the immutable application resource inventory.
+  - Qwen3-ASR and SenseVoice payloads are absent from the immutable application resource inventory, while the declared VAD/diarization auxiliary inventory is present and exact.
+  - Missing or incomplete license, notice, distribution eligibility, source version or hash evidence for any bundled auxiliary model rejects the release.
+  - A private, upstream-owned or authentication-required production asset URL rejects release admission.
   - Covers AE14. A current non-distributable frozen authority fails release admission.
   - A fixture product-eligible authority enables download only when every notice, identity and compatibility field is complete.
-- **Verification:** Packaging tests prove the runtime-only inventory; production enablement remains blocked until an eligible authority passes the explicit release lane.
+- **Verification:** Packaging tests prove the intended immutable/runtime inventory and exclusion of the two large downloadable models; production enablement remains blocked until eligible GitHub authorities pass the explicit release lane.
 
 ---
 
@@ -643,7 +652,7 @@ stateDiagram-v2
 | Managed-filesystem safety | U4 and U6 | Malicious archive, path-overlap, link, special-file, expansion-limit, root-swap and redaction fixtures prove that writes and deletes stay within one verified managed store and secrets never enter durable or Renderer-visible state. |
 | Manual product acceptance | After nonvisual checks and only with explicit UI authorization | Confirm AE1–AE17 on a packaged-like macOS build, including one real microphone, one silent test, one external-volume migration and one no-model recording. |
 
-Release confidence also requires reviewing the selected download provider's current official API lifecycle and validating Range, ETag, Last-Modified, redirect and immutable-object behavior against the production endpoint.
+Release confidence also requires validating Range, ETag, Last-Modified, redirect and immutable-asset behavior against both pinned production GitHub Release URLs.
 
 ---
 
@@ -658,7 +667,7 @@ Release confidence also requires reviewing the selected download provider's curr
 - Migration cancellation, crash recovery, external-volume removal and cleanup failure preserve one authoritative recoverable store.
 - Worker leases prevent publish, delete and switch races without blocking ordinary recording.
 - Settings and audio actions match R16, use approved Goo APIs, remain shadowless, and have accessible names and tooltips.
-- Runtime-only packaging passes its inventory checks; production model download remains disabled until a product-distributable authority and provider satisfy R18.
+- Runtime plus bundled auxiliary-model packaging passes its inventory checks; Qwen3-ASR and SenseVoice remain outside the app package, and their production GitHub downloads remain disabled until product-distributable authorities satisfy R18.
 - Documentation explains Runtime versus model responsibility, model storage recovery, download release prerequisites, corrupt-model redownload and application reinstall paths.
 - The final diff contains no abandoned alternate downloader, unused migration path, stale Web Audio microphone test, unbounded staging data or unrelated cleanup.
 
@@ -671,27 +680,20 @@ Release confidence also requires reviewing the selected download provider's curr
 - `packages/desktop_sherpa_worker/assets/processing/frozen_sherpa_macos_arm64.json` currently declares `distributionEligible: false` and requires converter-license review before product eligibility.
 - `packages/desktop_sherpa_worker/assets/processing/frozen_sensevoice_macos_arm64.json` currently declares `distributionEligible: false`, `developmentPosture: DEVELOPMENT_ONLY` and `licenseDisposition: LOCAL_DEVELOPMENT_BENCHMARK_ONLY`.
 - These authorities can support development tests, but they cannot authorize production model download or publication.
-- Current development models are fetched at resource-build time from pinned `k2-fsa/sherpa-onnx` GitHub Release URLs; the Sherpa macOS Runtime archive comes from pub.dev. This is not a user-facing in-app download flow.
+- Before packaging, Silero VAD, Pyannote segmentation and 3D-Speaker embedding each need frozen source/version, license, notice, distribution eligibility, byte size and SHA-256 evidence; the current combined formal manifest is not by itself release approval for those bundled resources.
+- Qwen3-ASR and SenseVoice are fetched during development resource builds from pinned `k2-fsa/sherpa-onnx` GitHub Release URLs. After redistribution review succeeds, production publishes byte-verified copies as versioned assets in a dedicated product-controlled public GitHub model repository and freezes those URLs in the app catalog.
+- Silero VAD, Pyannote segmentation and 3D-Speaker embedding are application-integrated auxiliary resources rather than user-managed downloads; the Sherpa macOS Runtime archive continues to come from pub.dev at build time.
 - The development downloader performs a full `curl` download and reuses only complete SHA-256-verified objects from `~/Library/Caches/Voice2Text/resource-downloads-v1`; it does not currently resume a partial transfer.
 
 ### Initial bundle map
 
 | Bundle | Capabilities | Mutation unit | Availability effect |
 | --- | --- | --- | --- |
-| 本地转写 | Formal ASR and speaker diarization | Install, redownload, migrate and delete together | Explicit retry and manual transcription require it; import alone does not. |
-| 实时字幕 | Live caption recognition | Independent bundle and lease | Recording remains available without it; only live captions are unavailable. |
-| Worker Runtime | Executables, dylibs, Native Helper and Runtime manifest | Immutable application asset | Damage requires application repair; users cannot download or migrate it. |
+| 本地转写 | Qwen3-ASR 0.6B INT8 | Independent GitHub download; install, redownload, migrate and delete as one bundle | Explicit retry and manual transcription require it; import alone does not. |
+| 实时字幕 | SenseVoice INT8 | Independent GitHub download; install, redownload, migrate and delete as one bundle | Recording remains available without it; only live captions are unavailable. |
+| Runtime 与辅助模型 | Executables, dylibs, Native Helper, Runtime manifest, Silero VAD, Pyannote segmentation and 3D-Speaker embedding | Immutable application asset | Damage requires application repair; users cannot download, delete or migrate it. |
 
 ### Deferred implementation notes
 
 - Final class and file names may be adjusted to fit existing module boundaries, but Main ownership and narrow IPC are fixed.
-- Cloudflare R2 with a custom domain is the current production candidate, but its final endpoint and Range/validator/cache behavior remain a release-time decision; U8 cannot open production downloads before that deferred validation succeeds.
 - Approximate migration byte progress is optional. Durable phase progression and cancellation boundaries are required.
-
-## Deferred / Open Questions
-
-### From 2026-08-24 review
-
-- **正式发布前验证 Cloudflare R2 下载协议** — 模型下载器实施顺序 (P2, adversarial-document-reviewer, confidence 75)
-
-  正式下载服务的实际续传与缓存行为若未验证，下载器可能在发布前需要返工；在正式发布前使用选定的 Cloudflare R2 自定义域名验证断点续传、文件身份、重定向和不可变对象规则。
