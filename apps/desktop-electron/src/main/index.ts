@@ -146,9 +146,12 @@ import {
   resolveResourceRoot,
 } from "./resources/resource_catalog";
 import { LocalModelService } from "./resources/local_model_service";
+import { ModelDownloadCoordinator } from "./resources/model_download_coordinator";
 import { ModelLeaseCoordinator } from "./resources/model_lease_coordinator";
 import { ModelStore } from "./resources/model_store";
 import { ModelStorageAccess } from "./resources/model_storage_access";
+import { productionModelCatalog } from "./resources/production_model_catalog";
+import { TarGzipModelArchiveAdapter } from "./resources/tar_gzip_model_archive_adapter";
 import { secureWebPreferences } from "./security";
 import { sha256File } from "./security/sha256_file";
 import { DesktopRepository } from "./storage/desktop_repository";
@@ -3541,6 +3544,9 @@ async function initializeLocalModels(runtimeReady: boolean): Promise<void> {
   localModelService = new LocalModelService({
     store: new ModelStore(app.getPath("userData")),
     gate: modelLeaseCoordinator,
+    catalog: productionModelCatalog,
+    downloader: new ModelDownloadCoordinator(),
+    archiveAdapter: new TarGzipModelArchiveAdapter(),
     runtime: {
       state: runtimeReady ? "ready" : "damaged",
       message: runtimeReady

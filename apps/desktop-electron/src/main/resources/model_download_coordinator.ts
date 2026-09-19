@@ -36,10 +36,17 @@ interface DownloadJournal {
   lastModified: string | null;
 }
 
+export interface RecoverableModelDownload {
+  confirmedBytes: number;
+}
+
 export class ModelDownloadCoordinator {
   private abort: AbortController | null = null;
 
-  constructor(private readonly fetcher: typeof fetch = fetch) {}
+  constructor(
+    private readonly fetcher: typeof fetch = fetch,
+    private readonly now: () => number = Date.now,
+  ) {}
 
   pause(): void {
     this.abort?.abort("paused");
@@ -51,12 +58,30 @@ export class ModelDownloadCoordinator {
     removeIfPresent(journalPath);
   }
 
+  recover(options: {
+    entry: TrustedModelDownload;
+    partialPath: string;
+    journalPath: string;
+  }): RecoverableModelDownload | null {
+    validateEntry(options.entry);
+    const offset = existsSync(options.partialPath)
+      ? fileSize(options.partialPath)
+      : 0;
+    const journal = readJournal(options.journalPath);
+    if (!journalMatches(journal, options.entry, offset)) {
+      removeIfPresent(options.partialPath);
+      removeIfPresent(options.journalPath);
+      return null;
+    }
+    return { confirmedBytes: offset };
+  }
+
   async download(options: {
     entry: TrustedModelDownload;
     partialPath: string;
     journalPath: string;
     completedPath: string;
-    onProgress: (confirmedBytes: number) => void;
+    onProgress: (confirmedBytes: number, bytesPerSecond: number | null) => void;
   }): Promise<void> {
     validateEntry(options.entry);
     if (!options.entry.distributionEligible) {
@@ -89,7 +114,10 @@ export class ModelDownloadCoordinator {
         signal: abort.signal,
       });
       assertTrustedResponse(response, options.entry);
-      if (offset > 0 && !validResumeResponse(response, offset, journal!)) {
+      if (
+        offset > 0 &&
+        !validResumeResponse(response, offset, journal!, options.entry)
+      ) {
         removeIfPresent(options.partialPath);
         removeIfPresent(options.journalPath);
         offset = 0;
@@ -116,6 +144,8 @@ export class ModelDownloadCoordinator {
         let confirmed = offset;
         let durableConfirmed = offset;
         let lastCheckpointMs = Date.now();
+        let lastSpeedBytes = offset;
+        let lastSpeedMs = this.now();
         const checkpoint = () => {
           fsyncSync(descriptor);
           writeJsonAtomically(options.journalPath, {
@@ -150,7 +180,19 @@ export class ModelDownloadCoordinator {
           ) {
             checkpoint();
           }
-          options.onProgress(confirmed);
+          const speedNow = this.now();
+          const speedElapsedMs = speedNow - lastSpeedMs;
+          const bytesPerSecond =
+            speedElapsedMs > 0
+              ? Math.round(
+                  ((confirmed - lastSpeedBytes) * 1_000) / speedElapsedMs,
+                )
+              : null;
+          options.onProgress(confirmed, bytesPerSecond);
+          if (speedElapsedMs >= 250) {
+            lastSpeedBytes = confirmed;
+            lastSpeedMs = speedNow;
+          }
         }
         checkpoint();
       } catch (error) {
@@ -232,9 +274,18 @@ function validResumeResponse(
   response: Response,
   offset: number,
   journal: DownloadJournal,
+  entry: TrustedModelDownload,
 ): boolean {
   if (response.status !== 206) return false;
-  if (!response.headers.get("content-range")?.startsWith(`bytes ${offset}-`)) {
+  const contentRange = /^bytes (\d+)-(\d+)\/(\d+)$/.exec(
+    response.headers.get("content-range") ?? "",
+  );
+  if (
+    !contentRange ||
+    Number(contentRange[1]) !== offset ||
+    Number(contentRange[2]) !== entry.archiveBytes - 1 ||
+    Number(contentRange[3]) !== entry.archiveBytes
+  ) {
     return false;
   }
   const etag = response.headers.get("etag");

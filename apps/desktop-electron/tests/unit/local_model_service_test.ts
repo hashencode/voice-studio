@@ -12,9 +12,12 @@ import {
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { LocalModelService } from "../../src/main/resources/local_model_service";
+import {
+  LocalModelService,
+  type AppModelCatalogEntry,
+} from "../../src/main/resources/local_model_service";
 import {
   extractTrustedModelArchive,
   type StreamingArchiveAdapter,
@@ -411,4 +414,196 @@ describe("managed local model authority", () => {
     expect(readFileSync(completedPath)).toEqual(complete);
     expect(existsSync(journalPath)).toBe(false);
   });
+
+  it("restores a trusted partial as paused without making a request", async () => {
+    const userData = temporaryRoot("download-recovery");
+    const store = new ModelStore(userData);
+    const active = store.publishActive(store.createDefaultRoot());
+    const entry = eligibleCatalogEntry(4);
+    const partialPath = join(
+      active.stagingRoot,
+      "downloads",
+      "formal-transcription.partial",
+    );
+    const journalPath = join(
+      active.stagingRoot,
+      "downloads",
+      "formal-transcription.json",
+    );
+    writeFileSync(partialPath, "ab");
+    writeFileSync(
+      journalPath,
+      JSON.stringify({
+        schemaVersion: 1,
+        bundleId: "formal-transcription",
+        catalogIdentity: entry.download!.catalogIdentity,
+        urlIdentity: createHash("sha256")
+          .update(new URL(entry.download!.url).toString())
+          .digest("hex"),
+        confirmedBytes: 2,
+        etag: '"v1"',
+        lastModified: null,
+      }),
+    );
+    const fetcher = vi.fn();
+    const service = new LocalModelService({
+      store,
+      gate: new ModelLeaseCoordinator(),
+      runtime: { state: "ready", message: "ready", identity: "runtime" },
+      catalog: [entry, closedCatalogEntry("live-caption")],
+      downloader: new ModelDownloadCoordinator(fetcher as typeof fetch),
+      archiveAdapter: { async *members() {} },
+    });
+
+    const snapshot = await service.initialize();
+
+    expect(fetcher).not.toHaveBeenCalled();
+    expect(snapshot.operation).toMatchObject({
+      kind: "download",
+      bundleId: "formal-transcription",
+      copiedBytes: 2,
+      totalBytes: 4,
+      message: "已暂停",
+    });
+    expect(
+      snapshot.bundles.find((bundle) => bundle.id === "formal-transcription"),
+    ).toMatchObject({ state: "paused", progressBytes: 2 });
+  });
+
+  it("restarts from zero when Content-Range does not encode the exact object", async () => {
+    const root = temporaryRoot("download-range-reset");
+    const entry = eligibleCatalogEntry(4).download!;
+    const partialPath = join(root, "partial");
+    const journalPath = join(root, "journal.json");
+    const completedPath = join(root, "archive");
+    writeFileSync(partialPath, "ab");
+    writeFileSync(
+      journalPath,
+      JSON.stringify({
+        schemaVersion: 1,
+        bundleId: entry.bundleId,
+        catalogIdentity: entry.catalogIdentity,
+        urlIdentity: createHash("sha256")
+          .update(new URL(entry.url).toString())
+          .digest("hex"),
+        confirmedBytes: 2,
+        etag: '"v1"',
+        lastModified: null,
+      }),
+    );
+    const responses = [
+      new Response("cd", {
+        status: 206,
+        headers: { etag: '"v1"', "content-range": "bytes 2-3/5" },
+      }),
+      new Response("abcd", { status: 200 }),
+    ];
+    const fetcher = vi.fn(async () => responses.shift()!);
+
+    await new ModelDownloadCoordinator(fetcher as typeof fetch).download({
+      entry,
+      partialPath,
+      journalPath,
+      completedPath,
+      onProgress: () => undefined,
+    });
+
+    expect(fetcher).toHaveBeenCalledTimes(2);
+    expect(readFileSync(completedPath, "utf8")).toBe("abcd");
+  });
+
+  it("reports recent transfer speed with confirmed progress", async () => {
+    const root = temporaryRoot("download-speed");
+    const entry = eligibleCatalogEntry(4).download!;
+    const now = vi.fn().mockReturnValueOnce(0).mockReturnValue(1_000);
+    const progress: Array<[number, number | null]> = [];
+    const downloader = new ModelDownloadCoordinator(
+      (async () => new Response("abcd", { status: 200 })) as typeof fetch,
+      now,
+    );
+
+    await downloader.download({
+      entry,
+      partialPath: join(root, "partial"),
+      journalPath: join(root, "journal.json"),
+      completedPath: join(root, "archive"),
+      onProgress: (confirmedBytes, bytesPerSecond) =>
+        progress.push([confirmedBytes, bytesPerSecond]),
+    });
+
+    expect(progress).toEqual([[4, 4]]);
+  });
+
+  it("stops before networking when the model store lacks download space", async () => {
+    const userData = temporaryRoot("download-space");
+    const fetcher = vi.fn();
+    const service = new LocalModelService({
+      store: new ModelStore(userData),
+      gate: new ModelLeaseCoordinator(),
+      runtime: { state: "ready", message: "ready", identity: "runtime" },
+      catalog: [eligibleCatalogEntry(4), closedCatalogEntry("live-caption")],
+      downloader: new ModelDownloadCoordinator(fetcher as typeof fetch),
+      archiveAdapter: { async *members() {} },
+      availableDiskBytes: () => 0,
+    });
+    const initial = await service.initialize();
+
+    await service.intent({
+      action: "download",
+      bundleId: "formal-transcription",
+      expectedRevision: initial.revision,
+    });
+    await vi.waitFor(async () => {
+      expect((await service.snapshot()).operation).toMatchObject({
+        kind: "download",
+        bundleId: "formal-transcription",
+        message: expect.stringMatching(/空间不足/),
+      });
+    });
+
+    expect(fetcher).not.toHaveBeenCalled();
+  });
 });
+
+function eligibleCatalogEntry(archiveBytes: number): AppModelCatalogEntry {
+  return {
+    id: "formal-transcription",
+    displayName: "本地转写",
+    version: "fixture-v1",
+    distributionEligible: true,
+    developmentOnly: false,
+    licenseComplete: true,
+    target: "darwin-arm64",
+    runtimeProtocol: "desktop-sherpa-worker/v1",
+    download: {
+      bundleId: "formal-transcription",
+      catalogIdentity: "catalog-fixture",
+      url: "https://models.example.test/formal.tar.gz",
+      allowedOrigins: ["https://models.example.test"],
+      archiveBytes,
+      archiveSha256: createHash("sha256").update("abcd").digest("hex"),
+      distributionEligible: true,
+    },
+    inventory: [
+      {
+        path: "model.bin",
+        bytes: 1,
+        sha256: createHash("sha256").update("x").digest("hex"),
+      },
+    ],
+  };
+}
+
+function closedCatalogEntry(
+  id: "formal-transcription" | "live-caption",
+): AppModelCatalogEntry {
+  return {
+    ...eligibleCatalogEntry(4),
+    id,
+    displayName: id,
+    distributionEligible: false,
+    licenseComplete: false,
+    download: null,
+    inventory: [],
+  };
+}

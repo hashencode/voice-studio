@@ -66,6 +66,7 @@ export const localModelOperationSnapshotSchema = z
     cancelable: z.boolean(),
     copiedBytes: z.number().int().nonnegative().safe(),
     totalBytes: z.number().int().nonnegative().safe(),
+    bytesPerSecond: z.number().int().nonnegative().safe().nullable().optional(),
     message: z.string().min(1).max(240).nullable(),
   })
   .strict();

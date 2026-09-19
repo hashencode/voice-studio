@@ -7,6 +7,7 @@ import {
   readdirSync,
   renameSync,
   rmdirSync,
+  statfsSync,
   unlinkSync,
 } from "node:fs";
 import path from "node:path";
@@ -116,6 +117,7 @@ export class LocalModelService {
         root: string,
       ) => Promise<void>;
       probeStore?: (store: ManagedModelStore) => Promise<void>;
+      availableDiskBytes?: (candidate: string) => number;
     },
   ) {
     this.migration = new ModelMigrationCoordinator(options.store, options.gate);
@@ -196,6 +198,13 @@ export class LocalModelService {
       }
     } catch {
       this.storageState = "recovery-required";
+    }
+    if (
+      !this.operation &&
+      this.activeStore &&
+      ["ready", "cleanup-required"].includes(this.storageState)
+    ) {
+      this.restorePausedDownload(this.activeStore);
     }
     return await this.publish();
   }
@@ -364,6 +373,7 @@ export class LocalModelService {
               ...this.operation,
               message: "已暂停",
               cancelable: true,
+              bytesPerSecond: null,
             };
           }
           this.options.downloader?.pause();
@@ -522,6 +532,12 @@ export class LocalModelService {
       `${bundleId}.archive`,
     );
     const extraction = path.join(store.stagingRoot, `${bundleId}-${id}`);
+    const recovered = downloader.recover({
+      entry: entry.download,
+      partialPath: partial,
+      journalPath: journal,
+    });
+    const initialBytes = recovered?.confirmedBytes ?? 0;
     let lastProgressPublishMs = 0;
     try {
       this.downloadOperationState = "running";
@@ -531,19 +547,26 @@ export class LocalModelService {
         bundleId,
         phase: null,
         cancelable: true,
-        copiedBytes: 0,
+        copiedBytes: initialBytes,
         totalBytes: entry.download.archiveBytes,
+        bytesPerSecond: null,
         message: null,
       };
       await this.publish();
+      ensureDiskCapacity(
+        store.stagingRoot,
+        entry.download.archiveBytes - initialBytes,
+        this.options.availableDiskBytes,
+      );
       await downloader.download({
         entry: entry.download,
         partialPath: partial,
         journalPath: journal,
         completedPath: archive,
-        onProgress: (bytes) => {
+        onProgress: (bytes, bytesPerSecond) => {
           if (this.operation?.id !== id) return;
           this.operation.copiedBytes = bytes;
+          this.operation.bytesPerSecond = bytesPerSecond;
           if (Date.now() - lastProgressPublishMs >= 250) {
             lastProgressPublishMs = Date.now();
             void this.publish();
@@ -554,7 +577,13 @@ export class LocalModelService {
         ...this.operation!,
         kind: "install",
         cancelable: false,
+        bytesPerSecond: null,
       };
+      ensureDiskCapacity(
+        store.stagingRoot,
+        entry.inventory.reduce((sum, item) => sum + item.bytes, 0),
+        this.options.availableDiskBytes,
+      );
       await extractTrustedModelArchive({
         archivePath: archive,
         stagingRoot: extraction,
@@ -607,6 +636,21 @@ export class LocalModelService {
         releasePublication();
       }
     } catch (error) {
+      if (this.downloadOperationState !== "paused") {
+        unlinkIfPresent(archive);
+        if (existsSync(extraction)) {
+          try {
+            removeOwnedStagingCandidate(extraction, entry.inventory);
+          } catch {
+            // Unknown staging residue is retained for explicit recovery.
+          }
+        }
+      }
+      const recoverable = downloader.recover({
+        entry: entry.download,
+        partialPath: partial,
+        journalPath: journal,
+      });
       if (
         this.operation?.id === id &&
         this.downloadOperationState !== "paused"
@@ -616,8 +660,13 @@ export class LocalModelService {
           ...this.operation,
           kind: "download",
           cancelable: true,
-          message: "下载失败",
+          copiedBytes: recoverable?.confirmedBytes ?? 0,
+          bytesPerSecond: null,
+          message: publicModelError(error, "下载失败").message,
         };
+      } else if (this.operation?.id === id) {
+        this.operation.copiedBytes = recoverable?.confirmedBytes ?? 0;
+        this.operation.bytesPerSecond = null;
       }
       throw error;
     }
@@ -653,6 +702,48 @@ export class LocalModelService {
         if (this.downloadTask === task) this.downloadTask = null;
       });
     this.downloadTask = task;
+  }
+
+  private restorePausedDownload(store: ManagedModelStore): void {
+    const downloader = this.options.downloader;
+    if (!downloader) return;
+    for (const entry of this.catalog) {
+      if (
+        !entry.distributionEligible ||
+        entry.developmentOnly ||
+        !entry.licenseComplete ||
+        !entry.download
+      ) {
+        continue;
+      }
+      const recovered = downloader.recover({
+        entry: entry.download,
+        partialPath: path.join(
+          store.stagingRoot,
+          "downloads",
+          `${entry.id}.partial`,
+        ),
+        journalPath: path.join(
+          store.stagingRoot,
+          "downloads",
+          `${entry.id}.json`,
+        ),
+      });
+      if (!recovered) continue;
+      this.downloadOperationState = "paused";
+      this.operation = {
+        id: `download-recovery-${entry.id}`,
+        kind: "download",
+        bundleId: entry.id,
+        phase: null,
+        cancelable: true,
+        copiedBytes: recovered.confirmedBytes,
+        totalBytes: entry.download.archiveBytes,
+        bytesPerSecond: null,
+        message: "已暂停",
+      };
+      return;
+    }
   }
 
   private cancelDownload(bundleId: LocalModelBundleId): void {
@@ -861,6 +952,27 @@ function removeVerifiedBundleCandidate(
   rmdirSync(root);
 }
 
+function removeOwnedStagingCandidate(
+  root: string,
+  inventory: readonly ExpectedModelFile[],
+): void {
+  const allowed = new Set(inventory.map((item) => item.path));
+  const actual = scanOwnedFiles(root);
+  if (actual.some((relative) => !allowed.has(relative))) {
+    throw new Error("模型暂存目录包含未登记文件");
+  }
+  for (const relative of actual.reverse()) {
+    const candidate = contained(root, relative);
+    const stat = lstatSync(candidate);
+    if (!stat.isFile() || stat.isSymbolicLink() || stat.nlink !== 1) {
+      throw new Error("模型暂存文件身份已变化");
+    }
+    unlinkSync(candidate);
+    removeEmptyParents(path.dirname(candidate), root);
+  }
+  rmdirSync(root);
+}
+
 function pathIdentity(candidate: string): string {
   return createHash("sha256").update(path.resolve(candidate)).digest("hex");
 }
@@ -962,4 +1074,27 @@ function publicModelError(error: unknown, fallback: string): Error {
     return error;
   }
   return new Error(fallback);
+}
+
+function ensureDiskCapacity(
+  candidate: string,
+  requiredBytes: number,
+  availableDiskBytes?: (candidate: string) => number,
+): void {
+  const available = availableDiskBytes
+    ? availableDiskBytes(candidate)
+    : (() => {
+        const fileSystem = statfsSync(candidate);
+        return fileSystem.bavail * fileSystem.bsize;
+      })();
+  if (
+    !Number.isFinite(available) ||
+    available < 0 ||
+    available < requiredBytes
+  ) {
+    const missingBytes = Math.max(0, Math.ceil(requiredBytes - available));
+    throw new Error(
+      `模型存储空间不足，请至少再释放 ${missingBytes} 字节后继续`,
+    );
+  }
 }
