@@ -139,6 +139,15 @@ export function LocalModelsFeature() {
     ? snapshot.bundles.find((bundle) => bundle.id === operation.bundleId)
     : null;
   const operationPaused = activeBundle?.state === "paused";
+  const operationFailed = activeBundle?.state === "failed";
+  const downloadAction = operationPaused
+    ? { action: "resume" as const, label: "继续" }
+    : operationFailed
+      ? {
+          action: "resume" as const,
+          label: (operation?.copiedBytes ?? 0) > 0 ? "继续" : "重试",
+        }
+      : { action: "pause" as const, label: "暂停" };
   return (
     <section aria-label="本地模型设置" className="w-full">
       {error ? (
@@ -157,11 +166,24 @@ export function LocalModelsFeature() {
             <Item role="listitem" className="rounded-none">
               <ItemContent className="gap-3">
                 <div className="flex items-center justify-between gap-3 text-sm">
-                  <span>
-                    {operation.phase
-                      ? PHASE_LABELS[operation.phase]
-                      : (operation.message ?? "正在处理模型")}
-                  </span>
+                  <div className="flex min-w-0 flex-col gap-1">
+                    <span>
+                      {operation.phase
+                        ? PHASE_LABELS[operation.phase]
+                        : (operation.message ?? "正在处理模型")}
+                    </span>
+                    {operation.totalBytes > 0 ? (
+                      <span className="text-xs text-muted-foreground">
+                        {formatBytes(operation.copiedBytes)} /{" "}
+                        {formatBytes(operation.totalBytes)}
+                        {activeBundle?.state === "downloading" &&
+                        operation.bytesPerSecond !== null &&
+                        operation.bytesPerSecond !== undefined
+                          ? ` · ${formatBytes(operation.bytesPerSecond)}/s`
+                          : ""}
+                      </span>
+                    ) : null}
+                  </div>
                   {operationProgress !== null ? (
                     <span>{operationProgress}%</span>
                   ) : null}
@@ -183,12 +205,12 @@ export function LocalModelsFeature() {
                         disabled={pending}
                         onClick={() =>
                           void act({
-                            action: operationPaused ? "resume" : "pause",
+                            action: downloadAction.action,
                             bundleId: operation.bundleId!,
                           })
                         }
                       >
-                        {operationPaused ? "继续" : "暂停"}
+                        {downloadAction.label}
                       </Button>
                     ) : null}
                     <Button
@@ -229,14 +251,9 @@ export function LocalModelsFeature() {
           </>
         ) : null}
 
-        <ModelRow
-          name="本地处理组件"
-          state={snapshot.runtime.state === "ready" ? "正常" : "已损坏"}
-          detail={snapshot.runtime.message}
-        />
-        {snapshot.bundles.map((bundle) => (
+        {snapshot.bundles.map((bundle, index) => (
           <React.Fragment key={bundle.id}>
-            <ItemSeparator />
+            {index > 0 ? <ItemSeparator /> : null}
             <ModelRow
               name={bundle.displayName}
               state={STATE_LABELS[bundle.state]}
@@ -301,6 +318,13 @@ export function LocalModelsFeature() {
       </SettingsItemGroup>
     </section>
   );
+}
+
+function formatBytes(bytes: number): string {
+  if (bytes >= 1024 ** 3) return `${(bytes / 1024 ** 3).toFixed(1)} GB`;
+  if (bytes >= 1024 ** 2) return `${(bytes / 1024 ** 2).toFixed(1)} MB`;
+  if (bytes >= 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+  return `${bytes} B`;
 }
 
 function ModelRow({

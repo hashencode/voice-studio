@@ -45,7 +45,7 @@ it("keeps the grouped-list geometry while the snapshot is loading", async () => 
   ).toBeVisible();
 });
 
-it("shows Runtime and both bundles without exposing file-location or unavailable model actions", async () => {
+it("shows both bundles without exposing Runtime, file-location, or unavailable model actions", async () => {
   const api = {
     ...companionRendererStubs(),
   } as unknown as Voice2TextDesktopApi;
@@ -62,13 +62,13 @@ it("shows Runtime and both bundles without exposing file-location or unavailable
   expect(screen.queryByRole("heading", { name: "本地模型" })).toBeNull();
   expect(screen.queryByText(localModelSnapshot.storage.displayPath)).toBeNull();
   expect(screen.queryByText("本地模型文件所在位置")).toBeNull();
-  expect(screen.getByText("本地处理组件")).toBeVisible();
+  expect(screen.queryByText("本地处理组件")).toBeNull();
   expect(screen.getByText("本地转写")).toBeVisible();
   expect(screen.getByText("实时字幕")).toBeVisible();
   const list = screen.getByRole("list");
   expect(list).toHaveAttribute("data-slot", "item-group");
-  expect(list.querySelectorAll('[data-slot="item"]')).toHaveLength(3);
-  expect(list.querySelectorAll('[data-slot="item-separator"]')).toHaveLength(2);
+  expect(list.querySelectorAll('[data-slot="item"]')).toHaveLength(2);
+  expect(list.querySelectorAll('[data-slot="item-separator"]')).toHaveLength(1);
   expect(list).toHaveClass(
     "[&_[data-slot=item-title]]:text-sm",
     "[&_[data-slot=item-title]]:leading-5",
@@ -91,9 +91,6 @@ it("shows Runtime and both bundles without exposing file-location or unavailable
   expect(screen.queryByRole("button", { name: "打开文件位置" })).toBeNull();
   expect(screen.queryByRole("button", { name: "修改默认路径" })).toBeNull();
   expect(list.querySelectorAll('[data-slot="item-media"]')).toHaveLength(0);
-  expect(
-    screen.getByText("正常").closest('[data-slot="item-actions"]'),
-  ).not.toBeNull();
   for (const status of screen.getAllByText("未安装")) {
     expect(status.closest('[data-slot="item-actions"]')).not.toBeNull();
   }
@@ -160,4 +157,49 @@ it("uses an operation-specific fallback without exposing mutation errors", async
   );
   expect(screen.queryByRole("alert")).toBeNull();
   expect(screen.queryByText(/private\/models/)).not.toBeInTheDocument();
+});
+
+it("shows confirmed bytes, progress, speed, pause, and cancel while downloading", async () => {
+  const downloading = {
+    ...localModelSnapshot,
+    bundles: localModelSnapshot.bundles.map((bundle, index) =>
+      index === 0
+        ? {
+            ...bundle,
+            state: "downloading" as const,
+            distributionEligible: true,
+            expectedBytes: 8 * 1024 * 1024,
+            progressBytes: 2 * 1024 * 1024,
+          }
+        : bundle,
+    ),
+    operation: {
+      id: "download-fixture",
+      kind: "download" as const,
+      bundleId: "formal-transcription" as const,
+      phase: null,
+      cancelable: true,
+      copiedBytes: 2 * 1024 * 1024,
+      totalBytes: 8 * 1024 * 1024,
+      bytesPerSecond: 1024 * 1024,
+      message: null,
+    },
+  };
+  const api = {
+    ...companionRendererStubs(),
+    getLocalModelSnapshot: vi.fn(async () => downloading),
+  } as unknown as Voice2TextDesktopApi;
+  Object.defineProperty(window, "voice2text", {
+    configurable: true,
+    value: api,
+  });
+
+  render(<LocalModelsFeature />);
+
+  expect(await screen.findByText(/2\.0 MB/)).toHaveTextContent(
+    "2.0 MB / 8.0 MB · 1.0 MB/s",
+  );
+  expect(screen.getByText("25%")).toBeVisible();
+  expect(screen.getByRole("button", { name: "暂停" })).toBeVisible();
+  expect(screen.getByRole("button", { name: "取消" })).toBeVisible();
 });
