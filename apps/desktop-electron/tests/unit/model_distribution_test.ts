@@ -1,14 +1,28 @@
 import { createHash } from "node:crypto";
+import { mkdtempSync, mkdirSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it } from "vitest";
+
+import { buildNormalizedModelArchive } from "../../scripts/build-model-release-assets";
 
 import type { AppModelCatalogEntry } from "../../src/main/resources/local_model_service";
 import {
   productionModelCatalog,
   validateProductionModelCatalog,
 } from "../../src/main/resources/production_model_catalog";
+import { extractTrustedModelArchive } from "../../src/main/resources/model_archive_extractor";
+import { TarGzipModelArchiveAdapter } from "../../src/main/resources/tar_gzip_model_archive_adapter";
 
 const SHA256 = createHash("sha256").update("fixture").digest("hex");
+const roots: string[] = [];
+
+afterEach(() => {
+  for (const root of roots.splice(0)) {
+    rmSync(root, { force: true, recursive: true });
+  }
+});
 
 function eligibleEntry(
   overrides: Partial<AppModelCatalogEntry> = {},
@@ -40,6 +54,50 @@ function eligibleEntry(
 }
 
 describe("production model distribution catalog", () => {
+  it("builds a deterministic normalized archive from only declared members", async () => {
+    const root = mkdtempSync(join(tmpdir(), "voice2text-release-builder-"));
+    roots.push(root);
+    const sourceRoot = join(root, "source");
+    mkdirSync(join(sourceRoot, "tokenizer"), { recursive: true });
+    writeFileSync(join(sourceRoot, "model.bin"), "model");
+    writeFileSync(join(sourceRoot, "tokenizer/tokens.txt"), "tokens");
+    writeFileSync(join(sourceRoot, "undeclared.txt"), "exclude me");
+    const member = (source: string, path: string, contents: string) => ({
+      source,
+      path,
+      bytes: Buffer.byteLength(contents),
+      sha256: createHash("sha256").update(contents).digest("hex"),
+    });
+    const spec = {
+      schemaVersion: 1 as const,
+      bundleId: "formal-transcription" as const,
+      version: "fixture-v1",
+      target: "darwin-arm64" as const,
+      runtimeProtocol: "desktop-sherpa-worker/v1",
+      sourceRoot,
+      members: [
+        member("model.bin", "model.bin", "model"),
+        member("tokenizer/tokens.txt", "tokenizer/tokens.txt", "tokens"),
+      ],
+    };
+
+    const first = await buildNormalizedModelArchive(spec, join(root, "one"));
+    const second = await buildNormalizedModelArchive(spec, join(root, "two"));
+
+    expect(first.archiveSha256).toBe(second.archiveSha256);
+    expect(first.archiveBytes).toBe(second.archiveBytes);
+    expect(first.inventory.map((item) => item.path)).toEqual([
+      "model.bin",
+      "tokenizer/tokens.txt",
+    ]);
+    await extractTrustedModelArchive({
+      archivePath: first.archivePath,
+      stagingRoot: join(root, "extracted"),
+      adapter: new TarGzipModelArchiveAdapter(),
+      inventory: first.inventory,
+    });
+  });
+
   it("keeps both production entries closed until release evidence exists", () => {
     expect(() =>
       validateProductionModelCatalog(productionModelCatalog),
