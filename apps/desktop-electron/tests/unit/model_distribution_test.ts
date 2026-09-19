@@ -1,4 +1,5 @@
 import { createHash } from "node:crypto";
+import { spawnSync } from "node:child_process";
 import { mkdtempSync, mkdirSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -116,6 +117,17 @@ describe("production model distribution catalog", () => {
           entry.inventory.length === 0,
       ),
     ).toBe(true);
+  });
+
+  it("fails explicit release admission before candidate preparation while evidence is closed", () => {
+    const result = spawnSync(
+      "bun",
+      ["scripts/validate-model-distribution.ts", "--release"],
+      { encoding: "utf8" },
+    );
+
+    expect(result.status).not.toBe(0);
+    expect(result.stderr).toMatch(/formal-transcription.*live-caption/);
   });
 
   it("accepts an exact eligible GitHub Release fixture", () => {

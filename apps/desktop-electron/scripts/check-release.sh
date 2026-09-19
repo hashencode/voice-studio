@@ -9,4 +9,5 @@ if [[ "${VOICE2TEXT_RELEASE_VALIDATION:-}" != "1" ]]; then
   exit 64
 fi
 
+bun "$electron_root/scripts/validate-model-distribution.ts" --release
 python3 "$repository_root/tool/audio_sidebar_release_candidate.py" prepare
