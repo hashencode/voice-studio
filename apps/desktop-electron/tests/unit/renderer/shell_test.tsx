@@ -1191,12 +1191,13 @@ describe("application shell", () => {
     ).toHaveAttribute("data-shell-profile-placeholder", "true");
     const settingsContent = document.getElementById("main-content");
     expect(settingsContent).not.toHaveClass("p-4", "sm:p-6");
+    expect(settingsContent).not.toHaveClass("bg-muted/20");
     expect(mains[0]!.querySelector("header")).toHaveClass(
       "h-[50px]",
       "border-b",
     );
     expect(document.querySelector("[data-settings-page]")).toHaveClass(
-      "bg-muted/20",
+      "bg-background",
     );
     await waitFor(() => {
       expect(api.preflightCapture).toHaveBeenCalled();

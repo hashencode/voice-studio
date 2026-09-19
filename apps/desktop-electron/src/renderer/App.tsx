@@ -51,6 +51,8 @@ import {
   useApplicationShell,
 } from "@/features/shell/use-application-shell";
 import { AiSettingsFeature } from "@/features/settings/ai-settings-feature";
+import { AppearanceSettingsFeature } from "@/features/settings/appearance-settings-feature";
+import { AppearanceThemeProvider } from "@/features/settings/appearance-theme-provider";
 import { LocalModelsFeature } from "@/features/settings/local-models-feature";
 import { RecordingSettingsFeature } from "@/features/settings/recording-settings-feature";
 import {
@@ -78,10 +80,12 @@ const EMPTY_ACTIVITY_ITEMS: ActivityItemView[] = [];
 
 export default function AppRoot() {
   return (
-    <ModalCoordinatorProvider>
-      <App />
-      <Toaster />
-    </ModalCoordinatorProvider>
+    <AppearanceThemeProvider>
+      <ModalCoordinatorProvider>
+        <App />
+        <Toaster />
+      </ModalCoordinatorProvider>
+    </AppearanceThemeProvider>
   );
 }
 
@@ -849,7 +853,6 @@ function App() {
           }
           contentRef={mainContentRef}
           contentPadding={contentPadding}
-          contentTone={current === "settings" ? "muted" : "default"}
           footer={
             captureDetailVisible ? (
               captureWorkspace.footer
@@ -1095,7 +1098,7 @@ const SettingsContent = React.memo(function SettingsContent({
   section: SettingsSection;
 }) {
   return (
-    <div data-settings-page="true" className="min-h-full bg-muted/20">
+    <div data-settings-page="true" className="min-h-full bg-background">
       <SettingsPageSelectionProvider value={section}>
         <SettingsPanels />
       </SettingsPageSelectionProvider>
@@ -1106,7 +1109,9 @@ const SettingsContent = React.memo(function SettingsContent({
 const SettingsPanels = React.memo(function SettingsPanels() {
   return (
     <div className="w-full min-w-0 px-4 py-6 sm:px-6 lg:px-10">
-      <SettingsPageSection section="general" label="通用" />
+      <SettingsPageSection section="general" label="通用">
+        <AppearanceSettingsFeature />
+      </SettingsPageSection>
       <SettingsPageSection section="recording" label="录制">
         <RecordingSettingsFeature />
       </SettingsPageSection>
