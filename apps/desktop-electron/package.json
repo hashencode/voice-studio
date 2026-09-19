@@ -30,6 +30,7 @@
     "test:visual": "bun run test:visual:harness && playwright test --config=playwright.config.ts",
     "check:boundaries": "bun scripts/check-renderer-boundaries.ts",
     "check:lifecycle": "bun scripts/check-bun-lifecycle.ts",
+    "check:model-distribution": "bun scripts/validate-model-distribution.ts",
     "smoke:package": "bun scripts/smoke-packaged-macos.ts"
   },
   "dependencies": {
