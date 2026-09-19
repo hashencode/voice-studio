@@ -1,4 +1,4 @@
-import { readdir, writeFile } from "node:fs/promises";
+import { readFile, readdir, writeFile } from "node:fs/promises";
 import path from "node:path";
 
 import { desktopWorkerHealthProtocol } from "../src/shared/contracts";
@@ -11,6 +11,30 @@ import { sha256FileWithShasum } from "./shasum_file";
 assertMacOSArm64ResourceHost();
 
 const root = path.resolve(process.argv[2] ?? "resources/worker");
+const frozenModelHashes = await readFrozenModelHashes(
+  process.argv[3],
+  process.argv[4],
+);
+
+const runtimeLibraries = [
+  "runtime/libonnxruntime.1.27.0.dylib",
+  "runtime/libsherpa-onnx-c-api.dylib",
+  "runtime/libsherpa-onnx-cxx-api.dylib",
+] as const;
+const formalModelArtifacts = [
+  "asr/conv_frontend.onnx",
+  "asr/encoder.int8.onnx",
+  "asr/decoder.int8.onnx",
+  "asr/tokenizer/tokenizer_config.json",
+  "asr/tokenizer/merges.txt",
+  "asr/tokenizer/vocab.json",
+] as const;
+const formalRuntimeArtifacts = [
+  ...runtimeLibraries,
+  "auxiliary/silero_vad.onnx",
+  "auxiliary/pyannote-segmentation/model.onnx",
+  "auxiliary/3d-speaker/embedding.onnx",
+] as const;
 
 async function files(directory: string): Promise<string[]> {
   const entries = await readdir(directory, { withFileTypes: true });
@@ -43,6 +67,14 @@ const artifactSha256 = (relativePath: string): string => {
   if (!artifact) throw new Error(`worker artifact is missing: ${relativePath}`);
   return artifact.sha256;
 };
+const modelArtifactSha256 = (relativePath: string): string => {
+  const staged = allArtifacts.find(
+    (candidate) => candidate.path === `models/${relativePath}`,
+  );
+  const sha256 = staged?.sha256 ?? frozenModelHashes.get(relativePath);
+  if (!sha256) throw new Error(`model authority is missing: ${relativePath}`);
+  return sha256;
+};
 const artifacts = allArtifacts.filter(
   (artifact) => !artifact.path.startsWith("models/"),
 );
@@ -71,20 +103,16 @@ await writeFile(
             "--asset-root={modelRoot}",
             "--fixture-root={attemptOutput}",
             "--model={modelRoot}/model.int8.onnx",
-            `--model-sha256=${artifactSha256("models/live-caption/model.int8.onnx")}`,
+            `--model-sha256=${modelArtifactSha256("live-caption/model.int8.onnx")}`,
             "--tokens={modelRoot}/tokens.txt",
-            `--tokens-sha256=${artifactSha256("models/live-caption/tokens.txt")}`,
-            "--vad={modelRoot}/silero_vad.onnx",
-            `--vad-sha256=${artifactSha256("models/live-caption/silero_vad.onnx")}`,
+            `--tokens-sha256=${modelArtifactSha256("live-caption/tokens.txt")}`,
+            "--vad={resourceRoot}/auxiliary/silero_vad.onnx",
+            `--vad-sha256=${artifactSha256("auxiliary/silero_vad.onnx")}`,
             '--control-json={"provider":"cpu","threads":2,"concurrency":1,"decodingMethod":"greedy_search","language":"auto","useInverseTextNormalization":false,"recognizerLifecycle":"resident_preloaded","vadThreshold":0.5,"minimumSpeechSeconds":0.25,"minimumSilenceSeconds":0.5,"maximumUtteranceSeconds":15,"publishesTokenPartials":false,"publishesCompletedUtterancesOnly":true}',
           ],
-          modelArtifacts: ["model.int8.onnx", "tokens.txt", "silero_vad.onnx"],
+          modelArtifacts: ["model.int8.onnx", "tokens.txt"],
           workerReportedModelArtifact: "model.int8.onnx",
-          runtimeArtifacts: [
-            "runtime/libonnxruntime.1.27.0.dylib",
-            "runtime/libsherpa-onnx-c-api.dylib",
-            "runtime/libsherpa-onnx-cxx-api.dylib",
-          ],
+          runtimeArtifacts: [...runtimeLibraries, "auxiliary/silero_vad.onnx"],
         },
         {
           operation: "asr",
@@ -127,24 +155,10 @@ await writeFile(
             "--tokenizer",
             "{modelRoot}/asr/tokenizer",
             "--vad",
-            "{modelRoot}/asr/silero_vad.onnx",
+            "{resourceRoot}/auxiliary/silero_vad.onnx",
           ],
-          modelArtifacts: [
-            "asr/conv_frontend.onnx",
-            "asr/encoder.int8.onnx",
-            "asr/decoder.int8.onnx",
-            "asr/tokenizer/tokenizer_config.json",
-            "asr/tokenizer/merges.txt",
-            "asr/tokenizer/vocab.json",
-            "asr/silero_vad.onnx",
-            "diarization/segmentation.onnx",
-            "diarization/embedding.onnx",
-          ],
-          runtimeArtifacts: [
-            "runtime/libonnxruntime.1.27.0.dylib",
-            "runtime/libsherpa-onnx-c-api.dylib",
-            "runtime/libsherpa-onnx-cxx-api.dylib",
-          ],
+          modelArtifacts: formalModelArtifacts,
+          runtimeArtifacts: formalRuntimeArtifacts,
         },
         {
           operation: "diarization",
@@ -161,26 +175,12 @@ await writeFile(
             "--diarization-threshold",
             "0.65",
             "--segmentation",
-            "{modelRoot}/diarization/segmentation.onnx",
+            "{resourceRoot}/auxiliary/pyannote-segmentation/model.onnx",
             "--embedding",
-            "{modelRoot}/diarization/embedding.onnx",
+            "{resourceRoot}/auxiliary/3d-speaker/embedding.onnx",
           ],
-          modelArtifacts: [
-            "asr/conv_frontend.onnx",
-            "asr/encoder.int8.onnx",
-            "asr/decoder.int8.onnx",
-            "asr/tokenizer/tokenizer_config.json",
-            "asr/tokenizer/merges.txt",
-            "asr/tokenizer/vocab.json",
-            "asr/silero_vad.onnx",
-            "diarization/segmentation.onnx",
-            "diarization/embedding.onnx",
-          ],
-          runtimeArtifacts: [
-            "runtime/libonnxruntime.1.27.0.dylib",
-            "runtime/libsherpa-onnx-c-api.dylib",
-            "runtime/libsherpa-onnx-cxx-api.dylib",
-          ],
+          modelArtifacts: formalModelArtifacts,
+          runtimeArtifacts: formalRuntimeArtifacts,
         },
       ],
     },
@@ -188,3 +188,55 @@ await writeFile(
     2,
   )}\n`,
 );
+
+async function readFrozenModelHashes(
+  sherpaAuthorityPath?: string,
+  senseVoiceAuthorityPath?: string,
+): Promise<Map<string, string>> {
+  const hashes = new Map<string, string>();
+  if (sherpaAuthorityPath) {
+    const authority = JSON.parse(
+      await readFile(path.resolve(sherpaAuthorityPath), "utf8"),
+    ) as { files?: Array<{ relativePath?: unknown; sha256?: unknown }> };
+    for (const file of authority.files ?? []) {
+      if (
+        typeof file.relativePath === "string" &&
+        typeof file.sha256 === "string" &&
+        /^[a-f0-9]{64}$/.test(file.sha256)
+      ) {
+        hashes.set(file.relativePath, file.sha256);
+      }
+    }
+  }
+  if (senseVoiceAuthorityPath) {
+    const authority = JSON.parse(
+      await readFile(path.resolve(senseVoiceAuthorityPath), "utf8"),
+    ) as {
+      model?: {
+        modelRelativePath?: unknown;
+        modelSha256?: unknown;
+        tokensRelativePath?: unknown;
+        tokensSha256?: unknown;
+      };
+    };
+    const model = authority.model;
+    if (
+      typeof model?.modelRelativePath === "string" &&
+      typeof model.modelSha256 === "string" &&
+      /^[a-f0-9]{64}$/.test(model.modelSha256)
+    ) {
+      hashes.set(`live-caption/${model.modelRelativePath}`, model.modelSha256);
+    }
+    if (
+      typeof model?.tokensRelativePath === "string" &&
+      typeof model.tokensSha256 === "string" &&
+      /^[a-f0-9]{64}$/.test(model.tokensSha256)
+    ) {
+      hashes.set(
+        `live-caption/${model.tokensRelativePath}`,
+        model.tokensSha256,
+      );
+    }
+  }
+  return hashes;
+}

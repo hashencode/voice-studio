@@ -28,6 +28,15 @@ export interface PlannedResourceDownload extends ResourceDownload {
   id: string;
 }
 
+export type ResourceMaterializationScope =
+  "development-full" | "live-caption-development" | "app-runtime";
+
+const auxiliaryDownloadIds = [
+  "segmentation-archive",
+  "embedding-model",
+  "silero-vad-model",
+] as const;
+
 export const runtimeArchive = {
   id: "sherpa-onnx-macos-runtime",
   package: "sherpa_onnx_macos",
@@ -42,14 +51,30 @@ export function resourceDownloadPlan(input: {
   senseVoiceAuthority: ResourcePlanSenseVoiceAuthority;
   senseVoiceLock: ResourcePlanSenseVoiceLock;
   temporaryRoot: string;
-  liveCaptionOnly: boolean;
+  liveCaptionOnly?: boolean;
+  scope?: ResourceMaterializationScope;
   runtime?: Pick<typeof runtimeArchive, "source" | "sha256" | "bytes">;
 }): PlannedResourceDownload[] {
   const selectedRuntime = input.runtime ?? runtimeArchive;
+  const scope =
+    input.scope ??
+    (input.liveCaptionOnly ? "live-caption-development" : "development-full");
   const downloads: PlannedResourceDownload[] = [];
-  if (!input.liveCaptionOnly) {
+  if (scope !== "live-caption-development") {
+    const authorityDownloads =
+      scope === "app-runtime"
+        ? auxiliaryDownloadIds.map((id) => {
+            const download = input.authority.downloads.find(
+              (candidate) => candidate.id === id,
+            );
+            if (!download) {
+              throw new Error(`auxiliary resource download is missing: ${id}`);
+            }
+            return download;
+          })
+        : input.authority.downloads;
     downloads.push(
-      ...input.authority.downloads.map((download) => ({
+      ...authorityDownloads.map((download) => ({
         id: download.id,
         source: download.source,
         sha256: download.sha256,
@@ -65,21 +90,26 @@ export function resourceDownloadPlan(input: {
       },
     );
   }
-  downloads.push(
-    {
-      id: "sensevoice-model-archive",
-      source: input.senseVoiceAuthority.model.source,
-      sha256: input.senseVoiceAuthority.model.archiveSha256,
-      bytes: input.senseVoiceLock.archiveBytes,
-      stagingPath: path.join(input.temporaryRoot, "sensevoice-model.download"),
-    },
-    {
-      id: "sensevoice-silero-vad",
-      source: input.senseVoiceAuthority.vad.source,
-      sha256: input.senseVoiceAuthority.vad.sha256,
-      bytes: input.senseVoiceLock.vadBytes,
-      stagingPath: path.join(input.temporaryRoot, "sensevoice-vad.download"),
-    },
-  );
+  if (scope !== "app-runtime") {
+    downloads.push(
+      {
+        id: "sensevoice-model-archive",
+        source: input.senseVoiceAuthority.model.source,
+        sha256: input.senseVoiceAuthority.model.archiveSha256,
+        bytes: input.senseVoiceLock.archiveBytes,
+        stagingPath: path.join(
+          input.temporaryRoot,
+          "sensevoice-model.download",
+        ),
+      },
+      {
+        id: "sensevoice-silero-vad",
+        source: input.senseVoiceAuthority.vad.source,
+        sha256: input.senseVoiceAuthority.vad.sha256,
+        bytes: input.senseVoiceLock.vadBytes,
+        stagingPath: path.join(input.temporaryRoot, "sensevoice-vad.download"),
+      },
+    );
+  }
   return downloads;
 }

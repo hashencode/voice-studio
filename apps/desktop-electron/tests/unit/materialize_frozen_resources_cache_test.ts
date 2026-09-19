@@ -21,6 +21,44 @@ function sha(value: string): string {
 }
 
 describe("frozen resource acquisition plan", () => {
+  it("acquires only runtime and auxiliary models for app resources", () => {
+    const plan = resourceDownloadPlan({
+      authority: {
+        downloads: [
+          fixtureDownload("qwen3-asr-archive", "qwen"),
+          fixtureDownload("segmentation-archive", "segmentation"),
+          fixtureDownload("embedding-model", "embedding"),
+          fixtureDownload("silero-vad-model", "silero"),
+        ],
+      },
+      senseVoiceAuthority: {
+        model: {
+          source: "https://fixture.test/sensevoice",
+          archiveSha256: sha("sensevoice"),
+        },
+        vad: {
+          source: "https://fixture.test/sensevoice-vad",
+          sha256: sha("sensevoice-vad"),
+        },
+      },
+      senseVoiceLock: { archiveBytes: 10, vadBytes: 10 },
+      runtime: {
+        source: "https://fixture.test/runtime",
+        sha256: sha("runtime"),
+        bytes: 10,
+      },
+      temporaryRoot: "/tmp/fixture-resource-plan",
+      scope: "app-runtime",
+    });
+
+    expect(plan.map((download) => download.id)).toEqual([
+      "segmentation-archive",
+      "embedding-model",
+      "silero-vad-model",
+      "sherpa-onnx-macos-runtime",
+    ]);
+  });
+
   it("reuses every acquisition category and reacquires only a corrupt digest", async () => {
     const root = await mkdtemp(
       path.join(os.tmpdir(), "voice2text-materializer-cache-test-"),
@@ -100,3 +138,16 @@ describe("frozen resource acquisition plan", () => {
     expect(third).toEqual(first);
   });
 });
+
+function fixtureDownload(id: string, content: string) {
+  return {
+    id,
+    source: `https://fixture.test/${id}`,
+    sha256: sha(content),
+    bytes: Buffer.byteLength(content),
+    kind:
+      id === "embedding-model" || id === "silero-vad-model"
+        ? ("file" as const)
+        : ("tar.bz2" as const),
+  };
+}

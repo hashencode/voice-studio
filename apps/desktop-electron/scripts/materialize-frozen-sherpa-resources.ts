@@ -110,7 +110,9 @@ const senseVoiceLockPath = path.resolve(
   process.argv[7] ??
     "assets/processing/frozen_sensevoice_macos_arm64.lock.json",
 );
-const liveCaptionOnly = process.env.VOICE2TEXT_LIVE_CAPTION_ONLY === "1";
+const resourceScope = resourceMaterializationScope();
+const liveCaptionOnly = resourceScope === "live-caption-development";
+const appRuntimeOnly = resourceScope === "app-runtime";
 let cacheForPrune: ResourceDownloadCache | undefined;
 let protectedDigests: Set<string> | undefined;
 let pendingError: unknown;
@@ -141,7 +143,7 @@ try {
     senseVoiceAuthority,
     senseVoiceLock,
     temporaryRoot,
-    liveCaptionOnly,
+    scope: resourceScope,
   });
   protectedDigests = new Set(
     protectedDownloads.map((download) => download.sha256),
@@ -155,10 +157,12 @@ try {
     return await resourceCache.snapshot(download);
   };
   await resourceCache.assertWorkingSet(protectedDownloads);
-  await mkdir(path.join(outputRoot, "models"), {
-    recursive: true,
-    mode: 0o700,
-  });
+  if (!appRuntimeOnly) {
+    await mkdir(path.join(outputRoot, "models"), {
+      recursive: true,
+      mode: 0o700,
+    });
+  }
   await mkdir(path.join(outputRoot, "runtime"), {
     recursive: true,
     mode: 0o700,
@@ -167,7 +171,9 @@ try {
   const sourceReceipts: Array<Record<string, unknown>> = [];
   const memberReceipts: Array<Record<string, unknown>> = [];
   if (!liveCaptionOnly) {
-    for (const download of authority.downloads) {
+    for (const download of authority.downloads.filter((candidate) =>
+      downloadById.has(candidate.id),
+    )) {
       const downloadPath = await snapshotDownload(download.id);
       sourceReceipts.push({
         id: download.id,
@@ -190,7 +196,9 @@ try {
       for (const member of members) {
         const destination = containedOutput(
           outputRoot,
-          path.join("models", member.relativePath),
+          appRuntimeOnly
+            ? auxiliaryResourcePath(member)
+            : path.join("models", member.relativePath),
         );
         await mkdir(path.dirname(destination), {
           recursive: true,
@@ -260,17 +268,19 @@ try {
     }
   }
 
-  await materializeSenseVoice({
-    authority: senseVoiceAuthority,
-    lock: senseVoiceLock,
-    outputRoot,
-    temporaryRoot,
-    sourceReceipts,
-    memberReceipts,
-    snapshotDownload,
-  });
+  if (!appRuntimeOnly) {
+    await materializeSenseVoice({
+      authority: senseVoiceAuthority,
+      lock: senseVoiceLock,
+      outputRoot,
+      temporaryRoot,
+      sourceReceipts,
+      memberReceipts,
+      snapshotDownload,
+    });
+  }
 
-  if (!liveCaptionOnly) {
+  if (!liveCaptionOnly && !appRuntimeOnly) {
     await writeFile(
       path.join(outputRoot, "frozen-authority.json"),
       authorityBytes,
@@ -285,9 +295,11 @@ try {
   await writeFile(
     path.join(
       outputRoot,
-      liveCaptionOnly
-        ? "frozen-live-caption-resource-build.json"
-        : "frozen-resource-build.json",
+      appRuntimeOnly
+        ? "frozen-auxiliary-resource-build.json"
+        : liveCaptionOnly
+          ? "frozen-live-caption-resource-build.json"
+          : "frozen-resource-build.json",
     ),
     `${JSON.stringify(
       {
@@ -297,8 +309,12 @@ try {
         licenseDisposition: liveCaptionOnly
           ? senseVoiceAuthority.licenseDisposition
           : authority.licenseDisposition,
-        setId: liveCaptionOnly ? senseVoiceAuthority.setId : authority.setId,
-        ...(liveCaptionOnly
+        setId: liveCaptionOnly
+          ? senseVoiceAuthority.setId
+          : appRuntimeOnly
+            ? `${authority.setId}-auxiliary`
+            : authority.setId,
+        ...(liveCaptionOnly || appRuntimeOnly
           ? {}
           : {
               contentKey: authority.contentKey,
@@ -306,9 +322,13 @@ try {
                 .update(authorityBytes)
                 .digest("hex"),
             }),
-        liveCaptionAuthoritySha256: createHash("sha256")
-          .update(senseVoiceAuthorityBytes)
-          .digest("hex"),
+        ...(appRuntimeOnly
+          ? {}
+          : {
+              liveCaptionAuthoritySha256: createHash("sha256")
+                .update(senseVoiceAuthorityBytes)
+                .digest("hex"),
+            }),
         sources: sourceReceipts,
         members: memberReceipts,
       },
@@ -336,6 +356,43 @@ try {
   }
 }
 if (pendingError !== undefined) throw pendingError;
+
+function resourceMaterializationScope():
+  "development-full" | "live-caption-development" | "app-runtime" {
+  const configured = process.env.VOICE2TEXT_RESOURCE_SCOPE;
+  if (configured !== undefined) {
+    if (
+      configured === "development-full" ||
+      configured === "live-caption-development" ||
+      configured === "app-runtime"
+    ) {
+      return configured;
+    }
+    throw new Error(
+      `unsupported resource materialization scope: ${configured}`,
+    );
+  }
+  return process.env.VOICE2TEXT_LIVE_CAPTION_ONLY === "1"
+    ? "live-caption-development"
+    : "development-full";
+}
+
+function auxiliaryResourcePath(member: FrozenFile): string {
+  switch (member.relativePath) {
+    case "asr/silero_vad.onnx":
+      return "auxiliary/silero_vad.onnx";
+    case "diarization/segmentation.onnx":
+      return "auxiliary/pyannote-segmentation/model.onnx";
+    case "licenses/pyannote-segmentation-LICENSE":
+      return "auxiliary/pyannote-segmentation/LICENSE";
+    case "diarization/embedding.onnx":
+      return "auxiliary/3d-speaker/embedding.onnx";
+    default:
+      throw new Error(
+        `downloaded model is not an app auxiliary resource: ${member.relativePath}`,
+      );
+  }
+}
 
 async function materializeSenseVoice(input: {
   authority: FrozenSenseVoiceAuthority;

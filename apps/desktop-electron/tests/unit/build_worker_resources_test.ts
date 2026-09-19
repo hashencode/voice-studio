@@ -41,6 +41,7 @@ describe("worker resource publication", () => {
     );
 
     expect(builder).toContain('materialization_root="$(mktemp -d');
+    expect(builder).toContain("VOICE2TEXT_RESOURCE_SCOPE=app-runtime");
     expect(builder).not.toContain("RESOURCE_CACHE_DIR");
     expect(materializer).toContain("new ResourceDownloadCache()");
     expect(materializer).not.toContain("freshDownload(");
@@ -79,34 +80,90 @@ describe("worker resource publication", () => {
   it("writes a verified live-caption operation into the worker manifest", async () => {
     const root = mkdtempSync(join(tmpdir(), "voice2text-worker-manifest-"));
     roots.push(root);
-    const artifactPaths = [
+    const resourceArtifactPaths = [
       "bin/desktop_sherpa_worker",
       "bin/desktop_sensevoice_caption_worker",
-      "models/asr/conv_frontend.onnx",
-      "models/asr/encoder.int8.onnx",
-      "models/asr/decoder.int8.onnx",
-      "models/asr/tokenizer/tokenizer_config.json",
-      "models/asr/tokenizer/merges.txt",
-      "models/asr/tokenizer/vocab.json",
-      "models/asr/silero_vad.onnx",
-      "models/diarization/segmentation.onnx",
-      "models/diarization/embedding.onnx",
-      "models/live-caption/model.int8.onnx",
-      "models/live-caption/tokens.txt",
-      "models/live-caption/silero_vad.onnx",
+      "auxiliary/silero_vad.onnx",
+      "auxiliary/pyannote-segmentation/model.onnx",
+      "auxiliary/pyannote-segmentation/LICENSE",
+      "auxiliary/3d-speaker/embedding.onnx",
       "runtime/libonnxruntime.1.27.0.dylib",
       "runtime/libsherpa-onnx-c-api.dylib",
       "runtime/libsherpa-onnx-cxx-api.dylib",
     ];
-    for (const relativePath of artifactPaths) {
+    for (const relativePath of resourceArtifactPaths) {
       const artifactPath = join(root, relativePath);
       mkdirSync(dirname(artifactPath), { recursive: true });
       writeFileSync(artifactPath, `fixture:${relativePath}`);
     }
 
+    const formalPaths = [
+      "asr/conv_frontend.onnx",
+      "asr/encoder.int8.onnx",
+      "asr/decoder.int8.onnx",
+      "asr/tokenizer/tokenizer_config.json",
+      "asr/tokenizer/merges.txt",
+      "asr/tokenizer/vocab.json",
+    ];
+    const livePaths = ["model.int8.onnx", "tokens.txt"];
+    const formalRoot = mkdtempSync(join(tmpdir(), "formal-model-authority-"));
+    const liveRoot = mkdtempSync(join(tmpdir(), "live-model-authority-"));
+    const authorityRoot = mkdtempSync(
+      join(tmpdir(), "worker-manifest-authority-"),
+    );
+    roots.push(formalRoot, liveRoot, authorityRoot);
+    for (const [authorityRoot, paths] of [
+      [formalRoot, formalPaths],
+      [liveRoot, livePaths],
+    ] as const) {
+      writeFileSync(join(authorityRoot, "installed.json"), "{}\n");
+      for (const relativePath of paths) {
+        const destination = join(authorityRoot, relativePath);
+        mkdirSync(dirname(destination), { recursive: true });
+        const sourcePrefix = authorityRoot === liveRoot ? "live-caption/" : "";
+        writeFileSync(
+          destination,
+          `fixture:models/${sourcePrefix}${relativePath}`,
+        );
+      }
+    }
+    const formalAuthorityPath = join(authorityRoot, "formal.json");
+    const liveAuthorityPath = join(authorityRoot, "live.json");
+    writeFileSync(
+      formalAuthorityPath,
+      JSON.stringify({
+        files: formalPaths.map((relativePath) => ({
+          relativePath,
+          sha256: createHash("sha256")
+            .update(readFileSync(join(formalRoot, relativePath)))
+            .digest("hex"),
+        })),
+      }),
+    );
+    writeFileSync(
+      liveAuthorityPath,
+      JSON.stringify({
+        model: {
+          modelRelativePath: "model.int8.onnx",
+          modelSha256: createHash("sha256")
+            .update(readFileSync(join(liveRoot, "model.int8.onnx")))
+            .digest("hex"),
+          tokensRelativePath: "tokens.txt",
+          tokensSha256: createHash("sha256")
+            .update(readFileSync(join(liveRoot, "tokens.txt")))
+            .digest("hex"),
+        },
+      }),
+    );
+
     const result = spawnSync(
       "bun",
-      [resolve("scripts/write-worker-manifest.ts"), root],
+      [
+        resolve("scripts/write-worker-manifest.ts"),
+        root,
+        formalAuthorityPath,
+        liveAuthorityPath,
+      ],
       { encoding: "utf8" },
     );
 
@@ -120,34 +177,14 @@ describe("worker resource publication", () => {
     expect(
       manifest.artifacts.every((item) => !item.path.startsWith("models/")),
     ).toBe(true);
-    const formalRoot = mkdtempSync(join(tmpdir(), "formal-model-authority-"));
-    const liveRoot = mkdtempSync(join(tmpdir(), "live-model-authority-"));
-    roots.push(formalRoot, liveRoot);
-    const formalPaths = artifactPaths
-      .filter(
-        (item) =>
-          item.startsWith("models/asr/") ||
-          item.startsWith("models/diarization/"),
-      )
-      .map((item) => item.slice("models/".length));
-    const livePaths = artifactPaths
-      .filter((item) => item.startsWith("models/live-caption/"))
-      .map((item) => item.slice("models/live-caption/".length));
-    for (const [authorityRoot, paths] of [
-      [formalRoot, formalPaths],
-      [liveRoot, livePaths],
-    ] as const) {
-      mkdirSync(authorityRoot, { recursive: true });
-      writeFileSync(join(authorityRoot, "installed.json"), "{}\n");
-      for (const relativePath of paths) {
-        const destination = join(authorityRoot, relativePath);
-        mkdirSync(dirname(destination), { recursive: true });
-        const sourcePrefix =
-          authorityRoot === liveRoot ? "models/live-caption/" : "models/";
-        writeFileSync(destination, `fixture:${sourcePrefix}${relativePath}`);
-      }
-    }
-    rmSync(join(root, "models"), { recursive: true });
+    expect(manifest.artifacts.map((item) => item.path)).toEqual(
+      expect.arrayContaining([
+        "auxiliary/silero_vad.onnx",
+        "auxiliary/pyannote-segmentation/model.onnx",
+        "auxiliary/pyannote-segmentation/LICENSE",
+        "auxiliary/3d-speaker/embedding.onnx",
+      ]),
+    );
     const catalog = await ResourceCatalog.load(root);
     const authority = (
       bundleId: "formal-transcription" | "live-caption",
@@ -179,6 +216,9 @@ describe("worker resource publication", () => {
     expect(command.args).toContain(
       `--model=${join(realpathSync(liveRoot), "model.int8.onnx")}`,
     );
+    expect(command.args).toContain(
+      `--vad=${join(root, "auxiliary/silero_vad.onnx")}`,
+    );
     expect(
       manifest.operations.find(
         (operation) => operation.operation === "live-caption",
@@ -208,6 +248,12 @@ describe("worker resource publication", () => {
       { encoding: "utf8" },
     );
     expect(verified.status, verified.stderr).toBe(0);
+
+    const formalCommand = catalog.command("asr");
+    writeFileSync(join(root, "auxiliary/silero_vad.onnx"), "replacement");
+    await expect(
+      assertAuthorizedResourceCommand(formalCommand),
+    ).rejects.toThrow(/artifact hash mismatch/i);
 
     writeFileSync(join(liveRoot, "model.int8.onnx"), "replacement");
     await expect(assertAuthorizedResourceCommand(command)).rejects.toThrow(

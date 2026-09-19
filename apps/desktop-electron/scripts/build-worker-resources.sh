@@ -58,7 +58,8 @@ clang -O2 \
   -o "$staging_root/bin/native_process_group_launcher"
 
 cd "$electron_root"
-bun scripts/materialize-frozen-sherpa-resources.ts \
+VOICE2TEXT_RESOURCE_SCOPE=app-runtime \
+  bun scripts/materialize-frozen-sherpa-resources.ts \
   "$authority" \
   "$staging_root" \
   "$repository_root/pubspec.lock" \
@@ -80,12 +81,10 @@ if [[ "${CODE_SIGNING_ALLOWED:-NO}" == "YES" ]] &&
     codesign --force --sign "$EXPANDED_CODE_SIGN_IDENTITY" "$runtime"
   done
 fi
-bun scripts/write-worker-manifest.ts "$staging_root"
-
-# Models are development materialization inputs only. The signed application
-# publishes immutable Worker Runtime; user-managed bundles live in the managed
-# model store and are never copied into app resources.
-rm -rf -- "$staging_root/models"
+bun scripts/write-worker-manifest.ts \
+  "$staging_root" \
+  "$authority" \
+  "$sensevoice_authority"
 
 bash "$electron_root/scripts/publish-worker-resources.sh" \
   "$staging_root" \
