@@ -16,6 +16,7 @@ export interface ResourceRootInput {
 export interface ResolvedResourceCommand {
   readonly catalogIdentity: string;
   readonly resourceRoot: string;
+  readonly authorizedRoots: readonly string[];
   readonly operation: string;
   readonly executable: string;
   readonly args: readonly string[];
@@ -224,6 +225,10 @@ export class ResourceCatalog {
     const command = Object.freeze({
       catalogIdentity: operationIdentity,
       resourceRoot: this.root,
+      authorizedRoots: Object.freeze([
+        this.root,
+        ...(model ? [model.root] : []),
+      ]),
       operation,
       executable,
       args: Object.freeze(

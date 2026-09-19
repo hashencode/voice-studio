@@ -100,7 +100,7 @@ await writeFile(
           arguments: [
             "--runtime-root={runtimeRoot}",
             "--model-root={modelRoot}",
-            "--asset-root={modelRoot}",
+            "--asset-root={resourceRoot}",
             "--fixture-root={attemptOutput}",
             "--model={modelRoot}/model.int8.onnx",
             `--model-sha256=${modelArtifactSha256("live-caption/model.int8.onnx")}`,

@@ -2054,6 +2054,27 @@ async function performCaptureStart(options: {
       `capture preflight failed: ${preflight.blockingReasons.join(",")}`,
     );
   }
+  let startLiveCaption: ((sessionId: string) => Promise<void>) | null = null;
+  if (options.captionEnabled) {
+    const identity = resourceCatalog?.processingIdentity("live-caption");
+    if (
+      !preflight.captionModelAvailable ||
+      !identity ||
+      !liveCaptionService ||
+      !profilePaths
+    ) {
+      throw new Error("verified live-caption runtime is unavailable");
+    }
+    const captionService = liveCaptionService;
+    const captureDirectory = profilePaths.captureDirectory;
+    startLiveCaption = async (sessionId) => {
+      await captionService.start({
+        sessionId,
+        sessionRoot: path.join(captureDirectory, sessionId),
+        ...identity,
+      });
+    };
+  }
   const result = await service.start(
     {
       sessionId: `session-${randomUUID()}`,
@@ -2067,17 +2088,7 @@ async function performCaptureStart(options: {
   );
   lastCaptureProjectionRetry = null;
   applicationState.resetCaptureLibraryProjection();
-  if (options.captionEnabled && preflight.captionModelAvailable) {
-    const identity = resourceCatalog?.processingIdentity("live-caption");
-    if (!identity || !liveCaptionService || !profilePaths) {
-      throw new Error("verified live-caption runtime is unavailable");
-    }
-    await liveCaptionService.start({
-      sessionId: result.sessionId,
-      sessionRoot: path.join(profilePaths.captureDirectory, result.sessionId),
-      ...identity,
-    });
-  }
+  await startLiveCaption?.(result.sessionId);
   publishCapture(result);
   return result;
 }
@@ -3384,9 +3395,7 @@ async function initializeApplication(): Promise<void> {
       }),
     );
     await initializeLocalModels(true);
-    const liveCaptionIdentity =
-      resourceCatalog.processingIdentity("live-caption");
-    if (liveCaptionIdentity && transcriptRepository) {
+    if (transcriptRepository) {
       liveCaptionService = new LiveCaptionService(
         transcriptRepository,
         {

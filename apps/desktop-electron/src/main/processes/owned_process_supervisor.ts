@@ -378,7 +378,9 @@ function validateCommandArguments(
     if (!path.isAbsolute(value)) continue;
     const candidate = path.resolve(value);
     if (
-      !isPathAtOrInside(command.resourceRoot, candidate) &&
+      !command.authorizedRoots.some((root) =>
+        isPathAtOrInside(root, candidate),
+      ) &&
       !isPathAtOrInside(attemptOutputDirectory, candidate)
     ) {
       throw new Error("resource command argument escapes authorized roots");

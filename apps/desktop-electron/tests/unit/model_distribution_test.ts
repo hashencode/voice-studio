@@ -99,7 +99,7 @@ describe("production model distribution catalog", () => {
     });
   });
 
-  it("keeps both production entries closed until release evidence exists", () => {
+  it("authorizes the two immutable production release assets", () => {
     expect(() =>
       validateProductionModelCatalog(productionModelCatalog),
     ).not.toThrow();
@@ -108,26 +108,66 @@ describe("production model distribution catalog", () => {
       "live-caption",
     ]);
     expect(
+      productionModelCatalog.map((entry) => ({
+        id: entry.id,
+        url: entry.download?.url,
+        archiveBytes: entry.download?.archiveBytes,
+        archiveSha256: entry.download?.archiveSha256,
+        catalogIdentity: entry.download?.catalogIdentity,
+        inventorySha256: createHash("sha256")
+          .update(JSON.stringify(entry.inventory))
+          .digest("hex"),
+      })),
+    ).toEqual([
+      {
+        id: "formal-transcription",
+        url: "https://github.com/hashencode/voice-studio-models/releases/download/models-v1/formal-transcription-qwen3-asr-0.6b-int8-2026-03-25-darwin-arm64.tar.gz",
+        archiveBytes: 849_404_180,
+        archiveSha256:
+          "674908c4b847caabd25a011aa457c280ed1e872b88c8234aa2dc7cbcab64404b",
+        catalogIdentity:
+          "674908c4b847caabd25a011aa457c280ed1e872b88c8234aa2dc7cbcab64404b",
+        inventorySha256:
+          "120b4eaa4f62d9f5be7e53e75d21f04bb819bc4aca789e2417a15d05518ecbc1",
+      },
+      {
+        id: "live-caption",
+        url: "https://github.com/hashencode/voice-studio-models/releases/download/models-v1/live-caption-sensevoice-2024-07-17-int8-darwin-arm64.tar.gz",
+        archiveBytes: 164_107_250,
+        archiveSha256:
+          "2cb16bb88adee12e4aaf54c76359a3a3e6c0e1fd0a59eb52caa38b9007ece912",
+        catalogIdentity:
+          "2cb16bb88adee12e4aaf54c76359a3a3e6c0e1fd0a59eb52caa38b9007ece912",
+        inventorySha256:
+          "5ab3887582180df629733f35f86929eeab297477df5d3464272caf9f88aeae73",
+      },
+    ]);
+    expect(
       productionModelCatalog.every(
         (entry) =>
-          !entry.distributionEligible &&
+          entry.distributionEligible &&
           !entry.developmentOnly &&
-          !entry.licenseComplete &&
-          entry.download === null &&
-          entry.inventory.length === 0,
+          entry.licenseComplete &&
+          entry.download?.distributionEligible === true &&
+          entry.download.allowedOrigins.includes(
+            "https://release-assets.githubusercontent.com",
+          ),
       ),
     ).toBe(true);
   });
 
-  it("fails explicit release admission before candidate preparation while evidence is closed", () => {
+  it("passes explicit model distribution admission for the immutable release", () => {
     const result = spawnSync(
       "bun",
       ["scripts/validate-model-distribution.ts", "--release"],
       { encoding: "utf8" },
     );
 
-    expect(result.status).not.toBe(0);
-    expect(result.stderr).toMatch(/formal-transcription.*live-caption/);
+    expect(result.status).toBe(0);
+    expect(JSON.parse(result.stdout)).toMatchObject({
+      bundleCount: 2,
+      productionDownloadsOpen: true,
+    });
   });
 
   it("accepts an exact eligible GitHub Release fixture", () => {

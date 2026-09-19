@@ -216,9 +216,12 @@ describe("worker resource publication", () => {
     expect(command.args).toContain(
       `--model=${join(realpathSync(liveRoot), "model.int8.onnx")}`,
     );
+    expect(command.args).toContain(`--model-root=${realpathSync(liveRoot)}`);
+    expect(command.args).toContain(`--asset-root=${root}`);
     expect(command.args).toContain(
       `--vad=${join(root, "auxiliary/silero_vad.onnx")}`,
     );
+    expect(command.authorizedRoots).toEqual([root, realpathSync(liveRoot)]);
     expect(
       manifest.operations.find(
         (operation) => operation.operation === "live-caption",

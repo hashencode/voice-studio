@@ -18,7 +18,7 @@ execution: code
 | Objective | macOS arm64 用户可以按需下载、暂停、继续、删除和重新下载本地转写与实时字幕模型；普通录音和应用启动不依赖这两个模型。 |
 | Means | Qwen3-ASR 与 SenseVoice 从自有公开 GitHub Release 下载；Silero VAD、Pyannote segmentation 和 3D-Speaker 随应用发布；现有 Main-owned 模型服务负责下载和安装。（KTD1-KTD6） |
 | Authority | 产品 catalog 决定可下载模型及其固定身份；应用资源 manifest 决定内置辅助模型；安装 manifest 和 Worker probe 决定本机模型是否可用。 |
-| Execution profile | 先完成许可、catalog schema 和 fixture，再确定内置资源边界、制作并发布模型包，最后接通下载/UI 和发布准入。生产下载在最终资产和证据通过前保持关闭。 |
+| Execution profile | 当前里程碑完成真实 GitHub 模型分发、开发环境下载/安装和 Worker 验证；正式应用打包、签名、公证和安装后 smoke 延后到实际发版。 |
 | Stop conditions | 不把开发专用 authority 改写成生产 authority；不从私有仓库或任意上游 URL 下载；未完成许可、大小、SHA-256、inventory 和公开 URL 验证时，不提交 `distributionEligible: true`；不重写既有迁移、lease、删除和麦克风测试。 |
 | Tail ownership | Codex 可以完成研究、实现、校验和文档。项目维护者负责接受剩余许可风险、授权公开 Release、提供或授权正式签名/公证产物，并决定最终应用发布。 |
 
@@ -45,6 +45,13 @@ Electron 只把 Qwen3-ASR 和 SenseVoice 作为用户可管理的远程模型。
 - **v1 只使用自有 GitHub Releases。** (session-settled: user-directed — chosen over a multi-source design: the first release only needs one public unauthenticated source.) Governs R1, R3, R8.
 - **只有两个大模型远程下载。** (session-settled: user-directed — chosen over downloading every model: auxiliary models are runtime dependencies that should remain immutable with the app.) Governs R1, R2, R6.
 - **旧计划保留为历史记录。** (session-settled: user-approved — chosen over deleting or continuing to extend the broad plan: repository history remains readable while the active backlog stays narrow.) Governs R9.
+- **先完成模型分发，不制作正式应用产物。** (session-settled: user-directed — chosen over a local-only development shortcut or immediate signed application release: development must exercise the same immutable GitHub assets, resume and installation checks that production will use.) Governs R1, R3-R8.
+
+### Current Execution Boundary
+
+当前里程碑包含五项资源证据、两个规范化模型包、公开不可变 GitHub Release、生产 catalog 激活，以及 Electron 开发环境中的下载、暂停、继续、删除、重新下载、解压校验和真实 Worker 加载测试。
+
+当前里程碑明确不构建 Electron 正式安装包，不执行 Developer ID 签名、Apple 公证或安装后的 packaged smoke。U5 在本阶段只关闭模型分发证据；应用产物证据和 Definition of Done 中的 packaged 条目延后到实际发版。模型资产和 catalog 不变时，后续应用发布直接复用本阶段证据。
 
 ### Requirements
 
@@ -386,6 +393,7 @@ Main owns this matrix. Renderer only displays the supplied state and sends revis
 | Lane | Applicability | Required evidence |
 | --- | --- | --- |
 | Documentation-only plan change | This planning task | Inspect the diff and references; do not run application tests or builds. |
+| Development model distribution | Current execution boundary | Validate the eligible catalog, anonymous final URLs, archive bytes/SHA-256, exact inventories, Range/validator behavior, local extraction and Worker initialization without creating an application artifact. |
 | Electron code | U1-U3 deterministic implementation | From `apps/desktop-electron`, `bun run check:code` passes after the narrow model-service, resource-catalog, build-resource and Renderer suites. |
 | Electron release | U5 for an explicit candidate | From `apps/desktop-electron`, `VOICE2TEXT_RELEASE_VALIDATION=1 bun run check:release -- --artifact <immutable-signed-distribution-path>` validates the exact application artifact and matching model/application receipts. |
 | Packaged worker smoke | U2, U3 and U5 | No-model startup passes; seeded Qwen and SenseVoice bundles compose with packaged auxiliaries and pass full operation smoke. |

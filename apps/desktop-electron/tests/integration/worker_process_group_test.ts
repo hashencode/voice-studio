@@ -4,6 +4,7 @@ import {
   mkdirSync,
   mkdtempSync,
   readFileSync,
+  realpathSync,
   rmSync,
   writeFileSync,
 } from "node:fs";
@@ -71,6 +72,12 @@ IFS= read -r request
 test "$request" = '{"schemaVersion":1,"operation":"health","expectedProtocolVersion":1}'
 printf '%s\\n' '{"schemaVersion":1,"type":"result","operation":"health","protocol":"desktop-sherpa-worker-health/v1","runtime":"sherpa-onnx"}'
 `;
+  const externalModelArgumentScript = `#!/bin/sh
+set -eu
+model_path="\${1#--model=}"
+test -f "$model_path"
+printf '%s\\n' '{"schemaVersion":1,"type":"result","operationId":"live-caption","attempt":1,"sourceIdentity":"fixture-source","phase":"asr","protocolIdentity":"desktop-sherpa-worker/v1","sourceSha256":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","modelSha256":"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb","runtimeSha256":"cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc","payload":{"authorized":true}}'
+`;
   const modelBytes = "fixture-model-v1";
   const runtimeBytes = "fixture-runtime-v1";
   const manifest = {
@@ -91,6 +98,12 @@ printf '%s\\n' '{"schemaVersion":1,"type":"result","operation":"health","protoco
       {
         path: "bin/health-fixture",
         sha256: createHash("sha256").update(healthScript).digest("hex"),
+      },
+      {
+        path: "bin/external-model-argument-fixture",
+        sha256: createHash("sha256")
+          .update(externalModelArgumentScript)
+          .digest("hex"),
       },
       {
         path: "model.bin",
@@ -144,6 +157,15 @@ printf '%s\\n' '{"schemaVersion":1,"type":"result","operation":"health","protoco
         executable: "bin/health-fixture",
         arguments: [],
       },
+      {
+        operation: "live-caption",
+        executable: "bin/external-model-argument-fixture",
+        arguments: ["--model={modelRoot}/model.bin"],
+        protocolIdentity: "desktop-sherpa-worker/v1",
+        modelArtifacts: ["model.bin"],
+        runtimeArtifacts: ["runtime.bin"],
+        modelBundleId: "live-caption",
+      },
     ],
   };
   for (const resourceRoot of [developmentRoot, packagedRoot]) {
@@ -156,6 +178,14 @@ printf '%s\\n' '{"schemaVersion":1,"type":"result","operation":"health","protoco
     chmodSync(join(resourceRoot, "bin", "progress-failure-fixture"), 0o700);
     writeFileSync(join(resourceRoot, "bin", "health-fixture"), healthScript);
     chmodSync(join(resourceRoot, "bin", "health-fixture"), 0o700);
+    writeFileSync(
+      join(resourceRoot, "bin", "external-model-argument-fixture"),
+      externalModelArgumentScript,
+    );
+    chmodSync(
+      join(resourceRoot, "bin", "external-model-argument-fixture"),
+      0o700,
+    );
     writeFileSync(join(resourceRoot, "model.bin"), modelBytes);
     writeFileSync(join(resourceRoot, "runtime.bin"), runtimeBytes);
     writeFileSync(
@@ -480,6 +510,53 @@ describe.skipIf(process.platform !== "darwin")(
         readFileSync(join(deadlineOutput, "descendant.pid"), "utf8"),
       );
       expect(processExists(deadlineDescendant)).toBe(false);
+    });
+
+    it("allows catalog-issued model arguments from the external model root", async () => {
+      const paths = fixture();
+      const catalog = await ResourceCatalog.load(
+        resolveResourceRoot({
+          appRoot: paths.developmentAppRoot,
+          packaged: false,
+          resourcesPath: "/not-used",
+        }),
+      );
+      const modelRoot = join(paths.root, "installed-live-caption");
+      const modelBytes = "external-live-caption-model";
+      mkdirSync(modelRoot, { recursive: true });
+      writeFileSync(join(modelRoot, "installed.json"), "{}\n");
+      writeFileSync(join(modelRoot, "model.bin"), modelBytes);
+      catalog.installModelAuthority({
+        bundleId: "live-caption",
+        root: modelRoot,
+        identity: createHash("sha256").update("installed-v1").digest("hex"),
+        artifacts: [
+          {
+            path: "model.bin",
+            sha256: createHash("sha256").update(modelBytes).digest("hex"),
+          },
+        ],
+      });
+
+      const workspaceRoot = join(paths.root, "profile-external-model");
+      const attemptOutput = join(workspaceRoot, "attempts", "84");
+      mkdirSync(attemptOutput, { recursive: true });
+      const command = catalog.command("live-caption");
+      const supervisor = new OwnedProcessSupervisor({ workspaceRoot });
+
+      await expect(
+        supervisor.run({
+          intent: {
+            ...intent(command.catalogIdentity, 84),
+            operationId: "live-caption",
+          },
+          command,
+          attemptOutputDirectory: attemptOutput,
+        }),
+      ).resolves.toEqual({ authorized: true });
+      expect(command.args).toEqual([
+        `--model=${join(realpathSync(modelRoot), "model.bin")}`,
+      ]);
     });
 
     it("rehashes the executable and operation model/runtime artifacts immediately before spawn", async () => {

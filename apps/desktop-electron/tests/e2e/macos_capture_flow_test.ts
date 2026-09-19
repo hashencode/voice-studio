@@ -51,6 +51,42 @@ const parity = desktopCaptureParitySchema.parse(
 );
 
 describe("macOS capture parity flow", () => {
+  it("supports live captions installed after application startup", () => {
+    const mainSource = readFileSync(
+      join(import.meta.dirname, "../../src/main/index.ts"),
+      "utf8",
+    );
+    const startupStart = mainSource.indexOf(
+      "await initializeLocalModels(true)",
+    );
+    const startupEnd = mainSource.indexOf(
+      "workerSupervisor = new WorkerHealthSupervisor",
+      startupStart,
+    );
+    const startupSource = mainSource.slice(startupStart, startupEnd);
+    expect(startupSource).toContain(
+      "if (transcriptRepository) {\n      liveCaptionService = new LiveCaptionService",
+    );
+    expect(startupSource).not.toContain('processingIdentity("live-caption")');
+
+    const captureStart = mainSource.indexOf(
+      "async function performCaptureStart",
+    );
+    const captureEnd = mainSource.indexOf(
+      "async function performCaptureControl",
+      captureStart,
+    );
+    const captureSource = mainSource.slice(captureStart, captureEnd);
+    expect(captureSource.indexOf("let startLiveCaption")).toBeLessThan(
+      captureSource.indexOf("const result = await service.start"),
+    );
+    expect(
+      captureSource.indexOf(
+        'throw new Error("verified live-caption runtime is unavailable")',
+      ),
+    ).toBeLessThan(captureSource.indexOf("const result = await service.start"));
+  });
+
   it("publishes durable capture before the live library projection lifecycle", () => {
     const mainSource = readFileSync(
       join(import.meta.dirname, "../../src/main/index.ts"),
