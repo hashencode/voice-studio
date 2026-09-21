@@ -1,5 +1,5 @@
 @import "tailwindcss";
-@import "@fontsource-variable/inter";
+@import "./spacing.css";
 
 @custom-variant dark (&:is(.dark *));
 
@@ -103,12 +103,10 @@
   body {
     @apply bg-background text-foreground antialiased;
     font-family:
-      "Inter Variable",
-      Inter,
-      "PingFang SC",
+      system-ui,
       -apple-system,
       BlinkMacSystemFont,
-      "SF Pro Text",
+      "Segoe UI",
       sans-serif;
     margin: 0;
     min-width: 320px;

@@ -148,7 +148,7 @@ export function AppShellFrame({
         {showHeader ? (
           <header
             data-shell-slot="content-head"
-            className="flex h-[50px] shrink-0 items-center gap-1.5 border-b bg-background px-4"
+            className="flex h-[50px] shrink-0 items-center gap-1.5 border-b bg-background px-(--spacing-shell-header-inline)"
           >
             {backAction ? (
               <>
@@ -201,8 +201,9 @@ export function AppShellFrame({
           data-context-pane-background="true"
           className={cn(
             "flex min-h-0 flex-1 flex-col overflow-auto",
-            contentPadding === "compact" && "p-4",
-            contentPadding === "page" && "p-4 sm:p-6",
+            contentPadding === "compact" && "p-(--spacing-shell-compact)",
+            contentPadding === "page" &&
+              "p-(--spacing-shell-page) sm:p-(--spacing-shell-page-wide)",
             contentTone === "muted" && "bg-muted/20",
           )}
         >

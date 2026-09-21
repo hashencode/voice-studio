@@ -67,7 +67,7 @@ export function ContextPaneShell({
           section !== "audio" && "border-b",
         )}
       >
-        <div className="flex h-full min-w-0 shrink-0 items-center justify-between gap-2 px-3">
+        <div className="flex h-full min-w-0 shrink-0 items-center justify-between gap-(--spacing-context-compact) px-(--spacing-context-inline)">
           <h2 className="truncate text-sm font-semibold">{label}</h2>
           {head ? <div className="min-w-0 shrink-0">{head}</div> : null}
         </div>
@@ -84,7 +84,7 @@ export function ContextPaneShell({
         <div
           data-shell-slot="context-filters"
           data-context-pane-filters="true"
-          className="flex h-[37px] shrink-0 items-center border-b border-border/60 px-2 py-1.5"
+          className="flex h-[37px] shrink-0 items-center border-b border-border/60 px-(--spacing-context-compact) py-1.5"
         >
           {filters}
         </div>
@@ -100,7 +100,7 @@ export function ContextPaneShell({
         <SidebarFooter
           data-shell-slot="context-footer"
           data-context-pane-fixed-footer="true"
-          className="shrink-0 border-t p-2"
+          className="shrink-0 border-t p-(--spacing-context-compact)"
         >
           {footer}
         </SidebarFooter>
@@ -127,7 +127,9 @@ export function ContextPaneSearchRegion({
         <div
           className={cn(
             "flex items-center border-b border-border/60",
-            compact ? "px-2 pt-1 pb-2" : "h-[45px] px-3 py-1.5",
+            compact
+              ? "px-(--spacing-context-compact) pt-(--spacing-context-tight) pb-(--spacing-context-compact)"
+              : "h-[45px] px-(--spacing-context-inline) py-1.5",
           )}
         >
           <div className="min-w-0 flex-1">{children}</div>

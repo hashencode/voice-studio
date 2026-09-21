@@ -1,0 +1,26 @@
+:root {
+  --spacing-unit-1: 4px;
+  --spacing-unit-2: 8px;
+  --spacing-unit-3: 12px;
+  --spacing-unit-4: 16px;
+  --spacing-unit-6: 24px;
+  --spacing-unit-10: 40px;
+
+  --spacing-shell-header-inline: var(--spacing-unit-4);
+  --spacing-shell-compact: var(--spacing-unit-4);
+  --spacing-shell-page: var(--spacing-unit-4);
+  --spacing-shell-page-wide: var(--spacing-unit-6);
+
+  --spacing-context-tight: var(--spacing-unit-1);
+  --spacing-context-compact: var(--spacing-unit-2);
+  --spacing-context-inline: var(--spacing-unit-3);
+
+  --spacing-settings-section: var(--spacing-unit-3);
+  --spacing-settings-canvas-inline: var(--spacing-unit-4);
+  --spacing-settings-canvas-block: var(--spacing-unit-6);
+  --spacing-settings-canvas-inline-wide: var(--spacing-unit-6);
+  --spacing-settings-canvas-inline-widest: var(--spacing-unit-10);
+
+  --spacing-card-default: var(--spacing-unit-4);
+  --spacing-card-small: var(--spacing-unit-3);
+}

@@ -122,7 +122,7 @@ describe("render-backed shell frame", () => {
       screen.getByText("内容夹具"),
     );
     expect(main.querySelector('[data-shell-slot="content-head"]')).toHaveClass(
-      "px-4",
+      "px-(--spacing-shell-header-inline)",
       "gap-1.5",
     );
     expect(screen.queryByRole("button", { name: "前进" })).toBeNull();
@@ -155,7 +155,25 @@ describe("render-backed shell frame", () => {
     );
     expect(
       context.querySelector('[data-shell-slot="context-filters"]'),
-    ).toHaveClass("h-[37px]");
+    ).toHaveClass("h-[37px]", "px-(--spacing-context-compact)");
+    expect(
+      context.querySelector('[data-shell-slot="context-head"] > div'),
+    ).toHaveClass(
+      "gap-(--spacing-context-compact)",
+      "px-(--spacing-context-inline)",
+    );
+    expect(
+      context.querySelector(
+        '[data-shell-slot="context-search"] > div > div',
+      ),
+    ).toHaveClass(
+      "px-(--spacing-context-compact)",
+      "pt-(--spacing-context-tight)",
+      "pb-(--spacing-context-compact)",
+    );
+    expect(
+      context.querySelector('[data-shell-slot="context-footer"]'),
+    ).toHaveClass("p-(--spacing-context-compact)");
     // The public render uses a 48px collapsed prefix, not the previous +1px overlay gap.
     expect(wrapper.querySelector('[data-slot="sidebar-gap"]')).not.toHaveClass(
       "!w-[calc(var(--sidebar-width-icon)+1px)]",
@@ -1166,8 +1184,8 @@ describe("application shell", () => {
     );
     expect(document.getElementById("main-content")?.tagName).toBe("DIV");
     expect(document.getElementById("main-content")).not.toHaveClass(
-      "p-4",
-      "sm:p-6",
+      "p-(--spacing-shell-page)",
+      "sm:p-(--spacing-shell-page-wide)",
     );
     expect(mains[0]!.querySelector("header")).toBeNull();
 
@@ -1190,7 +1208,10 @@ describe("application shell", () => {
       within(navigation).getByLabelText("个人中心（即将推出）"),
     ).toHaveAttribute("data-shell-profile-placeholder", "true");
     const settingsContent = document.getElementById("main-content");
-    expect(settingsContent).not.toHaveClass("p-4", "sm:p-6");
+    expect(settingsContent).not.toHaveClass(
+      "p-(--spacing-shell-page)",
+      "sm:p-(--spacing-shell-page-wide)",
+    );
     expect(settingsContent).not.toHaveClass("bg-muted/20");
     expect(mains[0]!.querySelector("header")).toHaveClass(
       "h-[50px]",
@@ -1243,6 +1264,9 @@ describe("application shell", () => {
     expect(recordingSection).toHaveAttribute("hidden");
     expect(localModelsSection).toHaveAttribute("hidden");
     expect(cloudModelsSection).toHaveAttribute("hidden");
+    expect(cloudModelsSection?.lastElementChild).toHaveClass(
+      "mt-(--spacing-settings-section)",
+    );
     expect(
       screen.queryByRole("region", { name: "音频智能设置" }),
     ).not.toBeInTheDocument();
@@ -1344,7 +1368,10 @@ describe("application shell", () => {
     expect(localModelsSetting).toHaveAttribute("aria-current", "location");
     expect(generalSetting).toHaveAttribute("data-active", "false");
     expect(generalSetting).not.toHaveAttribute("aria-current");
-    expect(settingsContent).not.toHaveClass("p-4", "sm:p-6");
+    expect(settingsContent).not.toHaveClass(
+      "p-(--spacing-shell-page)",
+      "sm:p-(--spacing-shell-page-wide)",
+    );
     expect(
       await screen.findByRole("region", { name: "本地模型设置" }),
     ).toBeVisible();
@@ -1484,8 +1511,8 @@ describe("application shell", () => {
       document.querySelector('[data-slot="sidebar-inset"] > header'),
     ).toHaveClass("h-[50px]");
     expect(document.getElementById("main-content")).toHaveClass(
-      "p-4",
-      "sm:p-6",
+      "p-(--spacing-shell-page)",
+      "sm:p-(--spacing-shell-page-wide)",
     );
     expect(screen.queryByText(/旧版资料库/)).not.toBeInTheDocument();
 
@@ -2299,8 +2326,8 @@ describe("application shell", () => {
         .querySelector("[data-context-pane-fixed-header]"),
     ).toHaveClass("h-[50px]");
     expect(document.getElementById("main-content")).toHaveClass(
-      "p-4",
-      "sm:p-6",
+      "p-(--spacing-shell-page)",
+      "sm:p-(--spacing-shell-page-wide)",
     );
     await user.click(
       screen.getByRole("button", { name: "收起互联上下文面板" }),
@@ -2381,7 +2408,9 @@ describe("application shell", () => {
     expect(document.querySelectorAll('[data-slot="empty-state"]')).toHaveLength(
       1,
     );
-    expect(document.getElementById("main-content")).not.toHaveClass("p-4");
+    expect(document.getElementById("main-content")).not.toHaveClass(
+      "p-(--spacing-shell-page)",
+    );
 
     act(() =>
       publish?.({
@@ -2406,8 +2435,8 @@ describe("application shell", () => {
       document.querySelector('[data-shell-slot="content-head"]'),
     ).toBeNull();
     expect(document.getElementById("main-content")).toHaveClass(
-      "p-4",
-      "sm:p-6",
+      "p-(--spacing-shell-page)",
+      "sm:p-(--spacing-shell-page-wide)",
     );
     expect(
       screen.getByRole("complementary", { name: "消息上下文面板" }),

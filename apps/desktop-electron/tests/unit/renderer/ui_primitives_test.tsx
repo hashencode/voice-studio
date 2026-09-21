@@ -326,7 +326,7 @@ describe("current shadcn primitives", () => {
       "rounded-xl",
       "ring-1",
       "ring-foreground/10",
-      "[--card-spacing:--spacing(4)]",
+      "[--card-spacing:var(--spacing-card-default)]",
     );
     expect(card).not.toHaveClass("shadow", "shadow-sm", "shadow-md");
     expect(screen.getByText("默认标题")).toHaveClass(
@@ -340,7 +340,7 @@ describe("current shadcn primitives", () => {
     );
     expect(screen.getByText("默认页脚")).toHaveClass("bg-muted/50", "border-t");
     expect(screen.getByRole("generic", { name: "紧凑卡片" })).toHaveClass(
-      "data-[size=sm]:[--card-spacing:--spacing(3)]",
+      "data-[size=sm]:[--card-spacing:var(--spacing-card-small)]",
     );
   });
 
@@ -993,6 +993,21 @@ describe("current shadcn primitives", () => {
     expect(button.className).not.toMatch(
       /hover:(?:bg|border|underline)|dark:hover:bg/,
     );
+  });
+
+  it("uses a soft danger surface for destructive buttons", () => {
+    render(<Button variant="destructive">确认删除</Button>);
+
+    const button = screen.getByRole("button", { name: "确认删除" });
+    expect(button).toHaveAttribute("data-variant", "destructive");
+    expect(button).toHaveClass(
+      "bg-destructive/10",
+      "text-destructive",
+      "hover:bg-destructive/20",
+      "dark:bg-destructive/20",
+      "dark:hover:bg-destructive/30",
+    );
+    expect(button).not.toHaveClass("bg-destructive", "text-white");
   });
 
   it("forwards controlled RadioGroup values with the Electron thin-focus exception", async () => {

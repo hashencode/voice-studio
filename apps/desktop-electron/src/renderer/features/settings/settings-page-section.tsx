@@ -46,7 +46,13 @@ export function SettingsPageSection({
           <div className="shrink-0">{action}</div>
         </div>
       ) : null}
-      <div className={hasAction ? "mt-3" : undefined}>{children}</div>
+      <div
+        className={
+          hasAction ? "mt-(--spacing-settings-section)" : undefined
+        }
+      >
+        {children}
+      </div>
     </section>
   );
 }
