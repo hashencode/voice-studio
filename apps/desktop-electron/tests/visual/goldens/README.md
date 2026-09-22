@@ -16,13 +16,17 @@ These images are canonical only for the following rendering contract:
 - Electron production Renderer entry with the test-only Main/Preload harness
 - CSS device pixel ratio 1 and exact 1280x720, 1240x820, 880x620, or 320x96 viewport
 - `zh-CN`, light color scheme, reduced motion, fixed fixture time `2026-08-19T03:20:00.000Z`
-- target shell font stack `"Inter Variable", Inter, "PingFang SC", -apple-system, BlinkMacSystemFont, "SF Pro Text", sans-serif` (self-hosted Inter; the floating Renderer imports the shared stylesheet and inherits this font)
+- captured shell font stack `"Inter Variable", Inter, "PingFang SC", -apple-system, BlinkMacSystemFont, "SF Pro Text", sans-serif` (self-hosted Inter; the floating Renderer imported the shared stylesheet and inherited this font)
 
 These ten baselines were inspected during authorized visual acceptance on
 2026-09-04. Nine width- or full-page-sensitive images were refreshed; the
 floating control remained unchanged. The final no-update run passed all twelve
 tests, including the runtime resize contract, hover, selected, keyboard-focus,
 disabled-state, and reference-integrity assertions.
+
+The Renderer switched from bundled Inter to the system-font stack after that
+acceptance run. The PNG baselines remain the last authorized captures and need
+an authorized refresh before they can establish the current typography.
 
 The shell baselines are:
 

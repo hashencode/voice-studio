@@ -35,4 +35,12 @@ To replace this reference, deliberately recapture the same public preview at the
 
 The previous screenshot-led implementation plan remains available as superseded design history at `docs/plans/2026-09-02-1350-refactor-electron-reui-app-shell-plan.md`.
 
-The Renderer self-hosts Inter Variable through the pinned `@fontsource-variable/inter` dependency. Its unmodified license is distributed from `public/licenses/inter-OFL.txt` by Vite's public asset copy. No ReUI runtime asset is used. The midpoint handle matches the observed transparent 28×48 hit area and two 2×8 strokes. Authorized direct image inspection and regional geometry/style assertions were completed on 2026-09-03 against the Electron product. Product content, Chinese fallback typography, thin focus, native handle title and desktop minimum behavior remain deliberate differences; this is not whole-page pixel equality.
+The Renderer now uses the platform system-font stack and does not bundle Inter.
+The pinned ReUI reference still records Inter as observed source evidence; this
+typography difference is an explicit product choice and does not alter the
+reference files or checksums. No ReUI runtime asset is used. The midpoint handle
+matches the observed transparent 28×48 hit area and two 2×8 strokes. Authorized
+direct image inspection and regional geometry/style assertions were completed
+on 2026-09-03 against the Electron product. Product content, typography, thin
+focus, native handle title and desktop minimum behavior remain deliberate
+differences; this is not whole-page pixel equality.

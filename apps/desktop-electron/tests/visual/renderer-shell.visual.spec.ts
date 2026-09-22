@@ -559,7 +559,6 @@ async function assertRuntimeContract(
       .fontFamily.split(",")
       .slice(0, 3)
       .map((family) => family.trim().replaceAll('"', "")),
-    interLoaded: document.fonts.check('14px "Inter Variable"'),
     frozenNow: Date.now(),
   }));
   expect(runtime).toEqual({
@@ -569,8 +568,7 @@ async function assertRuntimeContract(
     language: "zh-CN",
     colorScheme: "light",
     reducedMotion: true,
-    fontFamily: ["Inter Variable", "Inter", "PingFang SC"],
-    interLoaded: true,
+    fontFamily: ["system-ui", "-apple-system", "BlinkMacSystemFont"],
     frozenNow: Date.UTC(2026, 7, 19, 3, 20, 0),
   });
 }
