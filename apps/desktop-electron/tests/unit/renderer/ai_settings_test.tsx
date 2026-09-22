@@ -250,6 +250,7 @@ describe("cloud model settings", () => {
     const edit = screen.getByRole("dialog", { name: "编辑 team-chat" });
     const remove = within(edit).getByRole("button", { name: "删除模型" });
     expect(remove).not.toHaveTextContent("删除模型");
+    expect(remove).toHaveAttribute("data-variant", "destructive");
     await user.click(remove);
     let alert = screen.getByRole("alertdialog", { name: "删除模型确认" });
     expect(

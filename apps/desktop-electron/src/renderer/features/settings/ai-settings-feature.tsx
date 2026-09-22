@@ -521,9 +521,8 @@ function ProviderProfileDialog({
                   <AlertDialogTrigger asChild>
                     <Button
                       type="button"
-                      variant="ghost"
+                      variant="destructive"
                       size="icon-sm"
-                      className="text-destructive hover:bg-destructive/10 hover:text-destructive"
                       disabled={pending || !profile.capabilities.deletable}
                       aria-label="删除模型"
                       title="删除模型"
