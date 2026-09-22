@@ -448,13 +448,13 @@ describe("sidebar navigation e2e", () => {
     let resizeHandle = await screen.findByRole("separator", {
       name: "调整音频上下文面板宽度",
     });
-    expect(resizeHandle).toHaveAttribute("aria-valuenow", "300");
-    expect(shellWidth()).toBe("350px");
-    for (let step = 0; step < 18; step += 1) {
+    expect(resizeHandle).toHaveAttribute("aria-valuenow", "320");
+    expect(shellWidth()).toBe("370px");
+    for (let step = 0; step < 6; step += 1) {
       fireEvent.keyDown(resizeHandle, { key: "ArrowRight" });
     }
-    expect(resizeHandle).toHaveAttribute("aria-valuenow", "480");
-    expect(shellWidth()).toBe("530px");
+    expect(resizeHandle).toHaveAttribute("aria-valuenow", "380");
+    expect(shellWidth()).toBe("430px");
     expect(writes).not.toHaveBeenCalled();
 
     for (const target of [
@@ -467,8 +467,8 @@ describe("sidebar navigation e2e", () => {
       resizeHandle = await screen.findByRole("separator", {
         name: `调整${target.label}上下文面板宽度`,
       });
-      expect(resizeHandle).toHaveAttribute("aria-valuenow", "480");
-      expect(shellWidth()).toBe("530px");
+      expect(resizeHandle).toHaveAttribute("aria-valuenow", "380");
+      expect(shellWidth()).toBe("430px");
     }
     expect(writes).not.toHaveBeenCalled();
 
@@ -485,7 +485,7 @@ describe("sidebar navigation e2e", () => {
       await screen.findByRole("separator", {
         name: "调整音频上下文面板宽度",
       }),
-    ).toHaveAttribute("aria-valuenow", "480");
+    ).toHaveAttribute("aria-valuenow", "380");
     expect(writes).toHaveBeenCalledTimes(2);
     expect(
       writes.mock.calls.every(
@@ -506,9 +506,9 @@ describe("sidebar navigation e2e", () => {
     await waitFor(() =>
       expect(
         screen.getByRole("separator", { name: /上下文面板宽度/ }),
-      ).toHaveAttribute("aria-valuenow", "480"),
+      ).toHaveAttribute("aria-valuenow", "380"),
     );
-    expect(shellWidth()).toBe("530px");
+    expect(shellWidth()).toBe("430px");
 
     view.unmount();
     render(createElement(App));
@@ -516,8 +516,8 @@ describe("sidebar navigation e2e", () => {
       await screen.findByRole("separator", {
         name: "调整音频上下文面板宽度",
       }),
-    ).toHaveAttribute("aria-valuenow", "300");
-    expect(shellWidth()).toBe("350px");
+    ).toHaveAttribute("aria-valuenow", "320");
+    expect(shellWidth()).toBe("370px");
   });
 
   it("reveals message details while keeping a narrow pane docked", async () => {

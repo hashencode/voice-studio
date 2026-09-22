@@ -1108,7 +1108,7 @@ const SettingsContent = React.memo(function SettingsContent({
 
 const SettingsPanels = React.memo(function SettingsPanels() {
   return (
-    <div className="w-full min-w-0 px-4 py-6 sm:px-6 lg:px-10">
+    <div className="w-full min-w-0 px-(--spacing-settings-canvas-inline) py-(--spacing-settings-canvas-block) sm:px-(--spacing-settings-canvas-inline-wide) lg:px-(--spacing-settings-canvas-inline-widest)">
       <SettingsPageSection section="general" label="通用">
         <AppearanceSettingsFeature />
       </SettingsPageSection>

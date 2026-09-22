@@ -152,6 +152,13 @@ function PaneResizeHandle({
       onKeyDown={(event) => {
         onKeyDown?.(event);
         if (event.defaultPrevented || disabled) return;
+        if (event.key === "Home" || event.key === "End") {
+          event.preventDefault();
+          event.stopPropagation();
+          const nextWidth = event.key === "Home" ? minimum : maximum;
+          if (nextWidth !== value) onResizeRef.current(nextWidth);
+          return;
+        }
         const direction =
           event.key === "ArrowLeft" ? -1 : event.key === "ArrowRight" ? 1 : 0;
         if (direction === 0) return;

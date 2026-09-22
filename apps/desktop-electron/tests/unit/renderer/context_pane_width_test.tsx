@@ -44,17 +44,17 @@ function firePointer(
 describe("context pane width", () => {
   it.each([
     { viewportWidth: 880, maximum: 350 },
-    { viewportWidth: 1280, maximum: 480 },
-    { viewportWidth: 1600, maximum: 480 },
+    { viewportWidth: 1280, maximum: 380 },
+    { viewportWidth: 1600, maximum: 380 },
   ])(
     "derives the supported bounds at $viewportWidth px",
     ({ viewportWidth, maximum }) => {
       expect(contextPaneWidthLimits(viewportWidth)).toEqual({
-        minimum: 240,
+        minimum: 260,
         maximum,
       });
-      expect(resolveContextPaneWidth(300, viewportWidth)).toBe(300);
-      expect(resolveContextPaneWidth(100, viewportWidth)).toBe(240);
+      expect(resolveContextPaneWidth(320, viewportWidth)).toBe(320);
+      expect(resolveContextPaneWidth(100, viewportWidth)).toBe(260);
       expect(resolveContextPaneWidth(900, viewportWidth)).toBe(maximum);
     },
   );
@@ -64,20 +64,20 @@ describe("context pane width", () => {
     const writes = vi.spyOn(Storage.prototype, "setItem");
     const { result } = renderHook(() => useContextPaneWidth());
 
-    expect(result.current.requestedWidth).toBe(300);
-    expect(result.current.effectiveWidth).toBe(300);
+    expect(result.current.requestedWidth).toBe(320);
+    expect(result.current.effectiveWidth).toBe(320);
 
-    act(() => result.current.setRequestedWidth(480));
-    expect(result.current.requestedWidth).toBe(480);
-    expect(result.current.effectiveWidth).toBe(480);
+    act(() => result.current.setRequestedWidth(380));
+    expect(result.current.requestedWidth).toBe(380);
+    expect(result.current.effectiveWidth).toBe(380);
 
     act(() => setViewportWidth(880));
-    expect(result.current.requestedWidth).toBe(480);
+    expect(result.current.requestedWidth).toBe(380);
     expect(result.current.effectiveWidth).toBe(350);
 
     act(() => setViewportWidth(1600));
-    expect(result.current.requestedWidth).toBe(480);
-    expect(result.current.effectiveWidth).toBe(480);
+    expect(result.current.requestedWidth).toBe(380);
+    expect(result.current.effectiveWidth).toBe(380);
     expect(writes).not.toHaveBeenCalled();
   });
 
@@ -96,8 +96,8 @@ describe("context pane width", () => {
     }
 
     const view = render(<Harness state="audio-open" />);
-    act(() => widthController?.setRequestedWidth(420));
-    expect(screen.getByTestId("effective-width")).toHaveTextContent("420");
+    act(() => widthController?.setRequestedWidth(380));
+    expect(screen.getByTestId("effective-width")).toHaveTextContent("380");
 
     for (const state of [
       "messages-open",
@@ -106,16 +106,16 @@ describe("context pane width", () => {
       "settings-collapsed",
     ]) {
       view.rerender(<Harness state={state} />);
-      expect(screen.getByTestId("effective-width")).toHaveTextContent("420");
+      expect(screen.getByTestId("effective-width")).toHaveTextContent("380");
     }
     view.rerender(<Harness state="audio-empty" />);
-    expect(screen.getByTestId("effective-width")).toHaveTextContent("420");
+    expect(screen.getByTestId("effective-width")).toHaveTextContent("380");
     view.rerender(<Harness state="audio-open" />);
-    expect(screen.getByTestId("effective-width")).toHaveTextContent("420");
+    expect(screen.getByTestId("effective-width")).toHaveTextContent("380");
 
     view.unmount();
     render(<Harness state="audio-open" />);
-    expect(screen.getByTestId("effective-width")).toHaveTextContent("300");
+    expect(screen.getByTestId("effective-width")).toHaveTextContent("320");
   });
 });
 
@@ -128,9 +128,9 @@ describe("pane resize handle", () => {
     const view = render(
       <PaneResizeHandle
         aria-label="调整音频上下文面板宽度"
-        value={300}
-        minimum={240}
-        maximum={480}
+        value={320}
+        minimum={260}
+        maximum={380}
         onResize={onResize}
         onResizeStateChange={onResizeStateChange}
         cancellationKey="audio"
@@ -171,33 +171,35 @@ describe("pane resize handle", () => {
 
     expect(handle).toHaveAttribute("tabindex", "0");
     expect(handle).toHaveAttribute("aria-orientation", "vertical");
-    expect(handle).toHaveAttribute("aria-valuemin", "240");
-    expect(handle).toHaveAttribute("aria-valuemax", "480");
-    expect(handle).toHaveAttribute("aria-valuenow", "300");
+    expect(handle).toHaveAttribute("aria-valuemin", "260");
+    expect(handle).toHaveAttribute("aria-valuemax", "380");
+    expect(handle).toHaveAttribute("aria-valuenow", "320");
     expect(handle.querySelectorAll("[data-pane-resize-hit-area]")).toHaveLength(
       2,
     );
 
     fireEvent.keyDown(handle, { key: "ArrowLeft" });
     fireEvent.keyDown(handle, { key: "ArrowRight" });
-    expect(onResize.mock.calls).toEqual([[290], [310]]);
+    fireEvent.keyDown(handle, { key: "Home" });
+    fireEvent.keyDown(handle, { key: "End" });
+    expect(onResize.mock.calls).toEqual([[310], [330], [260], [380]]);
 
     rerender(
       <PaneResizeHandle
         aria-label="调整音频上下文面板宽度"
-        value={240}
-        minimum={240}
-        maximum={480}
+        value={260}
+        minimum={260}
+        maximum={380}
         onResize={onResize}
         cancellationKey="audio"
       />,
     );
     fireEvent.keyDown(handle, { key: "ArrowLeft" });
-    expect(onResize).toHaveBeenCalledTimes(2);
+    expect(onResize).toHaveBeenCalledTimes(4);
 
     fireEvent.click(handle);
     fireEvent.doubleClick(handle);
-    expect(onResize).toHaveBeenCalledTimes(2);
+    expect(onResize).toHaveBeenCalledTimes(4);
   });
 
   it("coalesces captured primary-pointer moves and flushes the last move on release", () => {
@@ -240,7 +242,7 @@ describe("pane resize handle", () => {
       isPrimary: true,
     });
     expect(onResize).toHaveBeenCalledOnce();
-    expect(onResize).toHaveBeenLastCalledWith(360);
+    expect(onResize).toHaveBeenLastCalledWith(380);
     expect(frames.size()).toBe(0);
     expect(releasePointerCapture).toHaveBeenCalledWith(7);
     expect(onResizeStateChange).toHaveBeenLastCalledWith(false);
@@ -263,9 +265,9 @@ describe("pane resize handle", () => {
     const onResizeStateChange = vi.fn();
     const props: React.ComponentProps<typeof PaneResizeHandle> = {
       "aria-label": "调整上下文面板宽度",
-      value: 300,
-      minimum: 240,
-      maximum: 480,
+      value: 320,
+      minimum: 260,
+      maximum: 380,
       onResize,
       onResizeStateChange,
       cancellationKey: "audio",
@@ -381,10 +383,10 @@ describe("app shell pane resizing", () => {
           onRequestClose: vi.fn(),
           children: <span>音频列表</span>,
         }}
-        contextPaneWidth={300}
+        contextPaneWidth={320}
         contextPaneResize={{
-          minimum: 240,
-          maximum: 480,
+          minimum: 260,
+          maximum: 380,
           onChange: onWidthChange,
         }}
         onTogglePane={onTogglePane}

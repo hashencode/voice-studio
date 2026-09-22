@@ -163,9 +163,7 @@ describe("render-backed shell frame", () => {
       "px-(--spacing-context-inline)",
     );
     expect(
-      context.querySelector(
-        '[data-shell-slot="context-search"] > div > div',
-      ),
+      context.querySelector('[data-shell-slot="context-search"] > div > div'),
     ).toHaveClass(
       "px-(--spacing-context-compact)",
       "pt-(--spacing-context-tight)",
@@ -1020,16 +1018,16 @@ describe("application shell", () => {
       '[data-slot="sidebar-wrapper"]',
     );
     expect(wrapper).not.toBeNull();
-    expect(wrapper!.style.getPropertyValue("--sidebar-width")).toBe("350px");
+    expect(wrapper!.style.getPropertyValue("--sidebar-width")).toBe("370px");
     const resizeHandle = screen.getByRole("separator", {
       name: "调整音频上下文面板宽度",
     });
-    expect(resizeHandle).toHaveAttribute("aria-valuenow", "300");
+    expect(resizeHandle).toHaveAttribute("aria-valuenow", "320");
     fireEvent.keyDown(resizeHandle, { key: "ArrowRight" });
     await waitFor(() =>
-      expect(wrapper!.style.getPropertyValue("--sidebar-width")).toBe("360px"),
+      expect(wrapper!.style.getPropertyValue("--sidebar-width")).toBe("380px"),
     );
-    expect(resizeHandle).toHaveAttribute("aria-valuenow", "310");
+    expect(resizeHandle).toHaveAttribute("aria-valuenow", "330");
 
     const outer = wrapper!.querySelector<HTMLElement>(
       ':scope > [data-slot="sidebar"]',
@@ -1144,8 +1142,8 @@ describe("application shell", () => {
     expect(persistentSearch).toHaveAttribute("data-state", "open");
     expect(persistentSearch?.firstElementChild?.firstElementChild).toHaveClass(
       "border-b",
-      "px-2",
-      "pb-2",
+      "px-(--spacing-context-compact)",
+      "pb-(--spacing-context-compact)",
     );
     expect(persistentSearch).toHaveClass(
       "transition-[grid-template-rows,opacity]",
@@ -1931,7 +1929,7 @@ describe("application shell", () => {
     });
     fireEvent.keyDown(resizeHandle, { key: "ArrowRight" });
     await waitFor(() =>
-      expect(wrapper.style.getPropertyValue("--sidebar-width")).toBe("360px"),
+      expect(wrapper.style.getPropertyValue("--sidebar-width")).toBe("380px"),
     );
 
     api.navigateMock.mockClear();
@@ -1991,7 +1989,7 @@ describe("application shell", () => {
       document.querySelector("[data-context-pane-midpoint-rail]"),
     ).toBeNull();
     expect(screen.queryByRole("button", { name: "后退" })).toBeNull();
-    expect(wrapper.style.getPropertyValue("--sidebar-width")).toBe("360px");
+    expect(wrapper.style.getPropertyValue("--sidebar-width")).toBe("380px");
 
     act(() =>
       publish?.({
@@ -2018,7 +2016,7 @@ describe("application shell", () => {
     ).toBeVisible();
     expect(screen.queryByRole("button", { name: /返回/ })).toBeNull();
     expect(screen.queryByRole("button", { name: "关闭录制详情" })).toBeNull();
-    expect(wrapper.style.getPropertyValue("--sidebar-width")).toBe("360px");
+    expect(wrapper.style.getPropertyValue("--sidebar-width")).toBe("380px");
   });
 
   it("opens the first saved recording before its list refresh resolves", async () => {
@@ -2505,8 +2503,8 @@ describe("application shell", () => {
     expect(fixedHeader).toHaveClass("h-[42px]");
     expect(searchRegion).toHaveAttribute("data-state", "open");
     expect(searchRegion?.firstElementChild?.firstElementChild).toHaveClass(
-      "px-2",
-      "pb-2",
+      "px-(--spacing-context-compact)",
+      "pb-(--spacing-context-compact)",
     );
     expect(pane).toHaveClass("bg-background", "text-foreground");
     expect(scrollingContent).toContainElement(

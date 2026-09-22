@@ -949,7 +949,7 @@ export function CaptureWorkspaceController({
         role="region"
         aria-label="录制详情"
         aria-busy={busy}
-        className="w-full min-w-0 space-y-5"
+        className="w-full min-w-0 space-y-(--spacing-page-section)"
       >
         <CaptureLibraryProjectionStatus
           projection={libraryProjection}

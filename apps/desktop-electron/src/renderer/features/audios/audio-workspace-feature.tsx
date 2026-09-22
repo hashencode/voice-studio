@@ -243,7 +243,7 @@ export function AudioWorkspaceFeature({
       <section
         aria-labelledby="audio-library-title"
         aria-busy={pending}
-        className="space-y-5"
+        className="space-y-(--spacing-page-section)"
       >
         <div>
           <p className="text-sm font-medium text-muted-foreground">本机音频</p>
@@ -823,7 +823,7 @@ function WorkspaceView({
 
       <div
         data-audio-sticky-actions
-        className="pointer-events-none sticky top-0 z-30 h-0 w-full min-w-0 px-5 sm:px-8"
+        className="pointer-events-none sticky top-0 z-30 h-0 w-full min-w-0 px-(--spacing-audio-canvas-inline) sm:px-(--spacing-audio-canvas-inline-wide)"
       >
         <div
           data-audio-sticky-actions-content
@@ -843,7 +843,7 @@ function WorkspaceView({
       <div
         ref={titleMarkerRef}
         data-audio-hero
-        className="w-full min-w-0 px-5 pt-8 sm:px-8"
+        className="w-full min-w-0 px-(--spacing-audio-canvas-inline) pt-(--spacing-activity-detail-block) sm:px-(--spacing-audio-canvas-inline-wide)"
       >
         <div
           data-audio-expanded-title
@@ -929,7 +929,7 @@ function WorkspaceView({
           aria-hidden="true"
           className="pointer-events-none absolute inset-x-0 top-0 h-11 border-b bg-background/95 backdrop-blur-sm"
         />
-        <div className="relative h-11 w-full min-w-0 px-5 sm:px-8">
+        <div className="relative h-11 w-full min-w-0 px-(--spacing-audio-canvas-inline) sm:px-(--spacing-audio-canvas-inline-wide)">
           <div
             data-audio-compact-title
             aria-hidden={!compactHeader}
@@ -999,7 +999,7 @@ function WorkspaceView({
         </div>
       </div>
 
-      <div className="w-full min-w-0 px-5 py-6 sm:px-8">
+      <div className="w-full min-w-0 px-(--spacing-audio-canvas-inline) py-(--spacing-audio-canvas-block) sm:px-(--spacing-audio-canvas-inline-wide)">
         <div
           id="audio-tab-transcript"
           role="tabpanel"
@@ -1637,7 +1637,10 @@ export function AudioPlaybackControls({
   const positionMs = playback?.positionMs ?? 0;
   const resolvedDurationMs = Math.max(1, playback?.durationMs ?? durationMs);
   return (
-    <section aria-label="音频播放器" className="w-full px-5 py-3 sm:px-8">
+    <section
+      aria-label="音频播放器"
+      className="w-full px-(--spacing-audio-canvas-inline) py-(--spacing-context-inline) sm:px-(--spacing-audio-canvas-inline-wide)"
+    >
       <div className="grid w-full min-w-0 items-center gap-4 md:grid-cols-[auto_minmax(12rem,1fr)_auto]">
         <div
           className="flex items-center gap-1"

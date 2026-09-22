@@ -306,7 +306,10 @@ export function CompanionMainWorkspace({
 }) {
   const { snapshot } = controller;
   return (
-    <section aria-label="互联工作区" className="space-y-5">
+    <section
+      aria-label="互联工作区"
+      className="space-y-(--spacing-page-section)"
+    >
       {controller.error ? (
         <div
           role="alert"
@@ -364,7 +367,7 @@ function PairingWorkspace({
   if (!snapshot) return null;
   const pending = controller.pendingAction !== null;
   return (
-    <section className="grid min-h-72 w-full place-items-center border-y py-5">
+    <section className="grid min-h-72 w-full place-items-center border-y py-(--spacing-page-section-block)">
       <div className="w-full min-w-0 space-y-4">
         <div className="text-center">
           <KeyRound className="mx-auto size-8" aria-hidden="true" />
@@ -437,7 +440,7 @@ function ReadinessWorkspace({
           onCreateInvite={controller.createInvite}
         />
       ) : (
-        <section className="border-y py-5">
+        <section className="border-y py-(--spacing-page-section-block)">
           <h2 className="font-semibold">手机接收当前关闭</h2>
           <p className="mt-1 text-sm text-muted-foreground">
             启用后才会请求局域网权限并接受手机连接。已有接收历史会保留。
@@ -475,8 +478,8 @@ function DeviceWorkspace({
 }) {
   const credentialMissing = peer.trustState === "credential-missing";
   return (
-    <div className="space-y-5">
-      <section className="border-y py-5">
+    <div className="space-y-(--spacing-page-section)">
+      <section className="border-y py-(--spacing-page-section-block)">
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div className="min-w-0">
             <p className="mt-1 text-sm text-muted-foreground">
@@ -573,7 +576,7 @@ function ReceiverStatus({ snapshot }: { snapshot: CompanionSnapshot }) {
       <section
         role="alert"
         aria-label="局域网权限被拒绝"
-        className="border-y py-5"
+        className="border-y py-(--spacing-page-section-block)"
       >
         <div className="flex items-start gap-3">
           <CircleAlert className="mt-0.5 size-5" aria-hidden="true" />
@@ -596,7 +599,7 @@ function ReceiverStatus({ snapshot }: { snapshot: CompanionSnapshot }) {
       <section
         role="status"
         aria-label="手机接收器已就绪"
-        className="border-y py-5"
+        className="border-y py-(--spacing-page-section-block)"
       >
         <div className="flex items-start gap-3">
           <CheckCircle2 className="mt-0.5 size-5" aria-hidden="true" />
@@ -621,7 +624,7 @@ function ReceiverStatus({ snapshot }: { snapshot: CompanionSnapshot }) {
     <section
       role={isError ? "alert" : "status"}
       aria-label={status.title}
-      className="border-y py-5"
+      className="border-y py-(--spacing-page-section-block)"
     >
       <div className="flex items-start gap-3">
         {discovery.state === "starting" ||
@@ -673,7 +676,10 @@ function PairingPanel({
         })
       : null;
   return (
-    <section aria-labelledby="pairing-title" className="border-y py-5">
+    <section
+      aria-labelledby="pairing-title"
+      className="border-y py-(--spacing-page-section-block)"
+    >
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div className="flex items-start gap-3">
           <KeyRound className="mt-0.5 size-5" aria-hidden="true" />

@@ -11,9 +11,9 @@ export const SHELL_SECTION_LABELS: Record<RendererShellSection, string> = {
 export type ContextPanePresentation = "docked" | "overlay";
 
 export const CONTEXT_PANE_WIDTH = {
-  default: 300,
-  minimum: 240,
-  maximum: 480,
+  default: 320,
+  minimum: 260,
+  maximum: 380,
   mainContentMinimum: 480,
 } as const;
 

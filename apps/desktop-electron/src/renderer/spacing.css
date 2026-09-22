@@ -21,6 +21,13 @@
   --spacing-settings-canvas-inline-wide: var(--spacing-unit-6);
   --spacing-settings-canvas-inline-widest: var(--spacing-unit-10);
 
+  --spacing-activity-detail-block: 32px;
+  --spacing-page-section: 20px;
+  --spacing-page-section-block: 20px;
+  --spacing-audio-canvas-inline: 20px;
+  --spacing-audio-canvas-inline-wide: 32px;
+  --spacing-audio-canvas-block: var(--spacing-unit-6);
+
   --spacing-card-default: var(--spacing-unit-4);
   --spacing-card-small: var(--spacing-unit-3);
 }

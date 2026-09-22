@@ -1316,7 +1316,11 @@ it("filters Audio summaries into the five transcription states", async () => {
   expect(
     pane.querySelector('[data-context-pane-search="true"]')?.firstElementChild
       ?.firstElementChild,
-  ).toHaveClass("border-b", "px-2", "pb-2");
+  ).toHaveClass(
+    "border-b",
+    "px-(--spacing-context-compact)",
+    "pb-(--spacing-context-compact)",
+  );
   const filterButton = screen.getByRole("button", {
     name: "筛选音频：全部",
   });
