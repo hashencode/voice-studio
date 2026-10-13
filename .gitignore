@@ -47,3 +47,6 @@ app.*.map.json
 /apps/mobile-flutter/android/app/debug
 /apps/mobile-flutter/android/app/profile
 /apps/mobile-flutter/android/app/release
+
+# Local screenshots and temporary verification artifacts.
+/.artifacts/
