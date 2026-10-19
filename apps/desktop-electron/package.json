@@ -6,7 +6,7 @@
   "private": true,
   "main": ".vite/build/main.js",
   "scripts": {
-    "start": "bun run resources:native:debug && electron-forge start",
+    "start": "bun run resources:native:debug && bun run electron-dev.mjs electron-forge start",
     "build": "vite build",
     "package": "bun run resources:all && electron-forge package",
     "make": "bun run resources:all && electron-forge make",
@@ -31,7 +31,8 @@
     "check:boundaries": "bun scripts/check-renderer-boundaries.ts",
     "check:lifecycle": "bun scripts/check-bun-lifecycle.ts",
     "check:model-distribution": "bun scripts/validate-model-distribution.ts",
-    "smoke:package": "bun scripts/smoke-packaged-macos.ts"
+    "smoke:package": "bun scripts/smoke-packaged-macos.ts",
+    "electron:identity": "bun run electron-dev.mjs"
   },
   "dependencies": {
     "class-variance-authority": "0.7.1",
@@ -77,5 +78,9 @@
   },
   "trustedDependencies": [
     "electron"
-  ]
+  ],
+  "electronDev": {
+    "appId": "com.goostudio.voicestudio.dev",
+    "productName": "Voice2Text Dev"
+  }
 }

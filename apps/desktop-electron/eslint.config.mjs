@@ -42,6 +42,7 @@ export default tseslint.config(
   },
   {
     files: [
+      "electron-dev.mjs",
       "src/main/**/*.ts",
       "src/preload/**/*.ts",
       "scripts/**/*.ts",
