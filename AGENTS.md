@@ -48,9 +48,11 @@
 
 ## Verification and build entry
 
-- Read `docs/standards/verification.md` for the verification lane that matches
-  the changed files. Run the lightest required lane and all bounded reverse
-  consumers. Do not run the repository-wide gate for routine changes.
+- Before planning changes or running checks, read `docs/standards/verification.md`.
+  State the affected files/consumers and choose the lightest sufficient checks.
+  Do not append full suites, equivalent aliases or size matrices at task completion.
+  Update the standard and README links when verification scripts change.
+  Run all bounded reverse consumers; existing visual permission still applies.
 - Read `docs/standards/build-resources.md` before builds, resource acquisition,
   code generation, or device watcher work. The visual-validation permission
   above still controls every UI process and visual test.

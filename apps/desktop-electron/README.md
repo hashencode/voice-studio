@@ -11,8 +11,9 @@ runtime fallback.
 ```bash
 bun ci
 bun run resources:worker
-bun run check:ui
-bun run check:code
+bun run typecheck
+# Select relevant checks using ../../docs/standards/verification.md.
+# Run start only for required, authorized runtime verification.
 bun run start
 ```
 
@@ -20,8 +21,11 @@ bun run start
 frozen worker/model resources change. Later development runs can use
 `bun run start` directly.
 
-For Renderer work, `bun run check:ui` checks formatting, lint, types, and
-focused Renderer behavior without launching Electron windows. Use
+For daily work, choose relevant test files and consumers using the
+[verification standard](../../docs/standards/verification.md). `check:ui` is the
+package-level Renderer gate and aliases `check:ui:quick`; run it once when that
+scope is needed. `check:code` is full Electron source regression, not an extra
+mandatory step after a passing local check. Both run without Electron windows. Use
 `bun run check:ui:visual` only when visual acceptance is explicitly requested.
 Updating canonical screenshots is a separate, deliberate action:
 `bun run check:ui:visual:update`. Broader Electron code work uses
@@ -147,8 +151,9 @@ and its close action remains a ghost icon button.
 
 Tests should lock these load-bearing classes and semantics, not entire generated
 class strings. Static and DOM checks do not establish screenshot-level parity.
-Do not run `check:ui:quick`, `check:ui`, browser/Electron-driven checks, or update
-goldens without explicit task-local visual-validation authorization.
+`check:ui:quick` and `check:ui` run non-GUI source checks; they do not establish
+rendered parity. Browser/Electron-driven checks and golden updates require
+explicit task-local visual-validation authorization under the root `AGENTS.md`.
 
 Capture has three deliberately separate presentations backed by the same Main
 authority: detailed setup/recovery/captions in the third-column workspace, a
