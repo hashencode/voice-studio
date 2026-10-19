@@ -12,6 +12,11 @@ import {
 import { Button } from "@/components/ui/button";
 import { EmptyState } from "@/components/ui/empty-state";
 import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from "@/components/ui/collapsible";
+import {
   Item,
   ItemContent,
   ItemDescription,
@@ -606,11 +611,27 @@ function ReceiverStatus({ snapshot }: { snapshot: CompanionSnapshot }) {
           <div className="min-w-0">
             <h2 className="font-semibold">手机接收器已就绪</h2>
             <p className="mt-1 text-sm text-muted-foreground">
-              {identity.deviceName} · 动态端口 {identity.port} · 已加密
+              {identity.deviceName}
             </p>
-            <p className="mt-1 break-all text-xs text-muted-foreground">
-              本机公钥指纹 {identity.fingerprint}
-            </p>
+            <Collapsible className="mt-1">
+              <CollapsibleTrigger asChild>
+                <Button type="button" variant="ghost" size="sm">
+                  连接详情
+                </Button>
+              </CollapsibleTrigger>
+              <CollapsibleContent>
+                <dl className="mt-2 space-y-1 text-xs text-muted-foreground">
+                  <div>
+                    <dt>监听端口</dt>
+                    <dd>{identity.port}</dd>
+                  </div>
+                  <div>
+                    <dt>本机公钥指纹</dt>
+                    <dd className="break-all">{identity.fingerprint}</dd>
+                  </div>
+                </dl>
+              </CollapsibleContent>
+            </Collapsible>
           </div>
         </div>
       </section>
@@ -751,9 +772,6 @@ function PairingPanel({
               {snapshot.pairingInvite.manualEndpoint.host}:
               {snapshot.pairingInvite.manualEndpoint.port}
             </code>
-            <p className="mt-2 text-xs text-muted-foreground">
-              此处只显示公开连接信息。长期配对凭据仅保存在两端的系统安全存储中。
-            </p>
           </div>
           {publicPairingArtifact ? (
             <div>
@@ -764,7 +782,7 @@ function PairingPanel({
                 {publicPairingArtifact}
               </code>
               <p className="mt-2 text-xs text-muted-foreground">
-                在手机端导入此公开信息后，仍需核对上方六码；其中不包含长期凭据。
+                在手机端导入配对信息，再核对两端显示的六位短码。
               </p>
             </div>
           ) : null}

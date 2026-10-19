@@ -964,7 +964,7 @@ class _HomePageState extends State<HomePage> {
     _showBatchFeedback(isRecentlyDeleted ? '彻底删除' : '删除', result);
     if (isRecentlyDeleted &&
         result.items.any((item) => item.reason == 'deletion_pending')) {
-      await _showMessageDialog('部分文件暂时无法删除，任务已保留，可稍后幂等重试。');
+      await _showMessageDialog('部分文件暂时无法删除，任务已保留，请稍后重试。');
     }
     _selectionController.clearSelection(haptic: false);
     await _load();
@@ -1022,8 +1022,8 @@ class _HomePageState extends State<HomePage> {
       actions: <GooAppBarIconAction>[
         GooAppBarIconAction(
           iconName: GooIcons.upload,
-          semanticLabel: _audioImportService.isAvailable ? '导入' : '导入能力尚未配置',
-          tooltip: _audioImportService.isAvailable ? '导入' : '当前平台尚未配置真实导入能力',
+          semanticLabel: _audioImportService.isAvailable ? '导入' : '当前设备暂不支持导入',
+          tooltip: _audioImportService.isAvailable ? '导入' : '当前设备暂不支持导入',
           onPressed: _audioImportService.isAvailable ? _importAudioMedia : null,
         ),
         GooAppBarIconAction(

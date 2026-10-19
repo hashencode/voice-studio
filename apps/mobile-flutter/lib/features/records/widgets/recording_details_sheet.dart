@@ -34,8 +34,6 @@ Future<void> showRecordingDetailsSheet({
               GooText(
                 '创建时间: ${DateTime.fromMillisecondsSinceEpoch(createdAtMs)}',
               ),
-              const SizedBox(height: 8),
-              GooText('路径: $path', selectable: true),
               if (latestJob != null) ...<Widget>[
                 const SizedBox(height: 12),
                 GooText(
@@ -43,16 +41,18 @@ Future<void> showRecordingDetailsSheet({
                   '${_stageLabel(latestJob)} · ${_modeLabel(latestJob)}',
                   variant: GooTextVariant.subtitle,
                 ),
-                const SizedBox(height: 6),
-                GooText(
-                  latestJob.resultText?.trim().isNotEmpty == true
-                      ? latestJob.resultText!
-                      : (latestJob.errorMessage?.trim().isNotEmpty == true
-                            ? latestJob.errorMessage!
-                            : latestJob.recordingPath),
-                  maxLines: 6,
-                  overflow: TextOverflow.ellipsis,
-                ),
+                if (latestJob.resultText?.trim().isNotEmpty == true ||
+                    latestJob.errorMessage?.trim().isNotEmpty ==
+                        true) ...<Widget>[
+                  const SizedBox(height: 6),
+                  GooText(
+                    latestJob.resultText?.trim().isNotEmpty == true
+                        ? latestJob.resultText!
+                        : latestJob.errorMessage!,
+                    maxLines: 6,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ],
               ],
               if (latestJob != null &&
                   latestJob.status != 'completed') ...<Widget>[

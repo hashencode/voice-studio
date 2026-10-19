@@ -279,9 +279,6 @@ describe("per-generation audio AI consent", () => {
       "云端音频草稿生成失败",
     );
     expect(screen.queryByText("DeepSeek 暂时不可用")).not.toBeInTheDocument();
-    expect(screen.getByRole("alert")).toHaveTextContent(
-      "不会自动切换提供商或重试",
-    );
     expect(desktop.generateAudioAi).toHaveBeenCalledTimes(1);
     expect(desktop.retryAudioAi).not.toHaveBeenCalled();
   });

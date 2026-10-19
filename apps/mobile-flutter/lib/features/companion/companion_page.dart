@@ -176,7 +176,7 @@ class _CompanionPageState extends State<CompanionPage> {
       context: context,
       builder: (_) => GooDialog.confirmation(
         title: '发送到已配对 Mac',
-        description: '原始录音会加密分块传输；桌面完整校验并签发 receipt 后，手机仍默认保留原件。',
+        description: '将原始录音加密发送到所选 Mac，完成后仍保留手机原件。',
         actions: <GooDialogAction>[
           const GooDialogAction(label: '取消'),
           for (var index = 0; index < available.length; index++)
@@ -230,11 +230,9 @@ class _CompanionPageState extends State<CompanionPage> {
     final action = await showGooDialog<String>(
       context: context,
       builder: (_) => GooDialog.custom(
-        title: '桌面接收凭证',
-        description:
-            '${receipt.desktopDeviceName}\n'
-            'SHA-256 ${receipt.wholeFileSha256}\n'
-            '${receipt.sizeBytes} bytes · desktop recording ${receipt.desktopRecordingId}',
+        title: '接收凭证',
+        customContentSizing: GooDialogContentSizing.adaptive,
+        customContentCenterChild: false,
         actions: const <GooDialogAction>[
           GooDialogAction(label: '继续保留', result: 'retain'),
           GooDialogAction(label: '稍后清理', result: 'defer'),
@@ -244,9 +242,40 @@ class _CompanionPageState extends State<CompanionPage> {
             tone: GooDialogActionTone.destructive,
           ),
         ],
-        child: const GooText(
-          '永久删除只在 receipt 已验证后可用，会删除手机上的音频原件和本地派生数据。',
-          variant: GooTextVariant.body,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: <Widget>[
+            GooText(
+              receipt.desktopDeviceName,
+              variant: GooTextVariant.subtitle,
+            ),
+            GooText(_formatFileSize(receipt.sizeBytes)),
+            GooText('接收时间：${_formatReceiptTime(receipt.committedAtMs)}'),
+            const SizedBox(height: 8),
+            const GooText(
+              '永久删除会删除手机上的音频原件和关联数据，须先确认 Mac 已接收。',
+              variant: GooTextVariant.body,
+            ),
+            const SizedBox(height: 8),
+            GooCollapsible(
+              title: '核验详情',
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: <Widget>[
+                  GooText(
+                    'SHA-256：${receipt.wholeFileSha256}',
+                    selectable: true,
+                  ),
+                  const SizedBox(height: 8),
+                  GooText(
+                    'Mac 录音编号：${receipt.desktopRecordingId}',
+                    selectable: true,
+                  ),
+                ],
+              ),
+            ),
+          ],
         ),
       ),
     );
@@ -256,8 +285,8 @@ class _CompanionPageState extends State<CompanionPage> {
       final confirmed = await showGooDialog<bool>(
         context: context,
         builder: (_) => GooDialog.confirmation(
-          title: '永久删除手机原件？',
-          description: '此操作不可撤销；桌面 receipt 和桌面音频不受影响。',
+          title: '永久删除手机原件确认',
+          description: '将永久删除手机原件及关联数据，删除后无法恢复。Mac 上的接收记录和音频不受影响。',
           actions: const <GooDialogAction>[
             GooDialogAction(label: '取消', result: false),
             GooDialogAction(
@@ -365,26 +394,18 @@ class _CompanionPageState extends State<CompanionPage> {
                             .toList(growable: false),
                 ),
                 const SizedBox(height: 20),
-                const GooText(
-                  '传输历史与 receipt',
-                  variant: GooTextVariant.subtitle,
-                ),
+                const GooText('传输历史', variant: GooTextVariant.subtitle),
                 const SizedBox(height: 8),
                 GooList(
                   style: GooListStyle.grouped,
                   children: _history.isEmpty
-                      ? const <Widget>[
-                          GooListItem(
-                            title: '暂无传输历史',
-                            subtitle: '完成后可在这里复核哈希、桌面 recording ID 和原件状态',
-                          ),
-                        ]
+                      ? const <Widget>[GooListItem(title: '暂无传输历史')]
                       : _history
                             .map(
                               (item) => GooListItem(
                                 title: item.displayName,
                                 subtitle:
-                                    '${item.state} · ${item.cleanupState}'
+                                    '${_historyStatus(item)}'
                                     '${item.receipt == null ? '' : ' · ${item.receipt!.desktopDeviceName}'}',
                                 showGuide: item.receipt != null,
                                 onTap: item.receipt == null
@@ -400,6 +421,40 @@ class _CompanionPageState extends State<CompanionPage> {
   }
 }
 
+String _historyStatus(MobileCompanionHistory history) {
+  final state = switch (history.state) {
+    'pending' => '等待发送',
+    'transferring' => '发送中',
+    'paused' => '已暂停',
+    'verifying' => '正在校验',
+    'committed' => 'Mac 已接收',
+    'failed' => '发送失败',
+    'canceled' => '已取消',
+    _ => '状态暂不可用',
+  };
+  final cleanup = switch (history.cleanupState) {
+    'retained' => '手机原件保留',
+    'deferred' => '稍后清理',
+    'deleted' => '手机原件已删除',
+    'not_applicable' => null,
+    _ => '原件状态暂不可用',
+  };
+  return <String>[state, if (cleanup != null) cleanup].join(' · ');
+}
+
+String _formatFileSize(int bytes) {
+  if (bytes < 1024) return '$bytes B';
+  if (bytes < 1024 * 1024) return '${(bytes / 1024).toStringAsFixed(1)} KB';
+  return '${(bytes / (1024 * 1024)).toStringAsFixed(1)} MB';
+}
+
+String _formatReceiptTime(int milliseconds) {
+  final time = DateTime.fromMillisecondsSinceEpoch(milliseconds);
+  String twoDigits(int value) => value.toString().padLeft(2, '0');
+  return '${time.year}-${twoDigits(time.month)}-${twoDigits(time.day)} '
+      '${twoDigits(time.hour)}:${twoDigits(time.minute)}';
+}
+
 String _message(String code) => switch (code) {
   'PAIRING_EXPIRED' => '配对邀请已过期，请在 Mac 上重新生成',
   'PAIRING_CODE_MISMATCH' => '六位短码不一致，未建立配对',
@@ -407,6 +462,6 @@ String _message(String code) => switch (code) {
   'PAIRING_REPAIR_REQUIRED' => '配对凭据不可用，请解除后重新配对',
   'INSUFFICIENT_DISK_SPACE' => 'Mac 空间不足，未提交音频，手机原件仍保留',
   'TRANSFER_CANCELED' => '传输已取消，手机原件仍保留',
-  'CONNECTION_CLOSED' => '网络中断；下次只会续传缺失分块',
-  _ => '传输未完成（$code），手机原件仍保留',
+  'CONNECTION_CLOSED' => '网络中断，请重新发送，手机原件仍保留。',
+  _ => '操作未完成，手机原件仍保留，请重试。',
 };

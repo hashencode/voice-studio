@@ -178,9 +178,6 @@ export function AudioAiFeature({
       {error ? (
         <div role="alert" className="mt-4 rounded-lg border px-3 py-2 text-sm">
           <p>{error}</p>
-          <p className="mt-1 text-muted-foreground">
-            当前提供商保持不变；不会自动切换提供商或重试。
-          </p>
         </div>
       ) : null}
 

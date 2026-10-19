@@ -65,9 +65,9 @@ class _HelpPageState extends State<HelpPage> {
       body:
           '音频数据库、录音和派生文件保存在应用私有存储，并从 Android 云备份和设备迁移中排除。'
           '这表示“由设备安全设置保护”，不代表应用实现了独立内容加密。\n\n'
-          '普通删除会先进入最近删除；永久删除会清理数据库图和受管文件。'
+          '普通删除会先进入最近删除；永久删除会删除音频及关联数据。'
           '自动清理默认关闭，只处理达到所选期限的最近删除记录。\n\n'
-          '导出和诊断通过系统分享以临时只读 URI 发送。应用不会创建公开链接或静默上传音频数据。',
+          '导出和诊断通过系统分享发送临时只读文件。应用不会创建公开链接或静默上传音频数据。',
     ),
   ];
 
@@ -75,18 +75,17 @@ class _HelpPageState extends State<HelpPage> {
     final descriptor = TranscriptionModelDescriptor.defaultModel();
     final ready = <String>[
       if (descriptor.offlineReady) '离线识别',
-      if (descriptor.vadReady) 'VAD 切片',
       if (descriptor.punctuationReady) '离线标点',
     ];
     final gated = <String>[
-      if (!descriptor.itn.verified) 'ITN 数字规范化',
-      if (!descriptor.confidence.verified) '自动低置信度',
+      if (!descriptor.itn.verified) '数字格式规范化',
+      if (!descriptor.confidence.verified) '自动标记低准确度内容',
       if (!descriptor.hotwords.verified) '热词',
       if (!descriptor.enhancement.verified) '语音增强',
     ];
-    return '${descriptor.name}：${descriptor.description}\n\n'
+    return '${descriptor.name}\n\n'
         '已开放：${ready.join('、')}。\n\n'
-        '未开放：${gated.join('、')}。这些入口会保持隐藏，直到真实模型能力、许可和基准门禁同时通过。';
+        '未开放：${gated.join('、')}。';
   }
 
   Future<void> _showTopic(_HelpTopic topic) {

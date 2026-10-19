@@ -26,6 +26,27 @@ class _RecordingRecoveryPanelState extends State<RecordingRecoveryPanel> {
       List<RecordingRecoveryCandidate>.of(widget.candidates);
   final Set<String> _busySessionIds = <String>{};
 
+  Future<void> _confirmDiscard(RecordingRecoveryCandidate candidate) async {
+    final confirmed = await showGooDialog<bool>(
+      context: context,
+      builder: (_) => GooDialog.confirmation(
+        title: '删除临时录音确认',
+        description: '删除后无法恢复这段录音。',
+        actions: const <GooDialogAction>[
+          GooDialogAction(label: '取消', result: false),
+          GooDialogAction(
+            label: '删除',
+            result: true,
+            tone: GooDialogActionTone.destructive,
+          ),
+        ],
+      ),
+    );
+    if (confirmed == true && mounted) {
+      await _resolve(candidate, recover: false);
+    }
+  }
+
   Future<void> _resolve(
     RecordingRecoveryCandidate candidate, {
     required bool recover,
@@ -57,7 +78,7 @@ class _RecordingRecoveryPanelState extends State<RecordingRecoveryPanel> {
       return const GooResult.preset(
         preset: GooResultPreset.noContent,
         title: '没有待处理录音',
-        description: '所有临时录音都已恢复或清理。',
+        description: '所有临时录音都已恢复或删除。',
       );
     }
 
@@ -65,7 +86,7 @@ class _RecordingRecoveryPanelState extends State<RecordingRecoveryPanel> {
       padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
       children: <Widget>[
         const GooText(
-          '检测到上次异常退出留下的录音。可恢复的文件会保存为正式音频；无效文件只能安全清理。',
+          '检测到上次异常退出留下的录音。恢复后可保存为正式音频；无效文件无法恢复。',
           variant: GooTextVariant.body,
           tone: GooTextTone.secondary,
         ),
@@ -97,8 +118,8 @@ class _RecordingRecoveryPanelState extends State<RecordingRecoveryPanel> {
             ),
           GooButton.text(
             disabled: busy,
-            onPressed: () => _resolve(candidate, recover: false),
-            child: const GooText('清理'),
+            onPressed: () => _confirmDiscard(candidate),
+            child: const GooText('删除'),
           ),
         ],
       ),

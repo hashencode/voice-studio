@@ -54,6 +54,36 @@ afterEach(() => {
 });
 
 describe("Companion route composition", () => {
+  it("keeps connection diagnostics collapsed until requested and allows closing them", async () => {
+    installApi(baseSnapshot);
+    const user = userEvent.setup();
+    render(<App />);
+
+    const receiver = await screen.findByRole("status", {
+      name: "手机接收器已就绪",
+    });
+    expect(within(receiver).getByText("Voice2Text Mac")).toBeVisible();
+    expect(within(receiver).queryByText("42424")).toBeNull();
+    expect(
+      within(receiver).queryByText(baseSnapshot.identity!.fingerprint),
+    ).toBeNull();
+
+    const details = within(receiver).getByRole("button", { name: "连接详情" });
+    expect(details).toHaveAttribute("aria-expanded", "false");
+    await user.click(details);
+    expect(details).toHaveAttribute("aria-expanded", "true");
+    expect(within(receiver).getByText("42424")).toBeVisible();
+    expect(
+      within(receiver).getByText(baseSnapshot.identity!.fingerprint),
+    ).toBeVisible();
+
+    await user.click(details);
+    expect(details).toHaveAttribute("aria-expanded", "false");
+    expect(
+      within(receiver).queryByText(baseSnapshot.identity!.fingerprint),
+    ).toBeNull();
+  });
+
   it("announces an initial receiver load failure only once", async () => {
     installApi(baseSnapshot, {
       getCompanionSnapshot: vi.fn(async () => {

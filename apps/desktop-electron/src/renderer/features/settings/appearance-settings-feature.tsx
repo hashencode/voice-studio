@@ -1,11 +1,6 @@
 import * as React from "react";
 
-import {
-  Field,
-  FieldContent,
-  FieldDescription,
-  FieldLabel,
-} from "@/components/ui/field";
+import { Field, FieldContent, FieldLabel } from "@/components/ui/field";
 import {
   Select,
   SelectItem,
@@ -43,7 +38,6 @@ export function AppearanceSettingsFeature() {
         <Field orientation="horizontal" className="items-center! p-4">
           <FieldContent>
             <FieldLabel id="color-mode-label">色彩模式</FieldLabel>
-            <FieldDescription>选择应用界面的明暗外观</FieldDescription>
           </FieldContent>
           <Select
             value={mode}

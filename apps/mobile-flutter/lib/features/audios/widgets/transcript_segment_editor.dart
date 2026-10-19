@@ -111,7 +111,6 @@ class _TranscriptEditorBodyState extends State<_TranscriptEditorBody> {
           children: <Widget>[
             GooListItem(
               title: '保存并标为已复核',
-              subtitle: '正文保存成功后同步确认此片段',
               trailing: ValueListenableBuilder<bool>(
                 valueListenable: widget.markReviewed,
                 builder: (context, value, _) {

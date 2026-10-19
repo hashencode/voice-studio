@@ -215,9 +215,6 @@ export function ActivityMainWorkspace({
       <section className="space-y-3">
         <div className="space-y-1">
           <h2 className="text-base font-semibold">错误原因</h2>
-          <p className="text-sm text-muted-foreground">
-            错误发生的环节和可用于定位的原因。
-          </p>
         </div>
         <Card>
           <CardContent>

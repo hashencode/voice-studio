@@ -313,9 +313,7 @@ class _SettingsPageState extends State<SettingsPage> {
             GooInput(
               controller: _audioApiSecretController,
               label: 'API 密钥',
-              helperText: _audioAiSecretConfigured
-                  ? '已安全保存；留空将保持现有密钥'
-                  : '由 Android Keystore 保护，不写入音频数据库',
+              helperText: _audioAiSecretConfigured ? '已安全保存；留空将保持现有密钥' : null,
               placeholder: _audioAiSecretConfigured
                   ? '输入新密钥以替换'
                   : '输入自己的 DeepSeek 密钥',
@@ -342,7 +340,6 @@ class _SettingsPageState extends State<SettingsPage> {
             children: <Widget>[
               GooListItem(
                 title: '停止录音后自动转写',
-                subtitle: '关闭后只保存录音，不自动进入转写流程',
                 trailing: GooSwitch(
                   value: _autoTranscribe,
                   onChanged: (bool value) {
@@ -366,7 +363,6 @@ class _SettingsPageState extends State<SettingsPage> {
               ),
               GooListItem(
                 title: '深色模式',
-                subtitle: '切换全局界面的明暗主题',
                 trailing: GooSwitch(
                   value: _isDarkMode,
                   onChanged: (bool value) {
@@ -389,7 +385,6 @@ class _SettingsPageState extends State<SettingsPage> {
               ),
               GooListItem(
                 title: '发送音频到 Mac',
-                subtitle: '用户确认配对、加密分块续传；receipt 前绝不删除手机原件',
                 leadingIconName: GooIcons.computer,
                 showGuide: true,
                 onTap: () => Navigator.of(context).pushNamed('/companion'),
@@ -425,7 +420,7 @@ class _SettingsPageState extends State<SettingsPage> {
 
     return GooListItem(
       title: descriptor.name,
-      subtitle: '${descriptor.description}\n$capabilities',
+      subtitle: capabilities,
       disabled: !descriptor.selectable,
       selected: selected,
       trailing: selected
