@@ -1,5 +1,7 @@
 # Project Agent Instructions
 
+- 文档总入口见 [docs/README.md](docs/README.md)，任务分类见 [AI 开发导航](docs/ai/README.md)；原规则、必读顺序和授权边界继续生效。
+
 ## Rule discovery before repository changes
 
 - The root rules in this file always apply. Before changing repository files,

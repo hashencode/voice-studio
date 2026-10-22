@@ -1,5 +1,7 @@
 # Voice2Text Electron desktop
 
+本端文档入口见 [docs/README.md](docs/README.md)，按架构、开发和验证分别阅读；根规则与原验收边界继续生效。
+
 This is the independent Electron desktop composition root. It uses Bun,
 Electron Forge, Vite, React/TypeScript, Tailwind, and the pinned shadcn
 `sidebar-09` composition. Flutter Desktop remains frozen reference source only;

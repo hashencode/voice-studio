@@ -185,3 +185,15 @@ Android debug APK 构建。该流程占用 6.30 GiB，按 25%（至少 0.5 GiB�
 ## ASR 模型 benchmark
 
 benchmark 工具集中放在 `benchmark/` 下；固定音频 fixture 放在 `benchmark/audio/` 并提交，模型和运行缓存放在 `build/asr_benchmark/`，不提交到 Git。当前标准只评估标准 VAD 单路线；根目录示例命令是 smoke，focused/coarse/full 参数矩阵使用方式见 `benchmark/README.md`。
+
+## 文档入口
+
+- [项目文档总导航](docs/README.md)：开发规则、接口或协议、验证要求及项目专题。
+- [AI 开发文档导航](docs/ai/README.md)：按任务读取适用规则；既有约束和历史验收继续按原范围生效。
+
+## 应用专属文档
+
+- [PC 端文档](apps/desktop-electron/docs/README.md)：本端架构、开发流程及验证入口。
+- [App 端文档](apps/mobile-flutter/docs/README.md)：本端架构、开发流程及验证入口。
+
+共同约束、跨端协议和历史资料继续见 [仓库文档导航](docs/README.md)，共享功能包不逐个复制一套 docs。
