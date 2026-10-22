@@ -148,7 +148,7 @@ Tests stop at the nearest application-owned boundary.
 - `apps/desktop-electron/src/renderer/components/ui/dialog.tsx`, `alert-dialog.tsx`, and `modal-coordinator.tsx` establish current modal ownership.
 - `apps/desktop-electron/src/renderer/features/settings/ai-settings-feature.tsx` contains the only feature-level manual radio protocol.
 - `apps/desktop-electron/src/renderer/features/audios/audio-route-feature.tsx` and `features/captions/caption-workspace.tsx` contain the largest hidden announcement protocols.
-- `docs/solutions/architecture-patterns/desktop-first-workstation-boundaries.md` keeps Electron composition inside `apps/desktop-electron`; it provides no evidence that historical accessibility protocols remain required.
+- `docs/desktop-first-workstation-boundaries.md` keeps Electron composition inside `apps/desktop-electron`; it provides no evidence that historical accessibility protocols remain required.
 
 ---
 

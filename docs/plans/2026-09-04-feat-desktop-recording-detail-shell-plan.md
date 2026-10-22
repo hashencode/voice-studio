@@ -180,7 +180,7 @@ execution: code
 - `apps/desktop-electron/src/main/index.ts`: 当前进程内 `activeCaptureTitle`、500ms 快照轮询、正式转写交接和 bootstrap 默认标题。
 - `apps/desktop-electron/src/main/storage/repositories/capture_repository.ts`: 已持久化的会话标题、创建时间、快照与命令回执事务边界。
 - `packages/desktop_macos_native/Sources/CaptureCore/MicrophoneCapture.swift`, `CoreAudioProcessTapCapture.swift`, `CaptureController.swift`: 已有麦克风电平累计、系统音频 peak 和原生捕获状态权威。
-- `docs/solutions/architecture-patterns/desktop-first-workstation-boundaries.md`: 桌面特有能力留在 Electron/native composition root，并按目标平台提供证据。
+- `docs/desktop-first-workstation-boundaries.md`: 桌面特有能力留在 Electron/native composition root，并按目标平台提供证据。
 - `docs/plans/2026-08-28-1606-refactor-electron-accessibility-cleanup-plan.md`: 保留 Radix AlertDialog、可见 pending/error 与局部确定性焦点，不复制 live announcement 协议。
 
 ---

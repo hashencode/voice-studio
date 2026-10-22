@@ -193,7 +193,7 @@ The measurements below come from the public ReUI App Shell 4 render at a 1280×7
 - `docs/plans/2026-08-19-1154-refactor-electron-sidebar-09-visual-fidelity-plan.md`: established shell geometry, flat-row, surface, visual-environment, and business-preservation constraints.
 - `docs/plans/2026-08-25-1021-fix-desktop-input-workspaces-plan.md`: derived third-pane presentation, message selection/search, companion selection, and modal navigation authority.
 - `docs/plans/2026-09-02-1008-fix-audio-first-use-fidelity-plan.md`: current first-use fidelity work that this plan must preserve rather than re-scope.
-- `docs/solutions/architecture-patterns/desktop-first-workstation-boundaries.md`: Electron remains the platform composition root and does not move domain boundaries during a Renderer-only refactor.
+- `docs/desktop-first-workstation-boundaries.md`: Electron remains the platform composition root and does not move domain boundaries during a Renderer-only refactor.
 
 ---
 

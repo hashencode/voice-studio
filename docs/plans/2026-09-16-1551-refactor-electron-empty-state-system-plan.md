@@ -79,7 +79,7 @@ The renderer currently calls two shared components but still presents several vi
 - `apps/desktop-electron/src/renderer/features/audios/audio-route-feature.tsx` — authoritative first-audio composition and its business-owned recording/import states.
 - `apps/desktop-electron/src/renderer/features/activity/activity-center.tsx`, `apps/desktop-electron/src/renderer/features/audios/audio-workspace-feature.tsx`, `apps/desktop-electron/src/renderer/features/companion/companion-feature.tsx`, and `apps/desktop-electron/src/renderer/features/settings/ai-settings-feature.tsx` — active consumers and hand-built placeholders.
 - `docs/plans/2026-09-02-1008-fix-audio-first-use-fidelity-plan.md` — prior decision to keep first use route-local; its deferred empty-state unification boundary is superseded by this plan.
-- `docs/solutions/architecture-patterns/desktop-first-workstation-boundaries.md` — keeps the refactor within the Electron composition root. No other relevant institutional learning or Compound Pack was found.
+- `docs/desktop-first-workstation-boundaries.md` — keeps the refactor within the Electron composition root. No other relevant institutional learning or Compound Pack was found.
 
 ### Empty-State Migration Inventory
 

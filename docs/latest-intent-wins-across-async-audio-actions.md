@@ -87,4 +87,4 @@ This change was verified with the repository's nonvisual Electron code gate. Vis
 
 ## Related Issues
 
-- [Desktop-first meeting workstation boundaries](../architecture-patterns/desktop-first-workstation-boundaries.md) provides adjacent context on desktop ownership and lifecycle boundaries.
+- [Desktop-first meeting workstation boundaries](desktop-first-workstation-boundaries.md) provides adjacent context on desktop ownership and lifecycle boundaries.

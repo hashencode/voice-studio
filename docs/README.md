@@ -13,6 +13,16 @@
 | 验证要求 | [standards/verification.md](standards/verification.md) |
 | 启动与项目说明 | [../README.md](../README.md) |
 
+## 专题经验
+
+专题 Markdown 直接保存在 `docs/` 根目录，按主题查阅；原日期、来源和验收范围继续保留。
+
+- [平台组合、状态归属与证据边界](desktop-first-workstation-boundaries.md)
+- [异步操作中的最新意图与目标归属](latest-intent-wins-across-async-audio-actions.md)
+- [空态组件与 Shell 布局的独立边界](separate-empty-state-component-scope-from-shell-chrome.md)
+
+历史来源和旧快照中的路径按同名专题定位。2026-10-22 存量整理已结项，见 [逐项结果](plans/2026-10-22-memory-cleanup-proposals.md)；保留的经验、设计来源和验收记录不再列为后续待清理。新候选继续按 AI 开发规范确认。
+
 ## 文档目录
 
 - [ai/](ai/README.md)：按任务选择开发规则，不保存第二份业务接口或验收结论。
@@ -22,7 +32,6 @@
 - [contracts/](contracts/)：既有协议 schema 或资源契约。
 - [product/](product/)：产品范围、状态与原验收证据。
 - [plans/](plans/)：保留原日期和范围的实施计划。
-- [solutions/](solutions/)：已解决问题与适用范围。
 - [brainstorms/](brainstorms/)：需求与方案探索。
 - [ideation/](ideation/)：产品探索资料。
 - [model-distribution/](model-distribution/)：模型分发及资源资料。

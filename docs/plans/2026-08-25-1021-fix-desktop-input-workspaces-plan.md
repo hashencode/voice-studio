@@ -292,7 +292,7 @@ flowchart TB
 - `apps/desktop-electron/src/renderer/features/shell/context-pane-shell.tsx`：尊重 `event.defaultPrevented` 的 window Escape handler。
 - `apps/desktop-electron/src/main/application/application_state.ts`：现有 read-through `acknowledgeActivity` 语义。
 - `apps/desktop-electron/src/renderer/features/companion/companion-feature.tsx`：现有单设备自动选择、ReceiverStatus、PairingPanel 和 TransfersPanel。
-- `docs/solutions/architecture-patterns/desktop-first-workstation-boundaries.md`：平台应用保持 composition root，macOS 行为留在桌面边界。
+- `docs/desktop-first-workstation-boundaries.md`：平台应用保持 composition root，macOS 行为留在桌面边界。
 - [Apple AVAudioPCMBuffer `floatChannelData`](https://developer.apple.com/documentation/avfaudio/avaudiopcmbuffer/floatchanneldata)：interleaved pointer 和 stride 约束。
 - [Apple AVAudioPCMBuffer `stride`](https://developer.apple.com/documentation/avfaudio/avaudiopcmbuffer/stride)：PCM interleaved channel spacing。
 - [Apple AVAudioEngine `installTap`](https://developer.apple.com/documentation/avfaudio/avaudionode/installtap%28onbus%3Abuffersize%3Aformat%3Ablock%3A%29)：tap buffer size 与 callback execution 约束。

@@ -293,8 +293,8 @@ stateDiagram-v2
 - `apps/desktop-electron/src/main/application/bootstrap_transaction.ts` 和 `apps/desktop-electron/src/main/index.ts` 已提供失败清理、single-flight bootstrap 与权威 snapshot 发布边界；本计划复用这些边界，不抽取通用重置事务或运行期关闭框架。
 - `apps/desktop-electron/src/renderer/features/shell/use-application-shell.ts` 已提供重复请求折叠、revision latch 和 blocker 保留逻辑。
 - `apps/desktop-electron/src/renderer/components/application-blocker.tsx`、`apps/desktop-electron/src/renderer/components/ui/alert-dialog.tsx` 和现有删除确认提供模态与破坏性操作模式。
-- `docs/solutions/architecture-patterns/desktop-first-workstation-boundaries.md` 要求 Electron 自己拥有桌面数据生命周期，并明确 cleanup 不跟随 symlink。
-- `docs/solutions/logic-errors/latest-intent-wins-across-async-audio-actions.md` 要求异步破坏性完成重新核对当前所有权；本计划把该原则应用到 blocker revision 与 action single-flight。
+- `docs/desktop-first-workstation-boundaries.md` 要求 Electron 自己拥有桌面数据生命周期，并明确 cleanup 不跟随 symlink。
+- `docs/latest-intent-wins-across-async-audio-actions.md` 要求异步破坏性完成重新核对当前所有权；本计划把该原则应用到 blocker revision 与 action single-flight。
 
 ### Product Contract Preservation
 

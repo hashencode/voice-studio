@@ -22,5 +22,5 @@ This page records current authority for each rule area; it does not add routes.
 | UI device watcher | `build-resources.md` |
 
 When a current rule changes, update its authority document and any affected
-route tests together. Keep architecture and `docs/solutions/` as supporting
+route tests together. Keep architecture and [documented cases](../README.md#专题经验) as supporting
 context, not as a competing source of current instructions.

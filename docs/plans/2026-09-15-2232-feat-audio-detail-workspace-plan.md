@@ -192,7 +192,7 @@ stateDiagram-v2
 - `apps/desktop-electron/src/renderer/components/app-sidebar.tsx`、`apps/desktop-electron/src/renderer/components/nav-main.tsx`、`apps/desktop-electron/src/renderer/features/shell/section-router-registry.tsx` 及其录制聚焦测试不属于本计划。
 - `Voice2TextDesktopApi.updateAudioMetadata` 是正式产品契约，不通过 optional 方法或 optional service 调用减轻测试 fixture 更新成本。
 - AI 建议标题可长于音频标题上限。超限建议不可直接采用，应提示用户先精简，不静默截断。
-- 不新增 renderer 私有存储抽象，不让 `audio_notes` 承担页面元数据语义。此边界符合 `docs/solutions/architecture-patterns/desktop-first-workstation-boundaries.md` 的 composition 与持久化所有权原则。
+- 不新增 renderer 私有存储抽象，不让 `audio_notes` 承担页面元数据语义。此边界符合 `docs/desktop-first-workstation-boundaries.md` 的 composition 与持久化所有权原则。
 - 迁移必须兼容可能已运行过当前草稿的 v4 数据库。有效且归属一致的 `workspace-title-origin:*` 和 `workspace-description:*` reserved note 优先回填正式元数据；没有 reserved note 时才使用当前标题和空描述。迁移后停止读取和写入这些实验键，但保留 legacy note 行，避免在没有可信来源标记时误删普通 note。
 - 历史标题按 v4 已接受的原始 TEXT 无损保存；256 字符限制只约束新的用户更新请求，迁移不得截断或规范化现有值。
 - v5 是前向 schema 升级。单一事务、提交前校验和失败回滚保护迁移过程；旧应用仍会按现有规则拒绝 v5 数据库，本计划不额外建设降级或备份恢复系统，也不把手工降低 `user_version` 当作恢复方案。
@@ -228,7 +228,7 @@ stateDiagram-v2
 - `apps/desktop-electron/src/main/storage/audio_database.ts` 和 `apps/desktop-electron/src/main/storage/audio_schema.ts` — schema 版本拒绝、结构校验和 fresh schema 入口。
 - `apps/desktop-electron/src/main/storage/repositories/audio_workspace_repository.ts` — workspace revision、当前标题、转写编辑和草稿元数据 shortcut。
 - `docs/plans/2026-09-03-0906-refactor-electron-reui-source-fidelity-plan.md` — 共享 Shell 已完成的视觉权威边界；该计划明确将音频详情内部重组留给后续工作。
-- `docs/solutions/architecture-patterns/desktop-first-workstation-boundaries.md` — Electron composition root 与持久化所有权的历史约束。
+- `docs/desktop-first-workstation-boundaries.md` — Electron composition root 与持久化所有权的历史约束。
 
 ---
 

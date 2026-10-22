@@ -44,7 +44,7 @@ The model choice has converged to Paraformer for both Chinese and English. The r
 
 ### Institutional Learnings
 
-- No relevant `docs/solutions/` learning was found in this workspace during planning.
+- No relevant repository learning was found in this workspace during planning; current topic documents are indexed by [docs/README.md](../README.md#专题经验).
 
 ### External References
 

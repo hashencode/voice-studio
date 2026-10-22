@@ -51,7 +51,7 @@ product requirement take precedence over historical plans and screenshots.
 - Preserve those surrounding behaviors during component migrations unless an
   explicit current requirement changes them, and protect intentional behavior
   at both the feature-component and Shell boundaries. See
-  `docs/solutions/logic-errors/separate-empty-state-component-scope-from-shell-chrome.md`.
+  `docs/separate-empty-state-component-scope-from-shell-chrome.md`.
 
 ## Electron accessibility guidance
 

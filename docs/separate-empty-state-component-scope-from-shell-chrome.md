@@ -123,4 +123,4 @@ During review, every changed Header, padding, side-pane, copy, focus, or navigat
 
 ## Related Issues
 
-- [Desktop-first workstation boundaries](../architecture-patterns/desktop-first-workstation-boundaries.md) provides the broader Electron composition-boundary context.
+- [Desktop-first workstation boundaries](desktop-first-workstation-boundaries.md) provides the broader Electron composition-boundary context.

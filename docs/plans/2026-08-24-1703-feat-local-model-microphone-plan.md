@@ -214,7 +214,7 @@ Chromium 不保证把该值识别为 Web Media 设备 ID，因此测试可能在
 - `packages/desktop_macos_native/Sources/CaptureCore/CaptureController.swift`
 - `packages/desktop_sherpa_worker/assets/processing/frozen_sherpa_macos_arm64.json`
 - `packages/desktop_sherpa_worker/assets/processing/frozen_sensevoice_macos_arm64.json`
-- `docs/solutions/architecture-patterns/desktop-first-workstation-boundaries.md`
+- `docs/desktop-first-workstation-boundaries.md`
 
 **External primary sources**
 

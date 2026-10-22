@@ -98,7 +98,7 @@ execution: code
 - [shadcn Empty](https://ui.shadcn.com/docs/components/radix/empty)：Empty 的 media、title、description、content 组合模型。
 - [shadcn Card](https://ui.shadcn.com/docs/components/radix/card)：Card 组合与 spacing ownership。
 - `docs/plans/2026-09-01-1659-feat-audio-workspace-first-use-plan.md`：保留 true-empty、Pane、导入和麦克风行为；其“居中单栏、不展示预览”视觉决定被本计划替代。
-- `docs/solutions/architecture-patterns/desktop-first-workstation-boundaries.md`：Electron 保持平台组合根，业务与共享边界不随局部 UI 改动移动。
+- `docs/desktop-first-workstation-boundaries.md`：Electron 保持平台组合根，业务与共享边界不随局部 UI 改动移动。
 - `apps/desktop-electron/src/renderer/components/ui/card.tsx`、`apps/desktop-electron/src/renderer/components/ui/button.tsx`：本地 Nova-aligned 表面、按钮变体和薄焦点权威。
 
 ---

@@ -50,7 +50,9 @@
     { "path": "docs/product/desktop-workstation-u9-evidence.json", "reason": "frozen completed-unit evidence" },
     { "path": "docs/architecture/companion-media-transfer-v1.md", "reason": "frozen v1 architecture referenced by historical evidence" },
     { "path": "docs/contracts/companion-media-transfer-v1.schema.json", "reason": "frozen v1 schema referenced by historical evidence" },
-    { "path": "docs/solutions", "reason": "historical institutional learnings" },
+    { "path": "docs/desktop-first-workstation-boundaries.md", "reason": "historical institutional learnings" },
+    { "path": "docs/latest-intent-wins-across-async-audio-actions.md", "reason": "historical institutional learnings" },
+    { "path": "docs/separate-empty-state-component-scope-from-shell-chrome.md", "reason": "historical institutional learnings" },
     { "path": "docs/REAL_DESKTOP_REGRESSION_MATRIX.md", "reason": "historical physical-device evidence" },
     { "path": "docs/REAL_DEVICE_REGRESSION_MATRIX.md", "reason": "historical physical-device evidence" },
     { "path": "apps/desktop-electron/tests/fixtures/flutter-reference", "reason": "frozen retired Flutter Desktop evidence" }

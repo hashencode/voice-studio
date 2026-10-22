@@ -214,7 +214,7 @@ stateDiagram-v2
 - `apps/desktop-electron/src/main/features/importing/macos_native_helper_client.ts:314` shows graceful close waiting for the command queue; line 441 contains the direct protocol close primitive.
 - `packages/desktop_macos_native/Sources/CaptureCore/CaptureController.swift:655` shows stop finalization and the unconditional recording hash assignment.
 - `apps/desktop-electron/src/main/storage/repositories/capture_repository.ts:336` shows recovery selection excluding rows with a recording hash.
-- `docs/solutions/architecture-patterns/desktop-first-workstation-boundaries.md` establishes Electron Main as the composition root and requires separation between committed and recoverable data.
+- `docs/desktop-first-workstation-boundaries.md` establishes Electron Main as the composition root and requires separation between committed and recoverable data.
 - `docs/plans/2026-09-04-feat-desktop-recording-detail-shell-plan.md` preserves the existing controlled stop confirmation and actionable failure placement.
 
 ---

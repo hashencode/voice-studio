@@ -15,7 +15,7 @@ execution: code
 
 - **Objective:** Replace the reference-only Flutter Desktop codebase with an Electron client in the existing monorepo while preserving worker lifecycle guarantees, macOS native behavior, and the proven workstation behavior that still applies.
 - **Product authority:** `docs/plans/2026-07-26-002-feat-desktop-first-meeting-workstation-plan.md`, `docs/product/desktop-workstation-status.md`, and the current Flutter Desktop behavior define functional truth until the Electron parity gate passes.
-- **Architecture authority:** `docs/architecture/desktop-client-transition.md`, `docs/architecture/desktop-runtime-boundaries.md`, and `docs/solutions/architecture-patterns/desktop-first-workstation-boundaries.md` define composition-root, worker, security, and target-evidence boundaries.
+- **Architecture authority:** `docs/architecture/desktop-client-transition.md`, `docs/architecture/desktop-runtime-boundaries.md`, and `docs/desktop-first-workstation-boundaries.md` define composition-root, worker, security, and target-evidence boundaries.
 - **Execution profile:** Deliver vertical slices behind explicit macOS development gates. Keep `apps/desktop` available as reference source and test evidence until its deletion is approved; it is not a runtime fallback and is not launched during migration.
 - **Stop conditions:** Stop and return for a new decision if Bun cannot produce a reproducible Forge package, the TypeScript domain/storage rewrite cannot preserve required workstation semantics, or a required native capability cannot be reproduced without weakening security or data integrity.
 - **Tail ownership:** Electron parity and Flutter deletion are separate reviewed changes. Root workspace normalization follows deletion and does not run concurrently with product migration.
@@ -356,7 +356,7 @@ docs/product/
 - Existing workstation contract: `docs/plans/2026-07-26-002-feat-desktop-first-meeting-workstation-plan.md`
 - Transition decision: `docs/architecture/desktop-client-transition.md`
 - Runtime boundary: `docs/architecture/desktop-runtime-boundaries.md`
-- Institutional pattern: `docs/solutions/architecture-patterns/desktop-first-workstation-boundaries.md`
+- Institutional pattern: `docs/desktop-first-workstation-boundaries.md`
 - Flutter composition and behavior: `apps/desktop/lib/app/desktop_bootstrap.dart`, `apps/desktop/lib/app/desktop_home_controller.dart`, `apps/desktop/lib/app/desktop_app.dart`
 - Storage authority: `packages/meeting_storage/lib/src/app_database.dart`, `packages/meeting_storage/lib/src/desktop_database_factory.dart`
 - Processing supervision: `apps/desktop/lib/features/processing/native_sherpa_worker_engine.dart`, `apps/desktop/lib/features/processing/desktop_processing_repository.dart`
@@ -609,7 +609,7 @@ docs/product/
 - **Files:** `apps/desktop-electron/src/main/platform/windows/`, `apps/desktop-electron/native/windows/`, `apps/desktop-electron/tests/packaged/windows_*_test.ts`, `docs/product/desktop-electron-windows-evidence.json`, `tool/validate_electron_desktop_scope.py`.
 - **Approach:** Reuse Renderer, TypeScript domain/storage services, worker protocols, and frozen logical configuration. Implement Windows-specific capture, secure import, secret storage, tray, process-tree cleanup, resource layout, signing placeholder, and Forge maker configuration. Rebuild and retest every target-specific artifact and product flow on a Windows machine.
 - **Execution note:** This unit does not run on the current macOS-only first milestone; it starts only when U12 records macOS closure.
-- **Patterns to follow:** Target-specific evidence rules in `docs/plans/2026-07-26-002-feat-desktop-first-meeting-workstation-plan.md` and `docs/solutions/architecture-patterns/desktop-first-workstation-boundaries.md`.
+- **Patterns to follow:** Target-specific evidence rules in `docs/plans/2026-07-26-002-feat-desktop-first-meeting-workstation-plan.md` and `docs/desktop-first-workstation-boundaries.md`.
 - **Test scenarios:**
   - Clean Bun install, development startup, package/make, static assets, and packaged worker/helper launch pass on the declared Windows target.
   - Windows process cancellation removes the complete process tree and rejects late output.

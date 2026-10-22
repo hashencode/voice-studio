@@ -2,6 +2,8 @@
 
 - 核心开发规范统一维护在 [docs/ai/development-rules.md](docs/ai/development-rules.md)；先按本文件的授权边界和原任务顺序读取，旧规则名不再作为独立正文。
 
+- 经验与记忆按 [统一维护规则](docs/ai/development-rules.md#经验与记忆维护) 按需复核；存量条目的迁移、合并和删除须确认具体批次。
+
 - 文档总入口见 [docs/README.md](docs/README.md)，任务分类见 [AI 开发导航](docs/ai/README.md)；原规则、必读顺序和授权边界继续生效。
 
 ## Rule discovery before repository changes
@@ -40,7 +42,7 @@
 
 ## Project knowledge
 
-- `docs/solutions/` contains documented solutions to past bugs, architecture decisions, best practices, and workflow issues. Entries are organized by category and may use YAML frontmatter such as `module`, `tags`, and `problem_type`; they are relevant when implementing or debugging in a documented area.
+- Past solutions are independent topic Markdown files directly under `docs/`. Start from [the topic index](docs/README.md#专题经验) and read the related cases when implementing or debugging; preserve their `module`, `tags`, `problem_type`, source and verification context.
 - `CONCEPTS.md` defines shared domain vocabulary for entities, named processes, and status concepts; it is relevant when orienting to the codebase or discussing domain behavior.
 
 ## Visual validation permission

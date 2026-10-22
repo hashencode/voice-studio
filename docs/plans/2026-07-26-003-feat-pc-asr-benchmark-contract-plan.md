@@ -146,7 +146,7 @@ verification scenarios below.
 
 ### Institutional Learnings
 
-- `docs/solutions/architecture-patterns/desktop-first-workstation-boundaries.md`
+- `docs/desktop-first-workstation-boundaries.md`
   requires target-specific evidence, hash-pinned model/runtime identities,
   worker-process isolation, bounded untrusted output, and capability exposure
   only after machine-verifiable admission.
@@ -1213,7 +1213,7 @@ rank-affecting correction creates a new contract revision and complete rerun.
 - **Origin document:** [docs/brainstorms/2026-07-26-pc-asr-benchmark-contract-requirements.md](../brainstorms/2026-07-26-pc-asr-benchmark-contract-requirements.md)
 - **Ideation:** [docs/ideation/2026-07-26-pc-asr-benchmark-contract-ideation.md](../ideation/2026-07-26-pc-asr-benchmark-contract-ideation.md)
 - Related plan: `docs/plans/2026-07-26-002-feat-desktop-first-meeting-workstation-plan.md`
-- Related learning: `docs/solutions/architecture-patterns/desktop-first-workstation-boundaries.md`
+- Related learning: `docs/desktop-first-workstation-boundaries.md`
 - Existing product contract: `benchmark/desktop/desktop_benchmark_contract.json`
 - Existing product decision: `benchmark/desktop/MACOS_ENGINE_SELECTION.md`
 - Existing native worker: `apps/desktop/tool/desktop_sherpa_worker.dart`

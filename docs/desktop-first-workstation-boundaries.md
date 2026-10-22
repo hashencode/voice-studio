@@ -1,6 +1,23 @@
 # Desktop-first meeting workstation boundaries
 
-## Context
+## Current applicability (2026-10-22)
+
+The current [workspace](../pubspec.yaml) composes Android in
+`apps/mobile-flutter` and Electron in `apps/desktop-electron`. Its shared
+workspace packages are `audio_core`, `audio_storage`, `audio_workflows`,
+`companion_protocol`, `desktop_sherpa_worker`, and `processing_contracts`.
+The root is the workspace, not the Android app package. The `meeting_*`
+names below describe the original architecture; directory existence does
+not make them current workspace dependencies. Follow the current
+[PC](../apps/desktop-electron/docs/README.md) and
+[App](../apps/mobile-flutter/docs/README.md) entry points for implementation.
+
+The original boundary reasoning and qualification conditions are retained
+below as historical context, not new product requirements or current pass
+claims. Choose routine checks from the
+[verification policy](standards/verification.md).
+
+## Historical context
 
 The repository keeps the Android mobile core at the root while adding a desktop
 meeting workstation under `apps/desktop-electron`. Both products share data contracts and
@@ -86,6 +103,10 @@ only until receipt or expiry. Source deletion must never happen before a
 verified receipt, and the default mobile behavior is to retain the source.
 
 ## Verification consequence
+
+This section describes the original target qualification closure. It does
+not require a full physical gate for routine or documentation-only work;
+the current verification policy selects checks for the actual change.
 
 Routine checks can validate contracts and recorded hashes, but evidence-producing
 physical gates remain explicit. A closure is complete only after the real target

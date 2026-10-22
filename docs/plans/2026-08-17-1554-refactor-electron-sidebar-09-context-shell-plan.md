@@ -397,5 +397,5 @@ This is not a per-edit loop. After U5 stabilizes, prepare one committed macOS ca
 - Electron active owners: `apps/desktop-electron/src/shared/contracts/`, `src/main/`, `src/preload/`, `src/renderer/`, and corresponding tests.
 - Flutter active owners: `packages/meeting_core/`, `packages/meeting_storage/`, `packages/meeting_workflows/`, `packages/companion_protocol/`, and `apps/mobile-flutter/` before their planned Audio renames.
 - Existing processing relation: active processing contracts/repositories already require a positive `meetingId` and create the owning record before the job; U8-U10 rename that invariant to `audioId`.
-- Architecture boundary: `docs/solutions/architecture-patterns/desktop-first-workstation-boundaries.md` remains useful for runtime ownership, but its Meeting vocabulary becomes historical/needs an active Audio successor.
+- Architecture boundary: `docs/desktop-first-workstation-boundaries.md` remains useful for runtime ownership, but its Meeting vocabulary becomes historical/needs an active Audio successor.
 - Current validation owners: `tool/validate_electron_desktop_scope.py`, `tool/check_electron_desktop.sh`, current scope/removal/status files, and frozen historical U12 evidence.

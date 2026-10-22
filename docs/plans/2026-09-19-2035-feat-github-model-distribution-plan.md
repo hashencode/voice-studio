@@ -218,7 +218,7 @@ Main owns this matrix. Renderer only displays the supplied state and sends revis
 ### Sources & Research
 
 - `docs/plans/2026-08-24-1703-feat-local-model-microphone-plan.md` records the original architecture and implemented model lifecycle.
-- `docs/solutions/architecture-patterns/desktop-first-workstation-boundaries.md` establishes Electron as composition root, Worker process isolation and artifact-specific evidence.
+- `docs/desktop-first-workstation-boundaries.md` establishes Electron as composition root, Worker process isolation and artifact-specific evidence.
 - `apps/desktop-electron/src/main/resources/local_model_service.ts` and `apps/desktop-electron/src/main/resources/model_download_coordinator.ts` contain the incumbent model and transfer flows this plan extends.
 - GitHub documents public release assets, the 2 GiB per-asset limit and immutable releases: <https://docs.github.com/en/rest/releases/assets>, <https://docs.github.com/en/repositories/releasing-projects-on-github/about-releases>, <https://docs.github.com/en/code-security/concepts/supply-chain-security/immutable-releases>.
 - The selected public distribution repository is <https://github.com/hashencode/voice-studio-models>.

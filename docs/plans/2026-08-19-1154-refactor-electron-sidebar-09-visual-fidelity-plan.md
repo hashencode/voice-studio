@@ -333,7 +333,7 @@ Main blur does not immediately imply show floating. The coordinator uses a short
 - Electron BrowserWindow: https://www.electronjs.org/docs/latest/api/browser-window
 - Electron screen: https://www.electronjs.org/docs/latest/api/screen
 - Electron security/context isolation: https://www.electronjs.org/docs/latest/tutorial/security
-- Repository boundary learning: docs/solutions/architecture-patterns/desktop-first-workstation-boundaries.md
+- Repository boundary learning: docs/desktop-first-workstation-boundaries.md
 - Existing shell architecture: docs/architecture/electron-audio-context-shell.md
 - Historical shell plan: docs/plans/2026-08-17-1554-refactor-electron-sidebar-09-context-shell-plan.md
 

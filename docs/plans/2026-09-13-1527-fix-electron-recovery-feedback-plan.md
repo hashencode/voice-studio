@@ -92,7 +92,7 @@ execution: code
 - [Recovery dialog](../../apps/desktop-electron/src/renderer/features/capture/recovery-dialog.tsx) 与 [capture workspace](../../apps/desktop-electron/src/renderer/features/capture/capture-workspace.tsx) — 当前关闭语义、批次状态和启动展示条件。
 - [AI settings](../../apps/desktop-electron/src/renderer/features/settings/ai-settings-feature.tsx) — 当前只读编辑弹窗路径。
 - [Application shell hook](../../apps/desktop-electron/src/renderer/features/shell/use-application-shell.ts) 与 [shell surfaces](../../apps/desktop-electron/src/renderer/features/shell/shell-surfaces.tsx) — 当前首次载入和错误页。
-- [Desktop-first workstation boundaries](../solutions/architecture-patterns/desktop-first-workstation-boundaries.md) — Main 权威、持久状态与短暂 UI 状态分离的既有项目约束。
+- [Desktop-first workstation boundaries](../desktop-first-workstation-boundaries.md) — Main 权威、持久状态与短暂 UI 状态分离的既有项目约束。
 
 ## Planning Contract
 

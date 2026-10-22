@@ -1582,7 +1582,7 @@ HTTP contract harness 均通过，DeepSeek 原测试保持绿色。U16 不再要
 - Modify: `benchmark/desktop/live_caption/MACOS_SENSEVOICE_LIVE_DECISION.md`
 - Modify: `benchmark/desktop/capture/MACOS_CAPTURE_FEASIBILITY.md`
 - Modify: `tool/dev_check.sh`
-- Create: `docs/solutions/architecture-patterns/desktop-first-workstation-boundaries.md`
+- Create: `docs/desktop-first-workstation-boundaries.md`
 
 **Approach:**
 

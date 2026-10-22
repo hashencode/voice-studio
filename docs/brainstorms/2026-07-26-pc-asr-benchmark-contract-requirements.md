@@ -36,7 +36,7 @@ Relevant existing evidence and boundaries:
 - `benchmark/desktop/desktop_model_candidates.json`
 - `benchmark/desktop/MACOS_ENGINE_SELECTION.md`
 - `benchmark/asr_benchmark_results_2026-07-05.md`
-- `docs/solutions/architecture-patterns/desktop-first-workstation-boundaries.md`
+- `docs/desktop-first-workstation-boundaries.md`
 
 Official model configuration sources:
 

@@ -96,7 +96,7 @@ The product needs both behaviors:
 
 ### Institutional Learnings
 
-- No `docs/solutions/` entries exist in this repo at plan time.
+- No dedicated learning entries existed in this repository at plan time; topic documents now follow the flat `docs/` layout.
 - Existing product docs emphasize local-first privacy and recording reliability: `docs/QUARK_RECORDING_MINUTES_UI_DESIGN_BRIEF.md` and `docs/QUARK_RECORDING_MINUTES_EXTENSIBLE_UI_DESIGN_BRIEF.md`.
 
 ### External References

@@ -185,7 +185,7 @@ flowchart TB
 - `apps/desktop-electron/src/main/storage/desktop_repository.ts` — authoritative `{audio, mediaAuthorityId, inserted}` commit result.
 - `apps/desktop-electron/src/main/storage/repositories/audio_workspace_repository.ts` — direct primary-key open and independent bounded list query.
 - `apps/desktop-electron/src/renderer/App.tsx` and `features/audios/audio-route-feature.tsx` — blank-state branch gap and existing direct import selection pattern.
-- `docs/solutions/architecture-patterns/desktop-first-workstation-boundaries.md` — Electron composition-root ownership and committed-data boundary guidance.
+- `docs/desktop-first-workstation-boundaries.md` — Electron composition-root ownership and committed-data boundary guidance.
 - ByeByte sibling repository `apps/desktop-electron/src/main/storage/grouped-queue-repository.ts` and `docs/plans/2026-09-13-2342-refactor-voice-studio-appshell-grouped-file-queue-plan.md` — application-message admission, safe dedupe and file-context separation pattern.
 
 ---

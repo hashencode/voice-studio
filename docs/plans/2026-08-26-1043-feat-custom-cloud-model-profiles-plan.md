@@ -188,7 +188,7 @@ The profile store controls future preparation. The job tables remain the authori
 - `apps/desktop-electron/src/main/storage/audio_database.ts` currently accepts only Audio schema version 1 and rejects other existing versions, which makes explicit migration support necessary.
 - `apps/desktop-electron/src/main/storage/audio_schema_fragments/v9.ts` and `apps/desktop-electron/src/main/storage/repositories/ai_job_repository.ts` establish the single-row provider store and immutable job snapshot pattern this plan extends.
 - `apps/desktop-electron/src/main/domain/audio-intelligence/provider_security.ts` and `apps/desktop-electron/src/main/domain/audio-intelligence/openai_provider.ts` own the direct-cloud transport bounds, endpoint policy, provider-specific request behavior, and client-visible prompt boundary.
-- `docs/solutions/architecture-patterns/desktop-first-workstation-boundaries.md` requires Keychain protection to remain distinct from FileVault and other storage guarantees.
+- `docs/desktop-first-workstation-boundaries.md` requires Keychain protection to remain distinct from FileVault and other storage guarantees.
 - `docs/product/s3-productization-status.md` records direct BYOK AI as delivered while the overall product remains not release-ready; this plan extends that path without claiming hosted membership AI.
 
 ---

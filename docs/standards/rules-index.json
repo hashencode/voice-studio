@@ -3,7 +3,7 @@
   "routes": [
     {
       "id": "documentation",
-      "paths": ["AGENTS.md", "CONCEPTS.md", "README.md", "docs/**"],
+      "paths": ["AGENTS.md", "CONCEPTS.md", "README.md", "docs/**", ".agents/**"],
       "documents": ["docs/standards/verification.md"]
     },
     {

@@ -189,7 +189,7 @@ deepened: 2026-09-08
 - `benchmark/desktop/capture/desktop_capture_probe.dart`
 - `benchmark/desktop/capture/MACOS_CAPTURE_FEASIBILITY.md`
 - `benchmark/desktop/capture/evidence/macos_m4_20m_chunk_recovery_probe.json`
-- `docs/solutions/architecture-patterns/desktop-first-workstation-boundaries.md`
+- `docs/desktop-first-workstation-boundaries.md`
 - `docs/plans/2026-09-07-1716-fix-electron-recording-quit-loop-plan.md`（只作为既有调查背景；本计划取代其中关于恢复呈现、零分片动作能力和失败 Dialog 类型的约定，不改变其余退出协调分析。）
 - [shadcn Sonner](https://ui.shadcn.com/docs/components/radix/sonner)
 - [radix-nova Sonner recipe](https://ui.shadcn.com/r/styles/radix-nova/sonner.json)

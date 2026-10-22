@@ -50,3 +50,7 @@ app.*.map.json
 
 # Local screenshots and temporary verification artifacts.
 /.artifacts/
+
+# Agent task scratch files; keep only the directory placeholder.
+/.agents/tmp/*
+!/.agents/tmp/.gitkeep

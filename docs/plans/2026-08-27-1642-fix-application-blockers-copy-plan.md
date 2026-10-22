@@ -430,4 +430,4 @@ Do not run the UI watcher, screenshots, browser-driven checks, or other visual v
 - `apps/desktop-electron/src/main/index.ts`
 - `apps/desktop-electron/src/main/profile/audio_profile.ts`
 - `docs/plans/2026-08-25-1021-fix-desktop-input-workspaces-plan.md`
-- `docs/solutions/architecture-patterns/desktop-first-workstation-boundaries.md`
+- `docs/desktop-first-workstation-boundaries.md`

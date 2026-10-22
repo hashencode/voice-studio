@@ -132,7 +132,7 @@ The shared contract reserves a `hosted/cloudHosted` shape, but the repository ha
 ### Sources & Research
 
 - `docs/plans/2026-08-26-1043-feat-custom-cloud-model-profiles-plan.md` defines the delivered multi-profile foundation and defers hosted membership AI.
-- `docs/solutions/architecture-patterns/desktop-first-workstation-boundaries.md` requires Electron to remain the composition root for Keychain facts and forbids claiming unavailable security capabilities.
+- `docs/desktop-first-workstation-boundaries.md` requires Electron to remain the composition root for Keychain facts and forbids claiming unavailable security capabilities.
 - `docs/product/desktop-electron-status.md` records custom BYOK as delivered and hosted authentication, gateway, quota, and billing as incomplete.
 - `apps/desktop-electron/src/shared/contracts/audio_ai.ts` reserves the hosted profile response shape but does not model hosted availability or execution.
 - `apps/desktop-electron/src/main/storage/audio_schema_fragments/v9.ts` makes profile names non-null and unique and restricts persisted profiles to `custom`.

@@ -173,7 +173,7 @@ repository.
 
 ### Institutional Learnings
 
-- `docs/solutions/architecture-patterns/desktop-first-workstation-boundaries.md`
+- `docs/desktop-first-workstation-boundaries.md`
   establishes that platform applications stay separate composition roots.
   `apps/codex_ui_reproduction` therefore remains independent from the root
   mobile app and `apps/desktop`.
@@ -909,4 +909,4 @@ flowchart TB
 - Project UI guidance: sibling `flutter-ui-mobile/DESIGN.md` and
   `flutter-ui-mobile/DOC.md`
 - Repository boundary learning:
-  `docs/solutions/architecture-patterns/desktop-first-workstation-boundaries.md`
+  `docs/desktop-first-workstation-boundaries.md`

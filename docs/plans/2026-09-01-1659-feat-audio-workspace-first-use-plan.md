@@ -100,7 +100,7 @@ execution: code
 #### Deferred to Follow-Up Work
 
 - 如果后续产品明确要求录制完成后自动打开新音频，再为 capture 终态设计稳定的 `audioId` 关联；本期不按时间、标题或列表排序猜测。
-- 在功能落地并验证后，考虑把“真实资料库空 / 搜索无结果 / 加载失败”三类状态的分离记录为新的 `docs/solutions/` 学习。
+- 在功能落地并验证后，考虑把“真实资料库空 / 搜索无结果 / 加载失败”三类状态的分离记录为 `docs/` 根目录下的专题经验，并从 [专题经验入口](../README.md#专题经验) 查阅。
 
 #### Out of Scope
 
@@ -198,7 +198,7 @@ Renderer preference owns the configured device identity, while existing Main/Nat
 - `apps/desktop-electron/tests/unit/renderer/audio_route_test.tsx` 与 `apps/desktop-electron/tests/unit/renderer/shell_test.tsx`：当前音频状态、pane、header、设置和导入回归边界。
 - `docs/plans/2026-08-17-1554-refactor-electron-sidebar-09-context-shell-plan.md`：结构性隐藏不得覆盖用户 pane 偏好的既有产品约束。
 - `docs/plans/2026-09-01-1554-fix-microphone-test-feedback-plan.md`：一次点击、serial polling、RMS、typed failure 和 cleanup 的麦克风测试 authority。
-- `docs/solutions/architecture-patterns/desktop-first-workstation-boundaries.md`：Renderer/composition work 留在 Electron application root，不把 UI state 推入共享 Dart packages。
+- `docs/desktop-first-workstation-boundaries.md`：Renderer/composition work 留在 Electron application root，不把 UI state 推入共享 Dart packages。
 - [ReUI Empty State 4](https://reui.io/blocks/application/empty-state/empty-state-4)：仅作为 zero-state 标题、描述和操作层级参考；本期明确不采用其双栏预览结构。
 
 ---

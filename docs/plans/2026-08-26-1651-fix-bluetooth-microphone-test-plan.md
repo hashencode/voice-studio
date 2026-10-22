@@ -76,7 +76,7 @@ Native 测试链路在启动后监听 `AVAudioEngineConfigurationChange`。只�
 
 #### Deferred to Follow-Up Work
 
-- 把本次蓝牙恢复和 Helper provenance 经验整理为新的 `docs/solutions/` 学习文档。
+- 把本次蓝牙恢复和 Helper provenance 经验整理为 `docs/` 根目录下按主题命名的经验文档，并在 [专题经验入口](../README.md#专题经验) 中登记。
 - 将相同的启动恢复机制扩展到正式录音，只有真实设备证据显示正式录音存在同一缺陷时再单独计划。
 
 #### Out of Scope
@@ -168,7 +168,7 @@ stateDiagram-v2
 ### Sources and Research
 
 - `docs/plans/2026-08-25-1021-fix-desktop-input-workspaces-plan.md` defines the existing manual-test and typed-failure behavior that this plan preserves.
-- `docs/solutions/architecture-patterns/desktop-first-workstation-boundaries.md` requires native process boundaries and evidence to remain bound to the exact target and artifact set.
+- `docs/desktop-first-workstation-boundaries.md` requires native process boundaries and evidence to remain bound to the exact target and artifact set.
 - `packages/desktop_macos_native/Sources/CaptureCore/MicrophoneCapture.swift` contains device selection, format capture, tap ownership and configuration notifications.
 - `packages/desktop_macos_native/Sources/CaptureCore/CaptureController.swift` owns microphone test identity, terminal snapshots and Native failure mapping.
 - `apps/desktop-electron/src/main/features/importing/helper_locator.ts` and `apps/desktop-electron/native/macos/build-helper.sh` make development Helper paths worktree-local.

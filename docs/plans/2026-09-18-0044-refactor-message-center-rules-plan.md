@@ -88,7 +88,7 @@ The current message contract caps the application snapshot at 20 items, while th
 - `apps/desktop-electron/src/renderer/features/activity/activity-center.tsx` — current embedded and Shell-owned search/filter controls, list Empty State, mark-all action, and detail workspace.
 - `apps/desktop-electron/src/renderer/App.tsx` — current selection fallback, exact-read effects, context-pane composition, Header visibility, content padding, and message detail routing.
 - `apps/desktop-electron/tests/unit/application_activity_test.ts`, `apps/desktop-electron/tests/unit/ipc_contract_test.ts`, `apps/desktop-electron/tests/unit/renderer/activity_center_test.tsx`, and `apps/desktop-electron/tests/unit/renderer/shell_test.tsx` — nearest state, contract, feature, and Shell test boundaries.
-- `docs/solutions/logic-errors/separate-empty-state-component-scope-from-shell-chrome.md` — component taxonomy, content scope, and Shell chrome are independent decisions.
+- `docs/separate-empty-state-component-scope-from-shell-chrome.md` — component taxonomy, content scope, and Shell chrome are independent decisions.
 - `docs/plans/2026-09-16-1551-refactor-electron-empty-state-system-plan.md` — historical message-empty classification that this plan supersedes only for the message workspace.
 
 ---
@@ -230,7 +230,7 @@ stateDiagram-v2
   3. Hide the right Header whenever no message is selected; render a local right-column selection prompt for the distinct nonempty-but-unselected state.
   4. Restore the existing detail and title as soon as a valid selection exists, including snapshots that transition from empty to populated.
 - **Execution note:** Start by replacing the current duplicate-empty Shell assertions; they encode behavior opposite to the confirmed rule and overlap unrelated working-tree changes.
-- **Patterns to follow:** The independent component-scope and Shell-chrome predicates documented in `docs/solutions/logic-errors/separate-empty-state-component-scope-from-shell-chrome.md` and the audio populated-but-unselected presentation in `App.tsx`.
+- **Patterns to follow:** The independent component-scope and Shell-chrome predicates documented in `docs/separate-empty-state-component-scope-from-shell-chrome.md` and the audio populated-but-unselected presentation in `App.tsx`.
 - **Test scenarios:**
   - Covers AE6. With an empty snapshot and an open message pane, verify the left “暂无消息” Empty State is visible while the right Empty State, right Header, and detail region are absent.
   - With an empty snapshot and the message pane preference closed, verify the pane trigger remains available and opening it reveals the sole Empty State without changing the blank right column.

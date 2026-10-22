@@ -197,7 +197,7 @@ Failure propagation remains specific to each boundary:
 - `apps/desktop-electron/src/main/application/floating_capture_stop_handoff.ts` — established Main-owned stop and details handoff boundary.
 - `apps/desktop-electron/src/main/domain/capture/capture_quit_coordinator.ts` and `apps/desktop-electron/src/main/features/playback/browser_window_playback_port.ts` — constructor-injected Main-side lifecycle patterns.
 - `docs/plans/2026-08-19-1154-refactor-electron-sidebar-09-visual-fidelity-plan.md` — prior decision for a separate minimal Renderer, Preload, redacted contract, and Main coordination.
-- `docs/solutions/architecture-patterns/desktop-first-workstation-boundaries.md` — composition-root and platform-boundary guidance.
+- `docs/desktop-first-workstation-boundaries.md` — composition-root and platform-boundary guidance.
 - [Vite `cacheDir` configuration](https://vite.dev/config/shared-options#cachedir) — confirms the default shared cache location and explicit override.
 - [Electron `BrowserWindow`](https://www.electronjs.org/docs/latest/api/browser-window) and [security guidance](https://www.electronjs.org/docs/latest/tutorial/security) — confirm the retained window and isolation model.
 
