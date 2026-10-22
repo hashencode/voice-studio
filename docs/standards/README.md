@@ -1,5 +1,7 @@
 # Current standards
 
+核心开发规范入口现统一为 [development-rules.md](../ai/development-rules.md)；本目录继续维护专项标准及其权威说明，原规则路由与详细政策保持不变。
+
 `AGENTS.md` is the mandatory entry point. Run `python3 tool/rules_for_change.py`
 with the files you intend to change, then read every returned document. The
 machine-readable `rules-index.json` is the only path and task-tag route map.

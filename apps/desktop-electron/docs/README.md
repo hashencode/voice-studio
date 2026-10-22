@@ -9,6 +9,7 @@
 | 本端架构与职责 | [architecture.md](architecture.md) |
 | 本端开发流程 | [development-workflow.md](development-workflow.md) |
 | 本端验证入口 | [testing-standards.md](testing-standards.md) |
+| 核心开发规范 | [development-rules.md](../../../docs/ai/development-rules.md) |
 | 仓库规则发现与权威 | [原标准导航](../../../docs/standards/README.md) |
 | 跨端接口与协议 | [根接口导航](../../../docs/api/README.md) |
 | 全部文档 | [根文档导航](../../../docs/README.md) |

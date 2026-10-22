@@ -1,5 +1,7 @@
 # AI 开发文档导航
 
+核心开发规范统一在 [development-rules.md](development-rules.md) 维护。先遵守根 AGENTS 的授权边界，再读取该文件及本导航指定的适用资料；本导航不另维护第二份规则正文。
+
 - 仓库规则与授权以根 [AGENTS.md](../../AGENTS.md) 为入口；本页提供统一的文档位置，不替代原规则发现流程。
 - 修改前用拟改路径执行 `python3 tool/rules_for_change.py <paths>`，读取它返回的每份文档；完成前按实际改动路径再次执行。需要任务标签时按原规则使用，不在本页维护第二份路径或标签匹配表。
 - [规则总览](../standards/README.md) 解释当前权威；[验证政策](../standards/verification.md) 决定检查范围和证据边界。文档变更只检查差异与引用，不运行产品测试、构建或 GUI。
@@ -7,7 +9,7 @@
 
 ## 保留的目录与命名
 
-`docs/standards/`、`rules-index.json` 及路由工具保留原位。持续规则和验证政策继续在该目录单点维护，不另建同内容的 `development-rules.md` 或 `testing-standards.md`。架构、产品、解决方案、计划和验收资料保持原路径、来源与状态。
+`docs/standards/`、`rules-index.json` 及路由工具保留原位。核心开发规范入口统一为 `development-rules.md`，专项规则和验证政策继续在原目录单点维护，不复制第二份正文或机器路由表。架构、产品、解决方案、计划和验收资料保持原路径、来源与状态。
 
 ## 先选择应用范围
 

@@ -1,5 +1,7 @@
 # Voice2Text
 
+核心开发规范：[docs/ai/development-rules.md](docs/ai/development-rules.md)。项目任务、接口和验收资料仍从原文档导航按范围读取。
+
 本地优先的语音录制与转写工程。移动端使用 Flutter，PC 端当前使用
 Electron，并仅支持 Apple Silicon macOS。
 
