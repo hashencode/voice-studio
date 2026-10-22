@@ -7,12 +7,12 @@ Electron，并仅支持 Apple Silicon macOS。
 
 ## 设计与开发指导
 
-当前项目 UI 设计与 Flutter 组件开发以相邻组件库文档为准：
+本项目 Flutter 移动端的 UI 设计与组件开发以相邻组件库文档为准：
 
-- 设计规范：`../flutter-ui-mobile/DESIGN.md`
-- 开发指导：`../flutter-ui-mobile/DOC.md`
+- 设计规范：[DESIGN.md](../flutter-ui-mobile/DESIGN.md)
+- 开发指导：[DOC.md](../flutter-ui-mobile/DOC.md)
 
-涉及 UI、页面结构、交互状态或组件选型的改动，应优先使用 `package:flutter_ui_mobile/flutter_ui_mobile.dart` 导出的 `Goo*` 组件，并遵循根目录 `AGENTS.md` 的项目级说明。
+涉及 Flutter UI、页面结构、交互状态或组件选型的改动，应优先使用 `package:flutter_ui_mobile/flutter_ui_mobile.dart` 导出的 `Goo*` 组件，并遵循根目录 `AGENTS.md` 的项目级说明。仓库地址、缺失资料的处理与版本核对见 [Flutter 规范](docs/standards/flutter-ui.md)；Electron 使用本仓桌面规范，不因该组件库引用而要求拉取 Flutter 依赖。
 
 ## 运行应用
 
