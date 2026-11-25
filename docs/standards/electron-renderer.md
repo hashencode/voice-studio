@@ -8,9 +8,10 @@ product requirement take precedence over historical plans and screenshots.
 
 ## Third-column layout
 
-- The Shell's main inset occupies the viewport width remaining after the
-  navigation rail and context pane. Keep the existing context-pane drag limits
-  and the main content minimum; do not add a second width state for the inset.
+- The framed workspace contains the header, docked context pane, and main
+  content. The main content occupies the workspace width remaining after the
+  context pane. Keep the shared drag limits and main content minimum in the
+  [Shell contract](../architecture/electron-audio-context-shell.md).
 - A page-level third-column canvas uses the available width (`w-full min-w-0`)
   with its established outer padding. Do not center and cap the entire page with
   `max-w-*` when the user expands the column.

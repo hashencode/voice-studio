@@ -20,6 +20,7 @@ import {
   type AudioRouteController,
   useAudioRouteController,
 } from "@/features/audios/audio-route-feature";
+import type { AudioWorkspaceHeader } from "@/features/audios/audio-workspace-feature";
 import { CaptureWorkspaceController } from "@/features/capture/capture-workspace";
 import {
   CompanionContextPane,
@@ -158,6 +159,14 @@ function App() {
   const paneTriggerRef = React.useRef<HTMLButtonElement>(null);
   const paneTriggerFocusPendingRef = React.useRef(false);
   const contentTitleRef = React.useRef<HTMLHeadingElement>(null);
+  const [audioHeaderTarget, setAudioHeaderTarget] =
+    React.useState<HTMLDivElement | null>(null);
+  const attachAudioTitle = React.useCallback(
+    (heading: HTMLHeadingElement | null) => {
+      contentTitleRef.current = heading;
+    },
+    [],
+  );
   const mainContentRef = React.useRef<HTMLDivElement>(null);
   const pendingSettingsTargetRef = React.useRef<SettingsSection | null>(null);
   const captureInvokerRef = React.useRef<HTMLElement | null>(null);
@@ -820,11 +829,17 @@ function App() {
           title={contentTitle}
           titleRef={contentTitleRef}
           customTitle={
-            captureDetailVisible ? captureWorkspace.customTitle : undefined
+            captureDetailVisible ? (
+              captureWorkspace.customTitle
+            ) : audioDetailPresentation ? (
+              <div
+                ref={setAudioHeaderTarget}
+                className="flex min-w-0 items-center gap-2"
+              />
+            ) : undefined
           }
           showHeader={
             !emptyPresentationHidesChrome &&
-            !audioDetailPresentation &&
             (current !== "messages" || captureDetailVisible)
           }
           visibility={{
@@ -874,6 +889,14 @@ function App() {
                     selectedActivity={selectedActivity}
                     onOpenFailureSettings={openFailureSettings}
                     settingsSection={settingsSection}
+                    audioHeader={
+                      audioDetailPresentation
+                        ? {
+                            target: audioHeaderTarget,
+                            onTitleMount: attachAudioTitle,
+                          }
+                        : undefined
+                    }
                   />
                 ) : null}
                 {captureWorkspace.content}
@@ -955,6 +978,7 @@ function ShellContent({
   selectedActivity,
   onOpenFailureSettings,
   settingsSection,
+  audioHeader,
 }: {
   snapshot: ApplicationSnapshot;
   audio: AudioRouteController;
@@ -964,6 +988,7 @@ function ShellContent({
   selectedActivity: ActivityItemView | null;
   onOpenFailureSettings: (item: ActivityItemView) => void;
   settingsSection: SettingsSection;
+  audioHeader?: AudioWorkspaceHeader;
 }) {
   if (snapshot.profile.phase === "initializing") {
     return (
@@ -1005,6 +1030,7 @@ function ShellContent({
         <div className="flex min-h-full flex-col gap-4">
           <AudioMainWorkspace
             controller={audio}
+            header={audioHeader}
             showRecordingReady={snapshot.capture.phase === "idle"}
             recordingSessionId={
               snapshot.capture.phase === "completed"
@@ -1054,7 +1080,7 @@ function SettingsContextPane({
   return (
     <SidebarGroup className="p-0">
       <SidebarGroupContent>
-        <nav aria-label="设置分类">
+        <nav aria-label="设置分类" className="p-(--spacing-context-compact)">
           <ul data-flat-row-list="true">
             {SETTINGS_SECTIONS.map((item) => {
               const Icon = item.icon;
@@ -1108,7 +1134,7 @@ const SettingsContent = React.memo(function SettingsContent({
 
 const SettingsPanels = React.memo(function SettingsPanels() {
   return (
-    <div className="w-full min-w-0 px-(--spacing-settings-canvas-inline) py-(--spacing-settings-canvas-block) sm:px-(--spacing-settings-canvas-inline-wide) lg:px-(--spacing-settings-canvas-inline-widest)">
+    <div className="w-full min-w-0 p-(--spacing-settings-canvas) lg:p-(--spacing-settings-canvas-wide)">
       <SettingsPageSection section="general" label="通用">
         <AppearanceSettingsFeature />
       </SettingsPageSection>

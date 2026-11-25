@@ -17,6 +17,7 @@ export function ContextPaneShell({
   section,
   presentation,
   onRequestClose,
+  showTitle = true,
   head,
   search,
   searchOpen = true,
@@ -28,6 +29,7 @@ export function ContextPaneShell({
   section: ContextPaneSection;
   presentation: ContextPanePresentation;
   onRequestClose: () => void;
+  showTitle?: boolean;
   head?: React.ReactNode;
   search?: React.ReactNode;
   searchOpen?: boolean;
@@ -55,23 +57,27 @@ export function ContextPaneShell({
       aria-hidden={!open}
       inert={!open}
       data-presentation={presentation}
-      className="w-[calc(var(--sidebar-width)-var(--sidebar-width-icon)-2px)]! shrink-0 bg-background text-foreground"
+      className="w-(--context-pane-width) shrink-0 border-r bg-background text-foreground"
     >
-      <SidebarHeader
-        data-shell-slot="context-head"
-        data-context-pane-head="true"
-        data-context-pane-fixed-header="true"
-        className={cn(
-          "shrink-0 gap-0 p-0",
-          section === "audio" ? "h-[42px]" : "h-[50px]",
-          section !== "audio" && "border-b",
-        )}
-      >
-        <div className="flex h-full min-w-0 shrink-0 items-center justify-between gap-(--spacing-context-compact) px-(--spacing-context-inline)">
-          <h2 className="truncate text-sm font-semibold">{label}</h2>
-          {head ? <div className="min-w-0 shrink-0">{head}</div> : null}
-        </div>
-      </SidebarHeader>
+      {showTitle || head ? (
+        <SidebarHeader
+          data-shell-slot="context-head"
+          data-context-pane-head="true"
+          data-context-pane-fixed-header="true"
+          className={cn(
+            "shrink-0 gap-0 p-0",
+            section === "audio" ? "h-[42px]" : "h-[50px]",
+            section !== "audio" && "border-b",
+          )}
+        >
+          <div className="flex h-full min-w-0 shrink-0 items-center justify-between gap-(--spacing-context-compact) px-(--spacing-context-inline)">
+            {showTitle ? (
+              <h2 className="truncate text-sm font-semibold">{label}</h2>
+            ) : null}
+            {head ? <div className="min-w-0 shrink-0">{head}</div> : null}
+          </div>
+        </SidebarHeader>
+      ) : null}
       {search ? (
         <ContextPaneSearchRegion
           open={searchOpen}

@@ -93,8 +93,8 @@ package-wide. Use `bunx prettier --check <changed-files>` and
 expand their consumers. No new runner or duplicate focused alias is required.
 
 After current-task visual authorization, use one invocation such as
-`bun run test:visual tests/visual/pane-spacing-alignment.visual.spec.ts --grep 'shared 260-320-380|supported minimum window'`.
-Preview the same selection with `bunx playwright test --config=playwright.config.ts tests/visual/pane-spacing-alignment.visual.spec.ts --grep 'shared 260-320-380|supported minimum window' --list`, which does not run the harness or GUI.
+`bun run test:visual tests/visual/pane-spacing-alignment.visual.spec.ts --grep 'shared 260-300-380|supported minimum window'`.
+Preview the same selection with `bunx playwright test --config=playwright.config.ts tests/visual/pane-spacing-alignment.visual.spec.ts --grep 'shared 260-300-380|supported minimum window' --list`, which does not run the harness or GUI.
 Retain the minimum-window clamp and independent floating-window contracts.
 A matching file alone can contain many unrelated states; choose names as well.
 

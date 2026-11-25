@@ -72,7 +72,6 @@ it("shows both bundles without exposing Runtime, file-location, or unavailable m
   expect(list).toHaveClass(
     "[&_[data-slot=item-title]]:text-sm",
     "[&_[data-slot=item-title]]:leading-5",
-    "[&_[data-slot=item-description]]:line-clamp-1",
     "[&_[data-slot=item-description]]:text-xs",
     "[&_[data-slot=item-description]]:leading-4",
   );

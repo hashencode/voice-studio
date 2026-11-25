@@ -46,7 +46,7 @@ export function NavMain({
           aria-current={current === item.section ? "page" : undefined}
           aria-label={item.ariaLabel ?? item.title}
           disabled={disabled}
-          className="px-2.5 md:px-2"
+          className="mx-auto w-8 p-2"
           onClick={() => onNavigate(item.section)}
         >
           <item.icon aria-hidden="true" />
@@ -66,9 +66,9 @@ export function NavMain({
   return (
     <>
       <SidebarContent>
-        <SidebarGroup className="pt-2.5">
+        <SidebarGroup>
           <SidebarGroupLabel className="sr-only">工作台</SidebarGroupLabel>
-          <SidebarGroupContent className="px-1.5 md:px-0">
+          <SidebarGroupContent>
             <SidebarMenu className="gap-0.5">
               {primaryItems.map(renderItem)}
             </SidebarMenu>

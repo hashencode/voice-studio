@@ -8,12 +8,17 @@ workstation closure records are historical evidence, not current product rules.
 
 The shell began from shadcn's `sidebar-09` block at commit
 [`25be24cca34d06eed29a4779c3f48c4816aa812c`](https://github.com/shadcn-ui/ui/tree/25be24cca34d06eed29a4779c3f48c4816aa812c/apps/v4/registry/new-york-v4/blocks/sidebar-09).
-One `SidebarProvider` owns a 49 px primary navigation rail, a docked context
-pane whose default width is 300 px and whose user-adjustable range is 240–480
-px, and the remaining main `SidebarInset`. The context-pane width also clamps
-to preserve at least 480 px of main content. The inset owns its bordered
-header, scrollable content, and optional footer. Page-level content fills the
-remaining width; local text or controls may have narrower readable measures.
+The current App Shell 8 layout places a 63 px primary navigation rail next to
+one workspace. The workspace has 8 px top, right and bottom insets, a 14 px
+radius and a 1 px border. Its 50 px header spans the context pane and the
+main content when the page shows a header.
+
+The docked context pane defaults to 300 px. It accepts requests from 260 to
+380 px and clamps against the space available inside the frame to preserve
+at least 480 px for the main content. At 880 px the effective maximum is
+327 px. The main content column owns its scroll region and optional footer.
+Page-level content fills the available width. Local text or controls can
+use narrower readable measures.
 
 Voice2Text replaces the block's mail demo with Audio, Companion, Messages, and
 Settings destinations. Each destination owns its context-pane open preference;
@@ -101,8 +106,8 @@ retired activity terminology.
 
 `bun run --cwd apps/desktop-electron test:visual` uses the production Renderer
 entry and a typed test-only Electron harness. Current geometry checks cover
-the 300 px default pane, 240–480 px resize bounds, the 480 px main-content
-minimum, and docked behavior at the 880 px window target. Visual execution and
+the 300 px default pane, 260–380 px requested bounds, the 480 px main-content
+minimum, and the 327 px maximum at the 880 px window target. Visual execution and
 snapshot updates require explicit authorization for the current task under
 `AGENTS.md`; this document does not grant that authorization.
 

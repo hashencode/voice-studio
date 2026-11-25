@@ -333,18 +333,11 @@ describe("sidebar navigation e2e", () => {
     let pane = await screen.findByRole("complementary", {
       name: "音频上下文面板",
     });
-    const wrapper = document.querySelector<HTMLElement>(
-      '[data-slot="sidebar-wrapper"]',
-    )!;
-    const outer = wrapper.querySelector<HTMLElement>(
-      ':scope > [data-slot="sidebar"]',
-    )!;
-    const container = outer.querySelector<HTMLElement>(
-      ':scope > [data-slot="sidebar-container"]',
-    )!;
     expect(pane).toHaveAttribute("data-presentation", "docked");
-    expect(outer).toHaveAttribute("data-state", "expanded");
-    expect(container).toHaveAttribute("data-presentation", "docked");
+    expect(
+      pane.closest('[data-shell-slot="context-pane-track"]'),
+    ).toHaveAttribute("data-state", "open");
+    expect(screen.getByRole("main")).toContainElement(pane);
     expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
     expect(
       screen.getByRole("navigation", { name: "工作站主导航" }),
@@ -371,12 +364,15 @@ describe("sidebar navigation e2e", () => {
     window.innerWidth = 1280;
     window.dispatchEvent(new Event("resize"));
     expect(pane).toHaveAttribute("data-presentation", "docked");
-    expect(outer).toHaveAttribute("data-state", "expanded");
-    expect(container).toHaveAttribute("data-presentation", "docked");
+    expect(
+      pane.closest('[data-shell-slot="context-pane-track"]'),
+    ).toHaveAttribute("data-state", "open");
     window.innerWidth = 880;
     window.dispatchEvent(new Event("resize"));
     expect(pane).toHaveAttribute("data-presentation", "docked");
-    expect(outer).toHaveAttribute("data-state", "expanded");
+    expect(
+      pane.closest('[data-shell-slot="context-pane-track"]'),
+    ).toHaveAttribute("data-state", "open");
     expect(api.listAudios).toHaveBeenCalledTimes(1);
     expect(writes).not.toHaveBeenCalled();
 
@@ -448,13 +444,13 @@ describe("sidebar navigation e2e", () => {
     let resizeHandle = await screen.findByRole("separator", {
       name: "调整音频上下文面板宽度",
     });
-    expect(resizeHandle).toHaveAttribute("aria-valuenow", "320");
-    expect(shellWidth()).toBe("370px");
-    for (let step = 0; step < 6; step += 1) {
+    expect(resizeHandle).toHaveAttribute("aria-valuenow", "300");
+    expect(contextPaneWidth()).toBe("300px");
+    for (let step = 0; step < 8; step += 1) {
       fireEvent.keyDown(resizeHandle, { key: "ArrowRight" });
     }
     expect(resizeHandle).toHaveAttribute("aria-valuenow", "380");
-    expect(shellWidth()).toBe("430px");
+    expect(contextPaneWidth()).toBe("380px");
     expect(writes).not.toHaveBeenCalled();
 
     for (const target of [
@@ -468,7 +464,7 @@ describe("sidebar navigation e2e", () => {
         name: `调整${target.label}上下文面板宽度`,
       });
       expect(resizeHandle).toHaveAttribute("aria-valuenow", "380");
-      expect(shellWidth()).toBe("430px");
+      expect(contextPaneWidth()).toBe("380px");
     }
     expect(writes).not.toHaveBeenCalled();
 
@@ -498,9 +494,9 @@ describe("sidebar navigation e2e", () => {
     await waitFor(() =>
       expect(
         screen.getByRole("separator", { name: /上下文面板宽度/ }),
-      ).toHaveAttribute("aria-valuenow", "350"),
+      ).toHaveAttribute("aria-valuenow", "327"),
     );
-    expect(shellWidth()).toBe("400px");
+    expect(contextPaneWidth()).toBe("327px");
     window.innerWidth = 1280;
     window.dispatchEvent(new Event("resize"));
     await waitFor(() =>
@@ -508,7 +504,7 @@ describe("sidebar navigation e2e", () => {
         screen.getByRole("separator", { name: /上下文面板宽度/ }),
       ).toHaveAttribute("aria-valuenow", "380"),
     );
-    expect(shellWidth()).toBe("430px");
+    expect(contextPaneWidth()).toBe("380px");
 
     view.unmount();
     render(createElement(App));
@@ -516,8 +512,8 @@ describe("sidebar navigation e2e", () => {
       await screen.findByRole("separator", {
         name: "调整音频上下文面板宽度",
       }),
-    ).toHaveAttribute("aria-valuenow", "320");
-    expect(shellWidth()).toBe("370px");
+    ).toHaveAttribute("aria-valuenow", "300");
+    expect(contextPaneWidth()).toBe("300px");
   });
 
   it("reveals message details while keeping a narrow pane docked", async () => {
@@ -649,10 +645,10 @@ describe("sidebar navigation e2e", () => {
   });
 });
 
-function shellWidth() {
+function contextPaneWidth() {
   const wrapper = document.querySelector<HTMLElement>(
     '[data-slot="sidebar-wrapper"]',
   );
   if (!wrapper) throw new Error("Expected the sidebar wrapper");
-  return wrapper.style.getPropertyValue("--sidebar-width");
+  return wrapper.style.getPropertyValue("--context-pane-width");
 }

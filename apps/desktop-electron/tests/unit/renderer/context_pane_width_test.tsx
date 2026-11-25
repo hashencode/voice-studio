@@ -43,7 +43,7 @@ function firePointer(
 
 describe("context pane width", () => {
   it.each([
-    { viewportWidth: 880, maximum: 350 },
+    { viewportWidth: 880, maximum: 327 },
     { viewportWidth: 1280, maximum: 380 },
     { viewportWidth: 1600, maximum: 380 },
   ])(
@@ -53,7 +53,7 @@ describe("context pane width", () => {
         minimum: 260,
         maximum,
       });
-      expect(resolveContextPaneWidth(320, viewportWidth)).toBe(320);
+      expect(resolveContextPaneWidth(300, viewportWidth)).toBe(300);
       expect(resolveContextPaneWidth(100, viewportWidth)).toBe(260);
       expect(resolveContextPaneWidth(900, viewportWidth)).toBe(maximum);
     },
@@ -64,8 +64,8 @@ describe("context pane width", () => {
     const writes = vi.spyOn(Storage.prototype, "setItem");
     const { result } = renderHook(() => useContextPaneWidth());
 
-    expect(result.current.requestedWidth).toBe(320);
-    expect(result.current.effectiveWidth).toBe(320);
+    expect(result.current.requestedWidth).toBe(300);
+    expect(result.current.effectiveWidth).toBe(300);
 
     act(() => result.current.setRequestedWidth(380));
     expect(result.current.requestedWidth).toBe(380);
@@ -73,7 +73,7 @@ describe("context pane width", () => {
 
     act(() => setViewportWidth(880));
     expect(result.current.requestedWidth).toBe(380);
-    expect(result.current.effectiveWidth).toBe(350);
+    expect(result.current.effectiveWidth).toBe(327);
 
     act(() => setViewportWidth(1600));
     expect(result.current.requestedWidth).toBe(380);
@@ -115,7 +115,7 @@ describe("context pane width", () => {
 
     view.unmount();
     render(<Harness state="audio-open" />);
-    expect(screen.getByTestId("effective-width")).toHaveTextContent("320");
+    expect(screen.getByTestId("effective-width")).toHaveTextContent("300");
   });
 });
 
@@ -398,9 +398,8 @@ describe("app shell pane resizing", () => {
     const wrapper = view.container.querySelector<HTMLElement>(
       '[data-slot="sidebar-wrapper"]',
     )!;
-    const gap = view.container.querySelector('[data-slot="sidebar-gap"]');
-    const container = view.container.querySelector(
-      '[data-slot="sidebar-container"]',
+    const track = view.container.querySelector(
+      '[data-shell-slot="context-pane-track"]',
     );
     const handle = screen.getByRole("separator");
 
@@ -409,10 +408,7 @@ describe("app shell pane resizing", () => {
     expect(onTogglePane).not.toHaveBeenCalled();
     expect(onWidthChange).not.toHaveBeenCalled();
 
-    expect(gap).toHaveClass(
-      "group-data-[resizing=true]/sidebar-wrapper:transition-none",
-    );
-    expect(container).toHaveClass(
+    expect(track).toHaveClass(
       "group-data-[resizing=true]/sidebar-wrapper:transition-none",
     );
     firePointer(handle, "pointerdown", {

@@ -4,7 +4,6 @@
   --spacing-unit-3: 12px;
   --spacing-unit-4: 16px;
   --spacing-unit-6: 24px;
-  --spacing-unit-10: 40px;
 
   --spacing-shell-header-inline: var(--spacing-unit-4);
   --spacing-shell-compact: var(--spacing-unit-4);
@@ -16,10 +15,8 @@
   --spacing-context-inline: var(--spacing-unit-3);
 
   --spacing-settings-section: var(--spacing-unit-3);
-  --spacing-settings-canvas-inline: var(--spacing-unit-4);
-  --spacing-settings-canvas-block: var(--spacing-unit-6);
-  --spacing-settings-canvas-inline-wide: var(--spacing-unit-6);
-  --spacing-settings-canvas-inline-widest: var(--spacing-unit-10);
+  --spacing-settings-canvas: var(--spacing-unit-4);
+  --spacing-settings-canvas-wide: 32px;
 
   --spacing-activity-detail-block: 32px;
   --spacing-page-section: 20px;

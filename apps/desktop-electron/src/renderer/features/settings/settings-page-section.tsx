@@ -62,7 +62,7 @@ export function SettingsItemGroup({
   return (
     <ItemGroup
       className={cn(
-        "gap-0 overflow-hidden rounded-xl border bg-card shadow-none [&_[data-slot=item-description]]:line-clamp-1 [&_[data-slot=item-description]]:text-xs [&_[data-slot=item-description]]:leading-4 [&_[data-slot=item-separator]]:my-0 [&_[data-slot=item-title]]:text-sm [&_[data-slot=item-title]]:leading-5",
+        "gap-0 overflow-hidden rounded-xl border bg-card shadow-none [&>[data-slot=item]]:min-h-16 [&>[data-slot=item]]:p-4 [&_[data-slot=item-actions]]:flex-wrap [&_[data-slot=item-description]]:text-xs [&_[data-slot=item-description]]:leading-4 [&_[data-slot=item-separator]]:my-0 [&_[data-slot=item-title]]:text-sm [&_[data-slot=item-title]]:leading-5",
         className,
       )}
       {...props}
@@ -77,7 +77,7 @@ export function SettingsListBlock({
   return (
     <div
       className={cn(
-        "overflow-hidden rounded-xl border bg-card shadow-none [&_[data-slot=field-description]]:text-xs [&_[data-slot=field-description]]:leading-4 [&_[data-slot=field-label]]:text-sm [&_[data-slot=field-label]]:leading-5",
+        "overflow-hidden rounded-xl border bg-card shadow-none [&>[data-slot=field]]:min-h-16 [&>[data-slot=field]]:flex-wrap [&_[data-slot=field-content]]:min-w-28 [&_[data-slot=field-description]]:text-xs [&_[data-slot=field-description]]:leading-4 [&_[data-slot=field-label]]:text-sm [&_[data-slot=field-label]]:leading-5",
         className,
       )}
       {...props}

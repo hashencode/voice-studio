@@ -3,8 +3,8 @@
 本端文档入口见 [docs/README.md](docs/README.md)，按架构、开发和验证分别阅读；根规则与原验收边界继续生效。
 
 This is the independent Electron desktop composition root. It uses Bun,
-Electron Forge, Vite, React/TypeScript, Tailwind, and the pinned shadcn
-`sidebar-09` composition. Flutter Desktop remains frozen reference source only;
+Electron Forge, Vite, React/TypeScript, Tailwind, and a framed App Shell 8
+workspace built with the local shadcn components. Flutter Desktop remains frozen reference source only;
 this application does not open its profile, import its packages, or use it as a
 runtime fallback.
 
@@ -53,16 +53,12 @@ directory and verifies the real worker health handshake.
 
 `bun run check:ui:visual` launches the repository-pinned Electron runtime through a
 test-only Main/Preload harness, exercises the production Renderer entry, checks
-sidebar geometry, and runs eleven deterministic tests with ten canonical
-screenshots, including the 1280 x 720 ReUI comparison state and the 320 x 96
-desktop floating capture control. It also checks the fixed-column shell at the
-880 px production minimum.
-Canonical pixel baselines are macOS arm64 only; every host still runs the
-semantic and 0.5 px geometry assertions. Run
-`bun run check:ui:visual:update` only after an explicit baseline-update request.
-Baseline updates require the environment recorded in
-`tests/visual/goldens/README.md` and a side-by-side review against the pinned
-ReUI App Shell 4 reference.
+the workspace frame, pane resizing, and control reachability at the 880 px
+production minimum. Main-window cases attach current images to their geometry
+and interaction results. The App Shell 4 PNGs document the previous layout.
+The independent 320 × 96 floating capture case retains its macOS arm64 pixel
+comparison. Run `bun run check:ui:visual:update` only after an explicit baseline
+update request and follow the [baseline environment](tests/visual/goldens/README.md).
 
 ## Frozen resource cache
 
@@ -88,8 +84,9 @@ by versioned serializable contracts in `src/shared`.
 
 ## Electron UI authority and registry provenance
 
-Electron shell composition and density follow the pinned ReUI App Shell 4
-reference in `tests/visual/references`; Electron renderer primitives use the
+Electron shell composition follows Media Studio's App Shell 8 layout. See the
+[current shell geometry](../../docs/architecture/electron-audio-context-shell.md).
+Electron renderer primitives use the
 official shadcn `radix-nova` composite style as their component, interaction,
 and typography baseline. The value in
 `components.json` selects both the Radix primitive base and the Nova visual

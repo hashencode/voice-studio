@@ -1,9 +1,14 @@
 # Renderer visual baseline authority
 
+The App Shell 4 main-window PNGs and the `aligned-voice-settings-*.png` files
+record earlier layouts. Current App Shell 8 cases assert geometry and
+interaction and attach current renders to their results. The standalone
+floating capture case retains its existing pixel comparison.
+
 The audio first-use top bar is intentionally omitted. The two
 `audio-empty-recording-ready*.png` baselines record that full-page presentation.
 
-The product shell defaults its context pane to 300px and supports runtime
+The recorded App Shell 4 shell defaulted its context pane to 300px and supported runtime
 resizing from 240px through 480px while retaining at least 480px for main
 content. The width-sensitive product PNGs below record the 300px default; the
 behavioral visual test separately covers drag, viewport clamping, four-section
@@ -44,7 +49,7 @@ The shell baselines are:
 The 1280×720 shell comparison uses
 `../references/reui-app-shell-4-2026-09-03-1280x720.png`. Its 390px context
 column and x=440 content origin remain historical public-reference evidence,
-not current Voice2Text product geometry. Current product assertions target a
+while the App Shell 4 product assertions targeted a
 49px primary rail, 300px default context pane plus 1px divider, x=350 content
 origin, aligned heads, compact controls, borders, and shadowless surfaces.
 Reference Chromium 151 and product Chromium 150 are recorded separately;

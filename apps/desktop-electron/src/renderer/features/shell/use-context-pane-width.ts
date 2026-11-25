@@ -20,7 +20,8 @@ export function contextPaneWidthLimits(
   const viewportMaximum =
     viewportWidth -
     SHELL_GEOMETRY.primaryRailWidth -
-    SHELL_GEOMETRY.contextPaneOuterBorderWidth -
+    SHELL_GEOMETRY.workspaceInset -
+    2 * SHELL_GEOMETRY.workspaceBorderWidth -
     CONTEXT_PANE_WIDTH.mainContentMinimum;
   return {
     minimum: CONTEXT_PANE_WIDTH.minimum,

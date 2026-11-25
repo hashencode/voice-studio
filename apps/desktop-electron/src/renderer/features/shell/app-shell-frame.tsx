@@ -1,5 +1,5 @@
 import * as React from "react";
-import { ArrowLeft } from "lucide-react";
+import { ArrowLeft, ChevronRight } from "lucide-react";
 
 import { AppSidebar } from "@/components/app-sidebar";
 import { Button } from "@/components/ui/button";
@@ -12,7 +12,6 @@ import {
 } from "@/components/ui/sidebar";
 import { ContextPaneShell } from "@/features/shell/context-pane-shell";
 import {
-  expandedContextPanePrefixWidth,
   SHELL_GEOMETRY,
   SHELL_SECTION_LABELS,
   type RendererShellSection,
@@ -55,8 +54,6 @@ type AppShellFrameProps = React.PropsWithChildren<{
   footer?: React.ReactNode;
 }>;
 
-// Independently composed from the pinned public render; controllers own all state.
-// Electron keeps a docked pane at its 880px minimum instead of the preview's sheet.
 export function AppShellFrame({
   section,
   onNavigate,
@@ -82,10 +79,25 @@ export function AppShellFrame({
   children,
 }: AppShellFrameProps) {
   const [contextPaneResizing, setContextPaneResizing] = React.useState(false);
+  const paneTrackRef = React.useRef<HTMLDivElement>(null);
+  const previousSectionRef = React.useRef(section);
   const open = contextPane?.open ?? false;
   const navigationVisible = visibility?.navigation ?? true;
+  const sectionLabel = SHELL_SECTION_LABELS[section];
+  const showSectionLabel =
+    navigationVisible && contextPane && title !== sectionLabel;
   const paneLabel = `${open ? "收起" : "打开"}${SHELL_SECTION_LABELS[contextPane?.section ?? section]}上下文面板`;
   const resizeLabel = `调整${SHELL_SECTION_LABELS[contextPane?.section ?? section]}上下文面板宽度`;
+
+  React.useLayoutEffect(() => {
+    if (previousSectionRef.current === section) return;
+    previousSectionRef.current = section;
+    const track = paneTrackRef.current;
+    if (!track) return;
+    track.style.transition = "none";
+    void track.offsetWidth;
+    track.style.removeProperty("transition");
+  }, [section]);
 
   return (
     <SidebarProvider
@@ -93,11 +105,14 @@ export function AppShellFrame({
       persistState={false}
       enableKeyboardShortcut={false}
       data-resizing={contextPaneResizing ? "true" : undefined}
-      className="relative h-svh overflow-hidden"
+      className="relative h-svh overflow-hidden bg-sidebar"
       style={
         {
-          "--sidebar-width": `${expandedContextPanePrefixWidth(contextPaneWidth)}px`,
-          "--sidebar-width-icon": `${SHELL_GEOMETRY.collapsedPrefixWidth}px`,
+          "--sidebar-width": `${SHELL_GEOMETRY.primaryRailWidth}px`,
+          "--context-pane-width": `${contextPaneWidth}px`,
+          "--workspace-inset": `${SHELL_GEOMETRY.workspaceInset}px`,
+          "--workspace-border": `${SHELL_GEOMETRY.workspaceBorderWidth}px`,
+          "--workspace-radius": `${SHELL_GEOMETRY.workspaceRadius}px`,
         } as React.CSSProperties
       }
     >
@@ -106,49 +121,20 @@ export function AppShellFrame({
           current={section}
           onNavigate={onNavigate}
           navigationDisabled={navigationDisabled}
-          presentation={
-            open && contextPane ? contextPane.presentation : "closed"
-          }
           unreadActivityCount={unreadActivityCount}
-        >
-          {contextPane ? <ContextPaneShell {...contextPane} /> : null}
-        </AppSidebar>
-      ) : null}
-      {navigationVisible && contextPane && open && contextPaneResize ? (
-        <PaneResizeHandle
-          aria-label={resizeLabel}
-          value={contextPaneWidth}
-          minimum={contextPaneResize.minimum}
-          maximum={contextPaneResize.maximum}
-          disabled={contextPaneResize.disabled}
-          cancellationKey={section}
-          onResize={contextPaneResize.onChange}
-          onResizeStateChange={setContextPaneResizing}
-          style={{ left: "var(--sidebar-width)" }}
         />
       ) : null}
-      {navigationVisible && contextPane ? (
-        <SidebarRail
-          ref={paneTriggerRef}
-          variant="handle"
-          data-context-pane-midpoint-rail="true"
-          type="button"
-          aria-label={paneLabel}
-          title={paneLabel}
-          tabIndex={0}
-          aria-expanded={open}
-          disabled={navigationDisabled}
-          onClick={onTogglePane}
-          style={{
-            left: open ? "var(--sidebar-width)" : "var(--sidebar-width-icon)",
-          }}
-        />
-      ) : null}
-      <SidebarInset className="z-30 min-h-0 min-w-0 overflow-hidden">
+      <SidebarInset
+        data-workspace-frame="true"
+        className={cn(
+          "my-(--workspace-inset) mr-(--workspace-inset) min-h-0 min-w-0 overflow-hidden rounded-(--workspace-radius) border-(length:--workspace-border)",
+          !navigationVisible && "ml-(--workspace-inset)",
+        )}
+      >
         {showHeader ? (
           <header
             data-shell-slot="content-head"
-            className="flex h-[50px] shrink-0 items-center gap-1.5 border-b bg-background px-(--spacing-shell-header-inline)"
+            className="flex h-[50px] shrink-0 items-center gap-2 border-b bg-background px-(--spacing-shell-header-inline)"
           >
             {backAction ? (
               <>
@@ -168,6 +154,17 @@ export function AppShellFrame({
                 />
               </>
             ) : null}
+            {showSectionLabel ? (
+              <>
+                <span className="shrink-0 text-sm font-medium">
+                  {sectionLabel}
+                </span>
+                <ChevronRight
+                  aria-hidden="true"
+                  className="size-3.5 shrink-0 text-muted-foreground"
+                />
+              </>
+            ) : null}
             {customTitle !== undefined ? (
               <div data-shell-slot="custom-title" className="min-w-0 flex-1">
                 {customTitle}
@@ -176,7 +173,7 @@ export function AppShellFrame({
               <h1
                 ref={titleRef}
                 tabIndex={-1}
-                className="min-w-0 flex-1 truncate text-sm leading-snug font-semibold"
+                className="min-w-0 flex-1 truncate text-sm leading-snug font-medium"
                 data-slot="content-title"
               >
                 {title}
@@ -189,34 +186,76 @@ export function AppShellFrame({
             ) : null}
           </header>
         ) : null}
-        {notice ? (
-          <div data-shell-slot="content-notice" className="shrink-0">
-            {notice}
+        <div data-shell-slot="workspace-body" className="flex min-h-0 flex-1">
+          {navigationVisible && contextPane ? (
+            <div
+              ref={paneTrackRef}
+              data-shell-slot="context-pane-track"
+              data-state={open ? "open" : "closed"}
+              className="relative w-(--context-pane-width) shrink-0 transition-[width] duration-200 ease-linear group-data-[resizing=true]/sidebar-wrapper:transition-none motion-reduce:transition-none data-[state=closed]:w-0"
+            >
+              <div className="h-full overflow-hidden">
+                <ContextPaneShell {...contextPane} showTitle={!showHeader} />
+              </div>
+              {open && contextPaneResize ? (
+                <PaneResizeHandle
+                  aria-label={resizeLabel}
+                  value={contextPaneWidth}
+                  minimum={contextPaneResize.minimum}
+                  maximum={contextPaneResize.maximum}
+                  disabled={contextPaneResize.disabled}
+                  cancellationKey={section}
+                  onResize={contextPaneResize.onChange}
+                  onResizeStateChange={setContextPaneResizing}
+                  className="left-full"
+                />
+              ) : null}
+              <SidebarRail
+                ref={paneTriggerRef}
+                variant="handle"
+                data-context-pane-midpoint-rail="true"
+                type="button"
+                aria-label={paneLabel}
+                title={paneLabel}
+                tabIndex={0}
+                aria-expanded={open}
+                disabled={navigationDisabled}
+                onClick={onTogglePane}
+                className="left-full"
+              />
+            </div>
+          ) : null}
+          <div className="flex min-w-0 flex-1 flex-col">
+            {notice ? (
+              <div data-shell-slot="content-notice" className="shrink-0">
+                {notice}
+              </div>
+            ) : null}
+            <div
+              ref={contentRef}
+              id="main-content"
+              data-shell-slot="content"
+              data-context-pane-background="true"
+              className={cn(
+                "flex min-h-0 flex-1 flex-col overflow-auto",
+                contentPadding === "compact" && "p-(--spacing-shell-compact)",
+                contentPadding === "page" &&
+                  "p-(--spacing-shell-page) sm:p-(--spacing-shell-page-wide)",
+                contentTone === "muted" && "bg-muted/20",
+              )}
+            >
+              {children}
+            </div>
+            {footer ? (
+              <footer
+                data-shell-slot="content-footer"
+                className="flex w-full shrink-0 flex-nowrap items-center border-t bg-background"
+              >
+                {footer}
+              </footer>
+            ) : null}
           </div>
-        ) : null}
-        <div
-          ref={contentRef}
-          id="main-content"
-          data-shell-slot="content"
-          data-context-pane-background="true"
-          className={cn(
-            "flex min-h-0 flex-1 flex-col overflow-auto",
-            contentPadding === "compact" && "p-(--spacing-shell-compact)",
-            contentPadding === "page" &&
-              "p-(--spacing-shell-page) sm:p-(--spacing-shell-page-wide)",
-            contentTone === "muted" && "bg-muted/20",
-          )}
-        >
-          {children}
         </div>
-        {footer ? (
-          <footer
-            data-shell-slot="content-footer"
-            className="flex w-full shrink-0 flex-nowrap items-center border-t bg-background"
-          >
-            {footer}
-          </footer>
-        ) : null}
       </SidebarInset>
     </SidebarProvider>
   );

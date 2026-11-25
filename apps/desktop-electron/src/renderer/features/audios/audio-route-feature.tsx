@@ -59,6 +59,7 @@ import { ContextPaneSearchRegion } from "@/features/shell/context-pane-shell";
 import {
   AudioDetailWorkspace,
   AudioPlaybackControls,
+  type AudioWorkspaceHeader,
 } from "@/features/audios/audio-workspace-feature";
 import {
   resolveRecordingMicrophone,
@@ -1441,12 +1442,14 @@ export function AudioContextPaneToolbar({
 
 export function AudioMainWorkspace({
   controller,
+  header,
   operationError,
   showRecordingReady = true,
   recordingSessionId = null,
   libraryProjection,
 }: {
   controller: AudioRouteController;
+  header?: AudioWorkspaceHeader;
   operationError?: string | null;
   showRecordingReady?: boolean;
   recordingSessionId?: string | null;
@@ -1478,6 +1481,7 @@ export function AudioMainWorkspace({
           <AudioDetailWorkspace
             api={controller.api}
             workspace={workspace}
+            header={header}
             routePending={controller.transitionPending}
             onWorkspaceChange={controller.setWorkspace}
             onWorkspaceMutation={controller.applyWorkspaceMutation}

@@ -1,4 +1,5 @@
 import * as React from "react";
+import { createPortal } from "react-dom";
 import { toast } from "sonner";
 import {
   Astroid,
@@ -334,9 +335,15 @@ export function AudioWorkspaceFeature({
   );
 }
 
+export type AudioWorkspaceHeader = {
+  target: HTMLDivElement | null;
+  onTitleMount: (heading: HTMLHeadingElement | null) => void;
+};
+
 export function AudioDetailWorkspace({
   api,
   workspace,
+  header,
   routePending,
   onWorkspaceChange,
   playback,
@@ -348,6 +355,7 @@ export function AudioDetailWorkspace({
 }: {
   api: Voice2TextDesktopApi;
   workspace: AudioWorkspaceSnapshot;
+  header?: AudioWorkspaceHeader;
   routePending: boolean;
   onWorkspaceChange: (value: AudioWorkspaceSnapshot) => void;
   playback?: AudioPlaybackSnapshot | null;
@@ -369,6 +377,7 @@ export function AudioDetailWorkspace({
     <WorkspaceView
       api={api}
       workspace={workspace}
+      header={header}
       pending={pending || routePending}
       error={error}
       setPending={setPending}
@@ -387,6 +396,7 @@ export function AudioDetailWorkspace({
 function WorkspaceView({
   api,
   workspace,
+  header,
   pending,
   error,
   setPending,
@@ -402,6 +412,7 @@ function WorkspaceView({
 }: {
   api: Voice2TextDesktopApi;
   workspace: AudioWorkspaceSnapshot;
+  header?: AudioWorkspaceHeader;
   pending: boolean;
   error: string | null;
   setPending: (value: boolean) => void;
@@ -421,6 +432,8 @@ function WorkspaceView({
   ) => Promise<AudioWorkspaceSnapshot | null>;
   transcriptStatus?: React.ReactNode;
 }) {
+  const usesShellHeader = header !== undefined;
+  const { target: headerTarget, onTitleMount } = header ?? {};
   const [query, setQuery] = React.useState("");
   const [searchOpen, setSearchOpen] = React.useState(false);
   const [transcriptViewMode, setTranscriptViewMode] =
@@ -501,7 +514,12 @@ function WorkspaceView({
 
   React.useEffect(() => {
     const marker = titleMarkerRef.current;
-    if (!marker || typeof IntersectionObserver === "undefined") return;
+    if (
+      usesShellHeader ||
+      !marker ||
+      typeof IntersectionObserver === "undefined"
+    )
+      return;
     const observer = new IntersectionObserver(
       ([entry]) => {
         const nextCompactHeader = !entry?.isIntersecting;
@@ -512,7 +530,7 @@ function WorkspaceView({
     );
     observer.observe(marker);
     return () => observer.disconnect();
-  }, [workspace.summary.audioId]);
+  }, [usesShellHeader, workspace.summary.audioId]);
 
   React.useEffect(() => {
     if (searchOpen) searchInputRef.current?.focus();
@@ -789,12 +807,67 @@ function WorkspaceView({
     : (command: Parameters<Voice2TextDesktopApi["controlAudioPlayback"]>[1]) =>
         void playbackAction(command);
 
+  const displayTitle = title.trim() || "未命名音频";
+  const renderTitle = (compact: boolean) =>
+    editingField === "title" && compactHeader === compact ? (
+      <InlineTextEditor
+        ariaLabel="音频标题"
+        initialValue={title}
+        className={
+          compact || usesShellHeader
+            ? "block min-w-[1ch] max-w-full truncate rounded-sm outline-none"
+            : "block min-w-[1ch] max-w-full rounded-sm outline-none"
+        }
+        onCancel={() => setEditingField(null)}
+        onCommit={(value) => commitMetadataEdit("title", value)}
+        onKeyboardExit={() => requestMetadataFocusRestore("title")}
+      />
+    ) : (
+      <button
+        ref={compact ? compactTitleTriggerRef : expandedTitleTriggerRef}
+        type="button"
+        aria-label="编辑音频标题"
+        className={
+          compact || usesShellHeader
+            ? "block min-w-0 max-w-full truncate rounded-sm text-left outline-none focus-visible:underline focus-visible:underline-offset-2"
+            : "max-w-full rounded-sm text-left outline-none focus-visible:underline focus-visible:underline-offset-2"
+        }
+        disabled={pending}
+        onClick={() => setEditingField("title")}
+      >
+        {displayTitle}
+      </button>
+    );
+  const exportAction = (
+    <AudioWorkspaceActions
+      pending={pending}
+      onExport={(format) => void exportAudio(format)}
+      showLabel={usesShellHeader}
+    />
+  );
+
   return (
     <section
       aria-label={`${workspace.summary.displayName} 工作区`}
       aria-busy={pending}
       className="min-h-full"
     >
+      {headerTarget
+        ? createPortal(
+            <>
+              <h1
+                ref={onTitleMount}
+                tabIndex={-1}
+                aria-label={displayTitle}
+                className="min-w-0 flex-1 text-sm leading-snug font-medium"
+              >
+                {renderTitle(false)}
+              </h1>
+              {exportAction}
+            </>,
+            headerTarget,
+          )
+        : null}
       {onBack ? (
         <Button
           type="button"
@@ -821,29 +894,32 @@ function WorkspaceView({
         />
       ) : null}
 
-      <div
-        data-audio-sticky-actions
-        className="pointer-events-none sticky top-0 z-30 h-0 w-full min-w-0 px-(--spacing-audio-canvas-inline) sm:px-(--spacing-audio-canvas-inline-wide)"
-      >
+      {!usesShellHeader ? (
         <div
-          data-audio-sticky-actions-content
-          className={
-            compactHeader
-              ? "pointer-events-auto ml-auto w-fit translate-y-[9px] transition-transform duration-200 motion-reduce:transition-none"
-              : "pointer-events-auto ml-auto w-fit translate-y-8 transition-transform duration-200 motion-reduce:transition-none"
-          }
+          data-audio-sticky-actions
+          className="pointer-events-none sticky top-0 z-30 h-0 w-full min-w-0 px-(--spacing-audio-canvas-inline) sm:px-(--spacing-audio-canvas-inline-wide)"
         >
-          <AudioWorkspaceActions
-            pending={pending}
-            onExport={(format) => void exportAudio(format)}
-          />
+          <div
+            data-audio-sticky-actions-content
+            className={
+              compactHeader
+                ? "pointer-events-auto ml-auto w-fit translate-y-[9px] transition-transform duration-200 motion-reduce:transition-none"
+                : "pointer-events-auto ml-auto w-fit translate-y-8 transition-transform duration-200 motion-reduce:transition-none"
+            }
+          >
+            {exportAction}
+          </div>
         </div>
-      </div>
+      ) : null}
 
       <div
         ref={titleMarkerRef}
         data-audio-hero
-        className="w-full min-w-0 px-(--spacing-audio-canvas-inline) pt-(--spacing-activity-detail-block) sm:px-(--spacing-audio-canvas-inline-wide)"
+        className={
+          usesShellHeader
+            ? "w-full min-w-0 px-(--spacing-audio-canvas-inline) pt-(--spacing-context-inline) sm:px-(--spacing-audio-canvas-inline-wide)"
+            : "w-full min-w-0 px-(--spacing-audio-canvas-inline) pt-(--spacing-activity-detail-block) sm:px-(--spacing-audio-canvas-inline-wide)"
+        }
       >
         <div
           data-audio-expanded-title
@@ -856,29 +932,11 @@ function WorkspaceView({
           }
         >
           <div className="min-w-0">
-            <h1 className="text-3xl font-semibold tracking-tight">
-              {editingField === "title" && !compactHeader ? (
-                <InlineTextEditor
-                  ariaLabel="音频标题"
-                  initialValue={title}
-                  className="block min-w-[1ch] max-w-full rounded-sm outline-none"
-                  onCancel={() => setEditingField(null)}
-                  onCommit={(value) => commitMetadataEdit("title", value)}
-                  onKeyboardExit={() => requestMetadataFocusRestore("title")}
-                />
-              ) : (
-                <button
-                  ref={expandedTitleTriggerRef}
-                  type="button"
-                  aria-label="编辑音频标题"
-                  className="max-w-full rounded-sm text-left outline-none focus-visible:underline focus-visible:underline-offset-2"
-                  disabled={pending}
-                  onClick={() => setEditingField("title")}
-                >
-                  {title.trim() || "未命名音频"}
-                </button>
-              )}
-            </h1>
+            {!usesShellHeader ? (
+              <h1 className="text-3xl font-semibold tracking-tight">
+                {renderTitle(false)}
+              </h1>
+            ) : null}
             <p className="mt-1 text-sm text-muted-foreground">
               {editingField === "description" ? (
                 <InlineTextEditor
@@ -915,53 +973,41 @@ function WorkspaceView({
 
       <div
         data-audio-sticky-header
-        className="sticky top-[50px] z-20 mt-5 h-11"
+        className={
+          usesShellHeader
+            ? "sticky top-0 z-20 h-11"
+            : "sticky top-[50px] z-20 mt-5 h-11"
+        }
       >
-        <div
-          aria-hidden="true"
-          className={
-            compactHeader
-              ? "pointer-events-none absolute inset-x-0 -top-[50px] h-[50px] bg-background/95 opacity-100 backdrop-blur-sm transition-opacity duration-200 motion-reduce:transition-none"
-              : "pointer-events-none absolute inset-x-0 -top-[50px] h-[50px] bg-background/95 opacity-0 backdrop-blur-sm transition-opacity duration-200 motion-reduce:transition-none"
-          }
-        />
+        {!usesShellHeader ? (
+          <div
+            aria-hidden="true"
+            className={
+              compactHeader
+                ? "pointer-events-none absolute inset-x-0 -top-[50px] h-[50px] bg-background/95 opacity-100 backdrop-blur-sm transition-opacity duration-200 motion-reduce:transition-none"
+                : "pointer-events-none absolute inset-x-0 -top-[50px] h-[50px] bg-background/95 opacity-0 backdrop-blur-sm transition-opacity duration-200 motion-reduce:transition-none"
+            }
+          />
+        ) : null}
         <div
           aria-hidden="true"
           className="pointer-events-none absolute inset-x-0 top-0 h-11 border-b bg-background/95 backdrop-blur-sm"
         />
         <div className="relative h-11 w-full min-w-0 px-(--spacing-audio-canvas-inline) sm:px-(--spacing-audio-canvas-inline-wide)">
-          <div
-            data-audio-compact-title
-            aria-hidden={!compactHeader}
-            inert={!compactHeader ? true : undefined}
-            className={
-              compactHeader
-                ? "absolute inset-x-5 -top-[35px] h-5 min-w-0 pr-12 text-sm leading-5 font-semibold opacity-100 transition-opacity duration-200 motion-reduce:transition-none sm:inset-x-8"
-                : "pointer-events-none absolute inset-x-5 -top-[35px] h-5 min-w-0 pr-12 text-sm leading-5 font-semibold opacity-0 transition-opacity duration-200 motion-reduce:transition-none sm:inset-x-8"
-            }
-          >
-            {editingField === "title" && compactHeader ? (
-              <InlineTextEditor
-                ariaLabel="音频标题"
-                initialValue={title}
-                className="block min-w-[1ch] max-w-full flex-1 truncate rounded-sm outline-none"
-                onCancel={() => setEditingField(null)}
-                onCommit={(value) => commitMetadataEdit("title", value)}
-                onKeyboardExit={() => requestMetadataFocusRestore("title")}
-              />
-            ) : (
-              <button
-                ref={compactTitleTriggerRef}
-                type="button"
-                aria-label="编辑音频标题"
-                className="block min-w-0 max-w-full truncate rounded-sm text-left outline-none focus-visible:underline focus-visible:underline-offset-2"
-                disabled={pending}
-                onClick={() => setEditingField("title")}
-              >
-                {title.trim() || "未命名音频"}
-              </button>
-            )}
-          </div>
+          {!usesShellHeader ? (
+            <div
+              data-audio-compact-title
+              aria-hidden={!compactHeader}
+              inert={!compactHeader ? true : undefined}
+              className={
+                compactHeader
+                  ? "absolute inset-x-5 -top-[35px] h-5 min-w-0 pr-12 text-sm leading-5 font-semibold opacity-100 transition-opacity duration-200 motion-reduce:transition-none sm:inset-x-8"
+                  : "pointer-events-none absolute inset-x-5 -top-[35px] h-5 min-w-0 pr-12 text-sm leading-5 font-semibold opacity-0 transition-opacity duration-200 motion-reduce:transition-none sm:inset-x-8"
+              }
+            >
+              {renderTitle(true)}
+            </div>
+          ) : null}
           <div
             role="tablist"
             aria-label="音频内容"
@@ -1585,9 +1631,11 @@ function SegmentRow({
 function AudioWorkspaceActions({
   pending,
   onExport,
+  showLabel,
 }: {
   pending: boolean;
   onExport: (format: AudioExportFormat) => void;
+  showLabel: boolean;
 }) {
   return (
     <div
@@ -1600,11 +1648,12 @@ function AudioWorkspaceActions({
           <Button
             type="button"
             variant="ghost"
-            size="icon-sm"
+            size={showLabel ? "sm" : "icon-sm"}
             disabled={pending}
             aria-label="导出"
           >
             <SquareArrowOutUpRight aria-hidden="true" />
+            {showLabel ? "导出" : null}
           </Button>
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end">

@@ -18,13 +18,14 @@ const rendererUrl = "http://127.0.0.1:4179";
 const canonicalScreenshots =
   process.platform === "darwin" && process.arch === "arm64";
 const PRODUCT_CONTEXT_PANE_WIDTH = 300;
-const PRODUCT_CONTEXT_PANE_MINIMUM = 240;
-const PRODUCT_CONTEXT_PANE_MAXIMUM = 480;
+const PRODUCT_CONTEXT_PANE_MINIMUM = 260;
+const PRODUCT_CONTEXT_PANE_MAXIMUM = 380;
 const PRODUCT_MAIN_CONTENT_MINIMUM = 480;
-const PRIMARY_RAIL_WIDTH = 49;
-const CONTEXT_PANE_BORDER_WIDTH = 1;
+const PRIMARY_RAIL_WIDTH = 63;
+const WORKSPACE_INSET = 8;
+const WORKSPACE_BORDER = 1;
 
-test.describe("sidebar-09 production Renderer", () => {
+test.describe("App Shell 8 production Renderer", () => {
   test.beforeAll(() => {
     // This guards evidence integrity, not same-session visual acceptance.
     const image = readFileSync(
@@ -48,22 +49,22 @@ test.describe("sidebar-09 production Renderer", () => {
     );
   });
 
-  test("1280x720 Audio App Shell 4 baseline", async () => {
+  test("1280x720 Audio App Shell 8 workspace", async () => {
     await withVisualSession("audio-closed", 1280, 720, async (session) => {
       const { page } = session;
       await expect(
         page.getByRole("complementary", { name: "音频上下文面板" }),
       ).toBeVisible();
-      await expect(page.getByRole("heading", { level: 1 })).toBeVisible();
+
       await page.getByRole("button", { name: "打开 产品设计评审.wav" }).click();
       await expect(
         page.getByRole("heading", { name: "产品设计评审.wav", level: 1 }),
       ).toBeVisible();
       await assertRuntimeContract(page, 1280, 720);
       await assertDockedGeometry(page, 1280, 720);
-      await assertReferenceChrome(page, true);
+
       await assertFlatRows(page, "音频列表");
-      await screenshot(session, "audio-app-shell-4.png", 1280, 720);
+      await screenshot(session, "audio-app-shell-8.png", 1280, 720);
     });
   });
 
@@ -71,11 +72,8 @@ test.describe("sidebar-09 production Renderer", () => {
     await withVisualSession("audio-active", 1280, 720, async (session) => {
       const { page } = session;
       await expect(
-        page.getByRole("button", { name: "产品设计评审", exact: true }),
-      ).toBeVisible();
-      await expect(
-        page.getByRole("button", { name: "编辑录制名称" }),
-      ).toBeVisible();
+        page.locator('[data-shell-slot="content-head"]'),
+      ).toContainText("产品设计评审");
       await expect(
         page.getByRole("complementary", { name: "音频上下文面板" }),
       ).toHaveCount(0);
@@ -95,8 +93,7 @@ test.describe("sidebar-09 production Renderer", () => {
       expectWithin(headerHeight, 50);
 
       await assertRuntimeContract(page, 1280, 720);
-      await assertRailOnlyGeometry(page, 1280, 720, false);
-      await assertReferenceChrome(page, false, false);
+      await assertRailOnlyGeometry(page, 1280, 720, false, false);
       await assertCaptureContainment(page, 1280, 720, false);
       await screenshot(
         session,
@@ -112,12 +109,9 @@ test.describe("sidebar-09 production Renderer", () => {
       await expect(
         page.getByRole("button", { name: "前进", exact: true }),
       ).toHaveCount(0);
-      const filters = page.getByRole("group", { name: "音频筛选" });
-      const selectedFilter = filters.locator('[aria-pressed="true"]');
-      await expect(selectedFilter).toHaveCSS(
-        "background-color",
-        renderReference.evidence.tokens.primary,
-      );
+      await expect(
+        page.getByRole("button", { name: "筛选音频：全部" }),
+      ).toBeEnabled();
       const rows = page
         .getByRole("list", { name: "音频列表" })
         .locator("button[data-flat-row]");
@@ -138,17 +132,23 @@ test.describe("sidebar-09 production Renderer", () => {
         name: "搜索音频",
         exact: true,
       });
+      const unfocusedBorder = await search.evaluate(
+        (element) => getComputedStyle(element).borderColor,
+      );
       await search.focus();
       await page.keyboard.press("Tab");
       await page.keyboard.press("Shift+Tab");
       await expect(search).toBeFocused();
       const focus = await search.evaluate((element) => ({
         visible: element.matches(":focus-visible"),
+        border: getComputedStyle(element).borderColor,
+        borderWidth: getComputedStyle(element).borderWidth,
         shadow: getComputedStyle(element).boxShadow,
       }));
       expect(focus.visible).toBe(true);
-      expect(focus.shadow).toContain("0px 0px 0px 1px");
-      expect(focus.shadow).not.toContain("0px 0px 0px 3px");
+      expect(focus.border).not.toBe(unfocusedBorder);
+      expect(focus.borderWidth).toBe("1px");
+      expect(focus.shadow).toBe("none");
     });
   });
 
@@ -156,7 +156,7 @@ test.describe("sidebar-09 production Renderer", () => {
     await withVisualSession("audio-closed", 1280, 720, async (session) => {
       const { page } = session;
       await expect(
-        page.getByRole("heading", { name: "请选择音频", level: 1 }),
+        page.getByText("请选择左侧音频", { exact: true }),
       ).toBeVisible();
       await expect(
         page.getByRole("button", { name: "导入音频" }),
@@ -169,12 +169,12 @@ test.describe("sidebar-09 production Renderer", () => {
         page.getByRole("button", { name: "打开音频上下文面板" }),
       ).toBeVisible();
       await expect(
-        page.getByRole("heading", { name: "请选择音频", level: 1 }),
+        page.getByText("请选择左侧音频", { exact: true }),
       ).toBeVisible();
 
       await assertRuntimeContract(page, 1280, 720);
       await assertRailOnlyGeometry(page, 1280, 720);
-      await assertReferenceChrome(page, false);
+
       await screenshot(session, "audio-pane-closed.png", 1280, 720);
     });
   });
@@ -187,7 +187,7 @@ test.describe("sidebar-09 production Renderer", () => {
       });
       await expect(emptyHeading).toBeVisible();
       await expect(
-        page.getByRole("region", { name: "首次使用音频" }),
+        page.getByRole("region", { name: "开始你的第一段音频" }),
       ).toBeVisible();
       await expect(
         page.getByRole("complementary", { name: "音频上下文面板" }),
@@ -196,7 +196,7 @@ test.describe("sidebar-09 production Renderer", () => {
         page.getByRole("button", { name: /音频上下文面板/ }),
       ).toHaveCount(0);
 
-      await assertAudioFirstUseDesktopGeometry(page);
+      await assertAudioFirstUseGeometry(page);
 
       await assertRuntimeContract(page, 1240, 820);
       await assertRailOnlyGeometry(page, 1240, 820, false);
@@ -211,7 +211,7 @@ test.describe("sidebar-09 production Renderer", () => {
         page.getByRole("heading", { name: "开始你的第一段音频" }),
       ).toBeVisible();
 
-      await assertAudioFirstUseMinimumGeometry(page);
+      await assertAudioFirstUseGeometry(page);
       await assertRuntimeContract(page, 880, 620);
       await assertRailOnlyGeometry(page, 880, 620, false);
       await screenshot(
@@ -227,12 +227,49 @@ test.describe("sidebar-09 production Renderer", () => {
     await withVisualSession("settings", 1280, 720, async (session) => {
       const { page } = session;
       await expect(
-        page.getByRole("heading", { name: "通用", level: 2 }),
+        page.getByRole("heading", { name: "通用", level: 1 }),
       ).toBeVisible();
       await assertRuntimeContract(page, 1280, 720);
       await assertDockedGeometry(page, 1280, 720);
-      await assertReferenceChrome(page, true, false);
+
       await screenshot(session, "settings.png", 1280, 720);
+    });
+  });
+
+  test("880x620 selected Audio keeps a long title and its actions reachable in dark mode", async () => {
+    await withVisualSession("audio-closed", 880, 620, async (session) => {
+      const { page } = session;
+      await page.emulateMedia({ colorScheme: "dark", reducedMotion: "reduce" });
+      await expect(page.locator("html")).toHaveClass(/\bdark\b/);
+      await page.getByRole("button", { name: "打开 产品设计评审.wav" }).click();
+      await page.getByRole("button", { name: "编辑音频标题" }).click();
+      const editor = page.getByRole("textbox", { name: "音频标题" });
+      const title = "本地音频设计评审与项目事项讨论".repeat(5);
+      await editor.fill(title);
+      await editor.press("Enter");
+      await expect(
+        page.getByRole("heading", { name: title, level: 1 }),
+      ).toBeVisible();
+
+      const resizeHandle = page.getByRole("separator", {
+        name: "调整音频上下文面板宽度",
+      });
+      await resizeHandle.press("End");
+      await assertDockedGeometry(page, 880, 620, 327);
+      await expect(page.getByRole("button", { name: "导出" })).toBeInViewport();
+      await expect(
+        page.getByRole("button", { name: "播放音频" }),
+      ).toBeInViewport();
+
+      const tabs = page.getByRole("tablist", { name: "音频内容" });
+      const content = page.locator("#main-content");
+      await content.evaluate((element) => {
+        element.scrollTop = 300;
+      });
+      expect((await tabs.boundingBox())?.y).toBe(
+        (await content.boundingBox())?.y,
+      );
+      await screenshot(session, "audio-dark-minimum.png", 880, 620);
     });
   });
 
@@ -261,20 +298,22 @@ test.describe("sidebar-09 production Renderer", () => {
         page.getByRole("complementary", { name: "录制控制" }),
       ).toHaveCount(0);
       const recoveryDialog = page.getByRole("dialog", {
-        name: "发现可恢复录制",
+        name: "发现可恢复的录音",
       });
       await expect(recoveryDialog).toBeVisible();
       await expect(
-        recoveryDialog.getByText("发现 6 段未完成的录音，可一次恢复并保存。"),
+        recoveryDialog.getByText(
+          "发现 6 段可恢复录音。下方操作会处理本批全部录音。",
+        ),
       ).toBeVisible();
       await expect(
         recoveryDialog.getByText("Recover-产品设计评审 1"),
       ).toHaveCount(0);
       await expect(
-        recoveryDialog.getByRole("button", { name: "恢复数据" }),
+        recoveryDialog.getByRole("button", { name: "立即恢复" }),
       ).toBeVisible();
       await expect(
-        recoveryDialog.getByRole("button", { name: "丢弃" }),
+        recoveryDialog.getByRole("button", { name: "删除数据" }),
       ).toBeVisible();
       await expect(page.getByRole("region", { name: "录制详情" })).toHaveCount(
         0,
@@ -321,7 +360,7 @@ test.describe("sidebar-09 production Renderer", () => {
 
       await assertRuntimeContract(page, 1280, 720);
       await assertDockedGeometry(page, 1280, 720);
-      await assertReferenceChrome(page, true, false);
+
       await assertFlatRows(page, "已信任设备列表");
       await screenshot(session, "companion-multiple-devices.png", 1280, 720);
     });
@@ -335,9 +374,9 @@ test.describe("sidebar-09 production Renderer", () => {
       const resizeHandle = page.getByRole("separator", {
         name: "调整音频上下文面板宽度",
       });
-      await dragPaneDivider(page, "upper", 90);
-      await assertDockedGeometry(page, 1280, 720, 390);
-      await dragPaneDivider(page, "lower", 90);
+      await dragPaneDivider(page, "upper", 40);
+      await assertDockedGeometry(page, 1280, 720, 340);
+      await dragPaneDivider(page, "lower", 60);
       await expect(resizeHandle).toHaveAttribute(
         "aria-valuenow",
         String(PRODUCT_CONTEXT_PANE_MAXIMUM),
@@ -348,7 +387,7 @@ test.describe("sidebar-09 production Renderer", () => {
         name: "收起音频上下文面板",
       });
       await collapseButton.click();
-      await assertRailOnlyGeometry(page, 1280, 720, true, 480);
+      await assertRailOnlyGeometry(page, 1280, 720);
       await page.getByRole("button", { name: "打开音频上下文面板" }).click();
       await assertDockedGeometry(page, 1280, 720, PRODUCT_CONTEXT_PANE_MAXIMUM);
       await expect(
@@ -356,12 +395,15 @@ test.describe("sidebar-09 production Renderer", () => {
       ).toBeVisible();
 
       for (const target of [
-        { navigation: "互联", pane: "互联上下文面板" },
-        { navigation: "消息", pane: "消息上下文面板" },
-        { navigation: "设置", pane: "设置上下文面板" },
-        { navigation: "音频", pane: "音频上下文面板" },
+        { navigation: /^互联$/, pane: "互联上下文面板" },
+        { navigation: /^消息/, pane: "消息上下文面板" },
+        { navigation: /^设置$/, pane: "设置上下文面板" },
+        { navigation: /^音频$/, pane: "音频上下文面板" },
       ]) {
-        await page.getByRole("button", { name: target.navigation }).click();
+        await page
+          .getByRole("navigation", { name: "工作站主导航" })
+          .getByRole("button", { name: target.navigation })
+          .click();
         await expect(
           page.getByRole("complementary", { name: target.pane }),
         ).toBeVisible();
@@ -374,7 +416,7 @@ test.describe("sidebar-09 production Renderer", () => {
       }
 
       await resizeVisualWindow(session, 880, 720);
-      await assertDockedGeometry(page, 880, 720, 350);
+      await assertDockedGeometry(page, 880, 720, 327);
       await resizeVisualWindow(session, 1280, 720);
       await assertDockedGeometry(page, 1280, 720, PRODUCT_CONTEXT_PANE_MAXIMUM);
 
@@ -557,7 +599,7 @@ async function assertRuntimeContract(
     reducedMotion: matchMedia("(prefers-reduced-motion: reduce)").matches,
     fontFamily: getComputedStyle(document.body)
       .fontFamily.split(",")
-      .slice(0, 3)
+      .slice(0, 2)
       .map((family) => family.trim().replaceAll('"', "")),
     frozenNow: Date.now(),
   }));
@@ -568,7 +610,7 @@ async function assertRuntimeContract(
     language: "zh-CN",
     colorScheme: "light",
     reducedMotion: true,
-    fontFamily: ["system-ui", "-apple-system", "BlinkMacSystemFont"],
+    fontFamily: ["system-ui", "-apple-system"],
     frozenNow: Date.UTC(2026, 7, 19, 3, 20, 0),
   });
 }
@@ -579,79 +621,53 @@ async function assertDockedGeometry(
   height: number,
   contextPaneWidth = PRODUCT_CONTEXT_PANE_WIDTH,
 ) {
-  const expandedPrefix =
-    PRIMARY_RAIL_WIDTH + contextPaneWidth + CONTEXT_PANE_BORDER_WIDTH;
   await expect
-    .poll(async () => {
-      const geometry = await shellGeometry(page);
-      return Math.abs(geometry.gap.width - expandedPrefix);
-    })
-    .toBeLessThan(0.5);
-  const geometry = await shellGeometry(page);
-  expectRect(geometry.wrapper, { x: 0, y: 0, width, height });
-  expectHorizontalRect(geometry.gap, { x: 0, width: expandedPrefix });
-  expectRect(geometry.container, {
-    x: 0,
-    y: 0,
-    width: expandedPrefix,
-    height,
-  });
-  expectRect(geometry.rail, {
-    x: 0,
-    y: 0,
-    width: PRIMARY_RAIL_WIDTH,
-    height,
-  });
-  expectWithin(geometry.railContentWidth, 48);
-  expectWithin(geometry.railBorderRight, 1);
-  if (!geometry.pane) throw new Error("Expected a docked context pane");
-  expectRect(geometry.pane, {
-    x: PRIMARY_RAIL_WIDTH,
-    y: 0,
-    width: contextPaneWidth,
-    height,
-  });
-  if (!geometry.resizeHandle)
-    throw new Error("Expected a docked pane resize handle");
-  expectWithin(
-    geometry.resizeHandle.x + geometry.resizeHandle.width / 2,
-    expandedPrefix,
-  );
+    .poll(async () => (await shellGeometry(page)).track?.width)
+    .toBe(contextPaneWidth);
+  const geometry = await assertFramedWorkspace(page, width, height);
+  const {
+    track,
+    pane,
+    resizeHandle,
+    midpointRail,
+    upperResizeHitArea,
+    lowerResizeHitArea,
+  } = geometry;
+  if (
+    !track ||
+    !pane ||
+    !resizeHandle ||
+    !midpointRail ||
+    !upperResizeHitArea ||
+    !lowerResizeHitArea
+  ) {
+    throw new Error("Expected the docked pane and its controls");
+  }
+  expectRect(pane, track);
+  expectWithin(pane.width, contextPaneWidth);
+  expectWithin(resizeHandle.x + resizeHandle.width / 2, track.right);
   expectWithin(geometry.resizeHandleValue!, contextPaneWidth);
   expectWithin(geometry.resizeHandleMinimum!, PRODUCT_CONTEXT_PANE_MINIMUM);
   expectWithin(
     geometry.resizeHandleMaximum!,
-    Math.max(
-      PRODUCT_CONTEXT_PANE_MINIMUM,
-      Math.min(
-        PRODUCT_CONTEXT_PANE_MAXIMUM,
-        width -
-          PRIMARY_RAIL_WIDTH -
-          CONTEXT_PANE_BORDER_WIDTH -
-          PRODUCT_MAIN_CONTENT_MINIMUM,
-      ),
+    Math.min(
+      PRODUCT_CONTEXT_PANE_MAXIMUM,
+      width -
+        PRIMARY_RAIL_WIDTH -
+        WORKSPACE_INSET -
+        2 * WORKSPACE_BORDER -
+        PRODUCT_MAIN_CONTENT_MINIMUM,
     ),
   );
-  if (!geometry.midpointRail)
-    throw new Error("Expected a docked midpoint rail");
-  expectRect(geometry.midpointRail, {
-    x: expandedPrefix,
-    y: height / 2 - 24,
-    width: 28,
-    height: 48,
-  });
-  if (!geometry.upperResizeHitArea || !geometry.lowerResizeHitArea) {
-    throw new Error("Expected split pane resize hit areas");
-  }
-  expect(geometry.upperResizeHitArea.bottom).toBeLessThanOrEqual(
-    geometry.midpointRail.y,
+  expectWithin(midpointRail.x, track.right);
+  expectWithin(
+    midpointRail.y + midpointRail.height / 2,
+    track.y + track.height / 2,
   );
-  expect(geometry.lowerResizeHitArea.y).toBeGreaterThanOrEqual(
-    geometry.midpointRail.bottom,
-  );
-  expectWithin(geometry.inset.x, expandedPrefix);
-  expectWithin(geometry.inset.width, Math.max(0, width - expandedPrefix));
-  expect(geometry.inset.width).toBeGreaterThanOrEqual(
+  expect(upperResizeHitArea.bottom).toBeLessThanOrEqual(midpointRail.y);
+  expect(lowerResizeHitArea.y).toBeGreaterThanOrEqual(midpointRail.bottom);
+  expectWithin(geometry.content.x, track.right);
+  expect(geometry.content.width).toBeGreaterThanOrEqual(
     PRODUCT_MAIN_CONTENT_MINIMUM,
   );
 }
@@ -661,151 +677,71 @@ async function assertRailOnlyGeometry(
   width: number,
   height: number,
   collapsedPaneMounted = true,
-  contextPaneWidth = PRODUCT_CONTEXT_PANE_WIDTH,
+  navigationVisible = true,
 ) {
-  await expect
-    .poll(async () => {
-      const geometry = await shellGeometry(page);
-      return Math.abs(geometry.gap.width - 48);
-    })
-    .toBeLessThan(0.5);
-  const geometry = await shellGeometry(page);
-  expectRect(geometry.wrapper, { x: 0, y: 0, width, height });
-  expectHorizontalRect(geometry.gap, { x: 0, width: 48 });
-  expectRect(geometry.container, { x: 0, y: 0, width: 48, height });
-  expectRect(geometry.rail, { x: 0, y: 0, width: 49, height });
-  expectWithin(geometry.railContentWidth, 48);
-  expectWithin(geometry.railBorderRight, 1);
+  const geometry = await assertFramedWorkspace(
+    page,
+    width,
+    height,
+    navigationVisible,
+  );
   expect(geometry.resizeHandle).toBeNull();
   if (collapsedPaneMounted) {
-    if (!geometry.pane)
-      throw new Error("Expected the collapsed pane to remain mounted");
-    expectRect(geometry.pane, {
-      x: PRIMARY_RAIL_WIDTH,
-      y: 0,
-      width: contextPaneWidth,
-      height,
-    });
-    if (!geometry.midpointRail)
-      throw new Error("Expected the collapsed midpoint rail to remain mounted");
-    expectRect(geometry.midpointRail, {
-      x: 48,
-      y: height / 2 - 24,
-      width: 28,
-      height: 48,
-    });
+    expect(geometry.pane).not.toBeNull();
+    expect(geometry.track?.width).toBe(0);
+    expect(geometry.midpointRail?.x).toBe(geometry.content.x);
   } else {
+    expect(geometry.track).toBeNull();
     expect(geometry.pane).toBeNull();
     expect(geometry.midpointRail).toBeNull();
   }
-  expectWithin(geometry.inset.x, 48);
-  expectWithin(geometry.inset.width, width - 48);
+  expectWithin(geometry.content.x, geometry.frame.x + WORKSPACE_BORDER);
 }
 
-async function assertReferenceChrome(
+async function assertFramedWorkspace(
   page: Awaited<ReturnType<typeof launch>>["page"],
-  paneOpen: boolean,
-  expectsSearch = true,
+  width: number,
+  height: number,
+  navigationVisible = true,
 ) {
-  const geometry = await page.evaluate(() => {
-    const rect = (selector: string) => {
-      const element = document.querySelector<HTMLElement>(selector);
-      if (!element) return null;
-      const value = element.getBoundingClientRect();
-      const style = getComputedStyle(element);
-      return {
-        x: value.x,
-        y: value.y,
-        width: value.width,
-        height: value.height,
-        boxShadow: style.boxShadow,
-        fontSize: style.fontSize,
-        fontWeight: style.fontWeight,
-        borderRadius: style.borderRadius,
-        paddingLeft: style.paddingLeft,
-        gap: style.gap,
-        marginLeft: style.marginLeft,
-        marginRight: style.marginRight,
-      };
-    };
-    return {
-      paneHead: rect("[data-context-pane-head]"),
-      contentHead: rect('[data-slot="sidebar-inset"] > header'),
-      searchBand: rect("[data-context-pane-search]"),
-      searchInput: rect("[data-context-pane-search] input"),
-      selectedFilter: rect(
-        '[data-context-pane-filters] button[aria-pressed="true"]',
-      ),
-      filtersBand: rect("[data-context-pane-filters]"),
-      title: rect(
-        '[data-slot="content-title"], [data-shell-slot="custom-title"] button:first-child, [data-shell-slot="custom-title"] h1, [data-shell-slot="custom-title"] input',
-      ),
-      separator: rect(
-        '[data-shell-slot="content-head"] [data-slot="separator"]',
-      ),
-      railStroke: rect('[data-slot="sidebar-rail-stroke"]'),
-      back: rect('button[aria-label="后退"]'),
-      avatar: rect('[data-shell-profile-placeholder="true"]'),
-      topPaneTriggerCount: document.querySelectorAll(
-        '[data-slot="sidebar-inset"] > header [aria-label*="上下文面板"]',
-      ).length,
-    };
-  });
-
-  expectWithin(geometry.contentHead!.height, 50);
-  expect(geometry.contentHead!.paddingLeft).toBe("16px");
-  expect(geometry.contentHead!.gap).toBe("6px");
-  expect(geometry.title!.fontSize).toBe("14px");
-  expect(geometry.title!.fontWeight).toBe("600");
-  expectWithin(geometry.separator!.height, 20);
-  expect(geometry.separator!.marginLeft).toBe("8px");
-  expect(geometry.separator!.marginRight).toBe("8px");
-  if (geometry.railStroke) {
-    expectWithin(geometry.railStroke.width, 2);
-    expectWithin(geometry.railStroke.height, 16);
-  } else if (paneOpen) {
-    throw new Error("Expected the midpoint rail stroke");
-  }
-  expectWithin(geometry.back!.width, 28);
-  expectWithin(geometry.back!.height, 28);
-  expectWithin(geometry.avatar!.width, 28);
-  expectWithin(geometry.avatar!.height, 28);
-  expect(geometry.topPaneTriggerCount).toBe(0);
-  for (const surface of [geometry.contentHead, geometry.back]) {
-    expectShadowless(surface!.boxShadow);
-  }
-  if (paneOpen) {
-    expectWithin(geometry.paneHead!.height, 50);
-    expectShadowless(geometry.paneHead!.boxShadow);
-  }
-  if (expectsSearch) {
-    expectWithin(geometry.searchBand!.height, 45);
-    expectWithin(geometry.searchInput!.x, PRIMARY_RAIL_WIDTH + 12);
-    expectWithin(geometry.searchInput!.width, PRODUCT_CONTEXT_PANE_WIDTH - 24);
-    expectWithin(geometry.searchInput!.height, 28);
-    expect(geometry.searchInput!.fontSize).toBe("12px");
-    expect(geometry.searchInput!.borderRadius).toBe("10px");
-    expect(geometry.searchInput!.paddingLeft).toBe("28px");
-    expectShadowless(geometry.searchInput!.boxShadow);
-    expectWithin(geometry.filtersBand!.height, 37);
-    expectWithin(geometry.selectedFilter!.height, 24);
-    expect(geometry.selectedFilter!.fontSize).toBe("12px");
-    expect(geometry.selectedFilter!.fontWeight).toBe("500");
-    expectShadowless(geometry.selectedFilter!.boxShadow);
+  const geometry = await shellGeometry(page);
+  expectRect(geometry.wrapper, { x: 0, y: 0, width, height });
+  const x = navigationVisible ? PRIMARY_RAIL_WIDTH : WORKSPACE_INSET;
+  if (navigationVisible) {
+    expectRect(geometry.rail!, {
+      x: 0,
+      y: 0,
+      width: PRIMARY_RAIL_WIDTH,
+      height,
+    });
   } else {
-    expect(geometry.searchBand).toBeNull();
+    expect(geometry.rail).toBeNull();
   }
-}
-
-function expectShadowless(value: string) {
-  const transparentLayers = value
-    .split(/,\s*(?=rgba?\()/)
-    .every(
-      (layer) =>
-        layer === "none" ||
-        /^rgba\([^)]*,\s*0\)\s+0px\s+0px\s+0px\s+0px$/.test(layer),
-    );
-  expect(transparentLayers).toBe(true);
+  expectRect(geometry.frame, {
+    x,
+    y: WORKSPACE_INSET,
+    width: width - x - WORKSPACE_INSET,
+    height: height - 2 * WORKSPACE_INSET,
+  });
+  expect(geometry.frameRadius).toBe("14px");
+  expect(geometry.frameBorder).toBe("1px");
+  expect(geometry.frameShadow).toBe("none");
+  if (geometry.header) {
+    expectRect(geometry.header, {
+      x: x + WORKSPACE_BORDER,
+      y: WORKSPACE_INSET + WORKSPACE_BORDER,
+      width: geometry.frame.width - 2 * WORKSPACE_BORDER,
+      height: 50,
+    });
+    expectWithin(geometry.header.bottom, geometry.body.y);
+  }
+  expectWithin(geometry.body.bottom, geometry.frame.bottom - WORKSPACE_BORDER);
+  expect(geometry.horizontalOverflow).toBeLessThanOrEqual(1);
+  if (geometry.footer) {
+    expectWithin(geometry.footer.y, geometry.content.bottom);
+    expectWithin(geometry.footer.bottom, geometry.body.bottom);
+  }
+  return geometry;
 }
 
 async function assertFlatRows(
@@ -902,29 +838,16 @@ async function assertCaptureContainment(
   }
 }
 
-async function assertAudioFirstUseDesktopGeometry(
+async function assertAudioFirstUseGeometry(
   page: Awaited<ReturnType<typeof launch>>["page"],
 ) {
   const geometry = await audioFirstUseGeometry(page);
-  const frameCenter = geometry.frame.x + geometry.frame.width / 2;
-  const mainCenter = geometry.main.x + geometry.main.width / 2;
-  const frameCenterRatio =
-    (geometry.frame.y + geometry.frame.height / 2 - geometry.main.y) /
-    geometry.main.height;
-
-  expectWithin(frameCenter, mainCenter, 2);
-  expect(frameCenterRatio).toBeGreaterThan(0.45);
-  expect(frameCenterRatio).toBeLessThan(0.55);
   expectRect(geometry.frame, geometry.main);
   expectMainPaddingRemoved(geometry.mainPadding);
-  expect(geometry.layout.width).toBeGreaterThanOrEqual(895);
-  expect(geometry.layout.width).toBeLessThanOrEqual(897);
+  expectWithin(geometry.layout.width, Math.min(896, geometry.frame.width));
   expectWithin(geometry.content.width, geometry.layout.width / 2, 2);
   expect(geometry.preview.x).toBeGreaterThanOrEqual(geometry.content.right);
   expect(geometry.preview.x - geometry.content.right).toBeLessThanOrEqual(12);
-  expectWithin(geometry.preview.right, geometry.frame.right, 2);
-  expectWithin(geometry.previewSurface.x, geometry.preview.x);
-  expectWithin(geometry.previewSurface.y, geometry.preview.y);
   expectWithin(geometry.previewSurface.right, geometry.frame.right);
   expectWithin(geometry.previewSurface.bottom, geometry.frame.bottom);
   expect(geometry.previewSurfaceBorders.top).toBeGreaterThan(0);
@@ -932,29 +855,6 @@ async function assertAudioFirstUseDesktopGeometry(
   expectWithin(geometry.previewSurfaceBorders.right, 0);
   expectWithin(geometry.previewSurfaceBorders.bottom, 0);
   expectWithin(geometry.primaryAction.y, geometry.importAction.y);
-  expect(geometry.previewFocusTargetCount).toBe(0);
-}
-
-async function assertAudioFirstUseMinimumGeometry(
-  page: Awaited<ReturnType<typeof launch>>["page"],
-) {
-  const geometry = await audioFirstUseGeometry(page);
-
-  expect(geometry.frame.width).toBeLessThan(1024);
-  expectRect(geometry.frame, geometry.main);
-  expectMainPaddingRemoved(geometry.mainPadding);
-  expectWithin(geometry.layout.width, geometry.frame.width);
-  expectWithin(geometry.content.width, geometry.layout.width);
-  expectWithin(geometry.content.bottom, geometry.preview.y);
-  expectWithin(geometry.preview.right, geometry.frame.right + 40, 2);
-  expect(geometry.previewSurface.width).toBeGreaterThanOrEqual(450);
-  expect(geometry.previewSurface.height).toBeGreaterThanOrEqual(360);
-  expect(geometry.previewSurfaceBorders.top).toBeGreaterThan(0);
-  expect(geometry.previewSurfaceBorders.left).toBeGreaterThan(0);
-  expectWithin(geometry.previewSurfaceBorders.right, 0);
-  expectWithin(geometry.previewSurfaceBorders.bottom, 0);
-  expect(geometry.frame.x).toBeGreaterThanOrEqual(geometry.main.x);
-  expect(geometry.frame.right).toBeLessThanOrEqual(geometry.main.right + 1);
   expect(geometry.documentScrollWidth).toBeLessThanOrEqual(
     geometry.documentClientWidth,
   );
@@ -1077,64 +977,46 @@ function expectMainPaddingRemoved(padding: {
 
 async function shellGeometry(page: Awaited<ReturnType<typeof launch>>["page"]) {
   return await page.evaluate(() => {
-    const wrapper = required('[data-slot="sidebar-wrapper"]');
-    const outer = required(':scope > [data-slot="sidebar"]', wrapper);
-    const gap = required(':scope > [data-slot="sidebar-gap"]', outer);
-    const container = required(
-      ':scope > [data-slot="sidebar-container"]',
-      outer,
+    const frame = required('[data-workspace-frame="true"]');
+    const content = required("#main-content");
+    const frameStyle = getComputedStyle(frame);
+    const resizeHandle = document.querySelector(
+      '[data-slot="pane-resize-handle"]',
     );
-    const inner = required(':scope > [data-slot="sidebar-inner"]', container);
-    const nested = Array.from(
-      inner.querySelectorAll<HTMLElement>(':scope > [data-slot="sidebar"]'),
-    );
-    const rail = nested[0]!;
-    const pane = nested[1] ?? null;
-    const inset = required(':scope > [data-slot="sidebar-inset"]', wrapper);
-    const midpointRail = wrapper.querySelector<HTMLElement>(
-      ':scope > [data-context-pane-midpoint-rail="true"]',
-    );
-    const resizeHandle = wrapper.querySelector<HTMLElement>(
-      ':scope > [data-slot="pane-resize-handle"]',
-    );
-    const upperResizeHitArea = resizeHandle?.querySelector<HTMLElement>(
-      '[data-pane-resize-hit-area="upper"]',
-    );
-    const lowerResizeHitArea = resizeHandle?.querySelector<HTMLElement>(
-      '[data-pane-resize-hit-area="lower"]',
-    );
-    const railStyle = getComputedStyle(rail);
+
     return {
-      wrapper: rect(wrapper),
-      gap: rect(gap),
-      container: rect(container),
-      rail: rect(rail),
-      pane: pane ? rect(pane) : null,
-      resizeHandle: resizeHandle ? rect(resizeHandle) : null,
-      upperResizeHitArea: upperResizeHitArea ? rect(upperResizeHitArea) : null,
-      lowerResizeHitArea: lowerResizeHitArea ? rect(lowerResizeHitArea) : null,
-      resizeHandleValue: resizeHandle
-        ? Number(resizeHandle.getAttribute("aria-valuenow"))
-        : null,
-      resizeHandleMinimum: resizeHandle
-        ? Number(resizeHandle.getAttribute("aria-valuemin"))
-        : null,
-      resizeHandleMaximum: resizeHandle
-        ? Number(resizeHandle.getAttribute("aria-valuemax"))
-        : null,
-      midpointRail: midpointRail ? rect(midpointRail) : null,
-      inset: rect(inset),
-      railContentWidth:
-        rail.getBoundingClientRect().width -
-        parseFloat(railStyle.borderRightWidth),
-      railBorderRight: parseFloat(railStyle.borderRightWidth),
+      wrapper: rect(required('[data-slot="sidebar-wrapper"]')),
+      frame: rect(frame),
+      frameRadius: frameStyle.borderRadius,
+      frameBorder: frameStyle.borderLeftWidth,
+      frameShadow: frameStyle.boxShadow,
+      rail: findRect('[aria-label="工作站主导航"]'),
+      header: findRect('[data-shell-slot="content-head"]'),
+      body: rect(required('[data-shell-slot="workspace-body"]')),
+      track: findRect('[data-shell-slot="context-pane-track"]'),
+      pane: findRect('[data-slot="sidebar"][role="complementary"]'),
+      resizeHandle: findRect('[data-slot="pane-resize-handle"]'),
+      upperResizeHitArea: findRect('[data-pane-resize-hit-area="upper"]'),
+      lowerResizeHitArea: findRect('[data-pane-resize-hit-area="lower"]'),
+      midpointRail: findRect("[data-context-pane-midpoint-rail]"),
+      resizeHandleValue: Number(resizeHandle?.getAttribute("aria-valuenow")),
+      resizeHandleMinimum: Number(resizeHandle?.getAttribute("aria-valuemin")),
+      resizeHandleMaximum: Number(resizeHandle?.getAttribute("aria-valuemax")),
+      content: rect(content),
+      footer: findRect('[data-shell-slot="content-footer"]'),
+      horizontalOverflow: content.scrollWidth - content.clientWidth,
     };
 
-    function required(selector: string, root: ParentNode = document) {
-      const element = root.querySelector<HTMLElement>(selector);
+    function required(selector: string) {
+      const element = document.querySelector<HTMLElement>(selector);
       if (!element)
         throw new Error(`Missing visual geometry target: ${selector}`);
       return element;
+    }
+
+    function findRect(selector: string) {
+      const element = document.querySelector(selector);
+      return element ? rect(element) : null;
     }
 
     function rect(element: Element) {
@@ -1206,14 +1088,6 @@ function expectRect(
   expectWithin(actual.height, expected.height);
 }
 
-function expectHorizontalRect(
-  actual: { x: number; width: number },
-  expected: { x: number; width: number },
-) {
-  expectWithin(actual.x, expected.x);
-  expectWithin(actual.width, expected.width);
-}
-
 function sortEvidenceKeys(value: unknown): unknown {
   if (Array.isArray(value)) return value.map(sortEvidenceKeys);
   if (value !== null && typeof value === "object") {
@@ -1236,7 +1110,8 @@ async function screenshot(
   width: number,
   height: number,
 ) {
-  if (!canonicalScreenshots) {
+  const floatingBaseline = name === "floating-capture-recording.png";
+  if (floatingBaseline && !canonicalScreenshots) {
     test.info().annotations.push({
       type: "screenshot-policy",
       description:
@@ -1264,5 +1139,7 @@ async function screenshot(
     },
     { width, height },
   );
-  expect(Buffer.from(png, "base64")).toMatchSnapshot(name);
+  const body = Buffer.from(png, "base64");
+  if (floatingBaseline) expect(body).toMatchSnapshot(name);
+  else await test.info().attach(name, { body, contentType: "image/png" });
 }

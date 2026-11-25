@@ -82,103 +82,43 @@ describe("render-backed shell frame", () => {
     );
 
     const wrapper = container.querySelector('[data-slot="sidebar-wrapper"]')!;
-    expect(
-      Array.from(wrapper.children).map((child) =>
-        child.getAttribute("data-slot"),
-      ),
-    ).toEqual([
-      "sidebar",
-      "pane-resize-handle",
-      "sidebar-rail",
-      "sidebar-inset",
-    ]);
-    const sidebarInner = wrapper.querySelector('[data-slot="sidebar-inner"]')!;
     const navigation = screen.getByRole("navigation", { name: "工作站主导航" });
+    const main = screen.getByRole("main");
+    const header = main.querySelector('[data-shell-slot="content-head"]');
+    const body = main.querySelector('[data-shell-slot="workspace-body"]');
+    const track = body?.querySelector('[data-shell-slot="context-pane-track"]');
     const context = screen.getByRole("complementary", {
       name: "音频上下文面板",
     });
-    expect(Array.from(sidebarInner.children)).toEqual([navigation, context]);
-    expect(
-      Array.from(context.children).map((child) =>
-        child.getAttribute("data-shell-slot"),
-      ),
-    ).toEqual([
-      "context-head",
-      "context-search",
-      "context-filters",
-      "context-list",
-      "context-footer",
-    ]);
-    const main = screen.getByRole("main");
-    expect(
-      Array.from(main.children).map((child) =>
-        child.getAttribute("data-shell-slot"),
-      ),
-    ).toEqual(["content-head", "content-notice", "content"]);
-    expect(
-      main.querySelector('[data-shell-slot="page-actions"]'),
-    ).toContainElement(screen.getByRole("button", { name: "页面操作" }));
-    expect(main.querySelector('[data-shell-slot="content"]')).toContainElement(
-      screen.getByText("内容夹具"),
+
+    expect(Array.from(wrapper.children)).toEqual([navigation, main]);
+    expect(Array.from(main.children)).toEqual([header, body]);
+    expect(main).toHaveAttribute("data-workspace-frame", "true");
+    expect(header).toHaveTextContent("音频");
+    expect(header).toContainElement(
+      screen.getByRole("heading", { name: "夹具标题" }),
     );
-    expect(main.querySelector('[data-shell-slot="content-head"]')).toHaveClass(
-      "px-(--spacing-shell-header-inline)",
-      "gap-1.5",
+    expect(header).toContainElement(
+      screen.getByRole("button", { name: "页面操作" }),
     );
-    expect(screen.queryByRole("button", { name: "前进" })).toBeNull();
-    expect(
-      main.querySelector(
-        '[data-shell-slot="content-head"] [data-slot="separator"]',
-      ),
-    ).toBeNull();
-    expect(screen.queryByRole("button", { name: /返回/ })).toBeNull();
-    expect(screen.getByRole("heading", { level: 1 })).toHaveClass(
-      "min-w-0",
-      "flex-1",
-      "font-semibold",
-      "leading-snug",
+    expect(track).toContainElement(context);
+    expect(within(context).queryByRole("heading", { name: "音频" })).toBeNull();
+    expect(context).toContainElement(
+      screen.getByRole("button", { name: "新录音" }),
     );
-    expect(wrapper).toHaveStyle({
-      "--sidebar-width": "350px",
-      "--sidebar-width-icon": "48px",
-    });
-    expect(
+    expect(context).toContainElement(
+      screen.getByRole("searchbox", { name: "搜索夹具" }),
+    );
+    expect(context).toContainElement(screen.getByText("列表页脚"));
+    expect(body).toContainElement(screen.getByText("内容夹具"));
+    expect(body).toContainElement(screen.getByText("状态提示"));
+    expect(track).toContainElement(
       screen.getByRole("button", { name: "收起音频上下文面板" }),
-    ).toHaveAttribute("data-variant", "handle");
-    expect(
-      screen.getByRole("separator", {
-        name: "调整音频上下文面板宽度",
-      }),
-    ).toHaveStyle({ left: "var(--sidebar-width)" });
-    expect(context).toHaveClass(
-      "w-[calc(var(--sidebar-width)-var(--sidebar-width-icon)-2px)]!",
     );
-    expect(
-      context.querySelector('[data-shell-slot="context-filters"]'),
-    ).toHaveClass("h-[37px]", "px-(--spacing-context-compact)");
-    expect(
-      context.querySelector('[data-shell-slot="context-head"] > div'),
-    ).toHaveClass(
-      "gap-(--spacing-context-compact)",
-      "px-(--spacing-context-inline)",
+    expect(track).toContainElement(
+      screen.getByRole("separator", { name: "调整音频上下文面板宽度" }),
     );
-    expect(
-      context.querySelector('[data-shell-slot="context-search"] > div > div'),
-    ).toHaveClass(
-      "px-(--spacing-context-compact)",
-      "pt-(--spacing-context-tight)",
-      "pb-(--spacing-context-compact)",
-    );
-    expect(
-      context.querySelector('[data-shell-slot="context-footer"]'),
-    ).toHaveClass("p-(--spacing-context-compact)");
-    // The public render uses a 48px collapsed prefix, not the previous +1px overlay gap.
-    expect(wrapper.querySelector('[data-slot="sidebar-gap"]')).not.toHaveClass(
-      "!w-[calc(var(--sidebar-width-icon)+1px)]",
-    );
-    expect(main).not.toHaveClass(
-      "ml-[calc(var(--sidebar-width)-var(--sidebar-width-icon)-1px)]",
-    );
+    expect(screen.queryByRole("button", { name: /返回|前进/ })).toBeNull();
   });
 
   it("replaces the default title and composes a fixed single-row footer outside the scroll owner", () => {
@@ -209,7 +149,10 @@ describe("render-backed shell frame", () => {
     const header = main.querySelector('[data-shell-slot="content-head"]');
     const content = main.querySelector('[data-shell-slot="content"]');
     const footer = main.querySelector('[data-shell-slot="content-footer"]');
-    expect(Array.from(main.children)).toEqual([header, content, footer]);
+    const body = main.querySelector('[data-shell-slot="workspace-body"]');
+    expect(Array.from(main.children)).toEqual([header, body]);
+    expect(content?.parentElement).toBe(footer?.parentElement);
+    expect(content?.nextElementSibling).toBe(footer);
     expect(header).toHaveClass(
       "h-[50px]",
       "shrink-0",
@@ -303,17 +246,13 @@ describe("render-backed shell frame", () => {
   });
 
   it("suppresses pane transitions only while the primary section changes", () => {
-    const transitionsAtLayout: string[][] = [];
+    const transitionsAtLayout: string[] = [];
     const layoutRead = vi
       .spyOn(HTMLElement.prototype, "offsetWidth", "get")
       .mockImplementation(function (this: HTMLElement) {
-        const container = this.parentElement?.querySelector<HTMLElement>(
-          '[data-slot="sidebar-container"]',
-        );
-        transitionsAtLayout.push([
-          this.style.transition,
-          container?.style.transition ?? "",
-        ]);
+        if (this.matches('[data-shell-slot="context-pane-track"]')) {
+          transitionsAtLayout.push(this.style.transition);
+        }
         return 0;
       });
 
@@ -338,53 +277,26 @@ describe("render-backed shell frame", () => {
     );
 
     const view = render(frame("audio", true));
-    const gap = () => view.container.querySelector('[data-slot="sidebar-gap"]');
-    const container = () =>
-      view.container.querySelector('[data-slot="sidebar-container"]');
-    expect(gap()).not.toHaveClass("transition-none");
-    expect(container()).not.toHaveClass("transition-none");
-    expect(layoutRead).not.toHaveBeenCalled();
+    const track = view.container.querySelector<HTMLElement>(
+      '[data-shell-slot="context-pane-track"]',
+    )!;
+    expect(transitionsAtLayout).toEqual([]);
 
     view.rerender(frame("settings", false));
-    expect(layoutRead).toHaveBeenCalledOnce();
-    expect(transitionsAtLayout).toEqual([["none", "none"]]);
-    expect((gap() as HTMLElement).style.transition).toBe("");
-    expect((container() as HTMLElement).style.transition).toBe("");
-    expect(gap()).toHaveClass("transition-[width]", "duration-200");
-    expect(container()).toHaveClass(
-      "transition-[left,right,width]",
-      "duration-200",
-    );
+    expect(transitionsAtLayout).toEqual(["none"]);
+    expect(track.style.transition).toBe("");
+    expect(track).toHaveAttribute("data-state", "closed");
 
     view.rerender(frame("audio", true));
-    expect(layoutRead).toHaveBeenCalledTimes(2);
-    expect(transitionsAtLayout).toEqual([
-      ["none", "none"],
-      ["none", "none"],
-    ]);
-    expect((gap() as HTMLElement).style.transition).toBe("");
-    expect((container() as HTMLElement).style.transition).toBe("");
-    expect(gap()).toHaveClass("transition-[width]", "duration-200");
-    expect(container()).toHaveClass(
-      "transition-[left,right,width]",
-      "duration-200",
-    );
+    expect(transitionsAtLayout).toEqual(["none", "none"]);
+    expect(track.style.transition).toBe("");
+    expect(track).toHaveAttribute("data-state", "open");
 
     view.rerender(frame("audio", false));
-    expect(layoutRead).toHaveBeenCalledTimes(2);
-    expect(gap()).toHaveClass("transition-[width]", "duration-200");
-    expect(container()).toHaveClass(
-      "transition-[left,right,width]",
-      "duration-200",
-    );
-
     view.rerender(frame("audio", true));
-    expect(layoutRead).toHaveBeenCalledTimes(2);
-    expect(gap()).toHaveClass("transition-[width]", "duration-200");
-    expect(container()).toHaveClass(
-      "transition-[left,right,width]",
-      "duration-200",
-    );
+    expect(transitionsAtLayout).toEqual(["none", "none"]);
+    expect(track).toHaveClass("transition-[width]");
+    layoutRead.mockRestore();
   });
 
   it("keeps controlled pane contents mounted and omits empty optional bands", async () => {
@@ -460,9 +372,10 @@ describe("render-backed shell frame", () => {
     expect(pane).toHaveAttribute("inert");
     expect(pane).toHaveAttribute("aria-hidden", "true");
     expect(input).toHaveValue("保留值");
-    expect(paneTriggerRef.current).toHaveStyle({
-      left: "var(--sidebar-width-icon)",
-    });
+    expect(paneTriggerRef.current).toHaveAttribute("aria-expanded", "false");
+    expect(
+      pane?.closest('[data-shell-slot="context-pane-track"]'),
+    ).toHaveAttribute("data-state", "closed");
     paneTriggerRef.current?.focus();
     expect(paneTriggerRef.current).toHaveFocus();
     view.rerender(frame(true));
@@ -682,8 +595,31 @@ describe("application shell", () => {
       await screen.findByRole("button", { name: "打开 音频 A.wav" }),
     );
     await user.click(screen.getByRole("button", { name: "打开 音频 B.wav" }));
-    expect(
+    const header = screen
+      .getByRole("main")
+      .querySelector<HTMLElement>('[data-shell-slot="content-head"]')!;
+    expect(header).toContainElement(
       screen.getByRole("heading", { level: 1, name: "音频 B.wav" }),
+    );
+    expect(header).toContainElement(
+      screen.getByRole("button", { name: "导出" }),
+    );
+    const editTitle = within(header).getByRole("button", {
+      name: "编辑音频标题",
+    });
+    expect(screen.getAllByRole("button", { name: "编辑音频标题" })).toEqual([
+      editTitle,
+    ]);
+    await user.click(editTitle);
+    expect(
+      within(header).getByRole("textbox", { name: "音频标题" }),
+    ).toHaveFocus();
+    await user.keyboard("{Escape}");
+    expect(
+      within(header).getByRole("button", { name: "编辑音频标题" }),
+    ).toHaveFocus();
+    expect(
+      screen.getByRole("complementary", { name: "音频上下文面板" }),
     ).toBeVisible();
     expect(screen.queryByRole("button", { name: /返回/ })).toBeNull();
 
@@ -953,11 +889,10 @@ describe("application shell", () => {
       screen.getByRole("complementary", { name: "音频上下文面板" }),
     ).toHaveAttribute("data-presentation", "docked");
 
-    const outer = navigation.closest<HTMLElement>(
-      '[data-slot="sidebar-inner"]',
-    )?.parentElement;
-    expect(outer).toHaveAttribute("data-slot", "sidebar-container");
-    expect(outer).toHaveClass("flex");
+    expect(screen.getByRole("main")).toContainElement(
+      screen.getByRole("complementary", { name: "音频上下文面板" }),
+    );
+    expect(screen.getByRole("main")).not.toContainElement(navigation);
     expect(document.querySelector('[data-mobile="true"]')).toBeNull();
   });
 
@@ -999,7 +934,7 @@ describe("application shell", () => {
     ).not.toBeInTheDocument();
   });
 
-  it("uses the render-backed nested shell geometry and landmarks", async () => {
+  it("uses the framed workspace landmarks and preserves settings state", async () => {
     const getLocalModelSnapshot = vi.fn(async () => localModelSnapshot);
     const onLocalModelSnapshot = vi.fn(() => () => undefined);
     const api = installApi(
@@ -1016,47 +951,18 @@ describe("application shell", () => {
 
     const wrapper = document.querySelector<HTMLElement>(
       '[data-slot="sidebar-wrapper"]',
-    );
-    expect(wrapper).not.toBeNull();
-    expect(wrapper!.style.getPropertyValue("--sidebar-width")).toBe("370px");
+    )!;
+    expect(wrapper.style.getPropertyValue("--sidebar-width")).toBe("63px");
     const resizeHandle = screen.getByRole("separator", {
       name: "调整音频上下文面板宽度",
     });
-    expect(resizeHandle).toHaveAttribute("aria-valuenow", "320");
+    expect(resizeHandle).toHaveAttribute("aria-valuenow", "300");
     fireEvent.keyDown(resizeHandle, { key: "ArrowRight" });
-    await waitFor(() =>
-      expect(wrapper!.style.getPropertyValue("--sidebar-width")).toBe("380px"),
-    );
-    expect(resizeHandle).toHaveAttribute("aria-valuenow", "330");
+    expect(resizeHandle).toHaveAttribute("aria-valuenow", "310");
 
-    const outer = wrapper!.querySelector<HTMLElement>(
-      ':scope > [data-slot="sidebar"]',
-    );
-    expect(outer).toHaveAttribute("data-state", "expanded");
-    expect(outer).toHaveAttribute("data-collapsible", "");
-
-    const container = outer!.querySelector<HTMLElement>(
-      ':scope > [data-slot="sidebar-container"]',
-    );
-    expect(container).toHaveAttribute("data-presentation", "docked");
-    expect(container).toHaveClass("overflow-hidden");
-
-    const inner = container!.querySelector<HTMLElement>(
-      ':scope > [data-slot="sidebar-inner"]',
-    );
-    const nestedSidebars = inner!.querySelectorAll<HTMLElement>(
-      ':scope > [data-slot="sidebar"]',
-    );
-    expect(nestedSidebars).toHaveLength(2);
-
-    const navigation = screen.getByRole("navigation", {
-      name: "工作站主导航",
-    });
-    expect(navigation).toBe(nestedSidebars[0]);
-    expect(navigation).toHaveClass(
-      "w-[calc(var(--sidebar-width-icon)+1px)]!",
-      "border-r",
-    );
+    const navigation = screen.getByRole("navigation", { name: "工作站主导航" });
+    expect(navigation.parentElement).toBe(wrapper);
+    expect(screen.getByRole("main")).not.toContainElement(navigation);
     expect(
       within(navigation)
         .getByLabelText("Voice2Text")
@@ -1106,13 +1012,8 @@ describe("application shell", () => {
     expect(contextTrigger).toHaveClass("h-12", "w-7");
     expect(pane).not.toContainElement(contextTrigger);
 
-    expect(pane).toBe(nestedSidebars[1]);
+    expect(screen.getByRole("main")).toContainElement(pane);
     expect(pane).toHaveAttribute("data-presentation", "docked");
-    expect(pane).toHaveClass(
-      "w-[calc(var(--sidebar-width)-var(--sidebar-width-icon)-2px)]!",
-      "shrink-0",
-    );
-    expect(pane).not.toHaveClass("flex-1");
     const fixedPaneHeader = pane.querySelector<HTMLElement>(
       "[data-context-pane-fixed-header]",
     );
@@ -1167,19 +1068,7 @@ describe("application shell", () => {
     const mains = screen.getAllByRole("main");
     expect(mains).toHaveLength(1);
     expect(mains[0]!).toHaveAttribute("data-slot", "sidebar-inset");
-    expect(mains[0]).toHaveClass("z-30", "min-w-0", "overflow-hidden");
-    expect(document.querySelector('[data-slot="sidebar-gap"]')).toHaveClass(
-      "transition-[width]",
-      "duration-200",
-      "ease-linear",
-    );
-    expect(
-      document.querySelector('[data-slot="sidebar-container"]'),
-    ).toHaveClass(
-      "transition-[left,right,width]",
-      "duration-200",
-      "ease-linear",
-    );
+    expect(mains[0]).toHaveAttribute("data-workspace-frame", "true");
     expect(document.getElementById("main-content")?.tagName).toBe("DIV");
     expect(document.getElementById("main-content")).not.toHaveClass(
       "p-(--spacing-shell-page)",
@@ -1189,19 +1078,14 @@ describe("application shell", () => {
 
     await user.click(within(navigation).getByRole("button", { name: "设置" }));
     await waitFor(() => expect(api.navigate).toHaveBeenCalledWith("settings"));
-    expect(outer).toHaveAttribute("data-state", "expanded");
-    expect(
-      inner!.querySelectorAll(':scope > [data-slot="sidebar"]'),
-    ).toHaveLength(2);
     const settingsPane = screen.getByRole("complementary", {
       name: "设置上下文面板",
     });
     expect(settingsPane).toBeVisible();
+    expect(screen.getByRole("main")).toContainElement(settingsPane);
     expect(
-      screen
-        .getByRole("complementary", { name: "设置上下文面板" })
-        .querySelector("[data-context-pane-fixed-header]"),
-    ).toHaveClass("h-[50px]");
+      within(settingsPane).queryByRole("heading", { name: "设置" }),
+    ).toBeNull();
     expect(
       within(navigation).getByLabelText("个人中心（即将推出）"),
     ).toHaveAttribute("data-shell-profile-placeholder", "true");
@@ -1704,11 +1588,9 @@ describe("application shell", () => {
     expect(
       screen.queryByRole("separator", { name: /音频上下文面板宽度/ }),
     ).not.toBeInTheDocument();
-    expect(document.querySelector('[data-slot="sidebar-gap"]')).toHaveClass(
-      "group-data-[collapsible=icon]:w-(--sidebar-width-icon)",
-    );
-    expect(screen.getByRole("main")).not.toHaveClass(
-      "ml-[calc(var(--sidebar-width)-var(--sidebar-width-icon)-1px)]",
+    expect(screen.getByRole("main")).toHaveAttribute(
+      "data-workspace-frame",
+      "true",
     );
     expect(writes).not.toHaveBeenCalled();
     expect(
@@ -1754,10 +1636,8 @@ describe("application shell", () => {
           }),
         ).toBeVisible();
         expect(
-          document.querySelector(
-            '[data-slot="sidebar-wrapper"] > [data-slot="sidebar"]',
-          ),
-        ).toHaveAttribute("data-state", "expanded");
+          document.querySelector('[data-shell-slot="context-pane-track"]'),
+        ).toHaveAttribute("data-state", "open");
       } else {
         expect(
           await screen.findByRole("button", { name: "打开音频上下文面板" }),
@@ -1929,7 +1809,9 @@ describe("application shell", () => {
     });
     fireEvent.keyDown(resizeHandle, { key: "ArrowRight" });
     await waitFor(() =>
-      expect(wrapper.style.getPropertyValue("--sidebar-width")).toBe("380px"),
+      expect(wrapper.style.getPropertyValue("--context-pane-width")).toBe(
+        "310px",
+      ),
     );
 
     api.navigateMock.mockClear();
@@ -1989,7 +1871,9 @@ describe("application shell", () => {
       document.querySelector("[data-context-pane-midpoint-rail]"),
     ).toBeNull();
     expect(screen.queryByRole("button", { name: "后退" })).toBeNull();
-    expect(wrapper.style.getPropertyValue("--sidebar-width")).toBe("380px");
+    expect(wrapper.style.getPropertyValue("--context-pane-width")).toBe(
+      "310px",
+    );
 
     act(() =>
       publish?.({
@@ -2016,7 +1900,9 @@ describe("application shell", () => {
     ).toBeVisible();
     expect(screen.queryByRole("button", { name: /返回/ })).toBeNull();
     expect(screen.queryByRole("button", { name: "关闭录制详情" })).toBeNull();
-    expect(wrapper.style.getPropertyValue("--sidebar-width")).toBe("380px");
+    expect(wrapper.style.getPropertyValue("--context-pane-width")).toBe(
+      "310px",
+    );
   });
 
   it("opens the first saved recording before its list refresh resolves", async () => {
@@ -2309,8 +2195,8 @@ describe("application shell", () => {
     ).toBeVisible();
     expect(
       screen
-        .getByRole("complementary", { name: "设置上下文面板" })
-        .querySelector("[data-context-pane-fixed-header]"),
+        .getByRole("main")
+        .querySelector('[data-shell-slot="content-head"]'),
     ).toHaveClass("h-[50px]");
     expect(writes).not.toHaveBeenCalled();
 
@@ -2320,8 +2206,8 @@ describe("application shell", () => {
     ).toBeVisible();
     expect(
       screen
-        .getByRole("complementary", { name: "互联上下文面板" })
-        .querySelector("[data-context-pane-fixed-header]"),
+        .getByRole("main")
+        .querySelector('[data-shell-slot="content-head"]'),
     ).toHaveClass("h-[50px]");
     expect(document.getElementById("main-content")).toHaveClass(
       "p-(--spacing-shell-page)",
